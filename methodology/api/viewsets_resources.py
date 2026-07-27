@@ -416,7 +416,6 @@ class PIPViewSet(viewsets.GenericViewSet):
                 relationship_type=request.data.get('relationship_type', ''),
                 source_entity_ref=request.data.get('source_entity_ref', ''),
                 target_entity_ref=request.data.get('target_entity_ref', ''),
-                display_order=request.data.get('display_order'),
             )
         except ProcessImprovementProposal.DoesNotExist:
             return Response({"error": f"PIP {pk} not found"}, status=status.HTTP_404_NOT_FOUND)

@@ -1274,7 +1274,6 @@ def add_pip_change(
     relationship_type: str = "",
     source_entity_ref: str = "",
     target_entity_ref: str = "",
-    display_order: Optional[int] = None,
 ) -> dict:
     """
     Add a typed change row to a Draft PIP.
@@ -1284,8 +1283,8 @@ def add_pip_change(
               ADD Activity: parent_workflow_id OR parent_workflow_ref (pk or #slug).
               ADD Artifact: produced_by_activity_ref required.
               Optionally set internal_ref="#slug" for later LINK/ref rows in this PIP.
-    - ALTER : entity_type + target_id + at least one of name/content/display_order required.
-              Activity: optional phase_ref (pk or #slug), optional display_order (1-based position).
+    - ALTER : entity_type + target_id + at least one of name/content required.
+              Activity: optional phase_ref (pk or #slug).
     - DROP  : entity_type + target_id + rationale in content.
     - LINK  : relationship_type + source_entity_ref + target_entity_ref (entity_type="").
     - UNLINK: same as LINK.
@@ -1293,7 +1292,7 @@ def add_pip_change(
     entity_type (ADD/ALTER/DROP): Workflow, Activity, Phase, Skill, Agent, Rule, Artifact.
 
     relationship_type (LINK/UNLINK): skill_activity, rule_activity, agent_activity,
-    activity_workflow, artifact_activity, activity_predecessor.
+    activity_workflow, artifact_activity.
 
     Full subtree recipe (call add_pip_change in order):
       1. ADD Phase       internal_ref="#phase1"  name="Construction"
@@ -1358,8 +1357,6 @@ def add_pip_change(
         payload["source_entity_ref"] = source_entity_ref
     if target_entity_ref:
         payload["target_entity_ref"] = target_entity_ref
-    if display_order is not None:
-        payload["display_order"] = display_order
     r = get_client().post(f"/api/pips/{pip_id}/changes/", json=payload)
     return check_response(r, "add_pip_change")
 
