@@ -191,6 +191,32 @@ class TestPhaseDetailView:
         
         # Assert — guest read allowed but private draft playbook is not visible
         assert response.status_code == 404
+
+    def test_phase_detail_anonymous_public_released_returns_200(self, client):
+        """Guest can view phase detail on released public playbook."""
+        from decimal import Decimal
+
+        user = User.objects.create_user(username='pubowner', password='testpass123')
+        playbook = Playbook.objects.create(
+            name='Public Released PB',
+            description='Guest readable',
+            category='development',
+            author=user,
+            visibility='public',
+            status='released',
+            version=Decimal('1.0'),
+        )
+        phase = Phase.objects.create(
+            playbook=playbook,
+            name='Guest Phase',
+            description='Test',
+            order=1,
+        )
+        url = reverse('phase_detail', kwargs={'playbook_pk': playbook.pk, 'phase_pk': phase.pk})
+        response = client.get(url)
+        assert response.status_code == 200
+        assert b'Guest Phase' in response.content
+        assert b'data-testid="edit-button"' not in response.content
     
     def test_phase_detail_permission_denied_for_other_user(self, client):
         """Phase detail returns 404 when user doesn't own the playbook."""

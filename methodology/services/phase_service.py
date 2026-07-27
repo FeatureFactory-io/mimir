@@ -293,7 +293,11 @@ class PhaseService:
             >>> len(result['workflow_activities'])
             3  # 3 workflows have activities in this phase
         """
-        logger.info(f"Getting phase {phase_id} with activities for user {user.email}")
+        logger.info(
+            "Getting phase %s with activities for user %s",
+            phase_id,
+            getattr(user, "email", None) or getattr(user, "username", "anonymous"),
+        )
         
         try:
             phase = Phase.objects.select_related('playbook').get(id=phase_id)
