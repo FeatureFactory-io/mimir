@@ -10,10 +10,13 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 
 from methodology.models import Playbook, Skill
 from methodology.services.skill_service import SkillService
+from methodology.utils.guest_auth import guest_read_or_login_required
+from methodology.utils.playbook_access import playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -27,26 +30,8 @@ logger = logging.getLogger(__name__)
 # ==================== HELPERS ====================
 
 def _get_playbook_or_deny(request, playbook_pk):
-    """
-    Retrieve playbook and verify view access (owner, team share, or public).
-
-    :param request: Django request object
-    :param playbook_pk: Playbook primary key
-    :returns: Playbook instance or None (caller should redirect)
-    :rtype: Playbook | None
-    """
-    playbook = get_object_or_404(Playbook, pk=playbook_pk)
-
-    if not playbook.can_view(request.user):
-        logger.warning(
-            "User %s denied access to playbook %s (no view access)",
-            request.user.username,
-            playbook_pk,
-        )
-        messages.error(request, "You don't have permission to access this playbook.")
-        return None
-
-    return playbook
+    """Return playbook if readable; else Http404 (no existence leak)."""
+    return playbook_readable_or_404(request, playbook_pk)
 
 
 def _get_skill_in_playbook(playbook, skill_pk):
@@ -63,29 +48,42 @@ def _get_skill_in_playbook(playbook, skill_pk):
 
 # ==================== GLOBAL LIST ====================
 
-@login_required
+@guest_read_or_login_required
 def skill_list_global(request):
     """
     Global skills list — all skills across all playbooks owned by the user.
 
     Supports search via ?q= query parameter.
+    Anonymous guests see skills from released public playbooks only.
 
     Template: skills/list.html
     Template Context:
         - skills: QuerySet of Skill instances
         - query: Current search string
         - total_count: Total skills before filtering
+        - is_guest_browse: True for anonymous session
 
     :param request: Django request object
     :return: Rendered global list template
     """
     query = request.GET.get('q', '').strip()
-    skills = SkillService.search_skills(query=query, user=request.user)
-    total_count = SkillService.search_skills(query='', user=request.user).count()
+
+    if request.user.is_authenticated:
+        skills = SkillService.search_skills(query=query, user=request.user)
+        total_count = SkillService.search_skills(query='', user=request.user).count()
+        is_guest_browse = False
+        user_label = request.user.username
+    else:
+        from methodology.services.guest_browse_service import list_global_skills_for_guest
+
+        skills = list_global_skills_for_guest(query=query or None)
+        total_count = list_global_skills_for_guest().count()
+        is_guest_browse = True
+        user_label = "anonymous"
 
     logger.info(
         "User %s viewing global skill list%s",
-        request.user.username,
+        user_label,
         f", query={query!r}" if query else '',
     )
 
@@ -93,6 +91,7 @@ def skill_list_global(request):
         'skills': skills,
         'query': query,
         'total_count': total_count,
+        'is_guest_browse': is_guest_browse,
     }
     return render(request, 'skills/list.html', context)
 
@@ -118,8 +117,6 @@ def skill_list(request, playbook_pk):
     :return: Rendered list template or redirect
     """
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
 
     query = request.GET.get('q', '').strip()
     domain_filter = request.GET.get('domain', '').strip()
@@ -178,8 +175,6 @@ def skill_create(request, playbook_pk):
     :return: Rendered form or redirect
     """
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
 
     if not playbook.can_edit(request.user):
         messages.error(request, "You don't have permission to create skills in this playbook.")
@@ -214,7 +209,7 @@ def skill_create(request, playbook_pk):
 
 # ==================== DETAIL ====================
 
-@login_required
+@guest_read_or_login_required
 def skill_detail(request, playbook_pk, skill_pk):
     """
     View skill detail page with metadata and activity references.
@@ -232,22 +227,25 @@ def skill_detail(request, playbook_pk, skill_pk):
     :return: Rendered detail template or redirect
     """
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
 
     skill = _get_skill_in_playbook(playbook, skill_pk)
     activities = SkillService.get_activities_for_skill(skill_pk)
+    can_edit = playbook.can_edit(request.user) if request.user.is_authenticated else False
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
 
     logger.info(
         "User %s viewing skill %s '%s' in playbook %s",
-        request.user.username, skill_pk, skill.title, playbook_pk,
+        user_label, skill_pk, skill.title, playbook_pk,
     )
 
     context = {
         'playbook': playbook,
         'skill': skill,
         'activities': activities,
-        'can_edit': playbook.can_edit(request.user),
+        'can_edit': can_edit,
+        'is_guest_browse': not request.user.is_authenticated,
     }
     if request.GET.get('embed') == '1':
         return render(request, 'skills/_embed.html', context)
@@ -278,8 +276,6 @@ def skill_edit(request, playbook_pk, skill_pk):
     :return: Rendered form or redirect
     """
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
 
     if not playbook.can_edit(request.user):
         messages.error(request, "You don't have permission to edit skills in this playbook.")
@@ -335,8 +331,6 @@ def skill_delete_confirm(request, playbook_pk, skill_pk):
     :return: Rendered modal partial
     """
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
 
     skill = _get_skill_in_playbook(playbook, skill_pk)
     activities = SkillService.get_activities_for_skill(skill_pk)
@@ -367,8 +361,6 @@ def skill_delete(request, playbook_pk, skill_pk):
     :return: Redirect to playbook skill list
     """
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
 
     if not playbook.can_edit(request.user):
         messages.error(request, "You don't have permission to delete skills in this playbook.")

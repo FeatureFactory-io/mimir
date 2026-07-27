@@ -169,15 +169,14 @@ class TestPlaybookList:
         assert 'UX Research Methodology' in content
         assert 'Design System Patterns' in content
     
-    def test_pb_list_10_login_required(self):
-        """PB-LIST-10: Login required to view playbooks list."""
+    def test_pb_list_10_guest_may_browse_public_list(self):
+        """PB-LIST-10: Anonymous guests may browse released public playbooks."""
         client = Client()
-        
+
         response = client.get(reverse('playbook_list'))
-        
-        # Should redirect to login
-        assert response.status_code == 302
-        assert '/auth/user/login/' in response.url
+
+        assert response.status_code == 200
+        assert b'data-testid="guest-auth-banner"' in response.content
 
 
 @pytest.mark.django_db

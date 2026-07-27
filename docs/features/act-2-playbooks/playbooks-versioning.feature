@@ -4,6 +4,10 @@ Feature: Playbook Versioning and Lifecycle Management
     And controlled change management for released playbooks
     So that I can iterate freely during development but maintain stability in production
 
+  # Guest read of released public playbooks: History tab is read-only per playbooks-view.feature (04d).
+  # Guests cannot access edit URLs (EDIT_PLAYBOOK-26/27) or release flows — login required.
+  # Version auto-increment and release remain owner/MCP-only; no guest scenarios in this file.
+
   Background:
     Given I am logged in as "maria@ux.com"
     And I am on the playbooks list page

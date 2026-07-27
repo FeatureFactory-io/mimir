@@ -244,24 +244,59 @@ class TestFullPageUnchanged:
         self._assert_full_page(client_auth.get(url))
 
 
+@pytest.fixture
+def public_released_playbook(user, db):
+    pb = Playbook.objects.create(
+        name='PublicReleasedEmbed',
+        description='For guest embed tests',
+        category='development',
+        status='released',
+        version='1.0',
+        visibility='public',
+        source='owned',
+        author=user,
+    )
+    return pb
+
+
+@pytest.fixture
+def public_released_workflow(public_released_playbook):
+    return Workflow.objects.create(
+        playbook=public_released_playbook,
+        name='PublicEmbedWorkflow',
+        description='Workflow for guest embed',
+        order=1,
+    )
+
+
 # ---------------------------------------------------------------------------
-# Anonymous user → 302 redirect to login
+# Anonymous user on public released → 200 embed; private/draft → 404
 # ---------------------------------------------------------------------------
+
+class TestEmbedAnonymousPublicReleased:
+    """Anonymous embed on released public playbooks returns 200 without navbar."""
+
+    def test_playbook_embed_anonymous_public(self, client, public_released_playbook):
+        url = _embed_url(reverse('playbook_detail', kwargs={'pk': public_released_playbook.pk}))
+        response = client.get(url)
+        assert response.status_code == 200
+        assert b'data-testid="main-navbar"' not in response.content
+
 
 class TestEmbedAnonymousRedirects:
-    """Anonymous requests on ?embed=1 URLs redirect to login (login_required)."""
+    """Anonymous requests on private/draft playbooks return 404 (not login redirect)."""
 
-    def test_playbook_embed_anonymous(self, client, playbook):
+    def test_playbook_embed_anonymous_draft(self, client, playbook):
         url = _embed_url(reverse('playbook_detail', kwargs={'pk': playbook.pk}))
-        assert client.get(url).status_code == 302
+        assert client.get(url).status_code == 404
 
-    def test_workflow_embed_anonymous(self, client, playbook, workflow):
+    def test_workflow_embed_anonymous_draft(self, client, playbook, workflow):
         url = _embed_url(
             reverse('workflow_detail', kwargs={'playbook_pk': playbook.pk, 'pk': workflow.pk})
         )
-        assert client.get(url).status_code == 302
+        assert client.get(url).status_code == 404
 
-    def test_activity_embed_anonymous(self, client, playbook, workflow, activity):
+    def test_activity_embed_anonymous_draft(self, client, playbook, workflow, activity):
         url = _embed_url(
             reverse('activity_detail', kwargs={
                 'playbook_pk': playbook.pk,
@@ -269,27 +304,27 @@ class TestEmbedAnonymousRedirects:
                 'activity_pk': activity.pk,
             })
         )
-        assert client.get(url).status_code == 302
+        assert client.get(url).status_code == 404
 
-    def test_skill_embed_anonymous(self, client, playbook, skill):
+    def test_skill_embed_anonymous_draft(self, client, playbook, skill):
         url = _embed_url(
             reverse('skill_detail', kwargs={'playbook_pk': playbook.pk, 'skill_pk': skill.pk})
         )
-        assert client.get(url).status_code == 302
+        assert client.get(url).status_code == 404
 
-    def test_agent_embed_anonymous(self, client, agent):
+    def test_agent_embed_anonymous_draft(self, client, agent):
         url = _embed_url(reverse('agent_detail', kwargs={'pk': agent.pk}))
-        assert client.get(url).status_code == 302
+        assert client.get(url).status_code == 404
 
-    def test_rule_embed_anonymous(self, client, playbook, rule):
+    def test_rule_embed_anonymous_draft(self, client, playbook, rule):
         url = _embed_url(
             reverse('rule_detail', kwargs={'playbook_pk': playbook.pk, 'rule_pk': rule.pk})
         )
-        assert client.get(url).status_code == 302
+        assert client.get(url).status_code == 404
 
-    def test_artifact_embed_anonymous(self, client, artifact):
+    def test_artifact_embed_anonymous_draft(self, client, artifact):
         url = _embed_url(reverse('artifact_detail', kwargs={'pk': artifact.pk}))
-        assert client.get(url).status_code == 302
+        assert client.get(url).status_code == 404
 
 
 # ---------------------------------------------------------------------------

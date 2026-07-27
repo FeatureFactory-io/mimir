@@ -34,3 +34,23 @@ Feature: FOB-PHASES-VIEW_PHASE-1 View Phase Details (OPTIONAL)
     Given Maria is viewing the phase
     When she clicks [Delete Phase]
     Then the FOB-PHASES-DELETE_PHASE-1 modal appears
+
+  # ============================================================
+  # GUEST ACCESS — anonymous read-only phase view (@guest_access)
+  # ============================================================
+
+  Scenario: FOB-PHASES-VIEW_PHASE-06 Guest views phase in public released playbook read-only
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    And the playbook has phase "Planning" in workflow "Component Development"
+    When Bob GET the phase detail URL for "Planning"
+    Then he sees phase name "Planning"
+    And he sees phase description and order
+    And he sees activities assigned to this phase
+    And he does not see [Edit Phase] or [Delete Phase]
+
+  Scenario: FOB-PHASES-VIEW_PHASE-07 Guest cannot view phase in private playbook
+    Given Bob is not logged in
+    And Mike owns a Private Released playbook with phase "Secret Phase"
+    When Bob GET the phase detail URL for "Secret Phase"
+    Then the response status is HTTP 404

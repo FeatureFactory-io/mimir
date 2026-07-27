@@ -5,6 +5,9 @@
 {% block title %}Phases{% endblock %}
 
 {% block content %}
+{% if is_guest_browse %}
+  {% include "partials/guest_auth_banner.html" %}
+{% endif %}
 <div data-testid="phases-list-global">
     <div class="hg-page-header mb-3" data-testid="phases-list-header">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">

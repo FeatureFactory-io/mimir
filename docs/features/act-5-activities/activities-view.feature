@@ -67,3 +67,32 @@ Feature: FOB-ACTIVITIES-VIEW_ACTIVITY-1 View Activity Details
     Given Maria is viewing the activity
     When she clicks [Delete Activity]
     Then the FOB-ACTIVITIES-DELETE_ACTIVITY-1 modal appears
+
+  # ============================================================
+  # GUEST ACCESS — anonymous read-only activity view (@guest_access)
+  # ============================================================
+
+  Scenario: FOB-ACTIVITIES-VIEW_ACTIVITY-10 Guest views activity in public released playbook read-only
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    And the playbook has activity "Setup component structure"
+    When Bob GET the activity detail URL for "Setup component structure"
+    Then he sees activity name "Setup component structure"
+    And he sees rendered guidance markdown
+    And he sees dependencies and input/output artifacts
+    And he does not see [Edit Activity], [Delete Activity], [Change Agent], or [Change Skill]
+
+  Scenario: FOB-ACTIVITIES-VIEW_ACTIVITY-11 Guest cannot view activity in private playbook
+    Given Bob is not logged in
+    And Mike owns a Private Released playbook with activity "Secret Activity"
+    When Bob GET the activity detail URL for "Secret Activity"
+    Then the response status is HTTP 404
+
+  Scenario: FOB-ACTIVITIES-VIEW_ACTIVITY-12 Guest views activity embed without login redirect
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    And the playbook has activity "Setup component structure"
+    When Bob GET the activity embed URL with "?embed=1"
+    Then the response status is HTTP 200
+    And the embed HTML shows activity content without navbar or breadcrumbs
+    And Bob is not redirected to the login page

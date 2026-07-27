@@ -4,6 +4,9 @@
 {% block title %}{{ rule.title }} - {{ playbook.name }}{% endblock %}
 
 {% block content %}
+{% if is_guest_browse %}
+  {% include "partials/guest_auth_banner.html" %}
+{% endif %}
 <div data-testid="rule-detail">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">

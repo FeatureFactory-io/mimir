@@ -88,3 +88,33 @@ Feature: FOB-AGENTS-GLOBAL-LIST-1 Global Agents List and Navigation
     Given Maria is on global agents list
     Then the "Agents" link in main navbar has "active" class
     And it shows she is on the Agents section
+
+  # ============================================================
+  # GUEST ACCESS — anonymous global agents list (@guest_access)
+  # See also: guest-global-entity-lists.feature (FOB-GUEST-GLOBAL-05)
+  # ============================================================
+
+  Scenario: AGENT-GLOBAL-13 Guest navigates to global agents list without login
+    Given Bob is not logged in
+    When Bob opens "/agents/"
+    Then he sees the global agents list page
+    And he sees "All Agents" header
+    And he sees the guest banner with data-testid "guest-auth-banner"
+    And he does not see the authenticated user menu or dashboard link in the full app navbar
+
+  Scenario: AGENT-GLOBAL-14 Guest global agents list shows released-public rows only
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development" with agents
+    And Mike owns a Private Released playbook with agents that must not appear for guests
+    When Bob opens "/agents/"
+    Then he sees agents from "React Frontend Development"
+    And each row shows playbook "React Frontend Development"
+    And he does not see agents from private or non-released-public playbooks
+    And he can [View] an agent to open read-only agent detail
+
+  Scenario: AGENT-GLOBAL-15 Guest cannot create agent from global list
+    Given Bob is not logged in
+    When Bob opens "/agents/"
+    Then [Create New Agent] is absent or redirects to login with "?next="
+    When Bob GET the create-agent URL directly
+    Then he is redirected to the FOB login page

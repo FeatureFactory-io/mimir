@@ -1,10 +1,10 @@
 ---
 name: Anonymous Public Playbooks
-overview: BPE-08 change request to let anonymous users browse public, non-draft playbooks and full read-only content (workflows, activities, artifacts, content browser), discovered via a new landing-page CTA. Documentation updates first; implementation follows test-first in small vertical slices.
+overview: BPE-08 change request to let anonymous users browse public released playbooks (status=released only) and full read-only content—including global entity lists (/workflows/, /activities/, /artifacts/, /skills/, /agents/, /rules/, /phases/) filtered to released public playbooks—discovered via landing-page CTA. Documentation first; test-first implementation in small slices.
 todos:
   # ── Phase 0: Permission spec (source of truth first) ──
   - id: doc-ac-visibility-table
-    content: "playbooks-access-control.md — update Visibility table (Public → anyone incl. anonymous when status≠draft)"
+    content: "playbooks-access-control.md — Visibility table: guests = public+released only; authenticated = public+non-draft; document asymmetry"
     status: pending
   - id: doc-ac-surface-matrix
     content: "playbooks-access-control.md — add Anonymous guest column to Access by surface table"
@@ -21,7 +21,7 @@ todos:
     content: "Section A Context Map — 3–5 file:line refs (playbook.py can_view, playbook_access.py, playbook_service.py, playbook_views.py, test_embed_views.py:252)"
     status: pending
   - id: plan-section-b-dnd
-    content: "Section B Do-Not-Do — no MCP guest, no global lists, no team browse, no anonymous PIPs, no serializer leaks"
+    content: "Section B Do-Not-Do — no MCP guest, no team browse, no anonymous PIPs, no serializer leaks; global lists OK when filtered to guest-readable playbooks"
     status: pending
   - id: plan-section-c-sao
     content: "Section C SAO sections — FOB Authorization, Service layer, HTMX templates, DRF permissions, Cytoscape graph API"
@@ -45,6 +45,12 @@ todos:
     status: pending
   - id: doc-feat-guest-browse-drill
     content: "playbooks-guest-browse.feature — scenarios GUEST-05..08 (drill-down, browser, create/login guards, dashboard guard)"
+    status: pending
+  - id: doc-feat-guest-global-lists
+    content: "Create guest-global-entity-lists.feature — GUEST-GLOBAL-01..07 (anonymous /workflows/ /activities/ /artifacts/ /skills/ /agents/ /rules/ /phases/; released-public only; no Create)"
+    status: pending
+  - id: doc-feat-agents-global-guest
+    content: "agents-global-list.feature — add AGENT-GLOBAL-13..15 (guest list, released-public rows only, Create → login)"
     status: pending
   - id: doc-feat-list-find
     content: "playbooks-list-find.feature — header comment + scenarios LIST+FIND-26..28 (guest list, empty, no Create)"
@@ -125,6 +131,20 @@ todos:
     content: "SAO.md — add Guest read security subsection (404 policy, graph GET, no MCP change)"
     status: pending
 
+  # ── Phase 1: Manual UAT flow (browser replay script) ──
+  - id: doc-uat-journey-map
+    content: "e2e-uat-flow.feature — add J0 row to journey map + optional pre-J1 execution note (guest needs no uat_user login)"
+    status: pending
+  - id: doc-uat-j0-scenarios
+    content: "e2e-uat-flow.feature — add Journey 0 UAT-00-01..07 (landing, guest list, detail, private 404, login gates, content browser, global /workflows/ list)"
+    status: pending
+  - id: doc-uat-visibility-copy
+    content: "e2e-uat-flow.feature — update UAT-03-01/01b visibility-help SEE lines; clarify UAT-03-05 is authenticated cross-user (guest path = J0)"
+    status: pending
+  - id: doc-uat-deviations
+    content: "e2e-uat-flow.feature — DEVIATIONS table row: guest browse is pre-registration evaluation path (no MCP counterpart)"
+    status: pending
+
   # ── Phase 1: Screen flow diagram ──
   - id: doc-drawio-nodes
     content: "screen-flow.drawio MVP tab — add FOB-LANDING-1, FOB-USE-CASES-1 (dashed), FOB-PLAYBOOKS-GUEST-LIST nodes"
@@ -146,16 +166,22 @@ todos:
 
   # ── Phase 3: Services (test-first, one method each) ──
   - id: test-svc-guest-list
-    content: "RED — unit test PlaybookService.list_public_playbooks_for_guest()"
+    content: "RED — unit test list_public_playbooks_for_guest() returns only visibility=public AND status=released (excludes active/disabled/draft)"
     status: pending
   - id: impl-svc-guest-list
     content: "GREEN — skeleton stub then implement list_public_playbooks_for_guest(); run test → evaluate"
     status: pending
   - id: test-svc-public-ids
-    content: "RED — unit test PlaybookService.get_public_playbook_ids()"
+    content: "RED — unit test get_guest_readable_playbook_ids() → released+public only"
     status: pending
   - id: impl-svc-public-ids
-    content: "GREEN — implement get_public_playbook_ids(); run test → evaluate"
+    content: "GREEN — implement get_guest_readable_playbook_ids(); run test → evaluate"
+    status: pending
+  - id: test-can-view-guest-released
+    content: "RED — unit test Playbook.can_view(AnonymousUser): released public OK; active/disabled/draft public → False"
+    status: pending
+  - id: impl-can-view-guest-released
+    content: "GREEN — tighten can_view() anonymous branch to status=released; run test → evaluate"
     status: pending
   - id: test-svc-status-align
     content: "RED — test get_accessible_playbook_ids() public filter uses status≠draft (not released-only)"
@@ -244,6 +270,29 @@ todos:
     content: "RED→GREEN — phase detail guest read; phase_views.py + template; pytest → evaluate"
     status: pending
 
+  # ── Phase 5: Global entity lists (guest read) ──
+  - id: test-impl-global-wf-list
+    content: "RED→GREEN — workflow_global_list guest branch; list_global_workflows_for_guest(); /workflows/ pytest → evaluate"
+    status: pending
+  - id: test-impl-global-act-list
+    content: "RED→GREEN — activity_global_list guest branch; /activities/ pytest → evaluate"
+    status: pending
+  - id: test-impl-global-art-list
+    content: "RED→GREEN — artifact_list_global guest branch; /artifacts/ pytest → evaluate"
+    status: pending
+  - id: test-impl-global-skill-list
+    content: "RED→GREEN — skill_list_global guest branch; /skills/ pytest → evaluate"
+    status: pending
+  - id: test-impl-global-agent-list
+    content: "RED→GREEN — agent_list_global guest branch; /agents/ pytest → evaluate"
+    status: pending
+  - id: test-impl-global-rule-list
+    content: "RED→GREEN — rule_list_global guest branch; /rules/ pytest → evaluate"
+    status: pending
+  - id: test-impl-global-phase-list
+    content: "RED→GREEN — phase_list_global guest branch; /phases/ pytest → evaluate"
+    status: pending
+
   # ── Phase 5: Content browser + graph API ──
   - id: test-cb-guest-access
     content: "RED — update test_content_browser_access.py (guest public OK, private 404)"
@@ -269,7 +318,7 @@ todos:
 
   # ── Phase 6: E2E guest journey + regression ──
   - id: test-guest-journey
-    content: "RED→GREEN — tests/integration/test_guest_playbook_browse.py full landing→browser path"
+    content: "RED→GREEN — tests/integration/test_guest_playbook_browse.py full landing→browser path + test_guest_global_lists.py"
     status: pending
   - id: test-regression
     content: "Run .venv/bin/python -m pytest tests/ — fix failures one file at a time → evaluate"
@@ -289,7 +338,7 @@ isProject: false
 
 ## Change summary
 
-**Goal:** Prospective users can evaluate Mimir playbooks **without registering**, by browsing playbooks where `visibility=public` and `status≠draft`, including all nested read-only content.
+**Goal:** Prospective users can evaluate Mimir playbooks **without registering**, by browsing playbooks where `visibility=public` and `status=released`, including nested read-only content and **global entity lists** (`/workflows/`, `/activities/`, `/artifacts/`, `/skills/`, `/agents/`, `/rules/`, `/phases/`) filtered to entities belonging to those guest-readable playbooks.
 
 **Confirmed scope (your answers):**
 - **In scope:** `visibility=public` + non-draft playbooks only (same rule as today’s cross-user read, minus login)
@@ -339,24 +388,24 @@ Update the visibility and access tables:
 
 | Value | Who can view (new) |
 |-------|-------------------|
-| **Public** | Owner always; **anyone (including anonymous)** when status ≠ draft |
+| **Public** | Owner always; **anonymous guests** when `status=released`; **authenticated users** when status ≠ draft |
 | **Private** | Owner only (unchanged) |
 
 Update **Access by surface** — add **Anonymous guest** column:
 
-| Surface | Public non-draft (anonymous) |
-|---------|------------------------------|
-| FOB GUI list `/playbooks/` | Public playbooks only (no owned section) |
+| Surface | Public released (anonymous guest) |
+|---------|-----------------------------------|
+| FOB GUI list `/playbooks/` | Released public playbooks only (no owned section) |
 | FOB GUI detail + child VIEW pages | Read-only; no Edit/Delete/Create/Release/PIP actions |
-| Content Browser `/browser/<pk>/` | Allowed when playbook is public non-draft |
+| Content Browser `/browser/<pk>/` | Allowed when playbook is released + public |
 | Graph API `GET /api/playbooks/<pk>/graph/` | Same rule (required for browser) |
-| Global lists (`/workflows/`, `/activities/`, …) | **Login required** (avoid leaking private playbook names) |
+| Global lists (`/workflows/`, `/activities/`, `/artifacts/`, `/skills/`, `/agents/`, `/rules/`, `/phases/`) | **Guest read:** rows from released public playbooks only; no Create; private playbook entities absent |
 | MCP / REST write | Unchanged — auth required |
 | PIPs | **Defer:** keep login-required unless you want anonymous PIP list on public playbooks (not needed for “evaluate content”) |
 
 Move **“Anonymous / non-owner → No”** in PIP table to reflect new guest read for playbook content only.
 
-**Status alignment note:** Document canonical rule as **`status != draft`** (matches `can_view()` and `list_public_playbooks()`). Fix [`get_accessible_playbook_ids()`](methodology/services/playbook_service.py) which incorrectly filters `status="released"` only — include in implementation.
+**Status alignment note:** Guest-readable filter is **`status=released`** (stricter than authenticated `status≠draft`). Fix [`get_accessible_playbook_ids()`](methodology/services/playbook_service.py) for authenticated users to use `status≠draft`; add separate `get_guest_readable_playbook_ids()` for anonymous querysets.
 
 ### 2. [`user_journey.md`](docs/features/user_journey.md)
 
@@ -373,7 +422,7 @@ Update **Act 2 LIST+FIND** section (~377–389) and **Content Browser** access n
 
 See [Per-file feature spec updates](#per-file-feature-spec-updates) below for every file’s concrete edits.
 
-**Summary:** 18 files updated · 1 new file · 56 feature files unchanged (no edit needed).
+**Summary:** 20 BDD feature files updated · 2 new BDD files (`playbooks-guest-browse.feature`, `guest-global-entity-lists.feature`) · 1 UAT replay file · 49 feature files unchanged.
 
 ### 4. [`IA_guidelines.md`](docs/ux/IA_guidelines.md)
 
@@ -419,7 +468,7 @@ Update § Anonymous landing (~298):
 **Out of scope for diagram:**
 - MCP guest access (unchanged — auth required)
 - Team browse for anonymous users
-- Global entity LIST routes for guests
+- Anonymous global search
 
 ### 5. [`SAO.md`](docs/architecture/SAO.md)
 
@@ -428,7 +477,8 @@ Update **FOB → Authorization** (~2789–2793):
 - Replace blanket “All web views require `@login_required`” with **tiered access**:
   - **Public routes:** `/`, `/use-cases/`, legal, auth
   - **Guest read routes:** playbook browse + read-only entity VIEW + content browser + graph API GET — gated by `Playbook.can_view(AnonymousUser)` not login
-  - **Authenticated-only:** dashboard, create/edit/delete, teams, PIPs, profile, global entity lists, search, feedback
+  - **Authenticated-only:** dashboard, create/edit/delete, teams, PIPs, profile, global search, feedback
+  - **Guest read routes:** playbook browse, child VIEW pages, content browser, graph API GET, **global entity lists** (filtered)
 
 Add short **Guest read security** subsection:
 - 404 (not 403) for inaccessible playbooks — no existence leak
@@ -443,8 +493,9 @@ MCP section: explicitly **no change** — remains token-authenticated.
 
 Convention for all edits below:
 - **Bob** = anonymous guest (not logged in)
-- **Mike** = owner of public released playbook `"React Frontend Development"`
-- **Public readable** = `visibility=public` AND `status≠draft` (released, active, or disabled)
+- **Mike** = owner of public **released** playbook `"React Frontend Development"`
+- **Guest-readable playbook** = `visibility=public` AND `status=released` (excludes draft, active, disabled)
+- **Authenticated public read** = `visibility=public` AND `status≠draft` (unchanged for logged-in users)
 - **404 not 403** for private/inaccessible playbooks (no existence leak)
 - **Guest banner** on guest pages: *Sign in to create and edit playbooks* with `[Sign In]` / `[Register]` (`data-testid="guest-auth-banner"`)
 
@@ -456,7 +507,7 @@ Convention for all edits below:
 
 | Section | Specific change |
 |---------|-----------------|
-| Visibility table (L15–18) | Public row: “other authenticated users” → “**anyone (including anonymous guests)** when status ≠ draft” |
+| Visibility table (L15–18) | Public row: guests when `status=released`; authenticated when status ≠ draft |
 | Access by surface (L27–34) | Add **Anonymous guest** column; fill per plan §1; REST API row: add “GET read on public playbook resources: AllowAny + can_view” |
 | PIP table (L46–53) | Split row: “Anonymous guest” → No for PIP submit/finalize; add footnote that playbook **content** read is allowed |
 | Deferred (L61–66) | Remove “GUI-only public read” phrasing; keep “MCP public read access” as deferred |
@@ -476,6 +527,20 @@ End-to-end guest journey (single file, `@guest_access` tag):
 | `FOB-PLAYBOOKS-GUEST-06` | Bob opens Content Browser from playbook header → graph loads |
 | `FOB-PLAYBOOKS-GUEST-07` | Bob GET `/playbooks/create/` → redirect to login with `?next=` |
 | `FOB-PLAYBOOKS-GUEST-08` | Bob GET `/dashboard/` → redirect to login (unchanged guard) |
+
+#### [`guest-global-entity-lists.feature`](docs/features/act-2-playbooks/guest-global-entity-lists.feature) — **NEW**
+
+Cross-cutting guest global list routes (`@guest_access @global_lists`):
+
+| Scenario ID | Route | Assertions |
+|-------------|-------|------------|
+| `FOB-GUEST-GLOBAL-01` | `/workflows/` | Bob sees workflows from Mike’s **released** public playbook; no Create; no rows from private or draft/active/disabled public playbooks |
+| `FOB-GUEST-GLOBAL-02` | `/activities/` | Same filter |
+| `FOB-GUEST-GLOBAL-03` | `/artifacts/` | Same filter |
+| `FOB-GUEST-GLOBAL-04` | `/skills/` | Same filter |
+| `FOB-GUEST-GLOBAL-05` | `/agents/` | Same filter |
+| `FOB-GUEST-GLOBAL-06` | `/rules/` | Same filter |
+| `FOB-GUEST-GLOBAL-07` | `/phases/` | Same filter |
 
 #### [`playbooks-list-find.feature`](docs/features/act-2-playbooks/playbooks-list-find.feature)
 
@@ -545,7 +610,7 @@ End-to-end guest journey (single file, `@guest_access` tag):
 | `FOB-WORKFLOWS-VIEW_WORKFLOW-11` | Given Bob not logged in; Mike owns public released playbook with workflow “Component Development”; When Bob GET workflow detail URL; Then name, description, activities list visible; And no `[Edit Workflow]`, `[Delete Workflow]`, `[Add Activity]` |
 | `FOB-WORKFLOWS-VIEW_WORKFLOW-12` | Bob GET workflow in private playbook → 404 |
 
-**Unchanged:** `workflows-list-find.feature`, `workflows-create.feature`, `workflows-edit.feature`, `workflows-delete.feature`, `workflows-export-import.feature`, `workflows-rules-crudlf.feature` — all assume authenticated owner; list-find global route stays login-required.
+**Unchanged:** `workflows-list-find.feature` (playbook-scoped scenarios), create, edit, delete, export-import, rules-crudlf. **Also update:** `guest-global-entity-lists.feature` (GUEST-GLOBAL-01 for `/workflows/`).
 
 ---
 
@@ -600,7 +665,7 @@ End-to-end guest journey (single file, `@guest_access` tag):
 | `AGENT-VIEW-08` | Bob GET agent in private playbook → 404 |
 | `AGENT-VIEW-09` | Bob GET `/agents/<pk>/?embed=1` → embed loads for public playbook agent |
 
-**Unchanged:** global-list (login-required), create, edit, delete, list-find
+**Unchanged:** `agents-list-find.feature`, create, edit, delete. **Also update:** `agents-global-list.feature` (AGENT-GLOBAL-13..15) + `guest-global-entity-lists.feature` (GUEST-GLOBAL-05).
 
 ---
 
@@ -707,6 +772,37 @@ Landing CTA scenario lives in `playbooks-guest-browse.feature` (FOB-PLAYBOOKS-GU
 
 ---
 
+### Manual UAT replay — [`tests/uat/e2e-uat-flow.feature`](tests/uat/e2e-uat-flow.feature) — **UPDATE**
+
+**Yes — this file needs updates.** It already proves **authenticated** public/private isolation (J3B / UAT-03-05, UAT-03-05b) but has **no anonymous guest path**. [`mcp-uat-flow.feature`](tests/uat/mcp-uat-flow.feature) stays unchanged (MCP remains token-auth; MCP-01b covers authenticated cross-user MCP read).
+
+| Area | Change |
+|------|--------|
+| **Journey map (L19–29)** | Add **J0 — Guest evaluation (pre-registration)** with scenarios UAT-00-01 … UAT-00-07 |
+| **Execution order (L7–17)** | Note optional **J0 before J1** (incognito, no cookies) OR **J0 after UAT-03-05 admin-create-public** to reuse `<ADMIN_PUBLIC_PB_ID>` / `<ADMIN_PRIVATE_PB_ID>` |
+| **DEVIATIONS (L47–54)** | Row: narrative “browse before register” → J0 guest path on shipped MVP |
+| **UAT-03-01 / UAT-03-01b (L181, L196)** | Update `[data-testid="visibility-help"]` SEE: Public = anyone including anonymous when status≠draft (not “authenticated readers only”) |
+| **UAT-03-05 (L288–322)** | Add header comment: **authenticated** uat_user path; anonymous equivalent is J0 — do not replace |
+| **UAT-03-05b (L324–358)** | No structural change; admin cross-user checks remain auth-only |
+
+#### New Journey 0 scenarios (mirror `playbooks-guest-browse.feature`)
+
+| Scenario | Steps (operator script) |
+|----------|---------------------------|
+| **UAT-00-01** Landing Explore CTA | Incognito GET `/` → SEE `[data-testid="landing-cta-explore-playbooks"]` → click → `/playbooks/` |
+| **UAT-00-02** Guest public list | No login; GET `/playbooks/` → SEE guest banner + `[data-testid="public-playbook-card-<ADMIN_PUBLIC_PB_ID>"]`; no Create button (or Sign in link) |
+| **UAT-00-03** Guest public detail read-only | GET `/playbooks/<ADMIN_PUBLIC_PB_ID>/` → detail 200; Edit/Delete/Release absent; workflow link works |
+| **UAT-00-04** Guest private 404 | GET `/playbooks/<ADMIN_PRIVATE_PB_ID>/` → HTTP 404 (not login redirect) |
+| **UAT-00-05** Guest login gates | GET `/playbooks/create/`, `/dashboard/` → redirect to login |
+| **UAT-00-06** Guest content browser (optional) | GET `/browser/<ADMIN_PUBLIC_PB_ID>/` → graph loads; click Activity node → embed panel without login redirect |
+| **UAT-00-07** Guest global workflows list | Incognito GET `/workflows/` → sees workflow from `<ADMIN_PUBLIC_PB_ID>`; no Create; private playbook workflows absent |
+
+**Precondition for J0:** admin has created and released a public playbook + a private playbook (reuse UAT-03-05 admin steps, or document one-time admin seed before J0).
+
+**Placeholder registry:** reuse `<ADMIN_PUBLIC_PB_ID>` / `<ADMIN_PRIVATE_PB_ID>` — no new placeholders required unless operator runs J0 before J3B (then add one-time admin seed block at top of J0).
+
+---
+
 ### Other docs (non-`.feature` but in scope)
 
 #### [`user_journey.md`](docs/features/user_journey.md)
@@ -757,7 +853,7 @@ No edits unless a comment references “authenticated-only public read”:
 - **Act 15:** error-recovery
 - **Act 0:** navigation, authentication, onboarding, email-verification
 
-**Rationale:** Global LIST+FIND routes (`/workflows/`, `/activities/`, etc.) stay login-required; guests reach child entities only via playbook-scoped URLs from public playbook detail or content browser.
+**Rationale:** Playbook-scoped LIST+FIND routes remain owner/authenticated contexts. **Global** LIST routes open to guests but queryset-filtered to entities whose parent playbook is guest-readable (`released` + `public`).
 
 ---
 
@@ -767,10 +863,11 @@ Work in vertical slices; test-first per BPE-08 rules.
 
 ### Slice A — Access primitives
 
-1. Add `PlaybookService.list_public_playbooks_for_guest()` — all public non-draft (no author exclusion needed for guests).
-2. Add `PlaybookService.get_public_playbook_ids()` for anonymous queryset filtering.
-3. Align `get_accessible_playbook_ids()` public filter to `status != 'draft'` (or document if `released|active` is intentional — prefer matching `can_view()`).
-4. Extend [`playbook_access.py`](methodology/utils/playbook_access.py): `playbook_readable_or_404(request, pk)` works for `AnonymousUser` (already mostly true).
+1. Add `PlaybookService.list_public_playbooks_for_guest()` — `visibility=public` AND `status=released` only.
+2. Add `PlaybookService.get_guest_readable_playbook_ids()` for anonymous queryset filtering.
+3. Tighten `Playbook.can_view()` for anonymous users: public + `status=released` only (authenticated users keep `status≠draft`).
+4. Align `get_accessible_playbook_ids()` for authenticated users to `status != 'draft'`.
+5. Extend [`playbook_access.py`](methodology/utils/playbook_access.py): `playbook_readable_or_404(request, pk)` works for `AnonymousUser`.
 
 ### Slice B — Auth decorator
 
@@ -781,10 +878,11 @@ Add `guest_read_or_login_required` (or split views):
 
 Allowlist (initial):
 
-- `/playbooks/` (list — guest variant shows public only)
+- `/playbooks/` (list — guest variant shows released public only)
 - `/playbooks/<pk>/` (detail)
 - `/playbooks/<pk>/workflows/...`, `/activities/...`, `/artifacts/...`, `/skills/...`, `/rules/...`, `/agents/...`, `/phases/...` — **VIEW actions only**
 - `/browser/<pk>/`
+- **Global lists:** `/workflows/`, `/activities/`, `/artifacts/`, `/skills/`, `/agents/`, `/rules/`, `/phases/` — GET only; queryset filtered to guest-readable playbooks
 
 ### Slice C — Landing + playbooks list UI
 
@@ -798,16 +896,23 @@ Allowlist (initial):
   - `workflow_views.py`, `activity_views.py`, `artifact_views.py`, `skill_views.py`, `rule_views.py`, `agent_views.py`, `phase_views.py`, `browser_views.py`
 - Templates: hide Edit/Delete/Create/Release/Content Browser owner actions when `not request.user.is_authenticated` (browser itself stays available)
 
-### Slice E — REST API for graph
+### Slice E — Global entity lists (guest)
+
+- Apply guest decorator + anonymous branch on each `*_list_global` view
+- Filter querysets by `get_guest_readable_playbook_ids()`
+- Templates: hide Create buttons; show guest banner
+
+### Slice F — REST API for graph
 
 - [`methodology/api/viewsets.py`](methodology/api/viewsets.py) + permissions: `AllowAny` + `can_view` check on **safe methods** for playbook graph endpoint only
 - Keep `IsAuthenticated` on all mutations and non-public resources
 
-### Slice F — Tests
+### Slice G — Tests
 
 | Test file | Coverage |
 |-----------|----------|
-| New `tests/integration/test_guest_playbook_browse.py` | Landing CTA, anonymous list, detail, private 404 |
+| New `tests/integration/test_guest_playbook_browse.py` | Landing CTA, anonymous list, detail, private 404, released-only filter |
+| New `tests/integration/test_guest_global_lists.py` | Anonymous GET on all 7 global list routes |
 | [`test_content_browser_access.py`](tests/integration/test_content_browser_access.py) | Flip 01b expectation |
 | [`test_playbook_view.py`](tests/integration/test_playbook_view.py) | Anonymous public read |
 | [`test_api_public_playbook_access.py`](tests/integration/test_api_public_playbook_access.py) | Anonymous graph GET |
@@ -821,6 +926,7 @@ Run: `.venv/bin/python -m pytest tests/integration/test_guest_playbook_browse.py
 - Anonymous `/teams/` browse
 - Anonymous global search
 - Anonymous PIP viewing/submission
+- Guest visibility of **active** or **disabled** public playbooks (guests: **released only**)
 - Opening team-shared **private** playbooks to non-members
 
 ---
@@ -835,7 +941,7 @@ Every todo follows [do-small-increments](.windsurf/rules/do-small-increments.md)
 4. **Docs before code** — complete Phase 0–0b–1 + `review-docs` gate before Phase 3
 5. **Test-first for code** — RED todo immediately before its GREEN todo
 
-**Todo count:** 72 atomic items in plan frontmatter (Phases 0–7).
+**Todo count:** 87 atomic items in plan frontmatter (Phases 0–7; includes UAT + global list todos).
 
 ---
 
@@ -889,6 +995,8 @@ Cross-check against [`.cursor/playbooks/Edda/BPE/BPE-01-Plan_Feature.md`](.curso
 | MCP T1/T2/T3 tests | Section F N/A |
 | ToolExecutor wiring (SAO §17) | No agent loop changes |
 | E2E Playwright guest journey | Optional; integration tests sufficient for MVP |
+| **`mcp-uat-flow.feature`** | **No change** — MCP stays token-auth |
+| **`e2e-uat-flow.feature`** | **Update** — J0 guest scenarios + visibility copy (see Phase 1 UAT todos) |
 | use-cases page CTA | Out of scope unless added later |
 
 ---
@@ -901,7 +1009,7 @@ Execute todos **top-to-bottom** in plan frontmatter order. Phases:
 |-------|-------|------|
 | 0 | `doc-ac-*` (3) | Permission spec complete |
 | 0b | `plan-doc-scaffold`, `plan-section-*`, `plan-issue-gitlab` (8) | BPE-01 Sections A–F + issue |
-| 1 | `doc-feat-*`, `doc-uj-*`, `doc-ia-*`, `doc-sao-*`, `doc-drawio-*` (28) | All specs aligned |
+| 1 | `doc-feat-*`, `doc-uj-*`, `doc-ia-*`, `doc-sao-*`, `doc-uat-*`, `doc-drawio-*` (34) | All specs + UAT + global lists aligned |
 | 2 | `review-docs` | **User approval required** |
 | 3 | `test-svc-*` / `impl-svc-*`, `test-decorator-*` / `impl-decorator`, `log-story-decorator`, `log-story-access-deny` (10) | Services + decorator + log stories green |
 | 4 | landing + list + detail + base nav + log-story-list + export/release guards (13) | Guest can list and view public playbook |
@@ -913,11 +1021,11 @@ Legacy section reference (implementation detail unchanged):
 
 ---
 
-## Open decisions (defaults assumed)
+## Resolved decisions
 
-| Question | Default in this plan |
-|----------|---------------------|
+| Question | Decision |
+|----------|----------|
+| Anonymous global entity lists (`/workflows/`, `/skills/`, etc.)? | **Yes** — all entity types from **released public** playbooks visible on global list routes; no Create |
+| Which public playbook statuses are guest-visible? | **`released` only** — excludes draft, active, disabled |
 | Anonymous PIP list on public playbooks? | **No** — login required |
-| Anonymous global `/workflows/` list? | **No** — playbook-scoped drill-down only |
-| `active`/`disabled` public playbooks visible to guests? | **Yes** — match `can_view()` (`status != draft`) |
 | Show author username on guest cards? | **Yes** — already shown for authenticated public browse |

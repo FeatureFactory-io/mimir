@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from methodology.models import Agent, Playbook
 from methodology.services.agent_service import AgentService
+from methodology.utils.guest_auth import guest_read_or_login_required
 
 logger = logging.getLogger(__name__)
 
@@ -26,35 +27,50 @@ logger = logging.getLogger(__name__)
 # ────────────────────────────────────────────────────────────────────────────
 
 
-@login_required
+@guest_read_or_login_required
 def agent_list_global(request):
     """
     Global agents list — all agents across all playbooks owned by the user.
 
     Supports search via ?q= query parameter (matches name and description).
+    Anonymous guests see agents from released public playbooks only.
 
     Template: agents/list.html
     Template Context:
         - agents: QuerySet of Agent instances (filtered by query if provided)
         - query: Current search string
         - total_count: Total agents before filtering
+        - is_guest_browse: True for anonymous session
 
     :param request: Django request object
     :return: Rendered global list template
     """
     query = request.GET.get('q', '').strip()
-    agents = AgentService.search_agents(query=query, user=request.user)
-    total_count = AgentService.search_agents(query='', user=request.user).count()
+
+    if request.user.is_authenticated:
+        agents = AgentService.search_agents(query=query, user=request.user)
+        total_count = AgentService.search_agents(query='', user=request.user).count()
+        is_guest_browse = False
+        user_label = request.user.username
+    else:
+        from methodology.services.guest_browse_service import list_global_agents_for_guest
+
+        agents = list_global_agents_for_guest(query=query or None)
+        total_count = list_global_agents_for_guest().count()
+        is_guest_browse = True
+        user_label = "anonymous"
 
     logger.info(
-        f"User {request.user.username} viewing global agent list"
-        + (f", query={query!r}" if query else "")
+        "User %s viewing global agent list%s",
+        user_label,
+        f", query={query!r}" if query else "",
     )
 
     context = {
         'agents': agents,
         'query': query,
         'total_count': total_count,
+        'is_guest_browse': is_guest_browse,
     }
     return render(request, 'agents/list.html', context)
 
@@ -167,7 +183,7 @@ def _render_create_form(request, playbook, form_data, errors):
 # ==================== DETAIL ====================
 
 
-@login_required
+@guest_read_or_login_required
 def agent_detail(request, pk):
     """
     Display agent details including associated activities.
@@ -189,16 +205,21 @@ def agent_detail(request, pk):
     except Agent.DoesNotExist:
         raise Http404()
     except (PermissionError, ObjectDoesNotExist):
-        messages.error(request, "You don't have permission to view this agent.")
-        return redirect('agent_list')
+        raise Http404()
 
     activities = AgentService.get_activities_for_agent(agent.pk)
+    can_edit = agent.can_edit(request.user) if request.user.is_authenticated else False
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
+    logger.info("User %s viewing agent %s", user_label, pk)
 
     context = {
         'agent': agent,
         'playbook': agent.playbook,
         'activities': activities,
-        'can_edit': agent.can_edit(request.user),
+        'can_edit': can_edit,
+        'is_guest_browse': not request.user.is_authenticated,
     }
     if request.GET.get('embed') == '1':
         return render(request, 'agents/_embed.html', context)

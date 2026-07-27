@@ -36,6 +36,8 @@ class TestContentBrowserServerSide:
             category="development",
             author=self.maria,
             visibility="public",
+            status="released",
+            version="1.0",
         )
         self.private_playbook = Playbook.objects.create(
             name="Private Playbook",
@@ -60,14 +62,18 @@ class TestContentBrowserServerSide:
         assert 'data-testid="nav-browser"' not in content
 
     # FOB-CONTENT-BROWSER-01b
-    def test_unauthenticated_browser_playbook_redirects_to_login(self):
-        """GET /browser/<pk>/ while logged out redirects to login with next= preserved."""
+    def test_unauthenticated_browser_public_released_playbook(self):
+        """GET /browser/<pk>/ while logged out returns 200 for released public playbook."""
         self.client.logout()
         response = self.client.get(f"/browser/{self.public_playbook.pk}/")
-        assert response.status_code == 302
-        location = response["Location"]
-        assert "login" in location
-        assert "next=" in location
+        assert response.status_code == 200
+        assert b'data-testid="browser-canvas"' in response.content
+
+    def test_unauthenticated_browser_private_playbook_404(self):
+        """GET /browser/<private_pk>/ while logged out returns 404."""
+        self.client.logout()
+        response = self.client.get(f"/browser/{self.private_playbook.pk}/")
+        assert response.status_code == 404
 
     # FOB-CONTENT-BROWSER-02
     def test_browser_root_returns_404(self):

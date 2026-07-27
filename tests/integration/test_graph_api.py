@@ -187,11 +187,14 @@ def team_playbook_access(db, other_user):
 
 @pytest.mark.django_db
 class TestGraphAPIAccess:
-    def test_graph_requires_authentication(self, api_client, released_playbook):
-        """Unauthenticated request returns 401."""
+    def test_graph_allows_anonymous_for_released_public(self, api_client, released_playbook):
+        """Unauthenticated request returns graph JSON for released public playbook."""
+        released_playbook.visibility = "public"
+        released_playbook.save(update_fields=["visibility"])
         url = f"/api/playbooks/{released_playbook.pk}/graph/"
         response = api_client.get(url)
-        assert response.status_code == 401
+        assert response.status_code == 200
+        assert "nodes" in response.json()
 
     def test_graph_returns_404_for_inaccessible_playbook(
         self, auth_client, private_playbook

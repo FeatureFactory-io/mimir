@@ -9,7 +9,8 @@ from decimal import Decimal
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 
@@ -335,25 +336,28 @@ class PlaybookViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=True, methods=["get"], url_path="graph")
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="graph",
+        permission_classes=[AllowAny],
+    )
     def graph(self, request, pk=None):
         """
         Return Cytoscape-ready graph data for a playbook.
 
-        Emits all entities (workflows, activities, skills, agents, artifacts, rules)
-        as typed nodes with namespaced IDs, plus typed edges and a phases array.
-
-        Access rules mirror playbook detail: same permission check via get_object().
-
-        Returns:
-            JSON: {
-                nodes: [{id, type, label, entity_pk, detail_url, embed_url, meta}],
-                edges: [{source, target, relationship}],
-                phases: [{id, name, colour}]
-            }
+        Anonymous guests may GET when playbook is guest-readable (released + public).
         """
-        logger.info(f"API: graph called - playbook_id={pk}")
-        playbook = self.get_object()
+        logger.info("API: graph called - playbook_id=%s user=%s", pk, request.user)
+        playbook = get_object_or_404(Playbook, pk=pk)
+        if not playbook.can_view(request.user):
+            logger.info(
+                "API: graph denied playbook_id=%s visibility=%s status=%s",
+                pk,
+                playbook.visibility,
+                playbook.status,
+            )
+            raise Http404()
         data = _build_playbook_graph(playbook, request.user)
         logger.info(
             f"API: graph built - playbook_id={pk} nodes={len(data['nodes'])} edges={len(data['edges'])}"

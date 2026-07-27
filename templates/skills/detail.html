@@ -5,6 +5,9 @@
 {% block title %}{{ skill.title }} - {{ playbook.name }}{% endblock %}
 
 {% block content %}
+{% if is_guest_browse %}
+  {% include "partials/guest_auth_banner.html" %}
+{% endif %}
 <div data-testid="skill-detail">
     <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb">

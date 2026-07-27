@@ -6,12 +6,15 @@ Handles create, read, update, delete operations for Phase entities.
 
 import logging
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import Http404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, PermissionDenied
 from methodology.models import Playbook, Phase
 from methodology.services.phase_service import PhaseService
 from methodology.services.playbook_service import PlaybookService
+from methodology.utils.guest_auth import guest_read_or_login_required
+from methodology.utils.playbook_access import playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +27,16 @@ logger = logging.getLogger(__name__)
 
 # ==================== LIST ====================
 
-@login_required
+@guest_read_or_login_required
 def phase_list_global(request):
     """
     Global phases list — all phases across all playbooks owned by the user.
 
     Supports:
     - ``?q=`` — search (matches name and description)
-    - ``?playbook=<id>`` — limit to phases in that playbook (must be owned by user)
+    - ``?playbook=<id>`` — limit to phases in that playbook (must be readable)
+
+    Anonymous guests see phases from released public playbooks only.
 
     Template: phases/list_global.html
     Template Context:
@@ -39,6 +44,7 @@ def phase_list_global(request):
         - query: Current search string
         - filter_playbook: Playbook instance if ``playbook`` query param applied, else None
         - total_count: Total phases before filtering
+        - is_guest_browse: True for anonymous session
 
     :param request: Django request object
     :return: Rendered global list template
@@ -46,11 +52,23 @@ def phase_list_global(request):
     query = request.GET.get('q', '').strip()
     filter_playbook = _resolve_phase_list_playbook_filter(request)
 
-    phases, total_count = PhaseService.list_phases_global(
-        request.user,
-        query=query or None,
-        playbook_filter=filter_playbook,
-    )
+    if request.user.is_authenticated:
+        phases, total_count = PhaseService.list_phases_global(
+            request.user,
+            query=query or None,
+            playbook_filter=filter_playbook,
+        )
+        is_guest_browse = False
+        user_label = request.user.username
+    else:
+        from methodology.services.guest_browse_service import list_global_phases_for_guest
+
+        phases, total_count = list_global_phases_for_guest(
+            query=query or None,
+            playbook_filter=filter_playbook,
+        )
+        is_guest_browse = True
+        user_label = "anonymous"
 
     log_extra = []
     if filter_playbook is not None:
@@ -59,7 +77,7 @@ def phase_list_global(request):
         log_extra.append(f"query={query!r}")
     logger.info(
         "User %s viewing global phase list%s",
-        request.user.username,
+        user_label,
         (" (" + ", ".join(log_extra) + ")") if log_extra else "",
     )
 
@@ -68,6 +86,7 @@ def phase_list_global(request):
         'query': query,
         'filter_playbook': filter_playbook,
         'total_count': total_count,
+        'is_guest_browse': is_guest_browse,
     }
     return render(request, 'phases/list_global.html', context)
 
@@ -76,9 +95,12 @@ def _resolve_phase_list_playbook_filter(request):
     """
     Parse optional ``playbook`` query param for :func:`phase_list_global`.
 
-    :returns: Owned :class:`Playbook` or ``None`` if missing/invalid/not owned
+    :returns: Readable :class:`Playbook` or ``None`` if missing/invalid/not accessible
     """
     raw = request.GET.get('playbook', '').strip()
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
     if not raw:
         return None
     try:
@@ -86,16 +108,26 @@ def _resolve_phase_list_playbook_filter(request):
     except ValueError:
         logger.info(
             "Ignoring invalid playbook query param for phase_list_global user=%s raw=%r",
-            request.user.username,
+            user_label,
             raw,
         )
         return None
+    if request.user.is_authenticated:
+        try:
+            return PlaybookService.get_playbook(pk, request.user)
+        except Exception:
+            logger.info(
+                "Playbook filter not applied (missing or not accessible) user=%s playbook=%s",
+                user_label,
+                pk,
+            )
+            return None
     try:
-        return PlaybookService.get_playbook(pk, request.user)
-    except Exception:
+        return playbook_readable_or_404(request, pk)
+    except Http404:
         logger.info(
             "Playbook filter not applied (missing or not accessible) user=%s playbook=%s",
-            request.user.username,
+            user_label,
             pk,
         )
         return None
@@ -188,7 +220,7 @@ def _render_create_form(request, playbook, form_data, errors):
 
 # ==================== DETAIL ====================
 
-@login_required
+@guest_read_or_login_required
 def phase_detail(request, playbook_pk, phase_pk):
     """
     Display phase details with activities.
@@ -198,10 +230,16 @@ def phase_detail(request, playbook_pk, phase_pk):
     :param phase_pk: Phase primary key
     :return: Rendered phase detail template
     """
-    playbook = get_object_or_404(Playbook, pk=playbook_pk, author=request.user)
-    phase_data = PhaseService.get_phase_with_activities(phase_pk, request.user)
-    
-    logger.info(f"User {request.user.username} viewing phase {phase_pk}")
+    playbook = playbook_readable_or_404(request, playbook_pk)
+    try:
+        phase_data = PhaseService.get_phase_with_activities(phase_pk, request.user)
+    except PermissionDenied:
+        raise Http404()
+
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
+    logger.info("User %s viewing phase %s", user_label, phase_pk)
     
     # Transform workflow_activities dict to list of dicts for template
     workflow_activities_list = [
@@ -214,6 +252,8 @@ def phase_detail(request, playbook_pk, phase_pk):
         'phase': phase_data['phase'],
         'workflow_activities': workflow_activities_list,
         'artifacts': phase_data['artifacts'],
+        'can_edit': playbook.can_edit(request.user) if request.user.is_authenticated else False,
+        'is_guest_browse': not request.user.is_authenticated,
     }
     return render(request, 'phases/detail.html', context)
 

@@ -109,7 +109,7 @@ Mike structures his playbook using the FOB editor:
 - Links Activities with upstream/downstream artifact relationships
 
 #### Screen: Playbook visibility (FOB today)
-Mike keeps visibility **Private (only me)** on the playbook wizard. In the current FOB build, only the owner can access and edit playbooks via the GUI and MCP. **Family** and **Local only** are stored as metadata for future Homebase sync; they do not grant access to other users yet. Team assignment and public/team visibility are planned (Act 11 / Homebase); REST API group sharing exists outside the GUI.
+Mike keeps visibility **Private (only me)** on the playbook wizard while drafting. When he is ready to share, he sets visibility to **Public** and releases the playbook. **Public + Released** playbooks are readable by anyone — including anonymous visitors — via the GUI (list, detail, child entity views, Content Browser). Only the owner can edit, delete, release, or export via the GUI; MCP remains author-scoped (token required). **Family** and **Local only** are stored as metadata for future Homebase sync; they do not grant access to other users yet. Team assignment and team-scoped visibility are planned (Act 11 / Homebase).
 
 #### Action: Release Playbook
 Mike is satisfied with the playbook and clicks **[Release]** on the playbook detail page:
@@ -117,7 +117,60 @@ Mike is satisfied with the playbook and clicks **[Release]** on the playbook det
 - "Once released, direct edits are locked. Changes require a PIP."
 - Mike confirms → playbook status changes to **Released v1.0**
 
-**Result**: The playbook is now available to all members of the Usability team as a stable v1.0 reference. Future changes require PIPs reviewed by Galdr and approved by an Administrator.
+**Result**: The playbook is now a stable v1.0 reference visible to all authenticated users and to anonymous guests (when Public). Future changes require PIPs reviewed by Galdr and approved by an Administrator.
+
+---
+
+### Act 0.5: Guest evaluation (pre-registration)
+
+**Context**: Before registering, a prospective user (Bob) discovers Mimir through the marketing landing page and evaluates released public playbooks without creating an account.
+
+#### Screen: FOB Landing Page (`/`)
+Bob opens the FOB root URL in an incognito session:
+- Brand header with **[Sign In]** and **[Register]**
+- Hero section with product value proposition
+- Primary CTA: **[Explore public playbooks]** (`data-testid="landing-cta-explore-playbooks"`) → `/playbooks/`
+- No full app navbar (Dashboard, Teams, PIPs, etc.)
+
+#### Screen: Guest Playbooks List (`/playbooks/`)
+Bob clicks **[Explore public playbooks]** and lands on the public browse grid:
+- **Minimal guest chrome**: brand + Sign In + Register only (no global search, notifications, or user menu)
+- **Guest banner** (`data-testid="guest-auth-banner"`): "Sign in to create and edit playbooks" with auth links
+- **Card grid**: released public playbooks only (e.g., Mike's "React Frontend Development")
+  - Each card shows title, author ("by Mike Chen"), version, status
+  - No Edit/Delete actions; no **[Create New Playbook]** button (create URLs redirect to login)
+- **Empty state** (when no public released playbooks exist): "Explore public playbooks will appear here"
+- Private, draft, active, and disabled public playbooks are never shown to guests
+
+#### Screen: Guest Playbook Detail (read-only drill-down)
+Bob opens a public released playbook detail page:
+- Full read-only tabs: Overview, Workflows, Activities, Artifacts, Skills, Agents, Rules, History
+- **[Content Browser]** available in the header action bar → `/browser/<pk>/`
+- No **[Edit]**, **[Delete]**, **[Release]**, **[Submit PIP]**, or **[Export JSON]**
+- Bob can follow links to workflow, activity, artifact, skill, agent, and rule detail pages — all read-only
+- Embed URLs (`?embed=1`) load in Content Browser detail panel without login redirect
+
+#### Screen: Guest Content Browser
+Bob opens Content Browser from the playbook header:
+- Three-panel layout: left tree, Cytoscape graph canvas, right detail panel
+- Graph data from `GET /api/playbooks/<pk>/graph/` (no API token required for public released playbooks)
+- Clicking a node loads entity embed content via HTMX without redirecting to login
+
+#### Screen: Guest Global Entity Lists
+Bob can browse global list routes without signing in:
+- `/workflows/`, `/activities/`, `/artifacts/`, `/skills/`, `/agents/`, `/rules/`, `/phases/`
+- Rows filtered to entities whose parent playbook is **public + released**
+- Guest banner on each list; Create actions require login
+
+#### Access denied (private playbooks)
+Bob attempts to open a private playbook URL directly:
+- HTTP **404** (not 403, not login redirect) — no existence leak
+- Same policy for private playbook workflows, Content Browser, and graph API
+
+#### Conversion path
+After evaluating content, Bob clicks **[Register]** or **[Sign In]** from the guest banner to proceed to Act 1 onboarding.
+
+**Feature specs**: `playbooks-guest-browse.feature`, `guest-global-entity-lists.feature`, Act 16 Content Browser guest scenarios.
 
 ---
 
@@ -379,6 +432,8 @@ Full search page with filters:
 Maria clicks "Playbooks" in the main navigation. The playbooks list page appears (this is the entry point for all playbook operations, marked with bold border in flow diagrams):
 
 **Layout** (MVP card grid):
+
+**Authenticated users (Maria logged in)**:
 - **Header**: "Playbooks" with [Create New Playbook] primary action
 - **Card grid**: Owned playbooks and other authors' **public, non-draft** playbooks in one section
   - Owned cards: Delete + View actions
@@ -387,6 +442,12 @@ Maria clicks "Playbooks" in the main navigation. The playbooks list page appears
   - "No playbooks yet"
   - [Create New Playbook] button
 - Draft playbooks with Public visibility remain **owner-only** until released
+
+**Anonymous guests (Bob, not logged in)** — see Act 0.5:
+- **Guest chrome**: brand + Sign In + Register; guest banner instead of Create
+- **Card grid**: released public playbooks only (no owned section)
+- **Empty state**: "Explore public playbooks will appear here" (not the owner empty state)
+- [Create New Playbook] absent or links to login; `/playbooks/create/` redirects to login
 
 **Example Data**:
 - "React Frontend Development" | Mike Chen | v1.2 | Active | Downloaded
@@ -413,10 +474,11 @@ Maria clicks [Create New Playbook]. The creation wizard opens:
 - **Tags**: Multi-select/token input (optional)
   - Example: "product management, discovery, validation, user research"
 - **Visibility**: Dropdown
-  - Private (only me) — default; owner-only access in FOB/MCP
+  - Private (only me) — default; owner-only view in FOB
+  - Public — once released (or otherwise non-draft), readable by anyone including anonymous guests; only owner can edit/delete
   - Family (coming soon) — disabled; metadata for future Homebase
   - Local only (coming soon) — disabled; metadata for future Homebase
-  - Help text explains owner-only access today
+  - Help text: "Public playbooks can be browsed without signing in once released; only you can edit or delete"
 - [Cancel] [Next: Add Workflows →] buttons
 
 **Wizard Step 2: Add Workflows** (optional first workflow)
@@ -610,7 +672,7 @@ Maria clicks [Edit] on her "Product Discovery Framework" draft playbook (v0.3). 
   - Category: Pre-populated dropdown (triggers version increment)
   - Tags: Pre-populated multi-select (triggers version increment)
   - Visibility: Pre-populated dropdown (Private default; Family/Local disabled with help text)
-    - Note: Owner-only access in FOB/MCP; visibility does not share playbooks with others today
+    - Private — owner-only view; Public — anyone can read once non-draft (anonymous guests when released)
 
 - **Status Section**:
   - Current Version: v0.3 (read-only, shows current version)
@@ -2853,7 +2915,7 @@ Maria searches for non-existent team:
 - Slides in from the right; loads entity embed view (`?embed=1`) via HTMX into panel div
 - [Open in new tab] and [Open full] buttons; [×] to close
 
-**Access control**: same visibility rules as playbook detail page (`_playbook_readable_or_404`); public non-draft = any authenticated user
+**Access control**: same visibility rules as playbook detail page (`playbook_readable_or_404`); public released = any user including anonymous guests; public non-draft = any authenticated user; graph API `GET /api/playbooks/<pk>/graph/` allows anonymous access when `can_view` passes
 
 **Feature file**: `docs/features/act-16-content-browser/content-browser.feature`
 

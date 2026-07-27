@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from methodology.models import Playbook, Workflow
 from methodology.services.workflow_service import WorkflowService
 from methodology.services.activity_service import ActivityService
+from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
@@ -20,16 +21,22 @@ logger = logging.getLogger(__name__)
 # ────────────────────────────────────────────────────────────────────────────
 
 
-@login_required
+@guest_read_or_login_required
 def workflow_global_list(request):
     """
     Global workflows overview - all workflows across all playbooks.
     
     Shows workflows from all playbooks accessible to the user (owned + public + team).
-    Useful for seeing workflow patterns and managing across playbooks.
+    Anonymous guests see workflows from released public playbooks only.
     """
-    # Get all workflows via service
-    workflows = WorkflowService.list_global_workflows(request.user)
+    if request.user.is_authenticated:
+        workflows = WorkflowService.list_global_workflows(request.user)
+        is_guest_browse = False
+        user_label = request.user.username
+    else:
+        workflows = WorkflowService.list_global_workflows_for_guest()
+        is_guest_browse = True
+        user_label = "anonymous"
     
     # Count unique playbooks
     playbook_count = workflows.values('playbook').distinct().count()
@@ -38,14 +45,18 @@ def workflow_global_list(request):
     total_activity_count = sum(w.get_activity_count() for w in workflows)
 
     logger.info(
-        f"User {request.user.username} viewing global workflows list "
-        f"({workflows.count()} workflows, {total_activity_count} activities)"
+        "User %s viewing global workflows list "
+        "(%s workflows, %s activities)",
+        user_label,
+        workflows.count(),
+        total_activity_count,
     )
 
     return render(request, 'workflows/global_list.html', {
         'workflows': workflows,
         'playbook_count': playbook_count,
         'total_activity_count': total_activity_count,
+        'is_guest_browse': is_guest_browse,
     })
 
 
@@ -102,7 +113,7 @@ def workflow_create(request, playbook_pk):
     })
 
 
-@login_required
+@guest_read_or_login_required
 def workflow_detail(request, playbook_pk, pk):
     """
     View workflow details with activities flow diagram.
@@ -145,28 +156,33 @@ def workflow_detail(request, playbook_pk, pk):
             # Continue without graph - template will show error or plain list
     
     can_submit_pip = (
-        playbook.source == "owned"
+        request.user.is_authenticated
+        and playbook.source == "owned"
         and playbook.author_id == request.user.id
         and playbook.is_released
     )
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
     logger.info(
         "User %s viewing workflow pk=%s playbook=%s can_edit=%s can_submit_pip=%s",
-        request.user.username,
+        user_label,
         pk,
         playbook_pk,
-        workflow.can_edit(request.user),
+        workflow.can_edit(request.user) if request.user.is_authenticated else False,
         can_submit_pip,
     )
 
     context = {
         'playbook': playbook,
         'workflow': workflow,
-        'can_edit': workflow.can_edit(request.user),
+        'can_edit': workflow.can_edit(request.user) if request.user.is_authenticated else False,
         'can_submit_pip': can_submit_pip,
         'activities_svg': activities_svg,
         'activity_count': activity_count,
         'has_activities': activity_count > 0,
         'activities': activities,
+        'is_guest_browse': not request.user.is_authenticated,
     }
     if request.GET.get('embed') == '1':
         return render(request, 'workflows/_embed.html', context)

@@ -441,5 +441,4 @@ class TestTeamGlobalLists:
         url = reverse("skill_detail", kwargs={"playbook_pk": playbook.pk, "skill_pk": skill.pk})
         response = client.get(url)
 
-        assert response.status_code == 302
-        assert response.url == reverse("playbook_list")
+        assert response.status_code == 404

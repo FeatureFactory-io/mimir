@@ -165,8 +165,8 @@ class TestPhaseDetailView:
         assert 'data-testid="edit-button"' not in content
         assert 'data-testid="delete-button"' not in content
     
-    def test_phase_detail_requires_authentication(self, client):
-        """Phase detail redirects to login when not authenticated."""
+    def test_phase_detail_anonymous_returns_404_for_private_playbook(self, client):
+        """Phase detail returns 404 for anonymous users on non-guest-readable playbooks."""
         # Setup
         user = User.objects.create_user(username='testuser', password='testpass123')
         
@@ -189,9 +189,8 @@ class TestPhaseDetailView:
         url = reverse('phase_detail', kwargs={'playbook_pk': playbook.pk, 'phase_pk': phase.pk})
         response = client.get(url)
         
-        # Assert
-        assert response.status_code == 302
-        assert '/auth/user/login/' in response.url
+        # Assert — guest read allowed but private draft playbook is not visible
+        assert response.status_code == 404
     
     def test_phase_detail_permission_denied_for_other_user(self, client):
         """Phase detail returns 404 when user doesn't own the playbook."""

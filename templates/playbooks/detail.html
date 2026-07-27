@@ -5,6 +5,9 @@
 {% block title %}{{ playbook.name }} - Playbook{% endblock %}
 
 {% block content %}
+{% if is_guest_browse %}
+  {% include "partials/guest_auth_banner.html" %}
+{% endif %}
 <div data-testid="playbook-detail">
     <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb">

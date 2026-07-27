@@ -5,6 +5,7 @@ Provides views for creating, viewing, and editing artifacts within playbooks.
 """
 
 import logging
+from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -13,6 +14,7 @@ from django.core.exceptions import ValidationError
 from methodology.models import Playbook, Artifact
 from methodology.services.artifact_service import ArtifactService
 from methodology.services.activity_service import ActivityService
+from methodology.utils.guest_auth import guest_read_or_login_required
 
 logger = logging.getLogger(__name__)
 
@@ -26,36 +28,50 @@ logger = logging.getLogger(__name__)
 # ==================== GLOBAL LIST ====================
 
 
-@login_required
+@guest_read_or_login_required
 def artifact_list_global(request):
     """
     Global artifacts list — all artifacts across all playbooks owned by the user.
     
     Supports search via ?q= query parameter (matches name and description).
+    Anonymous guests see artifacts from released public playbooks only.
     
     Template: artifacts/list_global.html
     Template Context:
         - artifacts: QuerySet of Artifact instances (filtered by query if provided)
         - query: Current search string
         - total_count: Total artifacts before filtering
+        - is_guest_browse: True for anonymous session
     
     :param request: Django request object
     :return: Rendered global list template
     """
     query = request.GET.get('q', '').strip()
-    
-    artifacts = ArtifactService.list_artifacts_global(request.user, query=query or None)
-    total_count = ArtifactService.list_artifacts_global(request.user).count()
-    
+
+    if request.user.is_authenticated:
+        artifacts = ArtifactService.list_artifacts_global(request.user, query=query or None)
+        total_count = ArtifactService.list_artifacts_global(request.user).count()
+        is_guest_browse = False
+        user_label = request.user.username
+    else:
+        from methodology.services.guest_browse_service import list_global_artifacts_for_guest
+
+        artifacts = list_global_artifacts_for_guest(query=query or None)
+        total_count = list_global_artifacts_for_guest().count()
+        is_guest_browse = True
+        user_label = "anonymous"
+
     logger.info(
-        f"User {request.user.username} viewing global artifact list"
-        + (f", query={query!r}" if query else "")
+        "User %s viewing global artifact list%s",
+        user_label,
+        f", query={query!r}" if query else "",
     )
-    
+
     context = {
         'artifacts': artifacts,
         'query': query,
         'total_count': total_count,
+        'is_guest_browse': is_guest_browse,
     }
     return render(request, 'artifacts/list_global.html', context)
 
@@ -169,7 +185,7 @@ def _render_create_form(request, playbook, form_data, errors):
 # ==================== VIEW ====================
 
 
-@login_required
+@guest_read_or_login_required
 def artifact_detail(request, pk):
     """
     Display artifact details.
@@ -190,27 +206,35 @@ def artifact_detail(request, pk):
     :return: Rendered detail template
     :raises Http404: If artifact not found
     """
-    logger.info(f"User {request.user.username} viewing artifact {pk}")
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
+    logger.info("User %s viewing artifact %s", user_label, pk)
 
     try:
         artifact = ArtifactService.get_artifact_for_user(pk, request.user)
     except Exception:
-        messages.error(request, "You don't have permission to view this artifact.")
-        return redirect("playbook_list")
+        raise Http404()
 
     # Get consumers
     consumers = ArtifactService.get_artifact_consumers(artifact)
+    can_edit = (
+        artifact.playbook.is_owned_by(request.user)
+        if request.user.is_authenticated
+        else False
+    )
 
     context = {
         "artifact": artifact,
         "playbook": artifact.playbook,
         "producer": artifact.produced_by,
         "consumers": consumers,
-        "can_edit": artifact.playbook.is_owned_by(request.user),
+        "can_edit": can_edit,
+        "is_guest_browse": not request.user.is_authenticated,
     }
     if request.GET.get('embed') == '1':
         return render(request, 'artifacts/_embed.html', context)
-    logger.info(f"Artifact detail rendered for user {request.user.username}")
+    logger.info("Artifact detail rendered for user %s", user_label)
     return render(request, "artifacts/detail.html", context)
 
 

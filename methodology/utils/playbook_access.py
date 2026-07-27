@@ -26,12 +26,18 @@ def playbook_readable_or_404(request, pk):
     Example return: Playbook(id=3, name="FeatureFactory", visibility="public", ...)
     """
     playbook = get_object_or_404(Playbook, pk=pk)
+    user_label = (
+        request.user.username
+        if request.user.is_authenticated
+        else "anonymous"
+    )
     if not playbook.can_view(request.user):
         logger.info(
-            "User %s denied view on playbook id=%s (visibility=%s)",
-            request.user.username,
+            "User %s denied view on playbook id=%s (visibility=%s status=%s)",
+            user_label,
             pk,
             playbook.visibility,
+            playbook.status,
         )
         raise Http404()
     return playbook

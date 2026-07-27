@@ -49,17 +49,45 @@ Feature: FOB-ARTIFACTS-VIEW_ARTIFACT-1 View Artifact Details
   # ARTIFACT FLOW - See artifacts-flow.feature for complete flow scenarios
   # ============================================================
 
-  Scenario: FOB-ARTIFACTS-VIEW_ARTIFACT-08 View artifact producer activity
+  Scenario: FOB-ARTIFACTS-VIEW_ARTIFACT-11 View artifact producer activity
     Given the artifact is produced by activity "Design Component API"
     When Maria views the artifact detail page
     Then she sees "Produced by" section
     And she sees "Design Component API" with clickable link
     And clicking the link navigates to activity detail page
 
-  Scenario: FOB-ARTIFACTS-VIEW_ARTIFACT-09 View artifact consumer activities
+  Scenario: FOB-ARTIFACTS-VIEW_ARTIFACT-12 View artifact consumer activities
     Given the artifact is consumed by 3 activities
     When Maria views the artifact detail page
     Then she sees "Consumed by" section
     And she sees list of 3 consumer activities
     And each shows whether it's required or optional input
     And each activity link is clickable
+
+  # ============================================================
+  # GUEST ACCESS — anonymous read-only artifact view (@guest_access)
+  # ============================================================
+
+  Scenario: FOB-ARTIFACTS-VIEW_ARTIFACT-08 Guest views artifact in public released playbook read-only
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    And an activity in that playbook links artifact "Component Design Document"
+    When Bob GET the artifact detail URL for "Component Design Document"
+    Then he sees artifact name "Component Design Document"
+    And he sees artifact type and template information read-only
+    And he does not see [Edit Artifact] or [Delete Artifact]
+
+  Scenario: FOB-ARTIFACTS-VIEW_ARTIFACT-09 Guest cannot view artifact in private playbook
+    Given Bob is not logged in
+    And Mike owns a Private Released playbook with artifact "Secret Artifact"
+    When Bob GET the artifact detail URL for "Secret Artifact"
+    Then the response status is HTTP 404
+
+  Scenario: FOB-ARTIFACTS-VIEW_ARTIFACT-10 Guest views artifact embed without login redirect
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    And an activity in that playbook links artifact "Component Design Document"
+    When Bob GET "/artifacts/<pk>/?embed=1" for "Component Design Document"
+    Then the response status is HTTP 200
+    And the embed content loads without navbar or mutation buttons
+    And Bob is not redirected to the login page

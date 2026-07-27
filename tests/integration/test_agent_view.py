@@ -117,12 +117,11 @@ class TestAgentView:
         assert b'data-testid="delete-agent-btn"' in response.content
 
     def test_view_requires_login(self):
-        """Redirect to login if not authenticated."""
+        """Anonymous guest cannot view agent on draft private playbook (404)."""
         self.client.logout()
         response = self.client.get(self._url())
 
-        assert response.status_code == 302
-        assert '/auth/' in response.url
+        assert response.status_code == 404
 
     def test_view_agent_not_found(self):
         """404 for non-existent agent."""
@@ -138,11 +137,10 @@ class TestAgentView:
         assert b'data-testid="agent-activities-empty"' in response.content
 
     def test_view_requires_ownership(self):
-        """Non-owner is redirected when viewing another user's agent."""
+        """Non-owner receives 404 when viewing another user's private agent."""
         other = User.objects.create_user(username='other_view', password='pass123')
         self.client.login(username='other_view', password='pass123')
 
         response = self.client.get(self._url())
 
-        assert response.status_code == 302
-        assert reverse('agent_list') in response.url
+        assert response.status_code == 404

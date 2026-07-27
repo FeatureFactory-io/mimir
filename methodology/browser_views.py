@@ -7,16 +7,16 @@ Provides the full-page graph explorer for playbooks at /browser/<pk>/.
 import json
 import logging
 
-from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
 from methodology.services.phase_service import PhaseService
+from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
 
-@login_required
+@guest_read_or_login_required
 def browser_playbook(request, pk):
     """Render the Content Browser pre-loaded for a specific playbook.
 
@@ -37,9 +37,12 @@ def browser_playbook(request, pk):
     playbook = playbook_readable_or_404(request, pk)
     phases = PhaseService.list_phases(pk, request.user)
     phases_json = json.dumps([{"id": p.id, "name": p.name} for p in phases])
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
     logger.info(
         "User %s accessed browser for playbook id=%s name=%s",
-        request.user.username,
+        user_label,
         pk,
         playbook.name,
     )
@@ -50,5 +53,6 @@ def browser_playbook(request, pk):
             "playbook": playbook,
             "playbook_pk": pk,
             "phases_json": phases_json,
+            "is_guest_browse": not request.user.is_authenticated,
         },
     )

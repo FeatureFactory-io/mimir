@@ -5,6 +5,7 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
 
   # MVP simplified: Owner or Administrator finalizes after Reviewed status.
   # Public viewers (authenticated but not owner) can view PIP details but cannot finalize.
+  # Anonymous guests cannot access PIP routes; playbook content browse does not include PIP list for guests (deferred).
   # MVP: banner says "owner or Administrator"; owner finalize in FOB is @mvp_gap (post-MVP).
   # For MVP the banner may read "Administrator" only until owner finalize UI ships.
 

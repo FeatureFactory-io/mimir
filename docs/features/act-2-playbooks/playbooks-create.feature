@@ -4,12 +4,12 @@ Feature: FOB-PLAYBOOKS-CREATE_PLAYBOOK-1 Create New Playbook ✅
   So that I can define and organize my methodology
 
   # Access control (MVP simplified):
-  # - Visibility: Private (owner-only view) or Public (any authenticated user can view).
+  # - Visibility: Private (owner-only view) or Public (anyone including anonymous guests can view once released/non-draft).
   # - Write (draft edit, delete) always owner-only regardless of visibility.
   # - Draft: editable by owner; Released: read-only except PIP.
   # - PIP finalize: owner or staff admin. Public viewers cannot finalize.
   # - Family, Local only, Homebase sync: deferred (not in MVP).
-  # - MCP always author-scoped even for public playbooks (GUI-only public read).
+  # - MCP always author-scoped even for public playbooks (token required).
 
   Status: ✅ COMPLETE - core wizard scenarios implemented
   Branch: feature/playbooks-crudv
@@ -92,10 +92,10 @@ Feature: FOB-PLAYBOOKS-CREATE_PLAYBOOK-1 Create New Playbook ✅
   Scenario: FOB-PLAYBOOKS-CREATE_PLAYBOOK-07b Create public playbook
     Given Maria is on the playbook creation wizard Step 1
     When she selects "Public" for Visibility
-    And she sees help text "Any authenticated user can view this playbook; only you can edit or delete it"
+    And she sees help text "Anyone can view this playbook (no sign-in required once released); only you can edit or delete it"
     And she completes all required fields and proceeds through Steps 2 and 3
     Then the playbook is created with visibility public
-    And any authenticated user can open and read the playbook in FOB
+    And anyone can open and read the playbook in FOB once it is released
     And only Maria can edit or delete it
 
   Scenario: FOB-PLAYBOOKS-CREATE_PLAYBOOK-08 Add optional tags
@@ -223,3 +223,16 @@ Feature: FOB-PLAYBOOKS-CREATE_PLAYBOOK-1 Create New Playbook ✅
     Then she sees "Initial Version: v1.0" and it is read-only
     And she cannot modify the version number on creation
     And the version will be v1.0 after creation
+
+  # GUEST ACCESS — create wizard requires login (@guest_access)
+  Scenario: FOB-PLAYBOOKS-CREATE_PLAYBOOK-22 Guest GET create URL redirects to login
+    Given Bob is not logged in
+    When Bob GET "/playbooks/create/"
+    Then he is redirected to the FOB login page
+    And the redirect URL includes "?next=/playbooks/create/"
+
+  Scenario: FOB-PLAYBOOKS-CREATE_PLAYBOOK-23 Guest POST create wizard redirects to login
+    Given Bob is not logged in
+    When Bob POST to the playbook create wizard step 1
+    Then he is redirected to the FOB login page
+    And no playbook is created

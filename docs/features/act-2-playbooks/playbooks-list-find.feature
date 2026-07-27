@@ -3,8 +3,11 @@ Feature: FOB-PLAYBOOKS-LIST+FIND-1 Playbooks List and Search
   I want to view, search, and filter my playbooks
   So that I can quickly find and manage methodologies I need
 
-  # MVP simplified: list shows owned playbooks and other authors' public, non-draft playbooks
-  # in one card grid. Empty state appears only when both sets are empty.
+  # MVP simplified: authenticated users see owned playbooks and other authors' public,
+  # non-draft playbooks in one card grid. Anonymous guests see released public playbooks only
+  # (see playbooks-guest-browse.feature and scenarios LIST+FIND-26..28).
+  # Empty state appears only when both sets are empty (authenticated) or when no released
+  # public playbooks exist (guest).
   # Write/edit/delete actions are visible only to the owner on their own playbooks.
 
   Background:
@@ -238,6 +241,7 @@ Feature: FOB-PLAYBOOKS-LIST+FIND-1 Playbooks List and Search
     And the Playbooks nav link is highlighted as active
 
   # MVP simplified: public browsing is in scope for MVP (released/active only, not draft).
+  # Logged-in non-owner variant; anonymous guest equivalent is LIST+FIND-26..28.
   Scenario: FOB-PLAYBOOKS-LIST+FIND-25 Browse Public playbooks from other owners
     Given Mike owns a Public Released playbook "React Frontend Development"
     And Maria is authenticated in FOB
@@ -245,3 +249,28 @@ Feature: FOB-PLAYBOOKS-LIST+FIND-1 Playbooks List and Search
     Then she sees "React Frontend Development" with author "Mike Chen"
     And she can [View] the playbook detail page
     And she does not see [Edit] or [Delete] actions for it in her list
+
+  # ============================================================
+  # GUEST ACCESS — anonymous public playbook browse (@guest_access)
+  # ============================================================
+
+  Scenario: FOB-PLAYBOOKS-LIST+FIND-26 Guest sees released public playbooks on list page
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    When Bob opens "/playbooks/"
+    Then he sees "React Frontend Development" with author "Mike Chen"
+    And he does not see [Edit] or [Delete] on the playbook card
+    And he sees the guest banner with data-testid "guest-auth-banner"
+
+  Scenario: FOB-PLAYBOOKS-LIST+FIND-27 Guest empty state when no public playbooks exist
+    Given Bob is not logged in
+    And no playbooks have visibility=public AND status=released
+    When Bob opens "/playbooks/"
+    Then he sees "Explore public playbooks will appear here"
+    And he does not see the authenticated owner empty state "No playbooks yet"
+    And he does not see [Create Playbook] as an actionable create wizard entry point
+
+  Scenario: FOB-PLAYBOOKS-LIST+FIND-28 Guest cannot create playbook from list page
+    Given Bob is not logged in
+    When Bob opens "/playbooks/"
+    Then [Create New Playbook] is absent or links to login with "?next="

@@ -4,6 +4,9 @@
 {% block title %}Skills{% endblock %}
 
 {% block content %}
+{% if is_guest_browse %}
+  {% include "partials/guest_auth_banner.html" %}
+{% endif %}
 <div data-testid="skills-list">
     <div class="hg-page-header mb-3" data-testid="skills-list-header">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">

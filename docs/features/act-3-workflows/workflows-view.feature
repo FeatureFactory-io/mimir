@@ -62,3 +62,22 @@ Feature: FOB-WORKFLOWS-VIEW_WORKFLOW-1 View Workflow Details
     Then she sees [Add Activity] button
     When she clicks it
     Then activity creation form appears
+
+  # ============================================================
+  # GUEST ACCESS — anonymous read-only workflow view (@guest_access)
+  # ============================================================
+
+  Scenario: FOB-WORKFLOWS-VIEW_WORKFLOW-11 Guest views workflow in public released playbook read-only
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    And the playbook has workflow "Component Development"
+    When Bob GET the workflow detail URL for "Component Development"
+    Then he sees workflow name "Component Development"
+    And he sees workflow description and activities list
+    And he does not see [Edit Workflow], [Delete Workflow], or [Add Activity]
+
+  Scenario: FOB-WORKFLOWS-VIEW_WORKFLOW-12 Guest cannot view workflow in private playbook
+    Given Bob is not logged in
+    And Mike owns a Private Released playbook with workflow "Secret Workflow"
+    When Bob GET the workflow detail URL for "Secret Workflow"
+    Then the response status is HTTP 404

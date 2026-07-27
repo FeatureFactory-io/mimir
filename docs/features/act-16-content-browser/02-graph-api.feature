@@ -13,6 +13,8 @@ Feature: FOB-CONTENT-BROWSER-API Content Browser Graph API and Data
     Then content-browser.js fetches data from GET /api/playbooks/<pk>/graph/
     And the response drives graph rendering with nodes, edges, and phase metadata
     And the response respects the same visibility/access rules as the playbook detail page
+    # Anonymous guests on released public playbooks follow the same access rules as
+    # authenticated public viewers (see FOB-CONTENT-BROWSER-13f).
 
 
   Scenario: FOB-CONTENT-BROWSER-13b Activity phase metadata is included in graph API response
@@ -46,7 +48,7 @@ Feature: FOB-CONTENT-BROWSER-API Content Browser Graph API and Data
       Node id format for structural nodes: "<type>:<entity_pk>" (unchanged)
 
 
-  Scenario: FOB-CONTENT-BROWSER-13f Activity nodes include a display code label
+  Scenario: FOB-CONTENT-BROWSER-13h Activity nodes include a display code label
     Given a playbook has a workflow "Build Phase Execution" with abbreviation "BPE"
     And that workflow has activities with order 1, 2, 3 named "Plan", "Implement", "Test"
     When the graph API is called for that playbook
@@ -60,7 +62,7 @@ Feature: FOB-CONTENT-BROWSER-API Content Browser Graph API and Data
     And if display_code is empty only the activity name is shown (single line, no blank line)
 
 
-  Scenario: FOB-CONTENT-BROWSER-13g Sequence edges show execution order within a workflow
+  Scenario: FOB-CONTENT-BROWSER-13i Sequence edges show execution order within a workflow
     Given a workflow has three activities with order 1, 2, 3
     When the graph API is called for that playbook
     Then the response contains sequence edges connecting consecutive activities:
@@ -73,6 +75,23 @@ Feature: FOB-CONTENT-BROWSER-API Content Browser Graph API and Data
     And sequence edges are NOT emitted across workflow boundaries
     And on the canvas sequence edges are rendered as solid mid-weight arrows
       distinct from the dashed predecessor edges
+
+
+  Scenario: FOB-CONTENT-BROWSER-13f Anonymous guest GET graph API for public released playbook
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development" with id=<public_pk>
+    When Bob GET "/api/playbooks/<public_pk>/graph/" without authentication token
+    Then the response status is HTTP 200
+    And the response body is JSON with "nodes" and "edges" arrays
+    And nodes include workflows, activities, and related entity types for that playbook
+
+
+  Scenario: FOB-CONTENT-BROWSER-13g Anonymous guest GET graph API for private playbook returns 404
+    Given Bob is not logged in
+    And Mike owns a Private Released playbook with id=<private_pk>
+    When Bob GET "/api/playbooks/<private_pk>/graph/" without authentication token
+    Then the response status is HTTP 404
+    And the response does not reveal whether the playbook exists or is private
 
 
     Given Maria opens a playbook in the graph view

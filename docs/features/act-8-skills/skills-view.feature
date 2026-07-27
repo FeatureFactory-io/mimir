@@ -45,3 +45,32 @@ Feature: FOB-SKILLS-VIEW_SKILL-1 View Skill Details
     Given Maria is viewing the skill
     When she clicks [Delete Skill]
     Then the FOB-SKILLS-DELETE_SKILL-1 modal appears
+
+  # ============================================================
+  # GUEST ACCESS — anonymous read-only skill view (@guest_access)
+  # ============================================================
+
+  Scenario: FOB-SKILLS-VIEW_SKILL-07 Guest views skill in public released playbook read-only
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    And the playbook has skill "React Form Component"
+    When Bob GET the skill detail URL for "React Form Component"
+    Then he sees skill title "React Form Component"
+    And he sees capability domain and technology stack badges
+    And he sees formatted Markdown content
+    And he does not see [Edit Skill] or [Delete Skill]
+
+  Scenario: FOB-SKILLS-VIEW_SKILL-08 Guest cannot view skill in private playbook
+    Given Bob is not logged in
+    And Mike owns a Private Released playbook with skill "Secret Skill"
+    When Bob GET the skill detail URL for "Secret Skill"
+    Then the response status is HTTP 404
+
+  Scenario: FOB-SKILLS-VIEW_SKILL-09 Guest views skill embed without login redirect
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    And the playbook has skill "React Form Component"
+    When Bob GET the skill embed URL with "?embed=1"
+    Then the response status is HTTP 200
+    And the embed content loads without navbar or mutation buttons
+    And Bob is not redirected to the login page

@@ -3,9 +3,10 @@ Feature: FOB-PLAYBOOKS-VIEW_PLAYBOOK-1 View Playbook Details
   I want to view complete playbook details
   So that I can understand the methodology structure and content
 
-  # MVP simplified: Public playbooks — any authenticated user may view (read-only for non-owners).
+  # MVP simplified: Public playbooks — anyone including anonymous guests may view (read-only for non-owners).
   # Private playbooks — owner-only view, edit, and delete.
   # Edit and Delete actions are shown only to the owner regardless of visibility.
+  # Export JSON, Release, Submit PIP, Duplicate — owner-only; guests never see these actions.
 
   Background:
     Given Maria is authenticated in FOB
@@ -60,7 +61,7 @@ Feature: FOB-PLAYBOOKS-VIEW_PLAYBOOK-1 View Playbook Details
       | Created  |                            3 months ago |
       | Source   | Downloaded from Usability family        |
 
-  # MVP simplified: public playbooks are readable by any authenticated user.
+  # MVP simplified: public playbooks are readable by any authenticated non-owner (Maria logged in).
   Scenario: FOB-PLAYBOOKS-VIEW_PLAYBOOK-04b Non-owner views Public playbook read-only
     Given Mike owns a Public Released playbook "React Frontend Development"
     And Maria is authenticated in FOB and is not the owner
@@ -69,8 +70,27 @@ Feature: FOB-PLAYBOOKS-VIEW_PLAYBOOK-1 View Playbook Details
     And she can read Overview, Workflows, and Activities tabs
     And [Edit] and [Delete] are not available to Maria (owner-only)
     And [Submit PIP] is not available to Maria (owner-only in MVP)
+    And [Export JSON] is not available to Maria (owner-only)
     And she sees [Content Browser] linking to /browser/<pk>/ for that playbook
     # MVP: PIP submission is owner-only. Public viewers can view the playbook and its PIPs but cannot propose changes.
+
+  # GUEST ACCESS — anonymous read-only public playbook view (@guest_access)
+  Scenario: FOB-PLAYBOOKS-VIEW_PLAYBOOK-04d Guest views Public playbook read-only
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    When Bob opens the playbook detail page for "React Frontend Development"
+    Then he sees Visibility "Public" in the metadata header
+    And he can read Overview, Workflows, and Activities tabs
+    And [Edit], [Delete], [Release], [Submit PIP], and [Export JSON] are not available
+    And he sees [Content Browser] linking to /browser/<pk>/ for that playbook
+    And he sees the guest banner with data-testid "guest-auth-banner"
+
+  Scenario: FOB-PLAYBOOKS-VIEW_PLAYBOOK-04e Guest cannot view private playbook detail
+    Given Bob is not logged in
+    And Mike owns a Private Released playbook "Internal Security Playbook"
+    When Bob GET "/playbooks/<private_pk>/"
+    Then the response status is HTTP 404
+    And Bob does not see playbook content
 
   Scenario: FOB-PLAYBOOKS-VIEW_PLAYBOOK-04c Content Browser entry on playbook detail
     Given Maria is on the playbook detail page for "React Frontend Development"
@@ -107,6 +127,9 @@ Feature: FOB-PLAYBOOKS-VIEW_PLAYBOOK-1 View Playbook Details
     Then she sees [Add Workflow] button
     When she is viewing a downloaded playbook "React Frontend Development"
     And she is on the Workflows tab
+    Then the [Add Workflow] button is not visible
+    When Bob is not logged in and views a Public Released playbook "React Frontend Development"
+    And he is on the Workflows tab
     Then the [Add Workflow] button is not visible
     # Implemented: Add Workflow + Manage buttons in workflows section
     # Only visible if can_edit (owned playbooks)
@@ -227,6 +250,7 @@ Feature: FOB-PLAYBOOKS-VIEW_PLAYBOOK-1 View Playbook Details
     # Implemented: playbook_export view
     # JSON download with metadata
     # Filename format: name-vX.json
+    # Owner-only: Bob (guest) and Maria viewing Mike's public playbook do not see [Export JSON]
 
   Scenario: FOB-PLAYBOOKS-VIEW_PLAYBOOK-19 Duplicate playbook ✅ IMPLEMENTED
     Given Maria is on the playbook detail page

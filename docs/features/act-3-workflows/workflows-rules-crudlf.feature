@@ -3,6 +3,9 @@ Feature: FOB-WORKFLOWS-RULES-1 Rules CRUDLF (playbook-scoped)
   I want to manage IDE-style rules for a playbook
   So that activities can reuse the same guidance and export includes .mdc files
 
+  # Guest read: rule VIEW at /playbooks/<pk>/rules/<rule_pk>/ and ?embed=1 only; CRUD requires auth.
+  # See playbooks-guest-browse.feature GUEST-05 and guest-global-entity-lists.feature GUEST-GLOBAL-06.
+
   Background:
     Given Maria is authenticated in FOB
     And she owns playbook "React Frontend v0.5"

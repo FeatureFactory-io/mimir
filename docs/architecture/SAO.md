@@ -921,7 +921,7 @@ The FOB web UI needs to display complex graph structures (workflows, activity de
 
 2. **CDN delivery, no build step** — Cytoscape.js and layout plugins load via CDN `<script>` tags, pinned to specific versions with [SRI integrity hashes](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity). No `package.json` at repo root; no webpack/vite/babel. View JS files (`static/js/<view>.js`) are plain browser JavaScript using the Cytoscape imperative API. Each view template must include a bootstrap guard (inline `<script>` checking `window.cytoscape`) that renders a static "scripts failed to load" fallback if any CDN resource is unavailable.
 
-3. **Data via Django-owned JSON endpoints** — the view script fetches data exclusively from Django-managed endpoints under `/api/`. Feature-specific endpoints are permitted and must go through Django's auth/serialization layer. Scripts must not access the database, bypass DRF serializers, or construct requests outside the `/api/` prefix.
+3. **Data via Django-owned JSON endpoints** — the view script fetches data exclusively from Django-managed endpoints under `/api/`. Feature-specific endpoints are permitted and must go through Django's auth/serialization layer. Scripts must not access the database, bypass DRF serializers, or construct requests outside the `/api/` prefix. For public released playbooks, `GET /api/playbooks/<pk>/graph/` allows anonymous access when `can_view` passes (see Guest read security in FOB Authorization).
 
 4. **No coupling to HTMX globals** — view scripts must not read or write HTMX client-side globals (`htmx.*`). Standard Django auth via HTTP session cookies is expected and relied upon. Write-capable views must read the CSRF token from a `data-csrftoken` attribute bootstrapped by the Django view — never fetched client-side.
 
@@ -2787,10 +2787,47 @@ async def create_playbook(name: str, description: str, category: str) -> dict:
 - Staff/superuser accounts bypass the verification lock entirely
 
 **Authorization**:
-- All web views require `@login_required`; unauthenticated requests redirect to `/auth/user/login/`
-- Login view additionally checks `UserEmailVerification.is_verified`; unverified users are shown an error with a re-send link
-- Staff/superuser: full access including Django Admin; bypass email-verification gate
-- Regular users: access scoped to their own playbooks and PIPs (group-based visibility planned)
+
+FOB web routes use a **tiered access model** — not a blanket `@login_required` on every view:
+
+| Tier | Who | Routes / behavior |
+|------|-----|-------------------|
+| **Public** | Anyone (no session) | `/` landing; login, register, password reset |
+| **Guest-read** | Anonymous + authenticated | GET on allowlisted read surfaces when `Playbook.can_view()` passes — see Guest read security below |
+| **Auth-only** | Logged-in verified users | Dashboard, create/edit/delete wizards, PIPs, Teams, profile, mutations, MCP-facing REST writes |
+
+**Guest-read allowlist (GET only)**:
+- `/playbooks/` — list shows released public playbooks for anonymous users
+- `/playbooks/<pk>/` and child entity VIEW routes (workflows, activities, artifacts, skills, agents, rules, phases)
+- `/browser/<pk>/` — Content Browser
+- Global lists: `/workflows/`, `/activities/`, `/artifacts/`, `/skills/`, `/agents/`, `/rules/`, `/phases/` — queryset filtered to guest-readable playbooks
+- `GET /api/playbooks/<pk>/graph/` — graph JSON for Content Browser
+
+**Auth-only (login redirect for anonymous)**:
+- All POST/PUT/DELETE; create/edit/delete wizards; `/dashboard/`; `/pips/`; `/teams/`; profile; Django Admin
+
+**Within guest-read tier**: `playbook_readable_or_404(request, pk)` enforces `Playbook.can_view()` — private or non-readable playbooks return **404** (not 403).
+
+Login view additionally checks `UserEmailVerification.is_verified`; unverified users are shown an error with a re-send link.
+
+Staff/superuser: full access including Django Admin; bypass email-verification gate.
+
+Regular authenticated users: access scoped to owned playbooks, public non-draft playbooks from others, and team-shared playbooks (Act 11).
+
+**MCP**: unchanged — all MCP tools require DRF token authentication (`--user`); no anonymous MCP access.
+
+### Guest read security
+
+Anonymous public playbook browse follows a **fail-closed, no-leak** policy:
+
+1. **404 not 403** — inaccessible playbooks (private, draft, wrong status for guest) return HTTP 404 so anonymous users cannot infer existence vs permission denial.
+2. **Released-only for guests** — anonymous users see public playbooks only when `status=released`; authenticated users also see public `active`/`disabled` non-draft playbooks.
+3. **Graph API** — `GET /api/playbooks/<pk>/graph/` uses `AllowAny` permission class plus server-side `can_view` check; no DRF token required for readable public playbooks; mutations and other API endpoints remain `IsAuthenticated`.
+4. **No serializer leaks** — guest responses use the same read serializers as authenticated viewers; no author email, internal IDs beyond PK, or draft-only fields in anonymous responses.
+5. **No MCP or PIP exposure** — PIP routes, team browse, global search, and all MCP tools stay auth-only.
+6. **Embed URLs** — entity `?embed=1` views on public released playbooks serve content without login redirect; session-expiry redirect applies to authenticated users only.
+
+Reference: `docs/features/act-2-playbooks/playbooks-access-control.md`, `methodology/utils/playbook_access.py`, `methodology/utils/guest_auth.py`.
 
 **PIP Transmission**: Uses DRF API token to transmit PIPs to HOMEBASE (future)
 

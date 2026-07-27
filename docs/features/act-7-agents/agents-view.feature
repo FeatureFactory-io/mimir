@@ -43,3 +43,31 @@ Feature: FOB-AGENTS-VIEW_AGENT-1 View Agent Details
     Given Maria is viewing the agent
     When she clicks [Delete Agent]
     Then the FOB-AGENTS-DELETE_AGENT-1 modal appears
+
+  # ============================================================
+  # GUEST ACCESS — anonymous read-only agent view (@guest_access)
+  # ============================================================
+
+  Scenario: AGENT-VIEW-07 Guest views agent in public released playbook read-only
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    And the playbook has agent "Cautious Developer (drdobbs-v2)"
+    When Bob GET the agent detail URL for "Cautious Developer (drdobbs-v2)"
+    Then he sees agent name "Cautious Developer (drdobbs-v2)"
+    And he sees agent description and linked activities read-only
+    And he does not see [Edit Agent] or [Delete Agent]
+
+  Scenario: AGENT-VIEW-08 Guest cannot view agent in private playbook
+    Given Bob is not logged in
+    And Mike owns a Private Released playbook with agent "Secret Agent"
+    When Bob GET the agent detail URL for "Secret Agent"
+    Then the response status is HTTP 404
+
+  Scenario: AGENT-VIEW-09 Guest views agent embed without login redirect
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    And the playbook has agent "Cautious Developer (drdobbs-v2)"
+    When Bob GET "/agents/<pk>/?embed=1" for "Cautious Developer (drdobbs-v2)"
+    Then the response status is HTTP 200
+    And the embed content loads without navbar or mutation buttons
+    And Bob is not redirected to the login page

@@ -248,6 +248,35 @@ class PlaybookService:
         return rows
 
     @staticmethod
+    def list_public_playbooks_for_guest():
+        """Released public playbooks visible to anonymous guests (browse list).
+
+        :returns: List of Playbook instances, newest first.
+        """
+        qs = (
+            Playbook.objects.filter(visibility="public", status="released")
+            .select_related("author")
+            .order_by("-updated_at")
+        )
+        rows = list(qs)
+        logger.info("Listed %s released public playbooks for anonymous guest", len(rows))
+        return rows
+
+    @staticmethod
+    def get_guest_readable_playbook_ids():
+        """Primary keys of playbooks anonymous guests may read.
+
+        :returns: Set of int playbook IDs.
+        """
+        ids = set(
+            Playbook.objects.filter(visibility="public", status="released").values_list(
+                "id", flat=True
+            )
+        )
+        logger.info("Guest-readable playbook count=%s", len(ids))
+        return ids
+
+    @staticmethod
     def list_team_playbooks_for_user(user):
         """
         Released playbooks shared via team membership (excludes own-authored).
@@ -301,7 +330,8 @@ class PlaybookService:
 
         # Get public playbook IDs (non-draft, excluding own)
         public_ids = set(
-            Playbook.objects.filter(visibility="public", status="released")
+            Playbook.objects.filter(visibility="public")
+            .exclude(status="draft")
             .exclude(author=user)
             .values_list("id", flat=True)
         )

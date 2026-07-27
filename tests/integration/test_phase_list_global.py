@@ -168,14 +168,15 @@ class TestPhaseListGlobal:
         assert b'data-testid="empty-state"' in response.content
         assert b'No phases yet' in response.content
 
-    def test_requires_authentication(self):
-        """Phase global list requires login."""
+    def test_anonymous_guest_can_browse_global_list(self):
+        """Anonymous users can browse released public phases (guest read)."""
         self.client.logout()
         url = reverse('phase_list_global')
         response = self.client.get(url)
 
-        assert response.status_code == 302
-        assert '/auth/' in response.url
+        assert response.status_code == 200
+        assert b'data-testid="guest-auth-banner"' in response.content
+        assert b'data-testid="empty-state"' in response.content
 
     def test_shows_playbook_name(self):
         """Phase table shows the parent playbook name."""

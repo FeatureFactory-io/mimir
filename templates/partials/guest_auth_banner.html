@@ -1,0 +1,14 @@
+{# Banner for anonymous guest browse sessions. #}
+<div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"
+     data-testid="guest-auth-banner"
+     role="status">
+  <span>Sign in to create and edit playbooks.</span>
+  <span class="d-flex gap-2">
+    <a href="{% url 'login' %}?next={{ request.path|urlencode }}"
+       class="btn btn-sm btn-primary"
+       data-testid="guest-banner-sign-in">Sign In</a>
+    <a href="{% url 'register' %}"
+       class="btn btn-sm btn-outline-primary"
+       data-testid="guest-banner-register">Register</a>
+  </span>
+</div>

@@ -4,7 +4,7 @@ Feature: FOB-PLAYBOOKS-EDIT_PLAYBOOK-1 Edit Playbook
   So that I can update and improve my methodology
 
   # Access: only the owner can edit draft playbooks in FOB (released → PIP only).
-  # Visibility: Private (owner-only view) or Public (any authenticated user can view).
+  # Visibility: Private (owner-only view) or Public (anyone including anonymous guests can view once released/non-draft).
   # Family and Local only are deferred (Homebase); not available in MVP edit form.
   # MVP simplified: write/delete always owner-only regardless of visibility.
 
@@ -85,7 +85,7 @@ Feature: FOB-PLAYBOOKS-EDIT_PLAYBOOK-1 Edit Playbook
     And she sees help text:
       """
       Private — only you can view this playbook.
-      Public — any authenticated user can view; only you can edit or delete it.
+      Public — anyone can view (no sign-in required once released); only you can edit or delete it.
       """
 
   Scenario: FOB-PLAYBOOKS-EDIT_PLAYBOOK-08b Change visibility Private → Public
@@ -93,7 +93,7 @@ Feature: FOB-PLAYBOOKS-EDIT_PLAYBOOK-1 Edit Playbook
     When she selects "Public"
     And she clicks [Save Changes]
     Then the playbook visibility is updated to public
-    And any authenticated user can now open and read the playbook in FOB
+    And anyone can now open and read the playbook in FOB once it is released
     And Maria remains the only person who can edit or delete it
 
   Scenario: FOB-PLAYBOOKS-EDIT_PLAYBOOK-08c Change visibility Public → Private
@@ -101,7 +101,7 @@ Feature: FOB-PLAYBOOKS-EDIT_PLAYBOOK-1 Edit Playbook
     When she selects "Private"
     And she clicks [Save Changes]
     Then the playbook visibility is updated to private
-    And non-owners can no longer open the playbook in FOB
+    And guests and non-owners can no longer open the playbook in FOB
 
   @deferred @homebase
   Scenario: FOB-PLAYBOOKS-EDIT_PLAYBOOK-09 Change visibility with Homebase Family sync
@@ -244,3 +244,17 @@ Feature: FOB-PLAYBOOKS-EDIT_PLAYBOOK-1 Edit Playbook
     Then the Tags field is empty
     And the form renders without errors
     And she can add new tags and save successfully
+
+  # GUEST ACCESS — edit routes require login (@guest_access)
+  Scenario: FOB-PLAYBOOKS-EDIT_PLAYBOOK-26 Guest GET edit URL for public playbook redirects to login
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    When Bob GET "/playbooks/<public_pk>/edit/"
+    Then he is redirected to the FOB login page
+
+  Scenario: FOB-PLAYBOOKS-EDIT_PLAYBOOK-27 Guest GET edit URL for private playbook redirects to login
+    Given Bob is not logged in
+    And Mike owns a Private Released playbook "Internal Security Playbook"
+    When Bob GET "/playbooks/<private_pk>/edit/"
+    Then he is redirected to the FOB login page
+    And Bob does not receive HTTP 404 on the edit route

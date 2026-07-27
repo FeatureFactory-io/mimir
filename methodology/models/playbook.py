@@ -115,11 +115,13 @@ class Playbook(models.Model):
             if self.shared_with_groups.filter(id__in=user.groups.all()).exists():
                 return True
 
-        # Public non-draft playbooks are viewable by anyone
+        # Public playbooks: guests see released only; authenticated see non-draft
         if self.visibility != "public":
             return False
         if self.status == "draft":
             return False
+        if not user or not getattr(user, "is_authenticated", False):
+            return self.status == "released"
         return True
 
     def can_edit(self, user):

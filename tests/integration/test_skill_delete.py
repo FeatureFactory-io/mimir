@@ -151,7 +151,7 @@ class TestSkillDelete:
 
         response = self.client.post(self._delete_url())
 
-        assert response.status_code == 302
+        assert response.status_code == 404
         assert Skill.objects.filter(pk=self.skill.pk).exists()
 
     def test_skill_delete_detail_has_delete_button(self):

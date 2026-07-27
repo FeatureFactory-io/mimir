@@ -19,6 +19,7 @@ from methodology.services.rule_service import RuleService
 from methodology.services.agent_service import AgentService
 from methodology.services.skill_service import SkillService
 from methodology.services.artifact_service import ArtifactService
+from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
@@ -51,12 +52,13 @@ def _activity_field_errors(exc: ValidationError) -> dict[str, str]:
 
 # ==================== GLOBAL LIST ====================
 
-@login_required
+@guest_read_or_login_required
 def activity_global_list(request):
     """
     Global activities overview - all activities across all workflows and playbooks.
     
     Shows activities from all workflows in playbooks accessible to the user (owned + public + team).
+    Anonymous guests see activities from released public playbooks only.
     Useful for seeing all tasks and managing across entire methodology.
     
     Template: activities/global_list.html
@@ -65,13 +67,22 @@ def activity_global_list(request):
         - workflow_count: Count of unique workflows
         - playbook_count: Count of unique playbooks
         - phase_groups: Dict of activities grouped by phase
+        - is_guest_browse: True for anonymous session
     
     :param request: Django request object
     :return: Rendered global list template
     """
-    # Get all activities via service
-    activities = ActivityService.list_activities_global(request.user)
-    
+    if request.user.is_authenticated:
+        activities = ActivityService.list_activities_global(request.user)
+        is_guest_browse = False
+        user_label = request.user.username
+    else:
+        from methodology.services.guest_browse_service import list_global_activities_for_guest
+
+        activities = list_global_activities_for_guest()
+        is_guest_browse = True
+        user_label = "anonymous"
+
     # Count unique workflows and playbooks
     workflow_count = activities.values('workflow').distinct().count()
     playbook_count = activities.values('workflow__playbook').distinct().count()
@@ -84,13 +95,18 @@ def activity_global_list(request):
             phase_groups[phase_name] = []
         phase_groups[phase_name].append(activity)
     
-    logger.info(f"User {request.user.username} viewing global activities list ({activities.count()} activities)")
+    logger.info(
+        "User %s viewing global activities list (%s activities)",
+        user_label,
+        activities.count(),
+    )
     
     return render(request, 'activities/global_list.html', {
         'activities': activities,
         'workflow_count': workflow_count,
         'playbook_count': playbook_count,
         'phase_groups': phase_groups,
+        'is_guest_browse': is_guest_browse,
     })
 
 
@@ -310,7 +326,7 @@ def _render_create_form(request, playbook, workflow, form_data, errors):
 
 # ==================== VIEW ====================
 
-@login_required
+@guest_read_or_login_required
 def activity_detail(request, playbook_pk, workflow_pk, activity_pk):
     """
     View activity details.
@@ -333,8 +349,11 @@ def activity_detail(request, playbook_pk, workflow_pk, activity_pk):
     :return: Rendered detail template
     :raises Http404: If playbook, workflow, or activity not found
     """
-    logger.info(f"User {request.user.username} viewing activity {activity_pk}")
-    
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
+    logger.info("User %s viewing activity %s", user_label, activity_pk)
+
     # Get instances with permission check
     playbook = playbook_readable_or_404(request, playbook_pk)
     workflow = get_object_or_404(Workflow, pk=workflow_pk, playbook=playbook)
@@ -355,27 +374,33 @@ def activity_detail(request, playbook_pk, workflow_pk, activity_pk):
         f"and {artifact_outputs.count()} artifact outputs"
     )
 
+    can_edit = (
+        workflow.can_edit(request.user) if request.user.is_authenticated else False
+    )
+    can_submit_pip = (
+        request.user.is_authenticated
+        and playbook.source == 'owned'
+        and playbook.author_id == request.user.id
+        and playbook.is_released
+    )
     context = {
         'playbook': playbook,
         'workflow': workflow,
         'activity': activity,
-        'can_edit': workflow.can_edit(request.user),
-        'can_submit_pip': (
-            playbook.source == 'owned'
-            and playbook.author_id == request.user.id
-            and playbook.is_released
-        ),
+        'can_edit': can_edit,
+        'can_submit_pip': can_submit_pip,
         'artifact_inputs': artifact_inputs,
         'artifact_outputs': artifact_outputs,
+        'is_guest_browse': not request.user.is_authenticated,
     }
     if request.GET.get('embed') == '1':
         return render(request, 'activities/_embed.html', context)
     logger.info(
         "Activity detail rendered user=%s activity=%s can_edit=%s can_submit_pip=%s",
-        request.user.username,
+        user_label,
         activity_pk,
-        context["can_edit"],
-        context["can_submit_pip"],
+        can_edit,
+        can_submit_pip,
     )
     return render(request, 'activities/detail.html', context)
 

@@ -39,11 +39,24 @@ Feature: FOB-CONTENT-BROWSER-DETAIL-PANEL Content Browser Detail Panel
 
 
   Scenario: FOB-CONTENT-BROWSER-08c Session expires while detail panel is open
+    # Applies to authenticated users only; anonymous guests have no session to expire.
     Given Maria has the detail panel open showing an Activity
     When her Django session expires
     And she clicks a different node
     Then the panel detects a non-entity response (login page redirect)
     And redirects the current tab to /auth/login/?next=/browser/<pk>/
+
+
+  Scenario: FOB-CONTENT-BROWSER-08d Guest clicks Activity node and detail panel loads embed without login redirect
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development" with id=<public_pk>
+    And Bob is on the graph view at "/browser/<public_pk>/"
+    When Bob clicks an Activity node on the canvas
+    Then the detail panel slides in from the right
+    And the panel fetches GET "<activity_detail_url>?embed=1" without authentication
+    And the embedded activity content loads with HTTP 200
+    And Bob is not redirected to the login page
+    And the panel shows activity name and guidance without navbar or mutation buttons
 
 
   Scenario: FOB-CONTENT-BROWSER-09 Close entity detail panel

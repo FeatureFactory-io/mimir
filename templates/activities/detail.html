@@ -5,6 +5,9 @@
 {% block title %}{{ activity.name }} - Activity{% endblock %}
 
 {% block content %}
+{% if is_guest_browse %}
+  {% include "partials/guest_auth_banner.html" %}
+{% endif %}
 <div data-testid="activity-detail">
     <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb">

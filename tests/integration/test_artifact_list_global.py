@@ -109,14 +109,15 @@ class TestArtifactListGlobal:
         assert b'data-testid="empty-state"' in response.content
         assert b'No artifacts yet' in response.content
 
-    def test_requires_authentication(self):
-        """Artifact global list requires login."""
+    def test_anonymous_guest_can_browse_global_list(self):
+        """Anonymous users can browse released public artifacts (guest read)."""
         self.client.logout()
         url = reverse('artifact_list_global')
         response = self.client.get(url)
 
-        assert response.status_code == 302
-        assert '/auth/' in response.url
+        assert response.status_code == 200
+        assert b'data-testid="guest-auth-banner"' in response.content
+        assert b'data-testid="empty-state"' in response.content
 
     def test_shows_playbook_name(self):
         """Artifact table shows the parent playbook name."""

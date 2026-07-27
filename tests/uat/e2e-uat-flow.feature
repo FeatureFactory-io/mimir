@@ -5,6 +5,7 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
   All MCP tool scenarios live in tests/uat/mcp-uat-flow.feature (run in agent mode).
 
   Execution order:
+    0. J0 here  (optional: guest evaluation — incognito, no cookies; can run before J1 OR after UAT-03-05 admin seed to reuse <ADMIN_PUBLIC_PB_ID>)
     1. J1 here  (register + token RECORD)
     2. mcp-uat-flow.feature MCP-00  (wire Docker token → smoke)
     3. J3 here  (GUI CRUDL)
@@ -20,6 +21,7 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
   JOURNEY MAP
   ==============================================================================
     | Journey | Scenarios in THIS file                               | MCP counterpart (mcp-uat-flow.feature) |
+    | J0      | UAT-00-01 … UAT-00-07 (guest browse pre-registration) | — (no MCP; token required)             |
     | J1      | UAT-01-00 … UAT-01-04, 01-01b, 01-03b               | MCP-00 (token wire)                    |
     | J3      | UAT-03-00 … UAT-03-03 + CRUDL splits                 | MCP-01/02/03                           |
     | J3B     | UAT-03-05, UAT-03-05b (GUI visibility isolation)     | MCP-01b (MCP author-scoping proof)     |
@@ -51,6 +53,7 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     | Activate playbook tile | Out of scope — skip. |
     | Notifications / Teams / GUI import/export | Skip or assert disabled only. |
     | Family/Homebase playbook sharing GUI | Deferred; FOB MVP uses Private vs Public. |
+    | Browse public playbooks before register | J0 guest path (UAT-00-01 … UAT-00-07); no MCP counterpart. |
     | Submit PIP UX lock until changes | Browser may allow click; SEE server `Add at least one Change before submitting.` |
 
   ==============================================================================
@@ -75,6 +78,74 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
 
   OUT OF SCOPE (this file): all CallMcpTool invocations, token swap, MCP sandbox, export/import,
   PIP MCP lifecycle, MCP isolation tests — all in mcp-uat-flow.feature.
+#############################################################################
+# Journey 0 — Guest evaluation (pre-registration, anonymous browse)
+#############################################################################
+  # Precondition: admin has created and released a public playbook + a private playbook.
+  # Reuse UAT-03-05 admin-create-public / admin-create-private steps OR run J0 after J3B.
+  # Run in incognito with no session cookies. No uat_user login required.
+
+  @manual @uat @act-0 @guest
+  Scenario: UAT-00-01 Landing Explore CTA navigates to public playbooks list
+    # STEP — Reach landing
+    # DO: incognito browser GET BASE_URL`/`
+    # SEE: `[data-testid="landing-cta-explore-playbooks"]` visible
+    # STEP — Follow CTA
+    # DO: click `[data-testid="landing-cta-explore-playbooks"]`
+    # SEE: URL `/playbooks/`
+    # IF DIFFER: UAT-00-01
+
+  @manual @uat @act-2 @guest
+  Scenario: UAT-00-02 Guest public list shows released public playbook only
+    # Pre: `<ADMIN_PUBLIC_PB_ID>` exists (released public playbook from UAT-03-05 admin steps)
+    # DO: incognito GET `/playbooks/` (no login)
+    # SEE: `[data-testid="guest-auth-banner"]` with Sign In / Register links
+    # SEE: `[data-testid="public-playbook-card-<ADMIN_PUBLIC_PB_ID>"]` referencing admin public playbook
+    # SEE: no actionable `[Create New Playbook]` button (absent or links to login)
+    # IF DIFFER: UAT-00-02
+
+  @manual @uat @act-2 @guest
+  Scenario: UAT-00-03 Guest public detail read-only with workflow drill-down
+    # DO: incognito GET `/playbooks/<ADMIN_PUBLIC_PB_ID>/`
+    # SEE: `[data-testid="playbook-detail"]` HTTP 200
+    # SEE: `[data-testid="edit-playbook-btn"]` and `[data-testid="delete-playbook-btn"]` NOT present
+    # SEE: `[data-testid="open-release-modal"]` NOT present
+    # DO: follow a workflow link from detail page
+    # SEE: workflow detail renders HTTP 200; no Edit/Delete workflow controls
+    # IF DIFFER: UAT-00-03
+
+  @manual @uat @act-2 @guest @visibility
+  Scenario: UAT-00-04 Guest private playbook returns 404 not login redirect
+    # Pre: `<ADMIN_PRIVATE_PB_ID>` from UAT-03-05 admin-create-private
+    # DO: incognito GET `/playbooks/<ADMIN_PRIVATE_PB_ID>/`
+    # SEE: HTTP 404 (NOT redirect to `/auth/user/login/`)
+    # IF DIFFER: UAT-00-04
+
+  @manual @uat @act-0 @guest
+  Scenario: UAT-00-05 Guest create and dashboard URLs redirect to login
+    # DO: incognito GET `/playbooks/create/`
+    # SEE: redirect `/auth/user/login/` with `next=/playbooks/create/` in URL
+    # DO: incognito GET `/dashboard/`
+    # SEE: redirect `/auth/user/login/` with `next=/dashboard/` in URL
+    # IF DIFFER: UAT-00-05
+
+  @manual @uat @act-16 @guest
+  Scenario: UAT-00-06 Guest Content Browser loads graph and embed panel
+    # DO: incognito GET `/browser/<ADMIN_PUBLIC_PB_ID>/`
+    # SEE: three-panel Content Browser layout; graph canvas renders nodes
+    # DO: click an Activity node in the graph
+    # SEE: detail panel loads embed content without login redirect
+    # IF DIFFER: UAT-00-06
+
+  @manual @uat @act-3 @guest
+  Scenario: UAT-00-07 Guest global workflows list shows released-public rows only
+    # DO: incognito GET `/workflows/`
+    # SEE: `[data-testid="guest-auth-banner"]`
+    # SEE: workflow from `<ADMIN_PUBLIC_PB_ID>` visible in global list
+    # SEE: no Create workflow button (or links to login)
+    # SEE: workflows from `<ADMIN_PRIVATE_PB_ID>` absent
+    # IF DIFFER: UAT-00-07
+
 #############################################################################
 # Journey 1 — Registration + verify + profile token
 ############################################################################
@@ -178,7 +249,7 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     # SEE: `[data-testid=\"wizard-step-1\"]`
     # STEP fill fundamentals
     # DO: `[data-testid=\"name-input\"]` `UAT Journey Playbook`; `[data-testid=\"description-input\"]` ≥40 char narrative; `[data-testid=\"category-select\"]` `development`; `[data-testid=\"visibility-select\"]` `private`
-    # SEE: `[data-testid=\"visibility-help\"]` explains Private vs Public (authenticated readers for Public); options `private` + `public` only
+    # SEE: `[data-testid=\"visibility-help\"]` explains Private vs Public (Public = anyone including anonymous guests once released/non-draft); options `private` + `public` only
     # STEP advance workflows
     # DO: click Next control whose label mentions adding workflows (`Next: Add Workflows`)
     # SEE: URL `/playbooks/create/step2/`
@@ -193,7 +264,7 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
   @manual @uat @act-2
   Scenario: UAT-03-01b Visibility helper on edit shell
     # DO: GET `/playbooks/<GUI_PLAYBOOK_ID>/edit/`
-    # SEE: `[data-testid=\"playbook-visibility-select\"]` selected `Private`; `[data-testid=\"visibility-help\"]` matches Private/Public semantics (no Family/Local rows)
+    # SEE: `[data-testid=\"playbook-visibility-select\"]` selected `Private`; `[data-testid=\"visibility-help\"]` matches Private/Public semantics including anonymous browse for Public released (no Family/Local rows)
 
   @manual @uat @act-4
   Scenario: UAT-03-02a Phase create + `/phases/` global RECORD
@@ -287,6 +358,7 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
 
   @manual @uat @act-2 @visibility
   Scenario: UAT-03-05 Other-user public vs private playbook appears/blocked in GUI list + detail
+    # AUTHENTICATED uat_user path — anonymous guest equivalent is Journey 0 (UAT-00-02 … UAT-00-04). Do not replace.
     # Pre: admin is a separate Django user (createsuperuser). UAT user is logged in as uat_user.
     # STEP admin-create-public
     # DO: in a separate browser session, login as admin; GET `/playbooks/create/`

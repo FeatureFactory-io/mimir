@@ -5,11 +5,14 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from methodology.models import Playbook, Rule
 from methodology.services.rule_service import RuleService
+from methodology.utils.guest_auth import guest_read_or_login_required
+from methodology.utils.playbook_access import playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -21,45 +24,51 @@ logger = logging.getLogger(__name__)
 
 
 def _get_playbook_or_deny(request, playbook_pk):
-    playbook = get_object_or_404(Playbook, pk=playbook_pk)
-    if not playbook.can_view(request.user):
-        logger.warning(
-            'User %s denied access to playbook %s (no view access)',
-            request.user.username,
-            playbook_pk,
-        )
-        messages.error(request, "You don't have permission to access this playbook.")
-        return None
-    return playbook
+    return playbook_readable_or_404(request, playbook_pk)
 
 
 def _get_rule_in_playbook(playbook, rule_pk):
     return get_object_or_404(Rule, pk=rule_pk, playbook=playbook)
 
 
-@login_required
+@guest_read_or_login_required
 def rule_list_global(request):
-    """Global rules list for owned playbooks."""
+    """Global rules list for owned playbooks; guests see released public playbooks."""
     query = request.GET.get('q', '').strip()
-    rules = RuleService.search_rules(query=query, user=request.user)
-    total_count = RuleService.search_rules(query='', user=request.user).count()
+
+    if request.user.is_authenticated:
+        rules = RuleService.search_rules(query=query, user=request.user)
+        total_count = RuleService.search_rules(query='', user=request.user).count()
+        is_guest_browse = False
+        user_label = request.user.username
+    else:
+        from methodology.services.guest_browse_service import list_global_rules_for_guest
+
+        rules = list_global_rules_for_guest(query=query or None)
+        total_count = list_global_rules_for_guest().count()
+        is_guest_browse = True
+        user_label = "anonymous"
+
     logger.info(
         'User %s viewing global rule list%s',
-        request.user.username,
+        user_label,
         f', query={query!r}' if query else '',
     )
     return render(
         request,
         'rules/list.html',
-        {'rules': rules, 'query': query, 'total_count': total_count},
+        {
+            'rules': rules,
+            'query': query,
+            'total_count': total_count,
+            'is_guest_browse': is_guest_browse,
+        },
     )
 
 
 @login_required
 def rule_list(request, playbook_pk):
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
 
     query = request.GET.get('q', '').strip()
     unlinked_only = request.GET.get('unlinked') == '1'
@@ -89,8 +98,6 @@ def rule_list(request, playbook_pk):
 @login_required
 def rule_create(request, playbook_pk):
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
     if not playbook.can_edit(request.user):
         messages.error(request, "You don't have permission to create rules in this playbook.")
         return redirect('playbook_list')
@@ -121,20 +128,29 @@ def rule_create(request, playbook_pk):
     return _render_create_form(request, playbook, {'always_apply': True}, {})
 
 
-@login_required
+@guest_read_or_login_required
 def rule_detail(request, playbook_pk, rule_pk):
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
 
     rule = _get_rule_in_playbook(playbook, rule_pk)
     activities = RuleService.get_activities_for_rule(rule_pk)
+    can_edit = playbook.can_edit(request.user) if request.user.is_authenticated else False
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
+    logger.info(
+        'User %s viewing rule %s in playbook %s',
+        user_label,
+        rule_pk,
+        playbook_pk,
+    )
 
     context = {
         'playbook': playbook,
         'rule': rule,
         'activities': activities,
-        'can_edit': playbook.can_edit(request.user),
+        'can_edit': can_edit,
+        'is_guest_browse': not request.user.is_authenticated,
     }
     if request.GET.get('embed') == '1':
         return render(request, 'rules/_embed.html', context)
@@ -144,8 +160,6 @@ def rule_detail(request, playbook_pk, rule_pk):
 @login_required
 def rule_edit(request, playbook_pk, rule_pk):
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
     if not playbook.can_edit(request.user):
         messages.error(request, "You don't have permission to edit rules in this playbook.")
         return redirect('playbook_list')
@@ -184,8 +198,6 @@ def rule_edit(request, playbook_pk, rule_pk):
 @login_required
 def rule_delete_confirm(request, playbook_pk, rule_pk):
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
 
     rule = _get_rule_in_playbook(playbook, rule_pk)
     activities = RuleService.get_activities_for_rule(rule_pk)
@@ -208,8 +220,6 @@ def rule_delete_confirm(request, playbook_pk, rule_pk):
 @login_required
 def rule_delete(request, playbook_pk, rule_pk):
     playbook = _get_playbook_or_deny(request, playbook_pk)
-    if playbook is None:
-        return redirect('playbook_list')
     if not playbook.can_edit(request.user):
         messages.error(request, "You don't have permission to delete rules in this playbook.")
         return redirect('playbook_list')

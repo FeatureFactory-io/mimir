@@ -67,6 +67,13 @@ class WorkflowService:
         
         logger.info(f"User {user.id} has access to {workflows.count()} workflows")
         return workflows
+
+    @staticmethod
+    def list_global_workflows_for_guest():
+        """Delegate to guest browse service (released public playbooks only)."""
+        from methodology.services.guest_browse_service import list_global_workflows_for_guest
+
+        return list_global_workflows_for_guest()
     
     @staticmethod
     @transaction.atomic

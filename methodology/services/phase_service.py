@@ -248,7 +248,11 @@ class PhaseService:
             >>> len(phases)
             5
         """
-        logger.info(f"Listing phases for playbook {playbook_id} for user {user.email}")
+        logger.info(
+            "Listing phases for playbook %s for user %s",
+            playbook_id,
+            getattr(user, "email", None) or getattr(user, "username", "anonymous"),
+        )
         
         try:
             playbook = Playbook.objects.get(id=playbook_id)

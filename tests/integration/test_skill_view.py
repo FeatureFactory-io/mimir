@@ -129,19 +129,17 @@ class TestSkillView:
         assert b'data-testid="activity-count"' in response.content
 
     def test_skill_view_requires_authentication(self):
-        """Skill detail requires login."""
+        """Anonymous guest cannot view skill on draft private playbook (404)."""
         self.client.logout()
         response = self.client.get(self._url())
 
-        assert response.status_code == 302
-        assert '/auth/' in response.url
+        assert response.status_code == 404
 
     def test_skill_view_requires_ownership(self):
-        """Non-owner cannot view skill of another user's playbook."""
+        """Non-owner cannot view skill of another user's private playbook."""
         other_user = User.objects.create_user(username='other', password='pass123')
         self.client.login(username='other', password='pass123')
 
         response = self.client.get(self._url())
 
-        assert response.status_code == 302
-        assert reverse('playbook_list') in response.url
+        assert response.status_code == 404

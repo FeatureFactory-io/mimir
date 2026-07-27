@@ -89,14 +89,14 @@ class TestSkillListFind:
         assert b'Setup React Component' in response.content
         assert b'Deploy to Production' not in response.content
 
-    def test_skill_global_list_requires_authentication(self):
-        """Global skills list requires login."""
+    def test_skill_global_list_allows_anonymous_guest_browse(self):
+        """Global skills list allows anonymous guest read."""
         self.client.logout()
         url = reverse('skill_list')
         response = self.client.get(url)
 
-        assert response.status_code == 302
-        assert '/auth/' in response.url
+        assert response.status_code == 200
+        assert b'data-testid="guest-auth-banner"' in response.content
 
     # ── Playbook-scoped list ─────────────────────────────────────────
 

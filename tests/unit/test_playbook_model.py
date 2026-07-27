@@ -201,3 +201,51 @@ class TestPlaybookCanView:
         playbook.shared_with_groups.add(group)
 
         assert playbook.can_view(outsider) is False
+
+    def test_anonymous_guest_sees_released_public_only(self):
+        """Anonymous users may view public released playbooks only."""
+        from django.contrib.auth.models import AnonymousUser
+        from decimal import Decimal
+
+        owner = User.objects.create_user(username='pubowner', password='testpass')
+        released = Playbook.objects.create(
+            name='Released Public',
+            description='Test',
+            category='product',
+            author=owner,
+            visibility='public',
+            status='released',
+            version=Decimal('1.0'),
+        )
+        active = Playbook.objects.create(
+            name='Active Public',
+            description='Test',
+            category='product',
+            author=owner,
+            visibility='public',
+            status='active',
+            version=Decimal('1.0'),
+        )
+        disabled = Playbook.objects.create(
+            name='Disabled Public',
+            description='Test',
+            category='product',
+            author=owner,
+            visibility='public',
+            status='disabled',
+            version=Decimal('1.0'),
+        )
+        draft = Playbook.objects.create(
+            name='Draft Public',
+            description='Test',
+            category='product',
+            author=owner,
+            visibility='public',
+            status='draft',
+        )
+        anon = AnonymousUser()
+        assert released.can_view(anon) is True
+        assert active.can_view(anon) is False
+        assert disabled.can_view(anon) is False
+        assert draft.can_view(anon) is False
+        assert active.can_view(owner) is True

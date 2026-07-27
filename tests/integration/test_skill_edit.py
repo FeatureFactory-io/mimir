@@ -148,5 +148,4 @@ class TestSkillEdit:
 
         response = self.client.post(self._url(), {'title': 'Hack', 'content': 'x'})
 
-        assert response.status_code == 302
-        assert reverse('playbook_list') in response.url
+        assert response.status_code == 404

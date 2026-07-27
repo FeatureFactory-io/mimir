@@ -23,6 +23,7 @@ from methodology.forms.playbook_forms import (
 )
 from methodology.models import Playbook
 from methodology.services.playbook_service import PlaybookService
+from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
 from methodology.services.workflow_service import WorkflowService
 
@@ -80,21 +81,43 @@ def _create_wizard_workflows(playbook: Playbook, workflows_data: list) -> None:
 # ==================== LIST ====================
 
 
-@login_required
+@guest_read_or_login_required
 def playbook_list(request):
     """
     List playbooks visible to the current user (owned + public by others + team-shared).
 
+    Anonymous guests see released public playbooks only.
+
     Template: playbooks/list.html
     Context:
-        playbooks — owned playbooks
-        public_playbooks — other authors' public, non-draft playbooks
+        playbooks — owned playbooks (authenticated only)
+        public_playbooks — browsable public playbooks
         team_playbooks — playbooks shared via team membership
         has_playbooks — True when any list is non-empty
+        is_guest_browse — True for anonymous session
 
     :param request: Django request object
     :return: Rendered list template
     """
+    if not request.user.is_authenticated:
+        public_playbooks = PlaybookService.list_public_playbooks_for_guest()
+        has_playbooks = bool(public_playbooks)
+        logger.info(
+            "Anonymous guest browsing playbooks list count=%s",
+            len(public_playbooks),
+        )
+        return render(
+            request,
+            "playbooks/list.html",
+            {
+                "playbooks": [],
+                "public_playbooks": public_playbooks,
+                "team_playbooks": [],
+                "has_playbooks": has_playbooks,
+                "is_guest_browse": True,
+            },
+        )
+
     playbooks = PlaybookService.list_playbooks(author=request.user)
     public_playbooks = PlaybookService.list_public_playbooks(request.user)
     team_playbooks = PlaybookService.list_team_playbooks_for_user(request.user)
@@ -115,6 +138,7 @@ def playbook_list(request):
             "public_playbooks": public_playbooks,
             "team_playbooks": team_playbooks,
             "has_playbooks": has_playbooks,
+            "is_guest_browse": False,
         },
     )
 
@@ -307,7 +331,7 @@ def playbook_add(request):
 # ==================== DETAIL ====================
 
 
-@login_required
+@guest_read_or_login_required
 def playbook_detail(request, pk):
     """
     Display playbook detail with Overview and Workflows tabs.
@@ -330,8 +354,14 @@ def playbook_detail(request, pk):
     from methodology.services.phase_service import PhaseService
 
     phases = PhaseService.list_phases(playbook.pk, request.user)
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
     logger.info(
-        f"User {request.user.username} viewing playbook '{playbook.name}' (id={pk})"
+        "User %s viewing playbook '%s' (id=%s)",
+        user_label,
+        playbook.name,
+        pk,
     )
 
     from methodology.services.playbook_history_service import list_playbook_version_rows
@@ -340,10 +370,11 @@ def playbook_detail(request, pk):
         "playbook": playbook,
         "workflows": workflows,
         "quick_stats": quick_stats,
-        "can_edit": can_edit,
+        "can_edit": can_edit if request.user.is_authenticated else False,
         "agents": agents,
         "phases": phases,
         "version_history": list_playbook_version_rows(playbook),
+        "is_guest_browse": not request.user.is_authenticated,
     }
     if request.GET.get("embed") == "1":
         return render(request, "playbooks/_embed.html", context)

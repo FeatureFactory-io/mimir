@@ -16,11 +16,33 @@ Feature: FOB-CONTENT-BROWSER-ACCESS Content Browser Access and Navigation
     And "Content Browser" is NOT shown in the top navigation bar
 
 
-  Scenario: FOB-CONTENT-BROWSER-01b Unauthenticated user is redirected to login
+  Scenario: FOB-CONTENT-BROWSER-01b-guest-public Anonymous guest opens Content Browser for public released playbook
     Given Bob is not logged in
-    When he navigates to /browser/3/
-    Then he is redirected to the FOB login page
-    And after logging in he is returned to the URL he originally requested
+    And Mike owns a Public Released playbook "React Frontend Development" with id=<public_pk>
+    When Bob navigates to /browser/<public_pk>/
+    Then the three-panel Content Browser layout renders
+    And the graph canvas loads with nodes and edges for that playbook
+    And the left panel heading shows "React Frontend Development"
+
+
+  Scenario: FOB-CONTENT-BROWSER-01b-guest-private Anonymous guest cannot open Content Browser for private playbook
+    Given Bob is not logged in
+    And Mike owns a Private Released playbook with id=<private_pk>
+    When Bob navigates to /browser/<private_pk>/
+    Then the view returns HTTP 404
+    And the Content Browser chrome is NOT rendered
+    And the response does not reveal whether the playbook exists or is private
+
+
+  Scenario: FOB-CONTENT-BROWSER-01c Guest Content Browser shows guest chrome and banner
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development" with id=<public_pk>
+    When Bob navigates to /browser/<public_pk>/
+    Then he sees the guest banner with data-testid "guest-auth-banner"
+    And the banner text includes "Sign in to create and edit playbooks"
+    And he sees [Sign In] and [Register] in the guest banner
+    And he does not see the full authenticated app navbar (global search, notifications, user menu)
+    And he sees minimal guest chrome (brand plus auth links only)
 
 
   Scenario: FOB-CONTENT-BROWSER-02 /browser/ without a playbook id returns 404
@@ -43,6 +65,7 @@ Feature: FOB-CONTENT-BROWSER-ACCESS Content Browser Access and Navigation
 
 
   Scenario: FOB-CONTENT-BROWSER-03c Inaccessible or missing playbook returns 404
+    # Applies to authenticated non-members and anonymous guests (Bob) alike.
     Given a visitor navigates to /browser/42/ (private playbook they cannot access)
     And a visitor navigates to /browser/9999/ (no such playbook exists)
     Then in both cases the view returns HTTP 404

@@ -95,11 +95,11 @@ Feature: FOB-PLAYBOOKS-DELETE_PLAYBOOK-1 Delete Playbook ✅
     And pressing Enter does not trigger deletion
     And the modal does not auto-submit
 
-  # MVP simplified: Public playbooks are visible to all authenticated users, so deleting one ends their access.
+  # MVP simplified: Public playbooks are visible to anyone who could view them (including anonymous guests), so deleting one ends their access.
   Scenario: FOB-PLAYBOOKS-DELETE_PLAYBOOK-12 Delete Public playbook shows access-loss warning
     Given Maria owns playbook "Shared UX Methodology" with visibility "public"
     When she opens the delete confirmation modal
-    Then she sees a warning "This playbook is public — deleting it will remove access for all other users who can currently view it"
+    Then she sees a warning "This playbook is public — deleting it will remove access for all viewers including anonymous guests"
     And she still sees the "All of this data will be permanently lost" notice
     And she can confirm deletion with the standard [Delete Playbook] button
 
@@ -176,3 +176,11 @@ Feature: FOB-PLAYBOOKS-DELETE_PLAYBOOK-1 Delete Playbook ✅
     When she clicks [Export JSON First]
     Then the export download is triggered
     And the modal remains open for her to proceed with deletion
+
+  # GUEST ACCESS — delete routes require login (@guest_access)
+  Scenario: FOB-PLAYBOOKS-DELETE_PLAYBOOK-21 Guest delete URL redirects to login
+    Given Bob is not logged in
+    And Mike owns a Public Released playbook "React Frontend Development"
+    When Bob GET "/playbooks/<public_pk>/delete/" or POST delete for that playbook
+    Then he is redirected to the FOB login page
+    And the playbook is not deleted

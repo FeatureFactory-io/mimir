@@ -295,3 +295,58 @@ class TestPlaybookServiceRelease:
         released_playbook.refresh_from_db()
         assert released_playbook.version == Decimal('2.0')
         assert released_playbook.status == 'released'
+
+
+@pytest.mark.django_db
+class TestPlaybookServiceGuestBrowse:
+    """Guest-readable playbook query helpers."""
+
+    def test_list_public_playbooks_for_guest_released_only(self, maria):
+        Playbook.objects.create(
+            name='Guest Released',
+            description='Visible',
+            category='development',
+            author=maria,
+            visibility='public',
+            status='released',
+            version=Decimal('1.0'),
+        )
+        Playbook.objects.create(
+            name='Guest Active',
+            description='Hidden from guest',
+            category='development',
+            author=maria,
+            visibility='public',
+            status='active',
+            version=Decimal('1.0'),
+        )
+        rows = PlaybookService.list_public_playbooks_for_guest()
+        assert len(rows) == 1
+        assert rows[0].name == 'Guest Released'
+
+    def test_get_guest_readable_playbook_ids(self, maria):
+        pb = Playbook.objects.create(
+            name='Ids Released',
+            description='Visible',
+            category='development',
+            author=maria,
+            visibility='public',
+            status='released',
+            version=Decimal('1.0'),
+        )
+        ids = PlaybookService.get_guest_readable_playbook_ids()
+        assert pb.pk in ids
+
+    def test_get_accessible_playbook_ids_includes_active_public(self, maria):
+        other = User.objects.create_user(username='other', email='o@t.com')
+        Playbook.objects.create(
+            name='Active Public Other',
+            description='Auth visible',
+            category='development',
+            author=other,
+            visibility='public',
+            status='active',
+            version=Decimal('1.0'),
+        )
+        ids = PlaybookService.get_accessible_playbook_ids(maria)
+        assert len(ids) >= 1
