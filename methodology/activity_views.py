@@ -110,14 +110,20 @@ def activity_global_list(request):
     })
 
 
-@login_required
+@guest_read_or_login_required
 def activity_list_for_playbook(request, playbook_pk):
     playbook = playbook_readable_or_404(request, playbook_pk)
-    activities_qs = ActivityService.list_activities_for_playbook(playbook_pk, request.user)
+    activities_qs = ActivityService.list_activities_for_playbook(
+        playbook_pk, request.user
+    )
     cnt = activities_qs.count()
+    is_guest_browse = not request.user.is_authenticated
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
     logger.info(
         'User %s viewing activities for playbook %s (count=%d)',
-        request.user.username,
+        user_label,
         playbook_pk,
         cnt,
     )
@@ -125,12 +131,13 @@ def activity_list_for_playbook(request, playbook_pk):
         'playbook': playbook,
         'activities': activities_qs,
         'can_edit': playbook.can_edit(request.user),
+        'is_guest_browse': is_guest_browse,
     })
 
 
 # ==================== LIST ====================
 
-@login_required
+@guest_read_or_login_required
 def activity_list(request, playbook_pk, workflow_pk):
     """
     List all activities in a workflow.
@@ -154,7 +161,11 @@ def activity_list(request, playbook_pk, workflow_pk):
     :return: Rendered list template
     :raises Http404: If playbook or workflow not found
     """
-    logger.info(f"User {request.user.username} accessing activity list for workflow {workflow_pk}")
+    logger.info(
+        "User %s accessing activity list for workflow %s",
+        request.user.username if request.user.is_authenticated else "anonymous",
+        workflow_pk,
+    )
     
     # Get workflow and playbook with permission check
     playbook = playbook_readable_or_404(request, playbook_pk)
@@ -178,6 +189,7 @@ def activity_list(request, playbook_pk, workflow_pk):
         'has_phases': has_phases,
         'total_activities': total_activities,
         'can_edit': workflow.can_edit(request.user),
+        'is_guest_browse': not request.user.is_authenticated,
     }
     
     return render(request, 'activities/list.html', context)

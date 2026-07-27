@@ -5,6 +5,9 @@
 {% block title %}Activities - {{ workflow.name }}{% endblock %}
 
 {% block content %}
+{% if is_guest_browse %}
+  {% include "partials/guest_auth_banner.html" %}
+{% endif %}
 <div data-testid="activities-list">
     <!-- Breadcrumbs -->
     <nav aria-label="breadcrumb">

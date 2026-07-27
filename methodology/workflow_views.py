@@ -189,16 +189,27 @@ def workflow_detail(request, playbook_pk, pk):
     return render(request, 'workflows/detail.html', context)
 
 
-@login_required
+@guest_read_or_login_required
 def workflow_list(request, playbook_pk):
     """List workflows for playbook."""
     playbook = playbook_readable_or_404(request, playbook_pk)
     workflows = WorkflowService.get_workflows_for_playbook(playbook_pk)
+    is_guest_browse = not request.user.is_authenticated
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
+    logger.info(
+        "User %s viewing workflows for playbook %s (count=%d)",
+        user_label,
+        playbook_pk,
+        len(workflows),
+    )
 
     return render(request, 'workflows/list.html', {
         'playbook': playbook,
         'workflows': workflows,
-        'can_edit': playbook.can_edit(request.user)
+        'can_edit': playbook.can_edit(request.user),
+        'is_guest_browse': is_guest_browse,
     })
 
 

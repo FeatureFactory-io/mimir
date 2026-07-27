@@ -88,6 +88,32 @@ def _resolve_nav_section(path: str):
     return None
 
 
+_GUEST_BROWSE_NAV_PREFIXES = (
+    "/playbooks/",
+    "/workflows/",
+    "/activities/",
+    "/artifacts/",
+    "/skills/",
+    "/agents/",
+    "/rules/",
+    "/phases/",
+    "/browser/",
+)
+
+
+def guest_browse_nav(request):
+    """Show guest entity navbar on anonymous browse routes only (not landing).
+
+    :param request: Django HTTP request.
+    :returns: Dict with ``show_guest_browse_nav`` bool.
+    """
+    if request.user.is_authenticated:
+        return {"show_guest_browse_nav": False}
+    path = request.path
+    show = any(path.startswith(prefix) for prefix in _GUEST_BROWSE_NAV_PREFIXES)
+    return {"show_guest_browse_nav": show}
+
+
 def notification_count(request):
     """Inject unread notification count for authenticated users.
 

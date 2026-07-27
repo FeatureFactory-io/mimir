@@ -66,7 +66,7 @@ def rule_list_global(request):
     )
 
 
-@login_required
+@guest_read_or_login_required
 def rule_list(request, playbook_pk):
     playbook = _get_playbook_or_deny(request, playbook_pk)
 
@@ -77,9 +77,12 @@ def rule_list(request, playbook_pk):
         search=query,
         unlinked_only=unlinked_only,
     )
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
     logger.info(
         'User %s listing rules in playbook %s',
-        request.user.username,
+        user_label,
         playbook_pk,
     )
     return render(
@@ -91,6 +94,7 @@ def rule_list(request, playbook_pk):
             'query': query,
             'unlinked_only': unlinked_only,
             'can_edit': playbook.can_edit(request.user),
+            'is_guest_browse': not request.user.is_authenticated,
         },
     )
 

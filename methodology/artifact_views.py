@@ -15,6 +15,7 @@ from methodology.models import Playbook, Artifact
 from methodology.services.artifact_service import ArtifactService
 from methodology.services.activity_service import ActivityService
 from methodology.utils.guest_auth import guest_read_or_login_required
+from methodology.utils.playbook_access import playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -348,7 +349,7 @@ def _render_edit_form(request, artifact, form_data, errors):
 # ==================== LIST ====================
 
 
-@login_required
+@guest_read_or_login_required
 def artifact_list(request, playbook_id):
     """
     Display artifacts list for playbook with search/filter.
@@ -375,13 +376,16 @@ def artifact_list(request, playbook_id):
         - required: Required filter ("true"/"false")
         - activity: Activity ID filter
     """
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
     logger.info(
-        f"User {request.user.username} accessing artifact list for playbook {playbook_id}"
+        "User %s accessing artifact list for playbook %s",
+        user_label,
+        playbook_id,
     )
 
-    playbook = _get_playbook_with_permission_check(request, playbook_id)
-    if not playbook:
-        return redirect("playbook_list")
+    playbook = playbook_readable_or_404(request, playbook_id)
 
     filters = _parse_list_filters(request.GET)
     total_count = ArtifactService.count_artifacts_for_playbook(playbook)
@@ -394,7 +398,10 @@ def artifact_list(request, playbook_id):
         activity_filter=filters['activity_filter'],
     )
 
-    context = _build_list_context(playbook, request.user, artifacts, filters, total_count)
+    context = _build_list_context(
+        playbook, request.user, artifacts, filters, total_count
+    )
+    context["is_guest_browse"] = not request.user.is_authenticated
     
     logger.info(
         f"Artifact list rendered: {artifacts.count()} artifacts "

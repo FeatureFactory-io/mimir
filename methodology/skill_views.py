@@ -98,7 +98,7 @@ def skill_list_global(request):
 
 # ==================== PLAYBOOK-SCOPED LIST ====================
 
-@login_required
+@guest_read_or_login_required
 def skill_list(request, playbook_pk):
     """
     List skills in a playbook with filtering.
@@ -134,9 +134,17 @@ def skill_list(request, playbook_pk):
     domains = SkillService.get_distinct_domains(playbook_pk)
     stacks = SkillService.get_distinct_stacks(playbook_pk)
 
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
     logger.info(
         "User %s listing skills in playbook %s [q=%s, domain=%s, stack=%s, unlinked=%s]",
-        request.user.username, playbook_pk, query, domain_filter, stack_filter, unlinked_only,
+        user_label,
+        playbook_pk,
+        query,
+        domain_filter,
+        stack_filter,
+        unlinked_only,
     )
 
     context = {
@@ -149,6 +157,7 @@ def skill_list(request, playbook_pk):
         'domains': domains,
         'stacks': stacks,
         'can_edit': playbook.can_edit(request.user),
+        'is_guest_browse': not request.user.is_authenticated,
     }
     return render(request, 'skills/playbook_list.html', context)
 

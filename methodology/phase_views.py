@@ -133,7 +133,7 @@ def _resolve_phase_list_playbook_filter(request):
         return None
 
 
-@login_required
+@guest_read_or_login_required
 def phase_list(request, playbook_pk):
     """
     Display list of phases for a playbook.
@@ -142,14 +142,17 @@ def phase_list(request, playbook_pk):
     :param playbook_pk: Playbook primary key
     :return: Rendered phase list template
     """
-    playbook = get_object_or_404(Playbook, pk=playbook_pk, author=request.user)
+    playbook = playbook_readable_or_404(request, playbook_pk)
     phases = PhaseService.list_phases(playbook_pk, request.user)
-    
-    logger.info(f"User {request.user.username} viewing phases for playbook {playbook_pk}")
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
+    logger.info("User %s viewing phases for playbook %s", user_label, playbook_pk)
     
     context = {
         'playbook': playbook,
         'phases': phases,
+        'is_guest_browse': not request.user.is_authenticated,
     }
     return render(request, 'phases/list.html', context)
 

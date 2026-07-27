@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from methodology.models import Agent, Playbook
 from methodology.services.agent_service import AgentService
 from methodology.utils.guest_auth import guest_read_or_login_required
+from methodology.utils.playbook_access import playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -75,14 +76,18 @@ def agent_list_global(request):
     return render(request, 'agents/list.html', context)
 
 
-@login_required
+@guest_read_or_login_required
 def agent_list_for_playbook(request, playbook_pk):
-    playbook = get_object_or_404(Playbook, pk=playbook_pk, author=request.user)
+    playbook = playbook_readable_or_404(request, playbook_pk)
     agents = AgentService.list_agents_for_playbook(playbook_pk)
     cnt = agents.count()
+    is_guest_browse = not request.user.is_authenticated
+    user_label = (
+        request.user.username if request.user.is_authenticated else "anonymous"
+    )
     logger.info(
         'User %s viewing agents for playbook %s (count=%d)',
-        request.user.username,
+        user_label,
         playbook_pk,
         cnt,
     )
@@ -90,6 +95,7 @@ def agent_list_for_playbook(request, playbook_pk):
         'playbook': playbook,
         'agents': agents,
         'can_edit': playbook.can_edit(request.user),
+        'is_guest_browse': is_guest_browse,
     })
 
 
