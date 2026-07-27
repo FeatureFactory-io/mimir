@@ -19,27 +19,11 @@
       Mimir provides your AI with the codified wisdom of how great software gets built — and tools to learn from experience.
       With every sprint and every feature built, your team and their AI get sharper — because the playbook they share keeps improving.
     </p>
-    <div class="d-flex gap-3 flex-wrap justify-content-center align-items-center" role="toolbar" aria-label="Landing actions">
-      <a href="{% url 'use_cases' %}" class="btn btn-outline-light btn-lg px-4"
-         data-testid="landing-cta-features"
-         data-bs-toggle="tooltip" title="See what Mimir can do for your team">
-        <i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i> What Mimir Can Do
-      </a>
-      <a href="{% url 'playbook_list' %}" class="btn btn-primary btn-lg px-4"
-         data-testid="landing-cta-explore-playbooks"
-         data-bs-toggle="tooltip" title="Browse public released playbooks">
-        <i class="fa-solid fa-book-open me-1" aria-hidden="true"></i> Explore public playbooks
-      </a>
-      <a href="{% url 'register' %}" class="btn btn-outline-light btn-lg px-4"
-         data-testid="landing-cta-register"
-         data-bs-toggle="tooltip" title="Create a new Mimir account">
-        <i class="fa-solid fa-user-plus me-1" aria-hidden="true"></i> Register
-      </a>
-      <a href="#mcp-config" class="btn btn-outline-light btn-lg px-4"
-         data-testid="landing-cta-connect"
-         data-bs-toggle="tooltip" title="Connect your AI IDE via MCP">
-        <i class="fa-solid fa-plug me-1" aria-hidden="true"></i> Connect MCP
-      </a>
+    <div class="d-flex gap-4 flex-wrap justify-content-center align-items-center">
+      <a href="{% url 'use_cases' %}" class="hg-landing-link" data-testid="landing-cta-features">What Mimir Can Do</a>
+      <a href="{% url 'playbook_list' %}" class="hg-landing-link" data-testid="landing-cta-explore-playbooks">Explore public playbooks</a>
+      <a href="{% url 'register' %}" class="btn btn-success btn-lg px-5" data-testid="landing-cta-register">Register</a>
+      <a href="#mcp-config" class="hg-landing-link" data-testid="landing-cta-connect">Connect MCP</a>
     </div>
   </div>
 </section>
