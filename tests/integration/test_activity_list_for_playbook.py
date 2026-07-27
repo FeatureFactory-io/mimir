@@ -94,13 +94,14 @@ class TestActivityListForPlaybook:
         assert response.status_code == 200
         assert 'PubActivity' in response.content.decode()
 
-    def test_unauthenticated_redirects_to_login(self, activity_list_playbook_setup):
+    def test_unauthenticated_private_playbook_returns_404(
+        self, activity_list_playbook_setup
+    ):
         pb_a = activity_list_playbook_setup['pb_a']
         response = Client().get(
             reverse('activity_list_for_playbook', kwargs={'playbook_pk': pb_a.pk})
         )
-        assert response.status_code == 302
-        assert response['Location'].startswith('/auth/user/login/')
+        assert response.status_code == 404
 
     def test_template_used(self, activity_list_playbook_setup):
         client = Client()

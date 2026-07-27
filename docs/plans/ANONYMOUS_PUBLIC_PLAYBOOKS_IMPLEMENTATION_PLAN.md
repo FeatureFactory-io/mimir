@@ -1029,3 +1029,83 @@ Legacy section reference (implementation detail unchanged):
 | Which public playbook statuses are guest-visible? | **`released` only** — excludes draft, active, disabled |
 | Anonymous PIP list on public playbooks? | **No** — login required |
 | Show author username on guest cards? | **Yes** — already shown for authenticated public browse |
+
+---
+
+## Phase 8 completion (2026-07-27)
+
+Journey-first gaps from `ed190cb` closed:
+
+- Guest entity navbar on browse routes (`guest_browse_nav` context processor + `base.html`)
+- Eight playbook-scoped READ list views: `@guest_read_or_login_required`, `playbook_readable_or_404`, guest banner on templates
+- `agent_list_for_playbook` / `phase_list` no longer filter `author=request.user`
+- Integration tests: 30 scenarios in `test_guest_playbook_browse.py` + 6 log-story tests in `test_guest_log_story.py`
+- Full suite: **1468 passed** (includes updated agent/activity/skill list tests)
+
+Deferred: Draw.io guest path updates (`doc-drawio-*`) → BPE-07 screen-flow green borders.
+
+---
+
+## BPE-01 mandatory sections (as-built)
+
+### Section A — Context Map
+
+| file | lines | note |
+|------|-------|------|
+| `methodology/models/playbook.py` | `can_view` | Guest branch: public + released only |
+| `methodology/utils/playbook_access.py` | 15–42 | `playbook_readable_or_404` — 404 not 403 |
+| `methodology/utils/guest_auth.py` | 15–52 | `guest_read_or_login_required` |
+| `methodology/services/guest_browse_service.py` | 1–99 | Global list querysets for guests |
+| `methodology/context_processors.py` | 86–110 | `guest_browse_nav` — nav on browse routes only |
+| `templates/base.html` | 68–260 | Auth nav vs guest browse nav |
+| `templates/playbooks/detail.html` | 230–305 | Quick-stat links → scoped lists |
+| `tests/integration/test_guest_playbook_browse.py` | 1–350 | GUEST-05 + GUEST-GLOBAL + navbar |
+
+### Section B — Do-Not-Do
+
+- No MCP tools for anonymous users (token required)
+- No anonymous `/teams/`, `/dashboard/`, `/pips/`, global search
+- No 403 for inaccessible playbooks — use 404
+- No guest write (Create/Edit/Delete/Release/Export/PIP)
+- No DRF changes beyond existing graph GET `AllowAny` + `can_view`
+- No guest visibility of public draft/active/disabled playbooks
+
+### Section C — SAO sections
+
+- FOB Authorization — tiered routes (guest read vs login-required mutations)
+- Service layer — `GuestBrowseService` + shared services for UI/MCP
+- HTMX templates — guest banner partial, suppress Create via `can_edit`
+- DRF permissions — graph API anonymous GET with `can_view`
+- Content Browser — `@guest_read_or_login_required` on browser view
+
+### Section D — Tests to Create
+
+| Test | Asserts |
+|------|---------|
+| `test_guest_playbook_browse.py` | GUEST-01..07, GUEST-GLOBAL-01..07, navbar, quick-stats, scoped lists, drill-down |
+| `test_guest_log_story.py` | caplog: guest_read allow/redirect, access deny, scoped list branch |
+| `test_guest_playbook_browse.py::TestGuestLoginGates` | export/release POST → login |
+| Updated `test_agent_list_for_playbook.py` | guest public 200; private 404 |
+| Updated `test_activity_list_for_playbook.py` | private 404 for guest |
+| `test_primary_nav_section.py` | `guest_browse_nav` path gating |
+
+### Section E — Log Story Script
+
+| Where | Beat | Trigger | Must include |
+|-------|------|---------|--------------|
+| `guest_auth._wrapped` | allow | anonymous GET | `guest_read allow`, `user=anonymous` |
+| `guest_auth._wrapped` | redirect | anonymous POST | `guest_read redirect login`, `method=POST` |
+| `playbook_access.playbook_readable_or_404` | branch | deny | `denied view on playbook`, `anonymous` |
+| `workflow_views.workflow_list` | exit | guest scoped list | `anonymous`, `viewing workflows for playbook` |
+| `guest_browse_service.*` | exit | global list | `Guest global`, `count=` |
+
+### Section F — MCP Tools to Expose
+
+**Not applicable** — guest browse is web UI + graph GET only; MCP remains token-authenticated author-scoped.
+
+---
+
+## BPE-04 / BPE-05 notes
+
+- **BPE-04:** No `behave.ini` / `make test-at` in repo; pytest integration tests in `test_guest_playbook_browse.py` prove the same Gherkin scenarios via Django test client.
+- **BPE-05:** Playwright guest journey deferred; UAT J0 manual script in `tests/uat/e2e-uat-flow.feature` covers browser exploratory path.

@@ -181,13 +181,11 @@ class TestSkillListFind:
         assert b'data-testid="empty-state"' in response.content
         assert b'No skills yet' in response.content
 
-    def test_skill_list_requires_authentication(self):
-        """Playbook skill list requires login."""
+    def test_skill_list_private_playbook_guest_returns_404(self):
+        """Guests cannot list skills on inaccessible private playbooks."""
         self.client.logout()
         response = self.client.get(self._playbook_list_url())
-
-        assert response.status_code == 302
-        assert '/auth/' in response.url
+        assert response.status_code == 404
 
     def test_skill_list_shows_activity_count(self):
         """Activity count badge shows correct number of linked activities."""

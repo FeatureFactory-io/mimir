@@ -66,13 +66,33 @@ class TestAgentListForPlaybook:
         )
         assert response.status_code == 404
 
-    def test_unauthenticated_redirects_to_login(self, agent_list_playbook_setup):
+    def test_unauthenticated_private_playbook_returns_404(self, agent_list_playbook_setup):
         pb_a = agent_list_playbook_setup['pb_a']
         response = Client().get(
             reverse('agent_list_for_playbook', kwargs={'playbook_pk': pb_a.pk})
         )
-        assert response.status_code == 302
-        assert response['Location'].startswith('/auth/user/login/')
+        assert response.status_code == 404
+
+    def test_guest_public_released_playbook_returns_200(self, db):
+        owner = User.objects.create_user(username='pub_ag', password='x')
+        from decimal import Decimal
+
+        pb = Playbook.objects.create(
+            name='Public Agents PB',
+            description='d',
+            category='development',
+            status='released',
+            visibility='public',
+            version=Decimal('1.0'),
+            author=owner,
+        )
+        Agent.objects.create(playbook=pb, name='Public Agent', description='d')
+        response = Client().get(
+            reverse('agent_list_for_playbook', kwargs={'playbook_pk': pb.pk})
+        )
+        assert response.status_code == 200
+        assert b'Public Agent' in response.content
+        assert b'data-testid="guest-auth-banner"' in response.content
 
     def test_template_used(self, agent_list_playbook_setup):
         client = Client()

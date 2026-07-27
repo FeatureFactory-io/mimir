@@ -133,8 +133,16 @@ Entity embed URLs:
 ## Permission model
 
 - `/browser/<pk>/` → `playbook_readable_or_404(request, pk)` in `methodology/utils/playbook_access.py`
-- `login_required` on browser view; Django redirects to `/auth/user/login/?next=...`
+- `@guest_read_or_login_required` on browser view — anonymous GET allowed when playbook is **public + released**
+- Authenticated users: unchanged (public non-draft also allowed per `can_view`)
 - Playbook detail `[Content Browser]` button visible to any user who can view the playbook detail page
+
+### Anonymous embed GET
+
+- All seven entity detail views use `@guest_read_or_login_required` and `playbook_readable_or_404` (or entity-level `can_view`)
+- `?embed=1` on a **released public** playbook returns `_embed.html` with **HTTP 200** and no login redirect
+- Private or non-guest-readable playbooks → **HTTP 404** (not 403)
+- Session-expiry redirect to login applies to **authenticated** sessions only; guests never hold a session on browse routes
 
 ---
 

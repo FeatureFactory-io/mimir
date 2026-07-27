@@ -33,6 +33,7 @@ Feature files under `act-2-playbooks/` and `act-9-pips/` align with this model.
 | **FOB GUI list `/playbooks/`** | Owner only | Released public playbooks only; guest banner; no Create | Owned + public non-draft cards | Owner only |
 | **FOB GUI detail + child VIEW** | Owner only | Read-only; no Edit/Delete/Create/Release/PIP | Read-only for non-owners | Owner only |
 | **Global lists** (`/workflows/`, `/activities/`, …) | Login required | Rows from released public playbooks only; no Create | Full accessible set per user | Login required |
+| **Playbook-scoped READ lists** (`/playbooks/<pk>/workflows/`, `/playbooks/<pk>/activities/`, workflow activities, artifacts, agents, skills, rules, phases) | Owner only | Allowed when parent playbook is released + public; read-only; no Create | Allowed when public non-draft | Owner only |
 | **Content Browser** `/browser/<pk>/` | Owner only | Allowed when released + public | Allowed when public non-draft | Owner only |
 | **Graph API** `GET /api/playbooks/<pk>/graph/` | Owner / group | AllowAny + `can_view` when released + public | Same as authenticated public viewer | Owner only |
 | **MCP tools** | Owner only (`author=user`) | **Not available** (token required) | Owner only (MCP author-scoped) | Owner only |
