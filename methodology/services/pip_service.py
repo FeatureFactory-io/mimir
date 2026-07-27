@@ -175,6 +175,7 @@ def _persist_pip_change(
     artifact_is_required: bool,
     append_to_playbook_end: bool,
     internal_ref: str = "",
+    display_order: Optional[int] = None,
 ) -> PipChange:
     pb = pip.playbook
     ct = change_type.upper().strip()
@@ -257,8 +258,8 @@ def _persist_pip_change(
     display_name = nm
     if ct == PipChange.CHANGE_ADD and not nm:
         raise ValidationError("Name is required for ADD changes.")
-    if ct == PipChange.CHANGE_ALTER and not nm and not body:
-        raise ValidationError("ALTER requires at least one of name or content.")
+    if ct == PipChange.CHANGE_ALTER and not nm and not body and display_order is None:
+        raise ValidationError("ALTER requires at least one of name, content, or display_order.")
     if ct == PipChange.CHANGE_DROP and not body:
         raise ValidationError("Rationale is required for DROP changes.")
     tgt = target_id
@@ -302,6 +303,7 @@ def _persist_pip_change(
         artifact_is_required=bool(artifact_is_required),
         append_to_playbook_end=bool(append_to_playbook_end),
         internal_ref=ref_label,
+        display_order=display_order,
     )
     logger.info("Persisted PipChange pk=%s pip=%s", pc.pk, pip.pk)
     return pc
@@ -566,6 +568,7 @@ class PIPService:
         relationship_type: str = "",
         source_entity_ref: str = "",
         target_entity_ref: str = "",
+        display_order: Optional[int] = None,
     ) -> PipChange:
         _pip_require_draft(pip, actor)
         ct = (change_type or "").upper().strip()
@@ -595,6 +598,7 @@ class PIPService:
             artifact_is_required=artifact_is_required,
             append_to_playbook_end=append_to_playbook_end,
             internal_ref=internal_ref,
+            display_order=display_order,
         )
 
     @staticmethod

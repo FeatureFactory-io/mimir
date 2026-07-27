@@ -336,6 +336,37 @@ class PlaybookViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=True, methods=["post"], url_path="export-local")
+    def export_local(self, request, pk=None):
+        """
+        Generate full playbook export bundle for local IDE sync.
+
+        Maps to: export_playbook_to_local MCP tool (HTTP facade writes files).
+        """
+        from django.core.exceptions import ObjectDoesNotExist
+
+        logger.info("API: export_playbook_to_local called playbook_id=%s", pk)
+        self.get_object()
+        folder_name = request.data.get("folder_name")
+
+        from methodology.services.playbook_export_service import PlaybookExportService
+
+        try:
+            bundle = PlaybookExportService.generate_playbook_export_bundle(
+                playbook_id=int(pk),
+                folder_name=folder_name,
+                user=request.user,
+            )
+        except ObjectDoesNotExist:
+            return Response(
+                {"detail": f"Playbook {pk} not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response(bundle)
+
     @action(
         detail=True,
         methods=["get"],

@@ -8,7 +8,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from methodology.models import Playbook, Workflow, Activity
+from methodology.models import Playbook, Workflow, Activity, Artifact
 
 User = get_user_model()
 
@@ -163,3 +163,78 @@ class TestActivityView:
         assert b'Playbooks' in response.content
         assert b'Workflows' in response.content
         assert b'Activities' in response.content
+
+    def test_view_09_output_artifacts_section_with_items(self):
+        """ART-FLOW-16: Output Artifacts card lists produced artifacts."""
+        Artifact.objects.create(
+            playbook=self.playbook,
+            produced_by=self.activity,
+            name="Component Code",
+            description="Implementation",
+            type="Code",
+            is_required=True,
+        )
+        Artifact.objects.create(
+            playbook=self.playbook,
+            produced_by=self.activity,
+            name="Component Styles",
+            description="CSS",
+            type="Code",
+            is_required=False,
+        )
+        url = reverse(
+            "activity_detail",
+            kwargs={
+                "playbook_pk": self.playbook.pk,
+                "workflow_pk": self.workflow.pk,
+                "activity_pk": self.activity.pk,
+            },
+        )
+        response = self.client.get(url)
+
+        assert response.status_code == 200
+        assert b'data-testid="output-artifacts-card"' in response.content
+        assert b"Output Artifacts" in response.content
+        assert b"Component Code" in response.content
+        assert b"Component Styles" in response.content
+        assert b'data-testid="artifact-output-' in response.content
+        assert b"Required" in response.content
+
+    def test_view_10_output_artifacts_empty_state(self):
+        """Activity detail shows empty state when no outputs."""
+        url = reverse(
+            "activity_detail",
+            kwargs={
+                "playbook_pk": self.playbook.pk,
+                "workflow_pk": self.workflow.pk,
+                "activity_pk": self.activity.pk,
+            },
+        )
+        response = self.client.get(url)
+
+        assert response.status_code == 200
+        assert b'data-testid="output-artifacts-card"' in response.content
+        assert b'data-testid="no-output-artifacts"' in response.content
+
+    def test_view_11_output_artifact_link_to_detail(self):
+        """ART-FLOW-19: Output artifact links to artifact detail."""
+        artifact = Artifact.objects.create(
+            playbook=self.playbook,
+            produced_by=self.activity,
+            name="Unit Tests",
+            type="Code",
+            is_required=True,
+        )
+        url = reverse(
+            "activity_detail",
+            kwargs={
+                "playbook_pk": self.playbook.pk,
+                "workflow_pk": self.workflow.pk,
+                "activity_pk": self.activity.pk,
+            },
+        )
+        response = self.client.get(url)
+
+        detail_url = reverse("artifact_detail", kwargs={"pk": artifact.pk})
+        assert response.status_code == 200
+        assert detail_url.encode() in response.content

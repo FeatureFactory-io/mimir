@@ -398,6 +398,61 @@ class ActivityService:
         logger.info(f"Set predecessor of activity {activity.id} to {predecessor.id} (successor synced)")
 
     @staticmethod
+    def clear_predecessor(activity):
+        """
+        Remove predecessor link from an activity and sync stale successor pointers.
+
+        :param activity: Activity instance to update
+        """
+        old_predecessor = activity.predecessor
+        if old_predecessor and old_predecessor.successor_id == activity.pk:
+            old_predecessor.successor = None
+            old_predecessor.save(update_fields=["successor"])
+            logger.info(
+                "Cleared stale successor on activity %s after predecessor unlink",
+                old_predecessor.id,
+            )
+        cleared_id = activity.predecessor_id
+        activity.predecessor = None
+        activity.save(update_fields=["predecessor", "updated_at"])
+        logger.info(
+            "Cleared predecessor of activity %s (was %s)",
+            activity.id,
+            cleared_id,
+        )
+
+    @staticmethod
+    def set_activity_order(activity, new_order: int):
+        """
+        Move an activity to ``new_order`` within its workflow and renumber 1..N.
+
+        :param activity: Activity to reposition
+        :param new_order: Target 1-based order
+        :raises ValidationError: if new_order is invalid
+        """
+        if new_order < 1:
+            raise ValidationError("display_order must be at least 1.")
+
+        workflow_id = activity.workflow_id
+        siblings = list(
+            Activity.objects.filter(workflow_id=workflow_id)
+            .order_by("order", "pk")
+        )
+        siblings = [a for a in siblings if a.pk != activity.pk]
+        insert_at = min(new_order - 1, len(siblings))
+        siblings.insert(insert_at, activity)
+
+        for idx, act in enumerate(siblings, start=1):
+            if act.order != idx:
+                Activity.objects.filter(pk=act.pk).update(order=idx)
+                logger.info(
+                    "Renumbered activity %s to order %s in workflow %s",
+                    act.pk,
+                    idx,
+                    workflow_id,
+                )
+
+    @staticmethod
     def duplicate_activity(activity_id, new_name=None):
         """
         Create a copy of an activity.

@@ -201,3 +201,107 @@ def test_mix_add_and_link_single_major_bump(alice, staff_bob, playbook_bundle):
     _finalize_all_accept(pip, alice, staff_bob)
     pb.refresh_from_db()
     assert pb.version == Decimal("2.0")
+
+
+@pytest.mark.django_db
+def test_link_activity_predecessor_via_pip(alice, staff_bob, playbook_bundle):
+    pb, wf1, _wf2, act, _skill, _rule = playbook_bundle
+    pred = Activity.objects.create(
+        workflow=wf1, name="Step One", guidance="first step body", order=1
+    )
+    act.order = 2
+    act.save(update_fields=["order"])
+    pip = PIPService.create_draft_for_playbook(
+        actor=alice, playbook_id=pb.pk, title="Chain fix"
+    )
+    PIPService.add_change(
+        actor=alice,
+        pip=pip,
+        change_type=PipChange.CHANGE_LINK,
+        relationship_type=PipChange.REL_ACTIVITY_PREDECESSOR,
+        source_entity_ref=str(pred.pk),
+        target_entity_ref=str(act.pk),
+    )
+    assert act.predecessor_id is None
+    _finalize_all_accept(pip, alice, staff_bob)
+    act.refresh_from_db()
+    pred.refresh_from_db()
+    assert act.predecessor_id == pred.pk
+    assert pred.successor_id == act.pk
+
+
+@pytest.mark.django_db
+def test_unlink_activity_predecessor_via_pip(alice, staff_bob, playbook_bundle):
+    pb, wf1, _wf2, act, _skill, _rule = playbook_bundle
+    pred = Activity.objects.create(
+        workflow=wf1, name="Step One", guidance="first step body", order=1
+    )
+    act.predecessor = pred
+    act.order = 2
+    act.save(update_fields=["predecessor", "order"])
+    pred.successor = act
+    pred.save(update_fields=["successor"])
+    pip = PIPService.create_draft_for_playbook(
+        actor=alice, playbook_id=pb.pk, title="Unlink pred"
+    )
+    PIPService.add_change(
+        actor=alice,
+        pip=pip,
+        change_type=PipChange.CHANGE_UNLINK,
+        relationship_type=PipChange.REL_ACTIVITY_PREDECESSOR,
+        source_entity_ref=str(pred.pk),
+        target_entity_ref=str(act.pk),
+    )
+    _finalize_all_accept(pip, alice, staff_bob)
+    act.refresh_from_db()
+    pred.refresh_from_db()
+    assert act.predecessor_id is None
+    assert pred.successor_id is None
+
+
+@pytest.mark.django_db
+def test_alter_activity_display_order_via_pip(alice, staff_bob, playbook_bundle):
+    pb, wf1, _wf2, act, _skill, _rule = playbook_bundle
+    second = Activity.objects.create(
+        workflow=wf1, name="Second", guidance="second step body", order=2
+    )
+    pip = PIPService.create_draft_for_playbook(
+        actor=alice, playbook_id=pb.pk, title="Reorder"
+    )
+    PIPService.add_change(
+        actor=alice,
+        pip=pip,
+        change_type=PipChange.CHANGE_ALTER,
+        entity_type=PipChange.ENTITY_ACTIVITY,
+        target_id=second.pk,
+        display_order=1,
+    )
+    _finalize_all_accept(pip, alice, staff_bob)
+    act.refresh_from_db()
+    second.refresh_from_db()
+    assert second.order == 1
+    assert act.order == 2
+
+
+@pytest.mark.django_db
+def test_duplicate_predecessor_link_rejected_at_persist(alice, playbook_bundle):
+    pb, wf1, _wf2, act, _skill, _rule = playbook_bundle
+    pred = Activity.objects.create(
+        workflow=wf1, name="Step One", guidance="first step body", order=1
+    )
+    act.predecessor = pred
+    act.save(update_fields=["predecessor"])
+    pred.successor = act
+    pred.save(update_fields=["successor"])
+    pip = PIPService.create_draft_for_playbook(
+        actor=alice, playbook_id=pb.pk, title="Dup pred"
+    )
+    with pytest.raises(ValidationError, match="already exists"):
+        PIPService.add_change(
+            actor=alice,
+            pip=pip,
+            change_type=PipChange.CHANGE_LINK,
+            relationship_type=PipChange.REL_ACTIVITY_PREDECESSOR,
+            source_entity_ref=str(pred.pk),
+            target_entity_ref=str(act.pk),
+        )

@@ -89,6 +89,7 @@ def _build_mcp() -> FastMCP:
 
     # Export / Import (4)
     mcp.tool()(tools.export_workflow_to_local)
+    mcp.tool()(tools.export_playbook_to_local)
     mcp.tool()(tools.import_workflow_from_local)
     mcp.tool()(tools.apply_upload_protocol)
     mcp.tool()(tools.create_pip_from_protocol)

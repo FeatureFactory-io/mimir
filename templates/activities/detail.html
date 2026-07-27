@@ -263,7 +263,7 @@
             <div class="card" data-testid="artifacts-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
-                        <i class="fa-solid fa-gift"></i> Input Artifacts
+                        <i class="fa-solid fa-box-open"></i> Input Artifacts
                         {% if artifact_inputs %}
                         <span class="badge bg-secondary ms-2">{{ artifact_inputs|length }}</span>
                         {% endif %}
@@ -275,7 +275,7 @@
                             {% for artifact_input in artifact_inputs %}
                             <li class="list-group-item px-0" data-testid="artifact-input-{{ artifact_input.artifact.id }}">
                                 <a href="{% url 'artifact_detail' pk=artifact_input.artifact.id %}">
-                                    <i class="fa-solid fa-gift text-primary me-2"></i>
+                                    <i class="fa-solid fa-box-open text-primary me-2"></i>
                                     <strong>{{ artifact_input.artifact.name }}</strong>
                                 </a>
                                 <span class="badge bg-secondary ms-2">{{ artifact_input.artifact.type }}</span>
@@ -299,6 +299,40 @@
                        title="Manage input artifacts">
                         <i class="fa-solid fa-pen-to-square"></i> Manage Artifacts
                     </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Output Artifacts Card -->
+            <div class="card mt-3" data-testid="output-artifacts-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-gift"></i> Output Artifacts
+                        {% if artifact_outputs %}
+                        <span class="badge bg-secondary ms-2">{{ artifact_outputs|length }}</span>
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if artifact_outputs %}
+                        <ul class="list-group list-group-flush">
+                            {% for artifact in artifact_outputs %}
+                            <li class="list-group-item px-0" data-testid="artifact-output-{{ artifact.id }}">
+                                <a href="{% url 'artifact_detail' pk=artifact.id %}">
+                                    <i class="fa-solid fa-gift text-success me-2"></i>
+                                    <strong>{{ artifact.name }}</strong>
+                                </a>
+                                <span class="badge bg-secondary ms-2">{{ artifact.type }}</span>
+                                {% if artifact.is_required %}
+                                <span class="badge bg-danger ms-1">Required</span>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted mb-0" data-testid="no-output-artifacts">
+                            <i class="fa-solid fa-info-circle"></i> No output artifacts
+                        </p>
                     {% endif %}
                 </div>
             </div>

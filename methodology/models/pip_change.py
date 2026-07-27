@@ -28,12 +28,14 @@ class PipChange(models.Model):
     REL_AGENT_ACTIVITY = "agent_activity"
     REL_ACTIVITY_WORKFLOW = "activity_workflow"
     REL_ARTIFACT_ACTIVITY = "artifact_activity"
+    REL_ACTIVITY_PREDECESSOR = "activity_predecessor"
     RELATIONSHIP_TYPE_CHOICES = [
         (REL_SKILL_ACTIVITY, "Skill → Activity"),
         (REL_RULE_ACTIVITY, "Rule → Activity"),
         (REL_AGENT_ACTIVITY, "Agent → Activity"),
         (REL_ACTIVITY_WORKFLOW, "Activity → Workflow"),
         (REL_ARTIFACT_ACTIVITY, "Artifact → Activity"),
+        (REL_ACTIVITY_PREDECESSOR, "Predecessor → Activity"),
     ]
 
     ENTITY_WORKFLOW = "Workflow"
@@ -107,6 +109,11 @@ class PipChange(models.Model):
     order = models.PositiveSmallIntegerField(
         default=1,
         help_text="Stable sequence within the pip (1-based).",
+    )
+    display_order = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="ALTER Activity: new execution order within workflow (1-based).",
     )
     name = models.CharField(max_length=255, blank=True)
     target_id = models.PositiveIntegerField(null=True, blank=True)

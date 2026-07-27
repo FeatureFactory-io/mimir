@@ -1159,6 +1159,54 @@ async def export_workflow_to_local(
     return result
 
 
+async def export_playbook_to_local(
+    playbook_id: int,
+    target_directory: str = ".cursor/playbooks",
+    folder_name: str = None,
+    additional_targets: list[str] | None = None,
+    sync_root_rules: bool = False,
+) -> dict:
+    """
+    Export full playbook to local AI workspace as markdown tree.
+
+    :param playbook_id: Playbook ID. Example: 3
+    :param target_directory: Base directory. Example: ".cursor/playbooks"
+    :param folder_name: Playbook folder name. Example: "Edda"
+    :param additional_targets: Extra roots to mirror the tree into
+    :param sync_root_rules: Copy always-apply rules to IDE root rule folders
+    :return: Export summary with entity counts and file paths
+    """
+    logger.info(
+        'MCP Tool: export_playbook_to_local playbook_id=%s target=%s',
+        playbook_id,
+        target_directory,
+    )
+
+    user = await sync_to_async(get_current_user)()
+
+    from methodology.services.playbook_export_service import PlaybookExportService
+
+    try:
+        result = await sync_to_async(PlaybookExportService.export_playbook_to_local)(
+            playbook_id=playbook_id,
+            target_directory=target_directory,
+            folder_name=folder_name,
+            additional_targets=additional_targets,
+            sync_root_rules=sync_root_rules,
+            user=user,
+        )
+    except PermissionError as exc:
+        raise ValueError(f'Playbook {playbook_id} not accessible') from exc
+
+    logger.info(
+        'MCP Tool: Exported playbook %s workflows=%s rules=%s',
+        playbook_id,
+        result.get('workflows'),
+        result.get('rules'),
+    )
+    return result
+
+
 async def import_workflow_from_local(
     workflow_id: int,
     source_directory: str,
@@ -2909,6 +2957,7 @@ async def add_pip_change(
     relationship_type: str = "",
     source_entity_ref: str = "",
     target_entity_ref: str = "",
+    display_order: Optional[int] = None,
 ) -> dict:
     """Attach a typed change row to a Draft PIP.
 
@@ -2926,7 +2975,9 @@ async def add_pip_change(
     entity_type (ADD/ALTER/DROP): Workflow, Activity, Phase, Skill, Agent, Rule, Artifact.
 
     relationship_type (LINK/UNLINK): skill_activity, rule_activity, agent_activity,
-    activity_workflow, artifact_activity.
+    activity_workflow, artifact_activity, activity_predecessor.
+
+    ALTER Activity: optional display_order (1-based workflow position).
 
     Full subtree recipe (call add_pip_change in order):
       1. ADD Phase       internal_ref="#phase1"  name="Construction"
@@ -2965,6 +3016,7 @@ async def add_pip_change(
                 relationship_type=relationship_type or "",
                 source_entity_ref=source_entity_ref or "",
                 target_entity_ref=target_entity_ref or "",
+                display_order=display_order,
             )
         except ValidationError as e:
             _handle_validation_error(e, "add_pip_change")
@@ -3560,6 +3612,7 @@ def initialize_mcp():
 
     # Register workflow export/import tools
     mcp.tool()(export_workflow_to_local)
+    mcp.tool()(export_playbook_to_local)
     mcp.tool()(import_workflow_from_local)
     mcp.tool()(apply_upload_protocol)
     mcp.tool()(create_pip_from_protocol)

@@ -46,7 +46,7 @@
     <ul class="list-unstyled small mb-0">
       {% for inp in artifact_inputs %}
       <li>
-        <i class="fa-solid fa-gift text-warning me-1"></i>
+        <i class="fa-solid fa-box-open text-warning me-1"></i>
         <a href="#" data-navigate-canvas="artifact:{{ inp.artifact.pk }}:activity:{{ activity.pk }}" class="text-decoration-none">{{ inp.artifact.name }}</a>
       </li>
       {% endfor %}
@@ -59,7 +59,7 @@
     <ul class="list-unstyled small mb-0">
       {% for art in artifact_outputs %}
       <li>
-        <i class="fa-solid fa-box-open text-success me-1"></i>
+        <i class="fa-solid fa-gift text-success me-1"></i>
         <a href="#" data-navigate-canvas="artifact:{{ art.pk }}:activity:{{ activity.pk }}" class="text-decoration-none">{{ art.name }}</a>
         {% if art.is_required %}<span class="badge bg-danger ms-1" style="font-size:0.65rem">required</span>{% endif %}
       </li>

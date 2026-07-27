@@ -406,6 +406,101 @@ def export_workflow_to_local(
     }
 
 
+def export_playbook_to_local(
+    playbook_id: int,
+    target_directory: str = ".cursor/playbooks",
+    folder_name: str = None,
+    additional_targets: list[str] | None = None,
+    sync_root_rules: bool = False,
+) -> dict:
+    """
+    Export full playbook tree to local AI workspace markdown files.
+
+    :param playbook_id: Playbook ID. Example: 3
+    :param target_directory: Base directory. Example: ".cursor/playbooks"
+    :param folder_name: Playbook folder name. Example: "Edda"
+    :param additional_targets: Optional extra export roots
+    :param sync_root_rules: Copy always-apply rules to IDE root folders
+    :return: Export summary dict
+    """
+    logger.info(
+        'HTTP Tool: export_playbook_to_local playbook=%s target=%s folder=%s',
+        playbook_id,
+        target_directory,
+        folder_name,
+    )
+    payload = {}
+    if folder_name:
+        payload["folder_name"] = folder_name
+    r = get_client().post(f"/api/playbooks/{playbook_id}/export-local/", json=payload)
+    data = check_response(r, "export_playbook_to_local")
+
+    resolved_target = ensure_writable_workspace_path(target_directory, purpose="export")
+    export_root = resolved_target / data["folder_name"]
+    export_root.mkdir(parents=True, exist_ok=True)
+    files_written = []
+
+    def _write(rel_dir: str, filename: str, content: str) -> None:
+        folder = export_root / rel_dir if rel_dir else export_root
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / filename).write_text(content, encoding="utf-8")
+        files_written.append(f"{rel_dir}/{filename}" if rel_dir else filename)
+
+    _write("", data["playbook_md"]["filename"], data["playbook_md"]["content"])
+    for rule in data.get("rule_files", []):
+        _write("rules", rule["filename"], rule["content"])
+    for agent in data.get("agent_files", []):
+        _write("agents", agent["filename"], agent["content"])
+    for skill in data.get("skill_files", []):
+        _write("skills", skill["filename"], skill["content"])
+    for artifact in data.get("artifact_files", []):
+        _write("artifacts", artifact["filename"], artifact["content"])
+    for wf in data.get("workflows", []):
+        for wf_file in wf.get("workflow_files", []):
+            _write(wf["folder_name"], wf_file["filename"], wf_file["content"])
+
+    extra_paths = []
+    for extra in additional_targets or []:
+        extra_root = ensure_writable_workspace_path(extra, purpose="export") / data["folder_name"]
+        extra_root.mkdir(parents=True, exist_ok=True)
+        for rel in files_written:
+            src = export_root / rel
+            dest = extra_root / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        extra_paths.append(str(extra_root))
+        logger.info("HTTP Tool: mirrored playbook export to %s", extra_root)
+
+    if sync_root_rules:
+        dev_root = resolved_target.resolve().parent
+        for rule in data.get("rule_files", []):
+            if "alwaysApply: true" not in rule.get("content", ""):
+                continue
+            for ide_rules, ext in (
+                (dev_root / ".cursor" / "rules", ".mdc"),
+                (dev_root / ".windsurf" / "rules", ".md"),
+            ):
+                ide_rules.mkdir(parents=True, exist_ok=True)
+                name = rule["filename"].replace(".mdc", ext)
+                (ide_rules / name).write_text(rule["content"], encoding="utf-8")
+
+    counts = data.get("counts", {})
+    return {
+        "status": "exported",
+        "playbook_id": data["playbook_id"],
+        "playbook_name": data["playbook_name"],
+        "export_paths": [str(export_root)] + extra_paths,
+        "workflows": counts.get("workflows", 0),
+        "activities": counts.get("activities", 0),
+        "rules": counts.get("rules", 0),
+        "skills": counts.get("skills", 0),
+        "agents": counts.get("agents", 0),
+        "artifacts": counts.get("artifacts", 0),
+        "files_created": files_written,
+        "message": "Playbook exported successfully.",
+    }
+
+
 def import_workflow_from_local(
     workflow_id: int,
     source_directory: str,

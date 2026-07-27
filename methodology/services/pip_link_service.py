@@ -32,6 +32,7 @@ _RELATIONSHIP_ENDPOINTS: dict[str, tuple[str, str]] = {
     PipChange.REL_AGENT_ACTIVITY: (PipChange.ENTITY_AGENT, PipChange.ENTITY_ACTIVITY),
     PipChange.REL_ACTIVITY_WORKFLOW: (PipChange.ENTITY_ACTIVITY, PipChange.ENTITY_WORKFLOW),
     PipChange.REL_ARTIFACT_ACTIVITY: (PipChange.ENTITY_ARTIFACT, PipChange.ENTITY_ACTIVITY),
+    PipChange.REL_ACTIVITY_PREDECESSOR: (PipChange.ENTITY_ACTIVITY, PipChange.ENTITY_ACTIVITY),
 }
 
 
@@ -185,6 +186,9 @@ def relationship_exists(
             artifact_id=source_id,
             activity_id=target_id,
         ).exists()
+    if relationship_type == PipChange.REL_ACTIVITY_PREDECESSOR:
+        act = Activity.objects.filter(pk=target_id).only("predecessor_id").first()
+        return act is not None and act.predecessor_id == source_id
     return False
 
 
@@ -256,6 +260,12 @@ def validate_link_change_for_persist(
             source_id=src_id,
             target_id=tgt_id,
         )
+        _validate_activity_predecessor_constraints(
+            rel=rel,
+            ct=ct,
+            source_id=src_id,
+            target_id=tgt_id,
+        )
 
     logger.info(
         "Validated %s %s src=%s tgt=%s pip=%s pending=%s/%s",
@@ -298,6 +308,23 @@ def _validate_endpoint_ref(
         raise ValidationError(f"Invalid entity reference '{ref}' — use pk or #internal_ref.")
     _assert_entity_in_playbook(expected_type, int(ref), playbook_id)
     return False
+
+
+def _validate_activity_predecessor_constraints(
+    *,
+    rel: str,
+    ct: str,
+    source_id: int,
+    target_id: int,
+) -> None:
+    if rel != PipChange.REL_ACTIVITY_PREDECESSOR:
+        return
+    if source_id == target_id:
+        raise ValidationError("Activity cannot be its own predecessor.")
+    pred = Activity.objects.select_related("workflow").get(pk=source_id)
+    succ = Activity.objects.select_related("workflow").get(pk=target_id)
+    if pred.workflow_id != succ.workflow_id:
+        raise ValidationError("Predecessor and successor must be in the same workflow.")
 
 
 def _validate_activity_workflow_constraints(

@@ -20,6 +20,7 @@ class WorkflowExportService:
         target_directory: str,
         folder_name: Optional[str] = None,
         user=None,
+        skip_rules: bool = False,
     ) -> dict:
         """
         Export workflow and activities as markdown files.
@@ -89,10 +90,13 @@ class WorkflowExportService:
             files_created.append(filename)
             logger.info(f"Created {filename}")
 
-        rules_dir, rule_files = WorkflowExportService._export_rules_for_workflow(
-            activities, Path(target_directory)
-        )
-        files_created.extend(rule_files)
+        rules_dir = None
+        rule_files = []
+        if not skip_rules:
+            rules_dir, rule_files = WorkflowExportService._export_rules_for_workflow(
+                activities, Path(target_directory)
+            )
+            files_created.extend(rule_files)
 
         result = {
             'status': 'exported',

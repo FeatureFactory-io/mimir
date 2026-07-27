@@ -423,6 +423,13 @@ class PipApplyChangesService:
                     artifact_id=src_id,
                     activity_id=tgt_id,
                 ).delete()
+        elif rel == PipChange.REL_ACTIVITY_PREDECESSOR:
+            successor = Activity.objects.select_related("workflow").get(pk=tgt_id)
+            if is_link:
+                predecessor = Activity.objects.get(pk=src_id)
+                ActivityService.set_predecessor(successor, predecessor)
+            else:
+                ActivityService.clear_predecessor(successor)
         else:
             raise ValidationError(f"Unsupported relationship_type '{rel}'.")
 
@@ -463,6 +470,17 @@ class PipApplyChangesService:
                     change=change, playbook=playbook, ref_map=ref_map,
                 )
             act.save(update_fields=["guidance", "name", "phase_id", "updated_at"])
+            if change.display_order is not None:
+                old_order = act.order
+                ActivityService.set_activity_order(act, int(change.display_order))
+                act.refresh_from_db()
+                logger.info(
+                    "PIP apply ALTER Activity pk=%s pip=%s display_order %s→%s",
+                    cid,
+                    pip_pk,
+                    old_order,
+                    act.order,
+                )
             logger.info("PIP apply ALTER Activity pk=%s pip=%s", cid, pip_pk)
             return
 
