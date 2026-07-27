@@ -100,10 +100,15 @@
 
                     <div class="mb-3">
                         <label for="id_password_confirm" class="form-label">Confirm password <span class="text-danger">*</span></label>
-                        <input type="password" name="password_confirm" id="id_password_confirm"
-                               class="form-control {% if errors.password_confirm %}is-invalid{% endif %}"
-                               data-testid="register-password-confirm-input"
-                               minlength="8" required>
+                        <div class="input-group">
+                            <input type="password" name="password_confirm" id="id_password_confirm"
+                                   class="form-control {% if errors.password_confirm %}is-invalid{% endif %}"
+                                   data-testid="register-password-confirm-input"
+                                   minlength="8" required>
+                            <button class="btn btn-outline-secondary" type="button" id="reg-password-confirm-toggle" title="Show / hide password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                         {% if errors.password_confirm %}
                         <div class="invalid-feedback d-block" data-testid="password-confirm-field-error">
                             <i class="fa-solid fa-circle-exclamation me-1"></i>{{ errors.password_confirm.0 }}
@@ -146,17 +151,26 @@
     var pw = document.getElementById('id_password');
     var pwc = document.getElementById('id_password_confirm');
     var toggle = document.getElementById('reg-password-toggle');
+    var toggleConfirm = document.getElementById('reg-password-confirm-toggle');
     function sync() {
         btn.disabled = !tos.checked;
     }
+    function setPasswordVisibility(show) {
+        var t = show ? 'text' : 'password';
+        var icon = show ? 'fas fa-eye-slash' : 'fas fa-eye';
+        pw.type = t;
+        pwc.type = t;
+        if (toggle) toggle.querySelector('i').className = icon;
+        if (toggleConfirm) toggleConfirm.querySelector('i').className = icon;
+    }
     tos.addEventListener('change', sync);
     sync();
-    if (toggle && pw && pwc) {
-        toggle.addEventListener('click', function () {
-            var t = pw.type === 'password' ? 'text' : 'password';
-            pw.type = t;
-            pwc.type = t;
-            toggle.querySelector('i').className = t === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+    if (pw && pwc) {
+        [toggle, toggleConfirm].forEach(function (btnToggle) {
+            if (!btnToggle) return;
+            btnToggle.addEventListener('click', function () {
+                setPasswordVisibility(pw.type === 'password');
+            });
         });
     }
 })();
