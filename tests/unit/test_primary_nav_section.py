@@ -100,21 +100,3 @@ def test_teams():
 
 def test_browser():
     assert _section("/browser/12/") == "playbooks"
-
-
-def test_guest_browse_nav_on_playbook_list():
-    from methodology.context_processors import guest_browse_nav
-
-    rf = RequestFactory()
-    req = rf.get("/playbooks/")
-    req.user = type("Anon", (), {"is_authenticated": False})()
-    assert guest_browse_nav(req)["show_guest_browse_nav"] is True
-
-
-def test_guest_browse_nav_hidden_on_landing():
-    from methodology.context_processors import guest_browse_nav
-
-    rf = RequestFactory()
-    req = rf.get("/")
-    req.user = type("Anon", (), {"is_authenticated": False})()
-    assert guest_browse_nav(req)["show_guest_browse_nav"] is False

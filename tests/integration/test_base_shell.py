@@ -32,12 +32,26 @@ def test_anonymous_landing_uses_hg_landing_classes():
 
 
 @pytest.mark.django_db
-def test_anonymous_landing_hides_app_nav_items():
+def test_anonymous_landing_shows_full_primary_nav():
     client = Client()
     response = client.get("/")
     body = response.content.decode()
-    for testid in ("nav-dashboard", "nav-playbooks", "nav-workflows", "nav-pips"):
-        assert f'data-testid="{testid}"' not in body, f"app nav {testid!r} leaked to landing"
+    for testid in (
+        "nav-dashboard",
+        "nav-playbooks",
+        "nav-workflows",
+        "nav-phases",
+        "nav-activities",
+        "nav-artifacts",
+        "nav-agents",
+        "nav-skills",
+        "nav-rules",
+        "nav-teams",
+        "nav-pips",
+    ):
+        assert f'data-testid="{testid}"' in body
+    assert 'data-testid="register-link"' in body
+    assert 'data-testid="login-link"' in body
 
 
 @pytest.mark.django_db

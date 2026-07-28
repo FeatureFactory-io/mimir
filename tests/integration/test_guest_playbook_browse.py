@@ -228,28 +228,40 @@ class TestGuestLoginGates:
 
 @pytest.mark.django_db
 class TestGuestNavbar:
-    def test_guest_nav_shows_browse_links(self, client, public_released):
+    PRIMARY_NAV_TESTIDS = (
+        b'data-testid="nav-dashboard"',
+        b'data-testid="nav-playbooks"',
+        b'data-testid="nav-workflows"',
+        b'data-testid="nav-phases"',
+        b'data-testid="nav-activities"',
+        b'data-testid="nav-artifacts"',
+        b'data-testid="nav-agents"',
+        b'data-testid="nav-skills"',
+        b'data-testid="nav-rules"',
+        b'data-testid="nav-teams"',
+        b'data-testid="nav-pips"',
+    )
+
+    def test_guest_nav_shows_full_primary_nav_on_playbook_list(self, client, public_released):
         response = client.get(reverse("playbook_list"))
         assert response.status_code == 200
-        for testid in (
-            b'data-testid="nav-playbooks"',
-            b'data-testid="nav-workflows"',
-            b'data-testid="nav-phases"',
-            b'data-testid="nav-activities"',
-            b'data-testid="nav-artifacts"',
-            b'data-testid="nav-agents"',
-            b'data-testid="nav-skills"',
-            b'data-testid="nav-rules"',
-        ):
+        for testid in self.PRIMARY_NAV_TESTIDS:
             assert testid in response.content
 
-    def test_guest_nav_hides_auth_only_links(self, client):
+    def test_guest_nav_shows_full_primary_nav_on_landing(self, client):
+        response = client.get("/")
+        assert response.status_code == 200
+        for testid in self.PRIMARY_NAV_TESTIDS:
+            assert testid in response.content
+
+    def test_guest_nav_hides_authenticated_right_side_widgets(self, client):
         response = client.get(reverse("playbook_list"))
         assert response.status_code == 200
-        assert b'data-testid="nav-dashboard"' not in response.content
-        assert b'data-testid="nav-teams"' not in response.content
-        assert b'data-testid="nav-pips"' not in response.content
         assert b'data-testid="global-search-input"' not in response.content
+        assert b'data-testid="notification-bell"' not in response.content
+        assert b'data-testid="user-display"' not in response.content
+        assert b'data-testid="register-link"' in response.content
+        assert b'data-testid="login-link"' in response.content
 
 
 @pytest.mark.django_db

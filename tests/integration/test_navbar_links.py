@@ -8,10 +8,39 @@ from django.contrib.auth.models import User
 from django.test import Client
 from django.urls import reverse
 
+PRIMARY_NAV_TESTIDS = (
+    "nav-dashboard",
+    "nav-playbooks",
+    "nav-workflows",
+    "nav-phases",
+    "nav-activities",
+    "nav-artifacts",
+    "nav-agents",
+    "nav-skills",
+    "nav-rules",
+    "nav-teams",
+    "nav-pips",
+)
+
 
 @pytest.mark.django_db
 class TestNavbarLinks:
     """Test navbar links use correct URL convention."""
+
+    def test_anonymous_landing_shows_full_primary_nav(self):
+        client = Client()
+        response = client.get("/")
+
+        assert response.status_code == 200
+        html = response.content.decode("utf-8")
+
+        for testid in PRIMARY_NAV_TESTIDS:
+            assert f'data-testid="{testid}"' in html
+        assert 'data-testid="register-link"' in html
+        assert 'data-testid="login-link"' in html
+        assert 'data-testid="global-search-input"' not in html
+        assert 'data-testid="notification-bell"' not in html
+        assert 'data-testid="user-display"' not in html
     
     def test_navbar_login_link_when_not_authenticated(self):
         """
@@ -83,3 +112,19 @@ class TestNavbarLinks:
         # Should have profile entry point
         assert 'data-testid="nav-view-profile"' in html
         assert reverse("profile") in html
+
+    def test_guest_teams_url_redirects_to_login(self):
+        client = Client()
+        response = client.get("/teams/")
+
+        assert response.status_code == 302
+        assert "/login/" in response.url
+        assert "next=/teams/" in response.url
+
+    def test_guest_pips_url_redirects_to_login(self):
+        client = Client()
+        response = client.get(reverse("pip_list"))
+
+        assert response.status_code == 302
+        assert "/login/" in response.url
+        assert "next=/pips/" in response.url
