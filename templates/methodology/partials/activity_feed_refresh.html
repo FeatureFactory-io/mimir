@@ -1,25 +1,35 @@
 {# templates/methodology/partials/activity_feed_refresh.html #}
-{# HTMX-powered activity feed refresh button #}
+{# HTMX-powered Recently Used feed controls and list #}
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div class="btn-group" role="group">
         <button class="btn btn-sm btn-outline-secondary"
-                hx-get="/dashboard/activities/"
-                hx-target="#activity-feed-container"
+                hx-get="/dashboard/activities/?hours={{ activity_hours|default:24 }}"
+                hx-target="#activity-feed-panel"
                 hx-swap="innerHTML"
                 data-testid="refresh-activities-button">
             <i class="fas fa-sync-alt me-1"></i>
             Refresh
         </button>
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
-                data-bs-toggle="dropdown">
+                data-bs-toggle="dropdown"
+                data-testid="recently-used-hours-label">
             <i class="fas fa-clock me-1"></i>
-            Last 24h
+            {{ activity_hours_label|default:"Last 24h" }}
         </button>
         <ul class="dropdown-menu">
-            <li><a class="dropdown-item" href="#" hx-get="/dashboard/activities/?hours=1" hx-target="#activity-feed-container">Last hour</a></li>
-            <li><a class="dropdown-item" href="#" hx-get="/dashboard/activities/?hours=24" hx-target="#activity-feed-container">Last 24h</a></li>
-            <li><a class="dropdown-item" href="#" hx-get="/dashboard/activities/?hours=168" hx-target="#activity-feed-container">Last week</a></li>
+            <li><a class="dropdown-item" href="#"
+                   hx-get="/dashboard/activities/?hours=1"
+                   hx-target="#activity-feed-panel"
+                   hx-swap="innerHTML">Last hour</a></li>
+            <li><a class="dropdown-item" href="#"
+                   hx-get="/dashboard/activities/?hours=24"
+                   hx-target="#activity-feed-panel"
+                   hx-swap="innerHTML">Last 24h</a></li>
+            <li><a class="dropdown-item" href="#"
+                   hx-get="/dashboard/activities/?hours=168"
+                   hx-target="#activity-feed-panel"
+                   hx-swap="innerHTML">Last week</a></li>
         </ul>
     </div>
     <small class="text-muted" id="last-updated">
@@ -30,3 +40,7 @@
 <div id="activity-feed-container">
     {% include 'methodology/partials/activity_feed.html' %}
 </div>
+
+<script>
+    console.log('recently-used: feed refreshed hours={{ activity_hours|default:24 }} count={{ activity_count_in_window|default:0 }}');
+</script>
