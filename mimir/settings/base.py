@@ -97,7 +97,6 @@ TEMPLATES = [
                 "methodology.context_processors.app_version",
                 "methodology.context_processors.pip_nav",
                 "methodology.context_processors.primary_nav_section",
-                "methodology.context_processors.guest_browse_nav",
                 "methodology.context_processors.notification_count",
             ],
         },
