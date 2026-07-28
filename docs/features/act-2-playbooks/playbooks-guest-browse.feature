@@ -23,7 +23,8 @@ Feature: FOB-PLAYBOOKS-GUEST Anonymous Public Playbook Browse
 
   Scenario: FOB-PLAYBOOKS-GUEST-02 Guest playbooks list shows released public playbooks only
     Given Bob opens "/playbooks/"
-    Then he sees a card for "React Frontend Development"
+    Then he sees all primary navbar links from Home through PIPs
+    And he sees a card for "React Frontend Development"
     And the card shows author "by Mike Chen"
     And he does not see an "Owned by you" or owned-playbooks section
     And he sees the guest banner with data-testid "guest-auth-banner"

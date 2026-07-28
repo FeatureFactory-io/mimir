@@ -295,9 +295,9 @@ Screens that combine **filters → table** with **checkbox-driven bulk operation
 
 **Content Browser** is **not** in the navbar. Open it from **Playbook VIEW** via the Content Browser button (`data-testid="playbook-content-browser"`) → `/browser/<playbook_pk>/`. Nav highlight for browser URLs maps to **Playbooks** (`methodology.context_processors.primary_nav_section`).
 
-**Anonymous landing** (`/`): brand + **[Explore public playbooks]** primary CTA (`data-testid="landing-cta-explore-playbooks"`) + Register + Sign In — no app nav items.
+**Anonymous sessions** (landing, browse routes, Content Browser, login/register pages): full primary navbar (Home → PIPs, same order as authenticated). Right side: **Register** + **Login** only. Auth-only nav targets (Home `/dashboard/`, Teams, PIPs) redirect to login; browse targets serve guest-readable content where implemented.
 
-**Guest chrome** (anonymous sessions on `/playbooks/`, public playbook drill-down, Content Browser, and guest-global list routes): minimal header with brand + Sign In + Register only. No full navbar (Home, Workflows, Teams, PIPs, etc.). Guest banner (`data-testid="guest-auth-banner"`) on list and browse surfaces prompts sign-in to create or edit.
+**Guest banner** (`data-testid="guest-auth-banner"`) on list and browse surfaces prompts sign-in to create or edit.
 
 Right-side (authenticated only): global search, notifications bell, user menu — hidden for guests.
 

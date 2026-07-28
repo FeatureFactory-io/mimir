@@ -100,7 +100,9 @@ Feature: FOB-AGENTS-GLOBAL-LIST-1 Global Agents List and Navigation
     Then he sees the global agents list page
     And he sees "All Agents" header
     And he sees the guest banner with data-testid "guest-auth-banner"
-    And he does not see the authenticated user menu or dashboard link in the full app navbar
+    And he sees all primary navbar links from Home through PIPs
+    And he does not see the authenticated user menu with data-testid "user-display"
+    And he does not see global search with data-testid "global-search-input"
 
   Scenario: AGENT-GLOBAL-14 Guest global agents list shows released-public rows only
     Given Bob is not logged in

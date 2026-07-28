@@ -41,8 +41,12 @@ Feature: FOB-CONTENT-BROWSER-ACCESS Content Browser Access and Navigation
     Then he sees the guest banner with data-testid "guest-auth-banner"
     And the banner text includes "Sign in to create and edit playbooks"
     And he sees [Sign In] and [Register] in the guest banner
-    And he does not see the full authenticated app navbar (global search, notifications, user menu)
-    And he sees minimal guest chrome (brand plus auth links only)
+    And he sees all primary navbar links from Home through PIPs
+    And he does not see global search with data-testid "global-search-input"
+    And he does not see the notification bell with data-testid "notification-bell"
+    And he does not see the user menu with data-testid "user-display"
+    And he sees [Register] with data-testid "register-link"
+    And he sees [Login] with data-testid "login-link"
 
 
   Scenario: FOB-CONTENT-BROWSER-02 /browser/ without a playbook id returns 404

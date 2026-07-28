@@ -127,14 +127,15 @@ Mike is satisfied with the playbook and clicks **[Release]** on the playbook det
 
 #### Screen: FOB Landing Page (`/`)
 Bob opens the FOB root URL in an incognito session:
-- Brand header with **[Sign In]** and **[Register]**
+- **Full primary navbar**: Home → Playbooks → Workflows → Phases → Activities → Artifacts → Agents → Skills → Rules → Teams → PIPs
+- Right side: **[Register]** and **[Login]** only (no global search, notifications bell, or user menu)
 - Hero section with product value proposition
 - Primary CTA: **[Explore public playbooks]** (`data-testid="landing-cta-explore-playbooks"`) → `/playbooks/`
-- No full app navbar (Dashboard, Teams, PIPs, etc.)
+- Auth-only nav targets (Home, Teams, PIPs) redirect to login when clicked
 
 #### Screen: Guest Playbooks List (`/playbooks/`)
 Bob clicks **[Explore public playbooks]** and lands on the public browse grid:
-- **Minimal guest chrome**: brand + Sign In + Register only (no global search, notifications, or user menu)
+- **Full primary navbar** (same as landing) + **[Register]** / **[Login]** on the right
 - **Guest banner** (`data-testid="guest-auth-banner"`): "Sign in to create and edit playbooks" with auth links
 - **Card grid**: released public playbooks only (e.g., Mike's "React Frontend Development")
   - Each card shows title, author ("by Mike Chen"), version, status
