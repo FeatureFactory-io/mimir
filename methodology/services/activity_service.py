@@ -545,7 +545,69 @@ class ActivityService:
             raise  # Propagate to caller
     
     @staticmethod
-    def get_recent_activities(user, limit=10):
+    def _validate_feed_hours(hours):
+        """
+        Validate Recently Used feed time-window hours.
+
+        :param hours: int — allowed values 1, 24, 168
+        :returns: int validated hours
+        :raises ValueError: if hours is not allowed
+        """
+        allowed = {1, 24, 168}
+        if hours not in allowed:
+            raise ValueError(
+                f"Invalid hours={hours}; allowed feed window hours: {sorted(allowed)}"
+            )
+        return hours
+
+    @staticmethod
+    def _recent_activities_queryset(user, hours=24):
+        """Base queryset for recent activities with time window filter."""
+        from datetime import timedelta
+
+        from django.db.models.functions import Coalesce, Greatest
+        from django.utils import timezone
+
+        validated_hours = ActivityService._validate_feed_hours(hours)
+        cutoff = timezone.now() - timedelta(hours=validated_hours)
+        accessible_playbook_ids = PlaybookService.get_accessible_playbook_ids(user)
+        return (
+            Activity.objects.filter(
+                workflow__playbook_id__in=accessible_playbook_ids
+            )
+            .annotate(
+                recent_time=Greatest(
+                    Coalesce("last_accessed_at", "updated_at"),
+                    "updated_at",
+                )
+            )
+            .filter(recent_time__gte=cutoff)
+            .select_related("workflow", "workflow__playbook")
+            .order_by("-recent_time"),
+            cutoff,
+        )
+
+    @staticmethod
+    def count_recent_activities_in_window(user, hours=24):
+        """
+        Count activities within the Recently Used time window.
+
+        :param user: User instance
+        :param hours: Time window in hours (default 24)
+        :return: int count of matching activities
+        """
+        queryset, _cutoff = ActivityService._recent_activities_queryset(user, hours=hours)
+        count = queryset.count()
+        logger.info(
+            "get_recent_activities count_in_window user_id=%s hours=%s result_count=%s",
+            getattr(user, "pk", user),
+            hours,
+            count,
+        )
+        return count
+
+    @staticmethod
+    def get_recent_activities(user, limit=10, hours=24):
         """
         Get recently used/modified activities sorted by most recent access or update.
         
@@ -554,29 +616,36 @@ class ActivityService:
         
         :param user: User instance
         :param limit: Maximum number of activities to return (default: 10)
+        :param hours: Time window in hours — 1, 24, or 168 (default: 24)
         :return: QuerySet of Activity instances ordered by recent_time descending
         :rtype: QuerySet[Activity]
+        :raises ValueError: if hours is not in {1, 24, 168}
         :raises: Database errors propagate naturally (OperationalError, DatabaseError)
         
         Example:
-            >>> recent = ActivityService.get_recent_activities(user, limit=10)
+            >>> recent = ActivityService.get_recent_activities(user, limit=10, hours=24)
             >>> for activity in recent:
             ...     print(activity.name, activity.timestamp)
         """
-        from django.db.models.functions import Coalesce, Greatest
-        
+        logger.info(
+            "get_recent_activities entry user_id=%s limit=%s hours=%s",
+            getattr(user, "pk", user),
+            limit,
+            hours,
+        )
+
         try:
-            accessible_playbook_ids = PlaybookService.get_accessible_playbook_ids(user)
-            return Activity.objects.filter(
-                workflow__playbook_id__in=accessible_playbook_ids
-            ).annotate(
-                recent_time=Greatest(
-                    Coalesce('last_accessed_at', 'updated_at'),
-                    'updated_at'
-                )
-            ).select_related(
-                'workflow', 'workflow__playbook'
-            ).order_by('-recent_time')[:limit]
+            queryset, cutoff = ActivityService._recent_activities_queryset(user, hours=hours)
+            results = queryset[:limit]
+            result_count = len(results)
+            logger.info(
+                "get_recent_activities processing cutoff=%s result_count=%s",
+                cutoff.isoformat(),
+                result_count,
+            )
+            return results
+        except ValueError:
+            raise
         except Exception as e:
             logger.error(f"Error fetching recent activities for user {user.username}: {e}")
             raise  # Propagate to caller for proper handling

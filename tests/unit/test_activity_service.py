@@ -306,10 +306,14 @@ class TestActivityService:
         )
 
         now = timezone.now()
-        recent_activity.last_accessed_at = now - timedelta(minutes=30)
-        recent_activity.save(update_fields=["last_accessed_at"])
-        stale_activity.last_accessed_at = now - timedelta(hours=5)
-        stale_activity.save(update_fields=["last_accessed_at"])
+        Activity.objects.filter(pk=recent_activity.pk).update(
+            last_accessed_at=now - timedelta(minutes=30),
+            updated_at=now - timedelta(minutes=30),
+        )
+        Activity.objects.filter(pk=stale_activity.pk).update(
+            last_accessed_at=now - timedelta(hours=5),
+            updated_at=now - timedelta(hours=5),
+        )
 
         one_hour = list(ActivityService.get_recent_activities(user, limit=10, hours=1))
         twenty_four_hours = list(
@@ -352,10 +356,14 @@ class TestActivityService:
         )
 
         now = timezone.now()
-        fresh.last_accessed_at = now - timedelta(hours=2)
-        fresh.save(update_fields=["last_accessed_at"])
-        old.last_accessed_at = now - timedelta(hours=48)
-        old.save(update_fields=["last_accessed_at"])
+        Activity.objects.filter(pk=fresh.pk).update(
+            last_accessed_at=now - timedelta(hours=2),
+            updated_at=now - timedelta(hours=2),
+        )
+        Activity.objects.filter(pk=old.pk).update(
+            last_accessed_at=now - timedelta(hours=48),
+            updated_at=now - timedelta(hours=48),
+        )
 
         recent = list(ActivityService.get_recent_activities(user, limit=10))
 
