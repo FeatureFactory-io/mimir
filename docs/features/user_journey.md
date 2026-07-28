@@ -131,6 +131,8 @@ Bob opens the FOB root URL in an incognito session:
 - Right side: **[Register]** and **[Login]** only (no global search, notifications bell, or user menu)
 - Hero section with product value proposition
 - Primary CTA: **[Explore public playbooks]** (`data-testid="landing-cta-explore-playbooks"`) → `/playbooks/`
+- Hero primary action (guest): **[Register]** (`data-testid="landing-cta-register"`) with user-plus icon → `/auth/user/register/`
+- Hero primary action (authenticated): **[Connect MCP]** (`data-testid="landing-cta-connect-mcp"`, primary button, plug icon) → `#mcp-config`
 - Auth-only nav targets (Home, Teams, PIPs) redirect to login when clicked
 
 #### Screen: Guest Playbooks List (`/playbooks/`)
