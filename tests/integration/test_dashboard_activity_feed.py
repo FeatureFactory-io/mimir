@@ -1,4 +1,4 @@
-"""Integration tests for dashboard Recently Used activity feed (FOB-DASHBOARD-09..13)."""
+"""Integration tests for dashboard Recently Contributed activity feed (FOB-DASHBOARD-09..13)."""
 
 from datetime import timedelta
 
@@ -47,7 +47,7 @@ def _create_playbook_with_activities(user, activity_specs):
 
 @pytest.mark.django_db
 class TestDashboardActivityFeed:
-    """Recently Used feed time-window filter and HTMX refresh."""
+    """Recently Contributed feed time-window filter and HTMX refresh."""
 
     def test_dashboard_shows_recently_used_section_title(self):
         client = Client()
@@ -59,8 +59,42 @@ class TestDashboardActivityFeed:
 
         assert response.status_code == 200
         assert 'data-testid="recently-used-section"' in content
-        assert "Recently Used" in content
+        assert "Recently Contributed" in content
         assert "Recent Activity" not in content
+        assert ">Recently Used<" not in content
+
+    def test_dashboard_empty_state_shows_contribution_copy(self):
+        """Empty feed shows contribution-themed helper copy on full dashboard load."""
+        client = Client()
+        user = User.objects.create_user(username="maria_empty", password="pass123")
+        client.force_login(user)
+
+        response = client.get(reverse("dashboard"))
+        content = response.content.decode("utf-8")
+
+        assert response.status_code == 200
+        assert 'data-testid="no-activities"' in content
+        assert "No recent activity" in content
+        assert (
+            "Your contribution activity will appear here as you contribute to Mimir"
+            in content
+        )
+
+    def test_dashboard_activities_empty_state_shows_contribution_copy(self):
+        """HTMX feed refresh shows the same empty-state copy when window has no rows."""
+        client = Client()
+        user = User.objects.create_user(username="maria_empty_htmx", password="pass123")
+        client.force_login(user)
+
+        response = client.get(reverse("dashboard_activities"), {"hours": 24})
+        content = response.content.decode("utf-8")
+
+        assert response.status_code == 200
+        assert 'data-testid="no-activities"' in content
+        assert (
+            "Your contribution activity will appear here as you contribute to Mimir"
+            in content
+        )
 
     def test_dashboard_default_load_uses_24h_window(self):
         client = Client()

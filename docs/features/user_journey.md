@@ -344,18 +344,18 @@ The pill counts PIPs where `status_changed_since_last_view = true`. It resets to
 - [View All Playbooks] link → FOB-PLAYBOOKS-LIST+FIND-1
 - Empty state: "No playbooks yet" with [Create Playbook] button
 
-**Section 2: Recently Used** (Middle section - informer style)
-- **Card title:** "Recently Used" (`data-testid="recently-used-section"`)
+**Section 2: Recently Contributed** (Middle section - informer style)
+- **Card title:** "Recently Contributed" (`data-testid="recently-used-section"`)
 - **Purpose**: Show recently accessed or updated methodology activities for quick return navigation
 - **NOT an audit trail**: Does not track all user actions; not create/update/delete event log
 - **Feed**: Up to 10 Activity rows (playbook link + timestamp), sorted by most recent access or update
 - **Time filter** (`data-testid="recently-used-hours-label"`): Last hour (1h) | Last 24h (default) | Last week (168h) — HTMX refresh without full page reload
 - **Refresh** (`data-testid="refresh-activities-button"`): Re-fetches feed using the currently selected window
 - **Window badge** (`data-testid="recently-used-window-count"`): e.g. `3 in last 24h` — count of activities in the selected window, not total accessible activities
-- Empty state: "No recent activity" when no rows match the window
+- Empty state: "No recent activity" when no rows match the window; helper copy references contributing to Mimir
 - **Future (FOB-DASHBOARD-02):** usage-count table — Item Name | Type | Times Used | Last Used | [View]
 
-**⚠️ IMPORTANT**: This is NOT a comprehensive audit log or activity tracking system. It only tracks views/access for the purpose of showing recently used items as quick navigation shortcuts. It does not track create/update/delete operations.
+**⚠️ IMPORTANT**: This is NOT a comprehensive audit log or activity tracking system. It only tracks views/access for the purpose of showing recently contributed items as quick navigation shortcuts. It does not track create/update/delete operations.
 
 **Section 3: Quick Actions** (Bottom section)
 - Three prominent action buttons:

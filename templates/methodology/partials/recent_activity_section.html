@@ -1,12 +1,12 @@
 {# templates/methodology/partials/recent_activity_section.html #}
-{# Recently Used section partial for dashboard #}
+{# Recently Contributed section partial for dashboard #}
 
 <div class="col-lg-6 mb-4">
     <div class="card h-100" data-testid="recently-used-section">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">
                 <i class="fas fa-clock-rotate-left text-info"></i>
-                Recently Used
+                Recently Contributed
             </h5>
             <small class="text-muted" data-testid="recently-used-window-count">
                 {{ activity_count_in_window|default:0 }} in last {{ activity_hours_label|default:"Last 24h"|cut:"Last " }}
