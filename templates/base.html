@@ -65,7 +65,6 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                {% if user.is_authenticated %}
                 <!-- Single active tab: methodology.context_processors.primary_nav_section -->
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
@@ -180,88 +179,6 @@
                         </a>
                     </li>
                 </ul>
-                {% elif show_guest_browse_nav %}
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link {% if nav_section == 'playbooks' %}active{% endif %}"
-                           href="/playbooks/"
-                           data-testid="nav-playbooks"
-                           data-bs-toggle="tooltip" data-bs-placement="bottom"
-                           title="Browse released public playbooks"
-                           {% if nav_section == 'playbooks' %}aria-current="page"{% endif %}>
-                            <i class="fas fa-book-sparkles"></i> Playbooks
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if nav_section == 'workflows' %}active{% endif %}" href="{% url 'workflow_global_list' %}" data-testid="nav-workflows"
-                           data-bs-toggle="tooltip" data-bs-placement="bottom"
-                           title="View workflows in released public playbooks"
-                           {% if nav_section == 'workflows' %}aria-current="page"{% endif %}>
-                            <i class="fas fa-diagram-project"></i> Workflows
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if nav_section == 'phases' %}active{% endif %}"
-                           href="{% url 'phase_list_global' %}"
-                           data-testid="nav-phases"
-                           data-bs-toggle="tooltip" data-bs-placement="bottom"
-                           title="View phases in released public playbooks"
-                           {% if nav_section == 'phases' %}aria-current="page"{% endif %}>
-                            <i class="fas fa-bars-progress"></i> Phases
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if nav_section == 'activities' %}active{% endif %}"
-                           href="{% url 'activity_global_list' %}"
-                           data-testid="nav-activities"
-                           data-bs-toggle="tooltip" data-bs-placement="bottom"
-                           title="View activities in released public playbooks"
-                           {% if nav_section == 'activities' %}aria-current="page"{% endif %}>
-                            <i class="fas fa-list-check"></i> Activities
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if nav_section == 'artifacts' %}active{% endif %}"
-                           href="{% url 'artifact_list_global' %}"
-                           data-testid="nav-artifacts"
-                           data-bs-toggle="tooltip" data-bs-placement="bottom"
-                           title="View artifacts in released public playbooks"
-                           {% if nav_section == 'artifacts' %}aria-current="page"{% endif %}>
-                            <i class="fas fa-gift"></i> Artifacts
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if nav_section == 'agents' %}active{% endif %}"
-                           href="{% url 'agent_list' %}"
-                           data-testid="nav-agents"
-                           data-bs-toggle="tooltip" data-bs-placement="bottom"
-                           title="View agents in released public playbooks"
-                           {% if nav_section == 'agents' %}aria-current="page"{% endif %}>
-                            <i class="fas fa-brain-circuit"></i> Agents
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if nav_section == 'skills' %}active{% endif %}"
-                           href="{% url 'skill_list' %}"
-                           data-testid="nav-skills"
-                           data-bs-toggle="tooltip" data-bs-placement="bottom"
-                           title="View skills in released public playbooks"
-                           {% if nav_section == 'skills' %}aria-current="page"{% endif %}>
-                            <i class="fas fa-hand-holding-magic"></i> Skills
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if nav_section == 'rules' %}active{% endif %}"
-                           href="{% url 'rule_list' %}"
-                           data-testid="nav-rules"
-                           data-bs-toggle="tooltip" data-bs-placement="bottom"
-                           title="View rules in released public playbooks"
-                           {% if nav_section == 'rules' %}aria-current="page"{% endif %}>
-                            <i class="fas fa-scale-balanced"></i> Rules
-                        </a>
-                    </li>
-                </ul>
-                {% endif %}
                 <ul class="navbar-nav ms-auto">
                     {% if user.is_authenticated %}
                     <li class="nav-item d-flex align-items-center me-3 position-relative">
