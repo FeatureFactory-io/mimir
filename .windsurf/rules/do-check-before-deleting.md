@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When you are about to remove function or file contents
----
-
 # Rule: Check Before Deleting Code
 
 Never mindlessly delete functions, variables, classes etc. Follow these steps:

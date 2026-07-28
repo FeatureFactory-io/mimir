@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When encountering missing parts of the file.
----
-
 # Rule: Check Previous Commits
 
 When you encounter missing imports, parts of the files missing, or files missing - always check:

@@ -2127,7 +2127,7 @@ Complete reference for all environment variables consumed by Mimir, grouped by e
 | `ANTHROPIC_API_KEY` | **Yes** (Galdr) | `sk-ant-api03-…` | Required for Galdr AI PIP review. Without it Galdr is disabled (`GALDR_USE_ANTHROPIC=False`). |
 | `GALDR_MODEL` | No | `claude-sonnet-4-5` | Any Anthropic model slug |
 | `GITHUB_TOKEN` | No | `ghp_…` | GitHub PAT with **Issues: write** on `GITHUB_BUG_REPO`. **If absent**, `BUG_REPORT_DRY_RUN` is auto-set to `True` so the Feedback widget works without filing real issues. |
-| `GITHUB_BUG_REPO` | No | `phainestai/mimir` | Target repo for bug reports |
+| `GITHUB_BUG_REPO` | No | `FeatureFactory-io/mimir` | Target repo for bug reports |
 | `BUG_REPORT_DRY_RUN` | No | auto | `1`/`true` to force dry-run even when token is present |
 | `USE_SES_IN_DEV` | No | `1` (default on) | Set `0` to print emails to the terminal instead of SES delivery |
 | `AWS_SES_REGION_NAME` | If SES | `us-east-1` | Required when `USE_SES_IN_DEV=1` |
@@ -2178,7 +2178,7 @@ Routine **application** deploys do not run CDK; **infrastructure** recreate uses
 | Variable | Required | Example | Notes |
 |----------|----------|---------|-------|
 | `GITHUB_TOKEN` | **Yes** | `ghp_…` or `gho_…` | Classic PAT or OAuth token with **Issues: write** on `GITHUB_BUG_REPO`. **Missing = Feedback widget returns "not configured" error.** |
-| `GITHUB_BUG_REPO` | No | `phainestai/mimir` | Target repo; this is the default |
+| `GITHUB_BUG_REPO` | No | `FeatureFactory-io/mimir` | Target repo; this is the default |
 | `BUG_REPORT_DRY_RUN` | No | — | `1`/`true` to skip GitHub API (staging diagnostics only) |
 | `MIMIR_GIT_REVISION` | No | `v0.0.41` | Set by CI (`deploy-idle.sh`); surfaced in `/health/` and bug report bodies |
 | `S3_BACKUP_BUCKET` | No | `mimir-db-backups-411113550285` | Used by `deploy-idle.sh` / `pre_deploy_backup`; set in GHA `deploy-idle` job (or repo variable) |
@@ -2467,7 +2467,7 @@ The web app can file structured issues from the global **Feedback** UI and from 
 | Variable | Example | Notes |
 |----------|---------|-------|
 | `GITHUB_TOKEN` | `github_pat_…` or `ghp_…` | Classic PAT or fine-grained token with **Issues: write** on the repository below. Store as an EB environment property (plain or SSM-backed); **never** commit. |
-| `GITHUB_BUG_REPO` | `phainestai/mimir` | Default if unset |
+| `GITHUB_BUG_REPO` | `FeatureFactory-io/mimir` | Default if unset |
 
 **Optional:**
 

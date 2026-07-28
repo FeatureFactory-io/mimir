@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When implementing or runninh tests
----
-
 # Rule: Test Runners
 
 Use the following runners:

@@ -38,6 +38,8 @@ logger = logging.getLogger(__name__)
 
 _VALID_ARTIFACT_TYPES = {choice[0] for choice in Artifact.ARTIFACT_TYPES}
 
+_APPEND_PREFIX = "APPEND TO GUIDANCE:"
+
 
 def _normalize_artifact_type(raw: str | None) -> str:
     """Return a valid Artifact.ARTIFACT_TYPES value, falling back to 'Other'.
@@ -462,7 +464,11 @@ class PipApplyChangesService:
             if act.workflow.playbook_id != playbook.pk:
                 raise ValidationError("Activity not in playbook.")
             if body:
-                act.guidance = body
+                if body.startswith(_APPEND_PREFIX):
+                    suffix = body[len(_APPEND_PREFIX):].strip()
+                    act.guidance = (act.guidance or "").rstrip() + "\n\n" + suffix
+                else:
+                    act.guidance = body
             if change.name.strip():
                 act.name = change.name.strip()[:200]
             if change.phase_ref:
@@ -514,7 +520,11 @@ class PipApplyChangesService:
             if change.name.strip():
                 sk.title = change.name.strip()[:200]
             if body:
-                sk.content = body
+                if body.startswith(_APPEND_PREFIX):
+                    suffix = body[len(_APPEND_PREFIX):].strip()
+                    sk.content = (sk.content or "").rstrip() + "\n\n" + suffix
+                else:
+                    sk.content = body
             sk.save(update_fields=["title", "content", "updated_at"])
             logger.info("PIP apply ALTER Skill pk=%s pip=%s", cid, pip_pk)
             return
@@ -553,7 +563,11 @@ class PipApplyChangesService:
             if change.name.strip():
                 ru.title = change.name.strip()[:200]
             if body:
-                ru.content = body
+                if body.startswith(_APPEND_PREFIX):
+                    suffix = body[len(_APPEND_PREFIX):].strip()
+                    ru.content = (ru.content or "").rstrip() + "\n\n" + suffix
+                else:
+                    ru.content = body
             ru.save(update_fields=["title", "content", "updated_at"])
             logger.info("PIP apply ALTER Rule pk=%s pip=%s", cid, pip_pk)
             return

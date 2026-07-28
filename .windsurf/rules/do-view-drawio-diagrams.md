@@ -1,9 +1,3 @@
----
-trigger: model_decision
-description: file_analysis: When encountering Draw.io files with embedded images, convert them to viewable format for analysis
----
-
-
 # Rule: View Draw.io Diagrams with Embedded Images
 
 When you encounter a Draw.io file (.drawio extension) that contains embedded images or screenshots, automatically convert it to a viewable format to analyze the visual content and annotations.

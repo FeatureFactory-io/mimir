@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # Rule: Continuous Testing and Error Monitoring
 
 ## Requirements

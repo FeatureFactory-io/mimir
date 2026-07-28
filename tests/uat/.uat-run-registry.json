@@ -97,7 +97,7 @@
     {
       "scenario": "UAT-08-07",
       "issue": 141,
-      "url": "https://github.com/phainestai/mimir/issues/141",
+      "url": "https://github.com/FeatureFactory-io/mimir/issues/141",
       "summary": "Nested delete form inside team settings form causes accidental team deletion / Save Settings unreliable",
       "status": "fixed",
       "fixed_in": "0c3d805"

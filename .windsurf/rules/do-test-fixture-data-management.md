@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When implementing E2E tests that require specific test data setup.
----
-
 # Rule: E2E Test Fixture Data Management
 
 

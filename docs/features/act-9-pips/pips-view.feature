@@ -211,3 +211,69 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
     Given PIP-35 is decided by Admin with all Changes REJECTED
     Then Maria receives an email with subject "Your PIP "Drop Legacy IE Support" — Rejected ✗"
     And the email body contains "Overall: Rejected. No changes were applied."
+
+  # ============================================================================
+  # WITHDRAW (EDIT & RESUBMIT)
+  # ============================================================================
+
+  Scenario: FOB-PIP-DETAIL-20 Submitted PIP shows Withdraw button
+    Given PIP-28 has status "Submitted"
+    When Maria opens FOB-PIP-DETAIL-1 for PIP-28
+    Then she sees [Withdraw] button
+    And she does NOT see [Edit PIP]
+    And she does NOT see [Submit for Review]
+    And the status banner reads "Submitted — queued for Galdr review."
+
+  Scenario: FOB-PIP-DETAIL-21 Processing (Galdr) PIP shows Withdraw button
+    Given PIP-27 has status "Processing (Galdr)"
+    When Maria opens FOB-PIP-DETAIL-1 for PIP-27
+    Then she sees [Withdraw] button
+    And the status banner reads "Galdr is reviewing your changes — check back shortly."
+
+  Scenario: FOB-PIP-DETAIL-22 Withdraw shows confirmation modal with clear warning
+    Given PIP-28 has status "Submitted"
+    And Maria is on FOB-PIP-DETAIL-1 for PIP-28
+    When she clicks [Withdraw]
+    Then a confirmation modal appears:
+      """
+      Withdraw PIP-28?
+      It will return to Draft and any in-progress Galdr review will be discarded.
+      """
+    And the modal has [Confirm] and [Cancel] buttons
+    When she clicks [Cancel]
+    Then the modal closes and PIP-28 status is still "Submitted"
+
+  Scenario: FOB-PIP-DETAIL-23 Confirming Withdraw on Submitted PIP reverts status to Draft
+    Given PIP-28 has status "Submitted"
+    And Maria is on FOB-PIP-DETAIL-1 for PIP-28
+    When she clicks [Withdraw] and confirms
+    Then PIP-28 status becomes "Draft"
+    And she sees [Edit PIP] button
+    And she sees [Submit for Review] button
+    And she sees [Discard] button
+    And no Galdr verdict badges are shown on any Change card
+    And the status banner reads "Draft — not yet submitted."
+
+  Scenario: FOB-PIP-DETAIL-24 Confirming Withdraw on Processing PIP aborts Galdr and clears recommendations
+    Given PIP-27 has status "Processing (Galdr)"
+    And Galdr has partially written recommendations for PIP-27
+    When Maria opens FOB-PIP-DETAIL-1 for PIP-27 and clicks [Withdraw] and confirms
+    Then PIP-27 status becomes "Draft"
+    And all Galdr recommendations on PIP-27 Changes are cleared
+    And no galdr_verdict badges appear on any Change card
+
+  Scenario: FOB-PIP-DETAIL-25 Withdrawn Draft can be edited and resubmitted
+    Given PIP-27 was withdrawn and now has status "Draft" with 1 existing Change
+    When Maria opens FOB-PIP-DETAIL-1 for PIP-27 and clicks [Edit PIP]
+    Then she can add, modify, or remove Changes
+    When she adds Change #2 (ALTER Activity "Component Testing")
+    And clicks [Submit for Review]
+    Then PIP-27 status becomes "Submitted"
+    And within seconds transitions to "Processing (Galdr)"
+    And a notification appears: "PIP 'Rename Discovery Activity' submitted — Galdr is reviewing your changes."
+
+  Scenario: FOB-PIP-DETAIL-26 Reviewed PIP does not show Withdraw button
+    Given PIP-42 has status "Reviewed"
+    When Maria opens FOB-PIP-DETAIL-1 for PIP-42
+    Then she does NOT see [Withdraw]
+    And she sees no action buttons (view-only)

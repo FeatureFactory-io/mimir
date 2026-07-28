@@ -12,7 +12,7 @@
 #   ./scripts/configure_dockerhub_github_actions.sh
 #
 # Optional:
-#   export GITHUB_REPOSITORY="phainestai/mimir"
+#   export GITHUB_REPOSITORY="FeatureFactory-io/mimir"
 #   export DOCKER_CREDENTIAL_HELPER_URL="https://index.docker.io/v1/"
 #
 set -euo pipefail
@@ -56,10 +56,10 @@ else
     elif [[ "${REMOTE}" =~ ^https?://[^/]+/(.+)$ ]]; then
       REPO_SPEC="${BASH_REMATCH[1]}"
     else
-      REPO_SPEC="phainestai/mimir"
+      REPO_SPEC="FeatureFactory-io/mimir"
     fi
   else
-    REPO_SPEC="${REPO_OVERRIDE:-phainestai/mimir}"
+    REPO_SPEC="${REPO_OVERRIDE:-FeatureFactory-io/mimir}"
   fi
 fi
 

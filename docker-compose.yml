@@ -27,7 +27,7 @@ services:
       DJANGO_DEBUG: "${DJANGO_DEBUG:-False}"
       DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0,web"
       GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
-      GITHUB_BUG_REPO: "${GITHUB_BUG_REPO:-phainestai/mimir}"
+      GITHUB_BUG_REPO: "${GITHUB_BUG_REPO:-FeatureFactory-io/mimir}"
       BUG_REPORT_DRY_RUN: "${BUG_REPORT_DRY_RUN:-}"
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8000/health/"]

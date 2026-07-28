@@ -1,0 +1,59 @@
+---
+alwaysApply: true
+---
+
+# Rule: Continuous Testing and Error Monitoring
+
+## Requirements
+
+1. **All tests must be runnable via `pytest tests/`**
+   - Ensure pytest compatibility for all test files
+   - Use pytest fixtures and conventions
+   - Maintain Django test compatibility where needed
+
+2. **Tests must add their output to `tests.log`**
+   - Configure pytest logging to write to `tests.log`
+   - Include detailed test results, errors, and timing
+   - Preserve log history for analysis
+
+3. **Run tests continuously**
+   - Monitor file changes and auto-run tests for the new and/or affected scenarios
+   - Use watch mode or interval-based execution
+   - Provide real-time feedback on test status
+
+4. **Monitor and fix errors automatically**
+   - Parse test output and `tests.log` for failures
+   - Identify root causes of test failures
+   - Implement fixes proactively
+   - Re-run tests to validate fixes
+
+## Implementation
+
+### Pytest Configuration
+- Configure `pytest.ini` or `pyproject.toml` for logging
+- Set up proper test discovery patterns
+- Configure Django settings for pytest
+
+### Continuous Monitoring
+- Use file watchers (e.g., `pytest-watch`, `entr`)
+- Parse test results in real-time
+- Log analysis for error patterns
+
+### Error Fixing Protocol
+- Categorize errors (syntax, logic, dependency, etc.)
+- Apply appropriate fixes based on error type
+- Formulate the target state (what should be the result of the fix)
+- Inform user that you found the error, how you see target state, and what you are going to do to fix it
+- Apply the fix
+- Validate fixes with immediate test re-run
+- Update tests if requirements have changed
+
+## Usage
+
+When working on any codebase:
+1. Ensure pytest setup is complete
+2. Check background processes. If there is no continuous_test_runner.py - start it
+3. Do continuous test output monitoring
+3. Also monitor `tests.log` for issues
+4. Fix errors as they are detected
+5. Maintain test health continuously

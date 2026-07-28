@@ -199,7 +199,7 @@ if _ses_cfg_set:
 #
 #   GITHUB_TOKEN — classic PAT or fine-grained token with **Issues: write** on
 #                  the repo given by GITHUB_BUG_REPO.
-#   GITHUB_BUG_REPO — default ``phainestai/mimir`` (override for forks).
+#   GITHUB_BUG_REPO — default ``FeatureFactory-io/mimir`` (override for forks).
 #   BUG_REPORT_DRY_RUN — optional; ``1``/``true`` skips PyGithub (staging only).
 #
 # If GITHUB_TOKEN is unset, the feedback widget and ``POST /api/feedback/report/``

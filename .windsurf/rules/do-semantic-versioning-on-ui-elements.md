@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When building HTML Pages, Django Templates, React Components/Views
----
-
 # UI naming for Playwright and accessibility
 
 **Selector order (use in this order):** `get_by_test_id` → `get_by_role` → `get_by_label` → `get_by_text` (stable only). Do **not** use CSS/XPath for primary flows.

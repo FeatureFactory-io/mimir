@@ -1,6 +1,1 @@
----
-trigger: model_decision
-description: Switching from working on one task to another
----
-
 If the work is not completed - there are outstanding items to complete - add TODO: to the areas where the work was not completing, stating what needs to be done, who is affected, and why is it important.

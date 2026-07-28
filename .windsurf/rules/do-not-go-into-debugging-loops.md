@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When investigating an error or undesired behavior
----
-
 your job is to keep a clear view of the original problem and prevent runaway debugging loops.
 
 Always follow these steps:

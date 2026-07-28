@@ -32,7 +32,7 @@ def test_submit_bug_invalid_email():
 @override_settings(
     BUG_REPORT_DRY_RUN=True,
     GITHUB_TOKEN="",
-    GITHUB_BUG_REPO="phainestai/mimir",
+    GITHUB_BUG_REPO="FeatureFactory-io/mimir",
     MIMIR_ENV="test",
 )
 def test_submit_bug_dry_run_short_circuits_github():

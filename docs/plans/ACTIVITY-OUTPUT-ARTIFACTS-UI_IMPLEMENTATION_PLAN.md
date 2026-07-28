@@ -1,7 +1,7 @@
 # Implementation Plan: Activity Detail Output Artifacts UI (#167)
 
 **Feature**: FOB-ART-OUT — Symmetric input/output artifact cards on activity detail  
-**GitHub Issue**: [#167](https://github.com/phainestai/mimir/issues/167)  
+**GitHub Issue**: [#167](https://github.com/FeatureFactory-io/mimir/issues/167)  
 **Branch**: `feature/activity-output-artifacts-ui`  
 **Spec**: `docs/features/act-6-artifacts/artifacts-flow.feature` — ART-FLOW-16, ART-FLOW-19  
 **UAT**: Browse activity with outputs on local server; verify badge count + links

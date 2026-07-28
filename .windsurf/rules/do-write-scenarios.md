@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When we are working on the scenario or .feature file - reading or creating it. If we are reading and its bad - ask questions and propose improvements to make it match rules.
----
-
 # Writing Effective BDD Feature Files
 
 ## 1. Principle: Always Start With a Feature Specification

@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # Rule: Small Increments
 
 Work in method-by-method steps.

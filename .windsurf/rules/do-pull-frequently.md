@@ -1,6 +1,1 @@
----
-trigger: model_decision
-description: Before starting on the next feature or an extension of the feature, or planning a big change to the codebase
----
-
 Always do git pull --rebase origin and process the changes figuring out what was added/removed/extended. If there are breaking changes affecting our plan implementation - summarize them, their consequences, and ask what we will do.

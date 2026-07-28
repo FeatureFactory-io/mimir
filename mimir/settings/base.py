@@ -19,11 +19,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Bug reports → GitHub Issues (UI offcanvas + MCP `report_bug` / HTTP facade).
 #   GITHUB_TOKEN — PAT or fine-grained token with **Issues: write** on GITHUB_BUG_REPO.
-#   GITHUB_BUG_REPO — "owner/repo"; default phainestai/mimir.
+#   GITHUB_BUG_REPO — "owner/repo"; default FeatureFactory-io/mimir.
 #   BUG_REPORT_DRY_RUN — if "1"/"true"/"yes", skip PyGithub (placeholder issue URL).
 # See README and docs/architecture/SAO.md for production / Elastic Beanstalk setup.
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
-GITHUB_BUG_REPO = os.environ.get("GITHUB_BUG_REPO", "phainestai/mimir").strip()
+GITHUB_BUG_REPO = os.environ.get("GITHUB_BUG_REPO", "FeatureFactory-io/mimir").strip()
 BUG_REPORT_DRY_RUN = os.environ.get("BUG_REPORT_DRY_RUN", "").lower() in (
     "1",
     "true",

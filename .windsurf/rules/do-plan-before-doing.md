@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: In the beginning of a new conversation with the user. When user asks you to implement something - a feature, a class, class method, property, test.
----
-
 # Rule: Plan Before Doing
 
 1. Read the feature or spec in full.

@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When you decided to commit or user asks to commit.
----
-
 # Rule: Follow Angular Commit Convention
 
 When committing, follow the Angular convention:

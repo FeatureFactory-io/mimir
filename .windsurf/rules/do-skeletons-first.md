@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: Creating classes, properties, methods, controllers, views etc.
----
-
 The core principle is that the developer who has no knowledge of the system can implement methods/properties etc. following only documentation in the skeleton - think its like you are a designer defining the task for the implementer.
 
 Do as follows:

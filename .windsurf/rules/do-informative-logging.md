@@ -1,11 +1,30 @@
----
-trigger: model_decision
-description: When implementing a method or property - add extensive logging level.
----
+**Mimir metadata (required on apply):** `always_apply: true` (currently false). This rule absorbs and replaces `add-logging`.
 
-Every service call or controller action must log to `app.log` at **INFO**. Configure logging if missing; `app.log` is cleared on restart for clean diagnosis.
+Every service call or controller action must log to `logs/app.log` (or the project’s designated app log) at **INFO**. Configure logging if missing: logger + file handler that rotates / clears on every app relaunch so diagnosis starts clean.
 
-**Ask yourself:** Where did it break? Why? What data and decisions led here?
+Use `logs/app.log` to troubleshoot who was doing what with which data when error X occurred. For UI / HTMX flows use `console.log` for decisions, actions, and results (map to the same story beats below).
+
+**Ban deferred-logging slices.** Logging ships in the same green slice as behavior — never a final “informative logging pass” after tests are green.
+
+**Ask yourself before writing each log line:**
+- What information will I need to precisely pinpoint where the error is occurring?
+- What context will I need in the logs to understand why it happened?
+- What data transformations or validations occurred?
+- Which decisions led to the current point?
+
+## Story beats (minimum narrative)
+
+On each major step emit the applicable beats so a reader can reconstruct the path:
+
+`entry → config → validation → processing → branch → exit → error`
+
+## Preferred line format (grep / caplog friendly)
+
+```text
+{logger_name} | {Class.method} | {beat} | key=value ...
+```
+
+Legacy `Class.method: message | key=value` is acceptable if `where` + beat intent remain searchable.
 
 ## Logging setup
 
@@ -28,7 +47,7 @@ buffer = io.StringIO()  # structured dumps
 ```python
 def method_name(self, param1, param2):
     logger.info(
-        f'Starting {method_name} param1={param1} param2_shape={getattr(param2, "shape", type(param2))}'
+        f'{self.__class__.__name__}.method_name | entry | param1={param1} param2_shape={getattr(param2, "shape", type(param2))}'
     )
 ```
 
@@ -46,16 +65,15 @@ logger.info(f'Preview:\n{tabulate(df.head(), headers=df.columns.tolist())}')
 
 ```python
 if condition:
-    logger.info(f'Column {column_name} present; processing...')
+    logger.info(f'{self.__class__.__name__}.method_name | branch | column={column_name} present=true')
 else:
-    logger.warning(f'Column {column_name} missing; default={default}')
+    logger.warning(f'{self.__class__.__name__}.method_name | branch | column={column_name} missing default={default}')
 ```
 
 **4. Validation / transforms**
 
 ```python
 logger.debug(f'Input dtypes: {df.dtypes.to_dict()}')
-# after transform
 logger.info(f'{operation_name}:\n{result.describe()}')
 ```
 
@@ -63,25 +81,39 @@ logger.info(f'{operation_name}:\n{result.describe()}')
 
 ```python
 try:
-    logger.info(f'Completed {operation_name}')
+    logger.info(f'{operation_name} | exit | status=ok')
 except Exception as e:
-    logger.error(f'{operation_name} failed: {e} param1={param1} data_shape={getattr(data, "shape", None)}')
+    logger.error(f'{operation_name} | error | err={e} param1={param1} data_shape={getattr(data, "shape", None)}')
     logger.info('Attempting recovery...')
 ```
 
 ## Minimum on each major step
 
-Method entry (name, key params, shapes/types), config used, validation results, processing steps (before/after where it matters), branch rationale, results, error context.
+- **Method entry:** operation name, key parameters, data shapes/types
+- **Configuration:** setup decisions, rule books, parameters used
+- **Data validation:** input validation results, type conversions, missing data handling
+- **Processing steps:** each major transformation with before/after summaries
+- **Conditional logic:** why paths were taken
+- **Results / exit:** success/failure indicators, output shapes
+- **Error context:** full parameter context, data state, recovery attempts
 
 ## Levels
 
-- **DEBUG:** flow, dtypes, internal state; sample data (`head`/`tail`/`describe`) when feasible.
-- **INFO:** entry/exit, config, main steps, outcomes.
-- **WARNING:** recoverable issues, fallbacks, data quality.
-- **ERROR:** failures needing attention.
+- **DEBUG:** flow, dtypes, internal state; sample values when feasible
+- **INFO:** entry/exit, config, main steps, outcomes
+- **WARNING:** recoverable issues, fallbacks, data quality
+- **ERROR:** failures needing attention
 
-## INFO line must answer (when relevant)
+## Every INFO line must answer (when relevant)
 
-Who acted, what changed, why, where (class/method/line if possible), inputs/ids, operation name, error if any, context (user, env, txn). Optional: next debug step.
+- Who triggered the action (user or AI agent)
+- What the action did (inputs, affected models/records)
+- Why the action occurred (intent, rule, or logic)
+- Where it happened (class, method/function)
+- Key identifiers (never raw secrets/tokens/passwords)
+- Unexpected condition (if any)
+- Relevant context (user ID, request/run ID, environment)
 
-Design messages so you can find root cause without reproducing blindly.
+Design messages so you can find root cause without reproducing the problem blindly.
+
+**Prove the story in tests** — see rule `do-assert-log-story` and skill *Pytest Log Story Assertions*.

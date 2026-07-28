@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When creating Template
----
-
 Font Awesome Pro Icons Required - Every action button/link needs an icon; if not specified, you shall propose 3 options
 Bootstrap Tooltips Required - Every button needs hover text that:
 Explains the action for active buttons

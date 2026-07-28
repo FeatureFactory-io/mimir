@@ -135,7 +135,7 @@ The **Feedback** tab (and MCP `report_bug` / HTTP facade) create structured issu
 | Variable | Description |
 |----------|-------------|
 | `GITHUB_TOKEN` | Classic or fine-grained PAT with **Issues: write** on the target repo |
-| `GITHUB_BUG_REPO` | Optional; default `phainestai/mimir` |
+| `GITHUB_BUG_REPO` | Optional; default `FeatureFactory-io/mimir` |
 | `BUG_REPORT_DRY_RUN` | Optional; `1` / `true` skips the API (smoke tests) |
 
 Docker Compose: add these to `web` service env (see [.env.example](.env.example)). **Do not** put `GITHUB_TOKEN` on the MCP facade container — it calls the web API, which uses the token.
@@ -481,7 +481,7 @@ Both rule sets contain identical content with different formatting. **If you use
 
 ## License
 
-https://github.com/phainestai/mimir#Apache-2.0-1-ov-file 
+https://github.com/FeatureFactory-io/mimir#Apache-2.0-1-ov-file 
 
 ## Learning Resources
 

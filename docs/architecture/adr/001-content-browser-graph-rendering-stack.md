@@ -4,7 +4,7 @@
 |-------|-------|
 | **Status** | Accepted |
 | **Date** | 2026-05-31 (decision) · 2026-06-22 (ADR drafted retroactively) |
-| **Deciders** | Act-16 planning (commit `40ec953`); shipped in [PR #145](https://github.com/phainestai/mimir/pull/145) |
+| **Deciders** | Act-16 planning (commit `40ec953`); shipped in [PR #145](https://github.com/FeatureFactory-io/mimir/pull/145) |
 | **Feature** | Act-16 Content Browser (`/browser/`, `/browser/<pk>/`) |
 | **Supersedes** | — |
 | **Superseded by** | — (see [Revisit criteria](#revisit-criteria)) |
@@ -84,7 +84,7 @@ SAO was amended to carve out this exception while keeping Graphviz as the defaul
 
 ### Positive
 
-- Shipped full Act-16 vision: interactive playbook graph, detail panel, trees, URL shareability ([PR #145](https://github.com/phainestai/mimir/pull/145), 63 scenarios).
+- Shipped full Act-16 vision: interactive playbook graph, detail panel, trees, URL shareability ([PR #145](https://github.com/FeatureFactory-io/mimir/pull/145), 63 scenarios).
 - Reuses existing REST/auth layer; graph API also usable by future clients.
 - Canvas performance acceptable for FeatureFactory-scale playbooks (Canvas renderer vs DOM SVG).
 
@@ -121,7 +121,7 @@ SAO was amended to carve out this exception while keeping Graphviz as the defaul
 
 PR #145 did **not** debate Graphviz vs Cytoscape. Relevant product feedback:
 
-- **Layout complexity** ([review on `03-graph-rendering.feature`](https://github.com/phainestai/mimir/pull/145)): 20-algorithm picker is too complex for typical users — feature-flag in production or collapse to 1–3 layouts.
+- **Layout complexity** ([review on `03-graph-rendering.feature`](https://github.com/FeatureFactory-io/mimir/pull/145)): 20-algorithm picker is too complex for typical users — feature-flag in production or collapse to 1–3 layouts.
 - **Author response (strek)**: layout/compound/routing experimentation drove "dirty JS"; intent to trim to pre-vetted defaults after team review.
 - **Merge note (sourishsarkar-epam)**: layout simplification acceptable as follow-up; uncertain about prod promotion.
 
@@ -155,4 +155,4 @@ A Graphviz replatform would require:
 - [`docs/features/user_journey.md`](../../features/user_journey.md) — Act 15: Content Browser
 - [`docs/plans/iterations/ITER-20260601-content-browser-graph.yaml`](../../plans/iterations/ITER-20260601-content-browser-graph.yaml) — S4/S5 manifest
 - [`methodology/services/activity_graph_service.py`](../../../methodology/services/activity_graph_service.py) — existing Graphviz pattern
-- [PR #145](https://github.com/phainestai/mimir/pull/145) — merge (2026-06)
+- [PR #145](https://github.com/FeatureFactory-io/mimir/pull/145) — merge (2026-06)

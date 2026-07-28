@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When writing or reviewing function/method docstrings
----
-
 # Docstring format (with examples)
 
 Every public function/method needs a docstring in this shape:
@@ -33,6 +28,6 @@ def get_workflow(workflow_id: str) -> dict:
     """
 ```
 
-**Anti-patterns:** no examples; vague “the name”; missing return example; docstring contradicts implementation (ask user which wins).
+**Anti-patterns:** no examples; vague "the name"; missing return example; docstring contradicts implementation (ask user which wins).
 
 **Optional / *args / **kwargs:** document each; examples show typical values.

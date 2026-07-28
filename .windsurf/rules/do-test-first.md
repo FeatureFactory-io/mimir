@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When you start working on a scenario, new methods or classes - do it unless user told you to do otherwise.
----
-
 Tests prove behavior. You **cannot claim** a scenario, class, or method is implemented until tests pass.
 
 - New code structure: follow `.windsurf/rules/do-skeletons-first.md` (docstrings, types, stubs).

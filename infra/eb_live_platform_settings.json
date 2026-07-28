@@ -318,7 +318,7 @@
     {
       "namespace": "aws:elasticbeanstalk:application:environment",
       "option_name": "GITHUB_BUG_REPO",
-      "value": "phainestai/mimir"
+      "value": "FeatureFactory-io/mimir"
     },
     {
       "namespace": "aws:elasticbeanstalk:application:environment",

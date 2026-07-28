@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When creating or updating github issues
----
-
 *When asked to create an Issue:*
 **Main idea: we are creating a task for the person with very little knowledge of the domain, and very little interest to learn. Therefore we have to create a very detailed to do, giving the person very little space to misinterpret what needs to be done.**
 

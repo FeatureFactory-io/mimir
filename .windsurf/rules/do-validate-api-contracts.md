@@ -1,9 +1,3 @@
----
-trigger: model_decision
-description: - When implementing frontend services that call backend APIs - When updating backend API response formats - During frontend-backend integration work - Before deploying changes that affect API contracts
----
-
-
 ## Requirements
 
 ### 1. Frontend Interface Validation

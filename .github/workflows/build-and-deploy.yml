@@ -248,7 +248,7 @@ jobs:
           VERSION_LABEL: ${{ steps.version.outputs.label }}
           GIT_REVISION: ${{ steps.version.outputs.revision }}
           DEPLOY_BUNDLE_PATH: deploy-bundle.zip
-          # GitHub PAT for the in-app Feedback widget (Issues: write on phainestai/mimir).
+          # GitHub PAT for the in-app Feedback widget (Issues: write on FeatureFactory-io/mimir).
           # Store as repo secret GH_BUG_REPORT_TOKEN. If absent, the existing EB value is kept.
           GH_BUG_REPORT_TOKEN: ${{ secrets.GH_BUG_REPORT_TOKEN }}
           S3_BACKUP_BUCKET: ${{ env.S3_BACKUP_BUCKET }}

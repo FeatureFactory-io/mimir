@@ -1,7 +1,7 @@
 # Implementation Plan: PIP Activity Predecessor & Order (#168)
 
 **Feature**: FOB-PIP-PRED — Structural activity sequencing via PIP apply  
-**GitHub Issue**: [#168](https://github.com/phainestai/mimir/issues/168)  
+**GitHub Issue**: [#168](https://github.com/FeatureFactory-io/mimir/issues/168)  
 **Branch**: `feature/pip-activity-predecessor-order`  
 **Spec**: Extend `docs/features/act-9-pips/pips-link-changes.feature` (new scenarios FOB-PIP-LINK-16..20)  
 **UAT**: Manual — accept sequencing PIP on released Edda; verify graph in UI + MCP `get_activity`

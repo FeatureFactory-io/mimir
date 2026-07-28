@@ -1,8 +1,3 @@
----
-trigger: model_decision
-description: When drawing a diagram in Draw.io or Mermaid check if it looks OK to human eye.
----
-
 Render and review as a human would: zoom to ~50% and scan for clarity.
 
 **Layout:** no overlapping shapes; consistent spacing/grid; readable text size and contrast; legend if symbols/colors need explanation.

@@ -1,7 +1,7 @@
 # Implementation Plan: Playbook Export to Local IDE Workspace (#165)
 
 **Feature**: FOB-MCP-PEXP — One-shot markdown export of full playbook to `.cursor` / `.windsurf`  
-**GitHub Issue**: [#165](https://github.com/phainestai/mimir/issues/165)  
+**GitHub Issue**: [#165](https://github.com/FeatureFactory-io/mimir/issues/165)  
 **Branch**: `feature/export-playbook-to-local`  
 **Spec**: New scenarios in `docs/features/act-3-workflows/workflows-export-import.feature` (FOB-WORKFLOWS-EXPORT_IMPORT-22..25)  
 **Related**: DSP-05 Generate AI IDE Configuration; distinct from JSON `export_playbook` (FOB-WORKFLOWS-EXPORT_IMPORT-20)

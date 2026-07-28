@@ -9,14 +9,13 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
   Background:
     Given Maria is authenticated in FOB
     And the following PIPs exist for user "maria":
-      | id | title                        | target_playbook            | changes | status              | submitted_at | status_changed_at |
-      | 42 | Add Accessibility Audit      | React Frontend Dev (id=1)  |       1 | Reviewed            | 2026-05-14   | 2026-05-15        |
-      | 38 | State Management Patterns    | React Frontend Dev (id=1)  |       2 | Accepted            | 2026-04-20   | 2026-04-22        |
-      | 35 | Drop Legacy IE Support       | React Frontend Dev (id=1)  |       1 | Rejected            | 2026-04-10   | 2026-04-11        |
-      | 30 | Add Figma Integration        | UX Research (id=2)         |       3 | Draft               | 2026-03-05   | 2026-03-05        |
-      | 28 | Improve Onboarding Flow      | UX Research (id=2)         |       1 | Submitted           | 2026-03-01   | 2026-03-01        |
-      | 27 | Rename Discovery Activity    | UX Research (id=2)         |       1 | Processing (Galdr)  | 2026-02-28   | 2026-02-28        |
-
+      | id | title                     | target_playbook           | changes | status             | submitted_at | status_changed_at |
+      | 42 | Add Accessibility Audit   | React Frontend Dev (id=1) |       1 | Reviewed           |   2026-05-14 |        2026-05-15 |
+      | 38 | State Management Patterns | React Frontend Dev (id=1) |       2 | Accepted           |   2026-04-20 |        2026-04-22 |
+      | 35 | Drop Legacy IE Support    | React Frontend Dev (id=1) |       1 | Rejected           |   2026-04-10 |        2026-04-11 |
+      | 30 | Add Figma Integration     | UX Research (id=2)        |       3 | Draft              |   2026-03-05 |        2026-03-05 |
+      | 28 | Improve Onboarding Flow   | UX Research (id=2)        |       1 | Submitted          |   2026-03-01 |        2026-03-01 |
+      | 27 | Rename Discovery Activity | UX Research (id=2)        |       1 | Processing (Galdr) |   2026-02-28 |        2026-02-28 |
   # ============================================================================
   # NAVIGATION
   # ============================================================================
@@ -44,7 +43,6 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
     When her AI assistant calls MCP tool "list_pips"
     Then "status_changed_since_last_view" is reset for all returned PIPs
     And the PIPs nav count pill shows "0" on next page load
-
   # ============================================================================
   # LIST DISPLAY
   # ============================================================================
@@ -79,7 +77,6 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
     And PIP-42 (Reviewed) row actions dropdown shows: View only
     And PIP-38 (Accepted) row actions dropdown shows: View only
     And PIP-35 (Rejected) row actions dropdown shows: View only
-
   # ============================================================================
   # FILTERS
   # ============================================================================
@@ -124,7 +121,6 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
     Given Maria is on FOB-PIP-LIST-1
     When she selects status "Draft" and playbook "UX Research (id=2)"
     Then she sees 1 row: PIP-30 "Add Figma Integration"
-
   # ============================================================================
   # NAVIGATION FROM LIST
   # ============================================================================
@@ -145,7 +141,6 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
     Then she sees a [+ New PIP] button in the page header
     When she clicks [+ New PIP]
     Then she is redirected to FOB-PIP-CREATE-1
-
   # ============================================================================
   # EMPTY STATES
   # ============================================================================
@@ -163,7 +158,6 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
     And there are no PIPs in that status
     Then she sees "No PIPs match the selected filters."
     And she sees [Clear Filters] button
-
   # ============================================================================
   # ADMIN ALL PIPs TAB
   # ============================================================================
@@ -181,3 +175,31 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
     When she navigates to FOB-PIP-LIST-1
     Then she sees only the "My PIPs" tab
     And there is no "All PIPs" tab visible
+  # ============================================================================
+  # WITHDRAW (EDIT & RESUBMIT)
+  # ============================================================================
+
+  Scenario: FOB-PIP-LIST-22 Submitted PIP row actions include Withdraw
+    Given Maria is on FOB-PIP-LIST-1
+    Then PIP-28 (Submitted) row actions dropdown shows: View, Withdraw
+    And PIP-28 row does NOT show: Edit, Discard
+
+  Scenario: FOB-PIP-LIST-23 Processing (Galdr) PIP row actions include Withdraw
+    Given Maria is on FOB-PIP-LIST-1
+    Then PIP-27 (Processing (Galdr)) row actions dropdown shows: View, Withdraw
+    And PIP-27 row does NOT show: Edit, Discard
+
+  Scenario: FOB-PIP-LIST-24 Withdraw from list reverts PIP to Draft
+    Given Maria is on FOB-PIP-LIST-1
+    When she clicks [Withdraw] on PIP-28 (Submitted)
+    Then a confirmation modal appears: "Withdraw PIP-28? It will return to Draft and any in-progress Galdr review will be discarded."
+    When she confirms
+    Then PIP-28 status badge changes to "Draft" (gray)
+    And PIP-28 row actions dropdown shows: View, Edit, Discard
+    And PIP-28 row does NOT show: Withdraw
+
+  Scenario: FOB-PIP-LIST-25 Withdraw not available for terminal-state PIPs
+    Given Maria is on FOB-PIP-LIST-1
+    Then PIP-42 (Reviewed) row actions dropdown does NOT show: Withdraw
+    And PIP-38 (Accepted) row actions dropdown does NOT show: Withdraw
+    And PIP-35 (Rejected) row actions dropdown does NOT show: Withdraw

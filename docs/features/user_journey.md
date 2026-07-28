@@ -1039,7 +1039,7 @@ Maria confirms and the workflow is removed from the playbook.
 mcp.export_workflow_to_local(
     workflow_id=42,
     target_directory=".windsurf/workflows",  # or ".cursor/workflows"
-    folder_name="FFE"  # Optional, defaults to workflow slug
+    folder_name="FFE",  # Optional, defaults to workflow slug
 )
 ```
 
@@ -1155,7 +1155,7 @@ mcp.export_workflow_to_local(
 mcp.import_workflow_from_local(
     workflow_id=42,
     source_directory=".windsurf/workflows/FFE",
-    auto_apply=False  # If True, applies immediately for draft playbooks
+    auto_apply=False,  # If True, applies immediately for draft playbooks
 )
 ```
 
@@ -1283,9 +1283,7 @@ Explain WHY each change improves the workflow. Good rationales help reviewers un
 
 **For Draft Playbooks** (auto_apply=True or manual approval):
 ```python
-mcp.apply_upload_protocol(
-    protocol_file=".windsurf/workflows/FFE/_Upload_Protocol.md"
-)
+mcp.apply_upload_protocol(protocol_file=".windsurf/workflows/FFE/_Upload_Protocol.md")
 ```
 
 **Response**:
@@ -1308,7 +1306,7 @@ mcp.apply_upload_protocol(
 ```python
 mcp.create_pip_from_protocol(
     protocol_file=".windsurf/workflows/FFE/_Upload_Protocol.md",
-    pip_title="Improve Frontend Development workflow activity flow"
+    pip_title="Improve Frontend Development workflow activity flow",
 )
 ```
 
@@ -2111,7 +2109,10 @@ Whether created via MCP or the FOB UI, the PIP creation form contains:
 #### PIP Lifecycle
 
 ```
-Draft → Submitted → Processing (Galdr) → Reviewed → Accepted / Rejected (partial)
+Draft ──→ Submitted ──→ Processing (Galdr) ──→ Reviewed ──→ Accepted / Rejected (partial)
+  ↑             │                 │
+  └──────[Withdraw]───────────────┘
+         (reverts to Draft; Galdr processing aborted if mid-flight)
 ```
 
 **Galdr Processing** (automated, runs immediately after submission):
@@ -2148,6 +2149,7 @@ Maria navigates to **PIPs** in the top nav. The list page loads and immediately 
 - **Row actions** (dropdown per row):
   - [View] → FOB-PIP-DETAIL
   - [Edit] (Draft only)
+  - [Withdraw] (Submitted and Processing only) — reverts PIP to Draft
   - [Discard] (Draft only)
 - **Example rows** (with blue dot on PIP-42 since it just moved to Reviewed):
 
@@ -2182,7 +2184,40 @@ Maria opens PIP-42:
              position in the workflow."
 ```
 
-- **Status banner**: "Reviewed — awaiting Administrator decision"
+- **Status banner** and available actions by state:
+  - **Draft**: "Draft — not yet submitted." → [Edit PIP] [Submit for Review] [Discard]
+  - **Submitted**: "Submitted — queued for Galdr review." → [Withdraw]
+  - **Processing (Galdr)**: "Galdr is reviewing your changes — check back shortly." → [Withdraw]
+  - **Reviewed**: "Reviewed — awaiting Administrator decision." → (read-only)
+  - **Accepted / Rejected**: outcome banner with per-Change verdicts → (read-only)
+
+**[Withdraw]** is available on Submitted and Processing PIPs. Clicking it shows a confirmation modal: "Withdraw PIP-42? It will return to Draft and any in-progress Galdr review will be discarded." On confirm, the PIP status reverts to `Draft`, Galdr processing is aborted, all Galdr recommendations are cleared, and Maria can edit and resubmit.
+
+---
+
+#### Withdrawing & Resubmitting a PIP
+
+**Context**: After submitting PIP-42, Maria realises she forgot to include a second Change — an ALTER on "Component Testing" to reference the new accessibility checklist. She decides to withdraw the PIP before Galdr finishes, add the missing Change, then resubmit.
+
+**Via FOB UI**:
+1. Maria opens PIP-42 (status: `Processing (Galdr)`) from **FOB-PIP-LIST** or **FOB-PIP-DETAIL**
+2. She clicks **[Withdraw]** → confirmation modal: *"Withdraw PIP-42? It will return to Draft and any in-progress Galdr review will be discarded."*
+3. She clicks **[Confirm]** → PIP-42 status reverts to `Draft`; all Galdr output is cleared
+4. She clicks **[Edit PIP]** → opens the PIP edit form pre-populated with existing Changes
+5. She adds Change #2 (ALTER Activity "Component Testing"), updates the summary
+6. She clicks **[Submit for Review]** → PIP-42 re-enters the `Submitted → Processing (Galdr)` pipeline
+
+**Via MCP**:
+```
+> mimir: Withdraw PIP-42 so I can add another change.
+```
+AI calls `cancel_pip(pip_id=42)` (withdraw to Draft) → then `add_pip_change(...)` to add the new Change → then `submit_pip(pip_id=42)` to resubmit.
+
+**Constraints**:
+- Withdraw is only available while status is `Submitted` or `Processing (Galdr)`
+- Once `Reviewed`, `Accepted`, or `Rejected`, the PIP is read-only and cannot be withdrawn
+- A PIP may be withdrawn and resubmitted any number of times before reaching `Reviewed`
+- Each resubmission restarts Galdr processing from scratch (prior recommendations are discarded)
 
 ---
 
@@ -2279,6 +2314,7 @@ AI builds the Change list and calls `submit_pip` via MCP → standard Galdr revi
 - ✅ Structure Changes as typed ADD / ALTER / DROP per entity
 - ✅ Insert new entities at a precise position within a container
 - ✅ Track PIP status through the Galdr processing + Admin review lifecycle
+- ✅ Withdraw a Submitted or Processing PIP to edit and resubmit before Galdr finalises
 - ✅ Receive per-Change email notification with reasoning
 - ✅ Administrators review Galdr recommendations in Django Admin and override as needed
 

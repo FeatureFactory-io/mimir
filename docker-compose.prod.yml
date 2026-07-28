@@ -26,7 +26,7 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-https://mimir.featurefactory.io}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-      GITHUB_BUG_REPO: ${GITHUB_BUG_REPO:-phainestai/mimir}
+      GITHUB_BUG_REPO: ${GITHUB_BUG_REPO:-FeatureFactory-io/mimir}
       BUG_REPORT_DRY_RUN: ${BUG_REPORT_DRY_RUN:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health/', timeout=5)"]

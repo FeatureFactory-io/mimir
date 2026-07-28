@@ -1,7 +1,7 @@
 # Act-16 Content Browser — Post-Merge Remediation Plan
 
 **BPE-08 Process Change Request** · Activity **#103** (FeatureFactory v13.3, Construction phase)  
-**Trigger:** [PR #145](https://github.com/phainestai/mimir/pull/145) merged with known review debt; holistic re-review found bugs, stale tests, spec drift, and **IA guideline violations** beyond the inline PR comments.  
+**Trigger:** [PR #145](https://github.com/FeatureFactory-io/mimir/pull/145) merged with known review debt; holistic re-review found bugs, stale tests, spec drift, and **IA guideline violations** beyond the inline PR comments.  
 **Status:** **Complete** — Phases A–D signed off (BPE-06 2026-06-22; Phase D Commander visual sign-off 2026-06-22; D10 regression fixes in `9cd8507`).
 
 ---
@@ -689,5 +689,5 @@ rg '<style>' templates/*/_embed.html
 | Item | Disposition |
 |------|-------------|
 | `mimir.db`, `.cursor/mcp.json` local drift | Do **not** commit |
-| `test_concurrent_creates_get_unique_orders` SQLite lock | Deferred — [#150](https://github.com/phainestai/mimir/issues/150) |
-| `content-browser.js` method length (>30 lines) | Deferred — [#151](https://github.com/phainestai/mimir/issues/151) |
+| `test_concurrent_creates_get_unique_orders` SQLite lock | Deferred — [#150](https://github.com/FeatureFactory-io/mimir/issues/150) |
+| `content-browser.js` method length (>30 lines) | Deferred — [#151](https://github.com/FeatureFactory-io/mimir/issues/151) |
