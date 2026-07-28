@@ -22,8 +22,19 @@
     <div class="d-flex gap-4 flex-wrap justify-content-center align-items-center">
       <a href="{% url 'use_cases' %}" class="hg-landing-link" data-testid="landing-cta-features">What Mimir Can Do</a>
       <a href="{% url 'playbook_list' %}" class="hg-landing-link" data-testid="landing-cta-explore-playbooks">Explore public playbooks</a>
-      <a href="{% url 'register' %}" class="btn btn-success btn-lg px-5" data-testid="landing-cta-register">Register</a>
-      <a href="#mcp-config" class="hg-landing-link" data-testid="landing-cta-connect">Connect MCP</a>
+      {% if user.is_authenticated %}
+      <a href="#mcp-config"
+         class="btn btn-primary btn-lg px-5 d-inline-flex align-items-center gap-2"
+         data-testid="landing-cta-connect-mcp">
+        <i class="fa-solid fa-plug" aria-hidden="true"></i> Connect MCP
+      </a>
+      {% else %}
+      <a href="{% url 'register' %}"
+         class="btn btn-success btn-lg px-5 d-inline-flex align-items-center gap-2"
+         data-testid="landing-cta-register">
+        <i class="fas fa-user-plus" aria-hidden="true"></i> Register
+      </a>
+      {% endif %}
     </div>
   </div>
 </section>
