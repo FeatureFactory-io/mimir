@@ -6,6 +6,42 @@ from django.shortcuts import render
 from methodology.services.global_search_service import GlobalSearchService
 logger = logging.getLogger(__name__)
 
+ACTIVITY_FEED_HOURS_LABELS = {
+    1: "Last hour",
+    24: "Last 24h",
+    168: "Last week",
+}
+
+
+def _parse_activity_feed_hours(request, default=24):
+    """Parse and validate Recently Used feed hours from request query params."""
+    from methodology.services.activity_service import ActivityService
+
+    raw = request.GET.get("hours", default)
+    try:
+        hours = int(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "dashboard_activities invalid hours=%r; falling back to %s",
+            raw,
+            default,
+        )
+        hours = default
+    try:
+        return ActivityService._validate_feed_hours(hours)
+    except ValueError:
+        logger.warning(
+            "dashboard_activities disallowed hours=%s; falling back to %s",
+            hours,
+            default,
+        )
+        return default
+
+
+def _activity_feed_hours_label(hours):
+    """Return UI label for the selected Recently Used time window."""
+    return ACTIVITY_FEED_HOURS_LABELS.get(hours, ACTIVITY_FEED_HOURS_LABELS[24])
+
 # ─── NO ORM IN VIEWS ────────────────────────────────────────────────────────
 # Views are thin controllers. NEVER query the ORM directly here.
 # All data access must go through services in methodology/services/.
@@ -76,19 +112,32 @@ def dashboard(request):
         all_playbooks = list(all_playbooks_dict.values())
         recent_playbooks = sorted(all_playbooks, key=lambda p: p.updated_at, reverse=True)[:5]
         
-        # Get recent activities (last 10 updated)
-        recent_activities = ActivityService.get_recent_activities(request.user, limit=10)
+        # Get recent activities (last 10 within default 24h window)
+        activity_hours = 24
+        recent_activities = ActivityService.get_recent_activities(
+            request.user, limit=10, hours=activity_hours
+        )
+        activity_count_in_window = ActivityService.count_recent_activities_in_window(
+            request.user, hours=activity_hours
+        )
         
         # Get counts (total unique accessible playbooks)
         playbook_count = len(all_playbooks)
-        activity_count = ActivityService.count_accessible_activities(request.user)
         
-        logger.info(f"Dashboard loaded for {request.user.username}: {playbook_count} playbooks, {activity_count} activities")
+        logger.info(
+            "Dashboard loaded for %s: %s playbooks, activity_count_in_window=%s hours=%s",
+            request.user.username,
+            playbook_count,
+            activity_count_in_window,
+            activity_hours,
+        )
         
         return render(request, 'dashboard.html', {
             'recent_playbooks': recent_playbooks,
             'recent_activities': recent_activities,
-            'activity_count': activity_count,
+            'activity_count_in_window': activity_count_in_window,
+            'activity_hours': activity_hours,
+            'activity_hours_label': _activity_feed_hours_label(activity_hours),
             'playbook_count': playbook_count,
         })
         
@@ -98,7 +147,9 @@ def dashboard(request):
         return render(request, 'dashboard.html', {
             'recent_playbooks': [],
             'recent_activities': [],
-            'activity_count': 0,
+            'activity_count_in_window': 0,
+            'activity_hours': 24,
+            'activity_hours_label': _activity_feed_hours_label(24),
             'playbook_count': 0,
             'error_message': 'Unable to load some dashboard data'
         })
@@ -125,22 +176,41 @@ def dashboard_activities(request):
     try:
         from methodology.services.activity_service import ActivityService
         
-        # Get hours parameter (default to 24)
-        hours = int(request.GET.get('hours', 24))
+        hours = _parse_activity_feed_hours(request)
+        logger.info(
+            "dashboard_activities entry user=%s hours=%s",
+            request.user.username,
+            hours,
+        )
         
-        # Get recent activities
-        recent_activities = ActivityService.get_recent_activities(request.user, limit=10)
+        recent_activities = ActivityService.get_recent_activities(
+            request.user, limit=10, hours=hours
+        )
+        activity_count_in_window = ActivityService.count_recent_activities_in_window(
+            request.user, hours=hours
+        )
         
-        logger.info(f"Returned {len(recent_activities)} activities for {request.user.username}")
+        logger.info(
+            "Returned %s activities for %s (hours=%s)",
+            len(recent_activities),
+            request.user.username,
+            hours,
+        )
         
-        return render(request, 'methodology/partials/activity_feed.html', {
+        return render(request, 'methodology/partials/activity_feed_refresh.html', {
             'recent_activities': recent_activities,
+            'activity_count_in_window': activity_count_in_window,
+            'activity_hours': hours,
+            'activity_hours_label': _activity_feed_hours_label(hours),
         })
         
     except Exception as e:
         logger.error(f"Error refreshing activity feed for {request.user.username}: {e}")
-        return render(request, 'methodology/partials/activity_feed.html', {
+        return render(request, 'methodology/partials/activity_feed_refresh.html', {
             'recent_activities': [],
+            'activity_count_in_window': 0,
+            'activity_hours': 24,
+            'activity_hours_label': _activity_feed_hours_label(24),
         })
 
 
