@@ -275,6 +275,140 @@ class TestActivityService:
         assert recent[0] == activity2
         assert recent[1] == activity1
 
+    def test_get_recent_activities_filters_by_hours(self):
+        """Activity older than window is excluded when hours filter is applied."""
+        from datetime import timedelta
+        from django.utils import timezone
+
+        user = User.objects.create_user(username="hours_user", password="pass123")
+        playbook = Playbook.objects.create(
+            name="Hours Playbook",
+            description="Test",
+            category="development",
+            author=user,
+        )
+        workflow = Workflow.objects.create(
+            playbook=playbook,
+            name="Hours Workflow",
+            description="Test",
+        )
+        recent_activity = Activity.objects.create(
+            workflow=workflow,
+            name="Recent Activity",
+            guidance="Test",
+            order=1,
+        )
+        stale_activity = Activity.objects.create(
+            workflow=workflow,
+            name="Stale Activity",
+            guidance="Test",
+            order=2,
+        )
+
+        now = timezone.now()
+        recent_activity.last_accessed_at = now - timedelta(minutes=30)
+        recent_activity.save(update_fields=["last_accessed_at"])
+        stale_activity.last_accessed_at = now - timedelta(hours=5)
+        stale_activity.save(update_fields=["last_accessed_at"])
+
+        one_hour = list(ActivityService.get_recent_activities(user, limit=10, hours=1))
+        twenty_four_hours = list(
+            ActivityService.get_recent_activities(user, limit=10, hours=24)
+        )
+
+        assert recent_activity in one_hour
+        assert stale_activity not in one_hour
+        assert recent_activity in twenty_four_hours
+        assert stale_activity in twenty_four_hours
+
+    def test_get_recent_activities_hours_defaults_to_24(self):
+        """Omitted hours behaves as 24 — excludes activity accessed more than 24h ago."""
+        from datetime import timedelta
+        from django.utils import timezone
+
+        user = User.objects.create_user(username="default_hours_user", password="pass123")
+        playbook = Playbook.objects.create(
+            name="Default Hours Playbook",
+            description="Test",
+            category="development",
+            author=user,
+        )
+        workflow = Workflow.objects.create(
+            playbook=playbook,
+            name="Default Hours Workflow",
+            description="Test",
+        )
+        fresh = Activity.objects.create(
+            workflow=workflow,
+            name="Fresh Activity",
+            guidance="Test",
+            order=1,
+        )
+        old = Activity.objects.create(
+            workflow=workflow,
+            name="Old Activity",
+            guidance="Test",
+            order=2,
+        )
+
+        now = timezone.now()
+        fresh.last_accessed_at = now - timedelta(hours=2)
+        fresh.save(update_fields=["last_accessed_at"])
+        old.last_accessed_at = now - timedelta(hours=48)
+        old.save(update_fields=["last_accessed_at"])
+
+        recent = list(ActivityService.get_recent_activities(user, limit=10))
+
+        assert fresh in recent
+        assert old not in recent
+
+    def test_get_recent_activities_rejects_invalid_hours(self):
+        """Invalid hours values raise ValueError."""
+        user = User.objects.create_user(username="invalid_hours_user", password="pass123")
+
+        with pytest.raises(ValueError, match="hours"):
+            ActivityService.get_recent_activities(user, limit=10, hours=0)
+
+        with pytest.raises(ValueError, match="hours"):
+            ActivityService.get_recent_activities(user, limit=10, hours=72)
+
+    def test_get_recent_activities_log_story(self, caplog):
+        """Log story: entry and processing beats for get_recent_activities."""
+        import logging
+
+        from tests.support.log_story import assert_log_story
+
+        caplog.set_level(logging.INFO)
+        user = User.objects.create_user(username="log_story_user", password="pass123")
+        playbook = Playbook.objects.create(
+            name="Log Story Playbook",
+            description="Test",
+            category="development",
+            author=user,
+        )
+        workflow = Workflow.objects.create(
+            playbook=playbook,
+            name="Log Story Workflow",
+            description="Test",
+        )
+        Activity.objects.create(
+            workflow=workflow,
+            name="Logged Activity",
+            guidance="Test",
+            order=1,
+        )
+
+        ActivityService.get_recent_activities(user, limit=10, hours=24)
+
+        assert_log_story(
+            caplog,
+            where="get_recent_activities",
+            beats={
+                "entry": ["user_id=", "limit=", "hours="],
+                "processing": ["cutoff=", "result_count="],
+            },
+        )
+
 
 
 @pytest.mark.django_db(transaction=True)
