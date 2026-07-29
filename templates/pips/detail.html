@@ -89,78 +89,134 @@
     </div>
     {% endif %}
 
-    {% if pip.summary %}
-    <div class="mb-4" data-testid="pip-detail-summary">
-        <h2 class="h6 text-secondary">Summary</h2>
-        <p class="mb-0">{{ pip.summary }}</p>
-    </div>
-    {% endif %}
-
-    <h2 class="h6 text-secondary mb-3">Changes</h2>
-    {% with changes=pip.changes.all %}
-    {% if changes %}
-        <div class="accordion" id="pipChangeAccordion">
-            {% for ch in changes %}
-            <div class="accordion-item" data-testid="pip-change-{{ ch.order }}">
-                <h2 class="accordion-header" id="heading{{ ch.pk }}">
-                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button"
-                            data-bs-toggle="collapse" data-bs-target="#collapse{{ ch.pk }}"
-                            aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
-                        <span class="me-2"><strong>{{ ch.change_type }}</strong> {{ ch.entity_type }}</span>
-                        {% if ch.galdr_recommendation %}
-                        <span class="badge {% if ch.galdr_recommendation == 'ACCEPT' %}bg-success{% elif ch.galdr_recommendation == 'REJECT' %}bg-danger{% else %}bg-warning text-dark{% endif %} ms-1"
-                              data-testid="galdr-verdict-{{ ch.order }}">{{ ch.galdr_recommendation }}</span>
-                        {% endif %}
-                        {% if ch.admin_decision %}
-                        <span class="badge {% if ch.admin_decision == 'ACCEPT' %}bg-success{% else %}bg-danger{% endif %} ms-1"
-                              data-testid="admin-verdict-{{ ch.order }}">
-                            ADMIN {{ ch.admin_decision }}</span>
-                        {% endif %}
-                    </button>
-                </h2>
-                <div id="collapse{{ ch.pk }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
-                     aria-labelledby="heading{{ ch.pk }}" data-bs-parent="#pipChangeAccordion">
-                    <div class="accordion-body">
-                        <p class="small text-muted mb-1">
-                            {% if ch.name %}<strong>{{ ch.name }}</strong>{% endif %}
-                            {% if ch.target_name_snapshot or ch.target_id %}
-                             · {% if ch.target_name_snapshot %}{{ ch.target_name_snapshot }}{% else %}#{{ ch.target_id }}{% endif %}
-                            {% endif %}
-                        </p>
-                        {% if ch.internal_ref or ch.parent_workflow_ref or ch.insert_after_activity_ref or ch.phase_ref or ch.produced_by_activity_ref or ch.artifact_type or ch.relationship_type or ch.source_entity_ref or ch.target_entity_ref or ch.parent_workflow_id or ch.insert_after_activity_id %}
-                        <p class="small text-muted mb-2" data-testid="pip-change-refs-{{ ch.order }}">
-                            {% if ch.internal_ref %}<span class="me-2">ref: <code>{{ ch.internal_ref }}</code></span>{% endif %}
-                            {% if ch.parent_workflow_ref %}<span class="me-2">parent wf: <code>{{ ch.parent_workflow_ref }}</code></span>{% elif ch.parent_workflow_id %}<span class="me-2">parent wf: #{{ ch.parent_workflow_id }}</span>{% endif %}
-                            {% if ch.insert_after_activity_ref %}<span class="me-2">after: <code>{{ ch.insert_after_activity_ref }}</code></span>{% elif ch.insert_after_activity_id %}<span class="me-2">after: #{{ ch.insert_after_activity_id }}</span>{% endif %}
-                            {% if ch.phase_ref %}<span class="me-2">phase: <code>{{ ch.phase_ref }}</code></span>{% endif %}
-                            {% if ch.produced_by_activity_ref %}<span class="me-2">producer: <code>{{ ch.produced_by_activity_ref }}</code></span>{% endif %}
-                            {% if ch.artifact_type %}<span class="me-2">artifact type: {{ ch.artifact_type }}{% if ch.artifact_is_required %} (required){% endif %}</span>{% endif %}
-                            {% if ch.relationship_type %}<span class="me-2">link: {{ ch.relationship_type }}</span>{% endif %}
-                            {% if ch.source_entity_ref %}<span class="me-2">src: <code>{{ ch.source_entity_ref }}</code></span>{% endif %}
-                            {% if ch.target_entity_ref %}<span class="me-2">tgt: <code>{{ ch.target_entity_ref }}</code></span>{% endif %}
-                        </p>
-                        {% endif %}
-                        {% if ch.content %}
-                        <div class="markdown-content border rounded p-3 mb-2" data-testid="pip-change-content-{{ ch.order }}">
-                            {{ ch.content|markdown }}
-                        </div>
-                        {% else %}
-                        <p class="text-muted small mb-2" data-testid="pip-change-content-{{ ch.order }}">(empty)</p>
-                        {% endif %}
-                        {% if ch.galdr_reasoning %}
-                        <div class="small mt-2" data-testid="galdr-reason-{{ ch.order }}">
-                            <span class="text-secondary">Galdr rationale:</span> {{ ch.galdr_reasoning }}
-                        </div>
-                        {% endif %}
-                    </div>
+    <div class="row">
+        <div class="col-md-8">
+            {% if pip.summary %}
+            <div class="card mb-4" data-testid="pip-detail-summary">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-align-left"></i> Summary</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ pip.summary }}</p>
                 </div>
             </div>
-            {% endfor %}
+            {% endif %}
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-code-branch"></i> Changes</h5>
+                </div>
+                <div class="card-body">
+                    {% with changes=pip.changes.all %}
+                    {% if changes %}
+                        <div class="accordion" id="pipChangeAccordion">
+                            {% for ch in changes %}
+                            <div class="accordion-item" data-testid="pip-change-{{ ch.order }}">
+                                <h2 class="accordion-header" id="heading{{ ch.pk }}">
+                                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button"
+                                            data-bs-toggle="collapse" data-bs-target="#collapse{{ ch.pk }}"
+                                            aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+                                        <span class="me-2"><strong>{{ ch.change_type }}</strong> {{ ch.entity_type }}</span>
+                                        {% if ch.galdr_recommendation %}
+                                        <span class="badge {% if ch.galdr_recommendation == 'ACCEPT' %}bg-success{% elif ch.galdr_recommendation == 'REJECT' %}bg-danger{% else %}bg-warning text-dark{% endif %} ms-1"
+                                              data-testid="galdr-verdict-{{ ch.order }}">{{ ch.galdr_recommendation }}</span>
+                                        {% endif %}
+                                        {% if ch.admin_decision %}
+                                        <span class="badge {% if ch.admin_decision == 'ACCEPT' %}bg-success{% else %}bg-danger{% endif %} ms-1"
+                                              data-testid="admin-verdict-{{ ch.order }}">
+                                            ADMIN {{ ch.admin_decision }}</span>
+                                        {% endif %}
+                                    </button>
+                                </h2>
+                                <div id="collapse{{ ch.pk }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                                     aria-labelledby="heading{{ ch.pk }}" data-bs-parent="#pipChangeAccordion">
+                                    <div class="accordion-body">
+                                        <p class="small text-muted mb-1">
+                                            {% if ch.name %}<strong>{{ ch.name }}</strong>{% endif %}
+                                            {% if ch.target_name_snapshot or ch.target_id %}
+                                             · {% if ch.target_name_snapshot %}{{ ch.target_name_snapshot }}{% else %}#{{ ch.target_id }}{% endif %}
+                                            {% endif %}
+                                        </p>
+                                        {% if ch.internal_ref or ch.parent_workflow_ref or ch.insert_after_activity_ref or ch.phase_ref or ch.produced_by_activity_ref or ch.artifact_type or ch.relationship_type or ch.source_entity_ref or ch.target_entity_ref or ch.parent_workflow_id or ch.insert_after_activity_id %}
+                                        <p class="small text-muted mb-2" data-testid="pip-change-refs-{{ ch.order }}">
+                                            {% if ch.internal_ref %}<span class="me-2">ref: <code>{{ ch.internal_ref }}</code></span>{% endif %}
+                                            {% if ch.parent_workflow_ref %}<span class="me-2">parent wf: <code>{{ ch.parent_workflow_ref }}</code></span>{% elif ch.parent_workflow_id %}<span class="me-2">parent wf: #{{ ch.parent_workflow_id }}</span>{% endif %}
+                                            {% if ch.insert_after_activity_ref %}<span class="me-2">after: <code>{{ ch.insert_after_activity_ref }}</code></span>{% elif ch.insert_after_activity_id %}<span class="me-2">after: #{{ ch.insert_after_activity_id }}</span>{% endif %}
+                                            {% if ch.phase_ref %}<span class="me-2">phase: <code>{{ ch.phase_ref }}</code></span>{% endif %}
+                                            {% if ch.produced_by_activity_ref %}<span class="me-2">producer: <code>{{ ch.produced_by_activity_ref }}</code></span>{% endif %}
+                                            {% if ch.artifact_type %}<span class="me-2">artifact type: {{ ch.artifact_type }}{% if ch.artifact_is_required %} (required){% endif %}</span>{% endif %}
+                                            {% if ch.relationship_type %}<span class="me-2">link: {{ ch.relationship_type }}</span>{% endif %}
+                                            {% if ch.source_entity_ref %}<span class="me-2">src: <code>{{ ch.source_entity_ref }}</code></span>{% endif %}
+                                            {% if ch.target_entity_ref %}<span class="me-2">tgt: <code>{{ ch.target_entity_ref }}</code></span>{% endif %}
+                                        </p>
+                                        {% endif %}
+                                        {% if ch.content %}
+                                        <div class="markdown-content border rounded p-3 mb-2" data-testid="pip-change-content-{{ ch.order }}">
+                                            {{ ch.content|markdown }}
+                                        </div>
+                                        {% else %}
+                                        <p class="text-muted small mb-2" data-testid="pip-change-content-{{ ch.order }}">(empty)</p>
+                                        {% endif %}
+                                        {% if ch.galdr_reasoning %}
+                                        <div class="small mt-2" data-testid="galdr-reason-{{ ch.order }}">
+                                            <span class="text-secondary">Galdr rationale:</span> {{ ch.galdr_reasoning }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-muted" data-testid="pip-detail-no-changes">No structured changes captured.</div>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
         </div>
-    {% else %}
-        <div class="text-muted border rounded p-3" data-testid="pip-detail-no-changes">No structured changes captured.</div>
-    {% endif %}
-    {% endwith %}
+
+        <div class="col-md-4">
+            <div class="card mb-4" data-testid="pip-detail-metadata">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-info-circle"></i> Details</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Status:</dt>
+                        <dd class="col-sm-7">
+                            <span class="badge rounded-pill {{ pip.status_bootstrap_class }}">{{ pip.get_status_display }}</span>
+                        </dd>
+                        <dt class="col-sm-5">Changes:</dt>
+                        <dd class="col-sm-7">{{ pip.changes.count }}</dd>
+                        <dt class="col-sm-5">Created:</dt>
+                        <dd class="col-sm-7">{{ pip.created_at|date:"M d, Y" }}</dd>
+                        {% if pip.submitted_at %}
+                        <dt class="col-sm-5">Submitted:</dt>
+                        <dd class="col-sm-7">{{ pip.submitted_at|date:"M d, Y" }}</dd>
+                        {% endif %}
+                        {% if pip.created_by %}
+                        <dt class="col-sm-5">Author:</dt>
+                        <dd class="col-sm-7">{{ pip.created_by.username }}</dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-book-sparkles"></i> Target Playbook</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-title mb-1">{{ pip.playbook.name }}</h6>
+                    <p class="card-text small text-muted mb-2">v{{ pip.playbook.version }}</p>
+                    <a href="{% url 'playbook_detail' pk=pip.playbook.pk %}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-arrow-right"></i> View Playbook
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 {% if can_revert_to_draft %}

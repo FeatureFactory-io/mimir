@@ -109,22 +109,33 @@
     <div class="row g-4 mb-4">
         <div class="col-12 col-lg-8">
             <div class="card h-100" data-testid="team-info-card">
-                <div class="card-body">
-                    <h6 class="text-muted text-uppercase small fw-semibold mb-3">About</h6>
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-align-left"></i> About</h5>
+                </div>
+                <div class="card-body markdown-content">
                     {% if team.description %}
-                    <div class="markdown-content mb-3">{{ team.description|markdown }}</div>
+                    {{ team.description|markdown }}
                     {% else %}
-                    <p class="text-muted fst-italic mb-3">No description provided.</p>
+                    <p class="text-muted fst-italic mb-0">No description provided.</p>
                     {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-info-circle"></i> Details</h5>
+                </div>
+                <div class="card-body">
                     <dl class="row small mb-0">
-                        <dt class="col-sm-4 text-muted">Admin</dt>
-                        <dd class="col-sm-8">
+                        <dt class="col-sm-5 text-muted">Admin</dt>
+                        <dd class="col-sm-7">
                             <i class="fa-solid fa-crown text-warning me-1"></i>
                             {{ team.admin.get_full_name|default:team.admin.username }}
                             <span class="text-muted">(@{{ team.admin.username }})</span>
                         </dd>
-                        <dt class="col-sm-4 text-muted">Join Policy</dt>
-                        <dd class="col-sm-8">
+                        <dt class="col-sm-5 text-muted">Join Policy</dt>
+                        <dd class="col-sm-7">
                             {% if team.join_policy == "Auto-approve" %}
                             <span class="badge bg-success">{{ team.join_policy }}</span>
                             {% elif team.join_policy == "Requires Approval" %}
@@ -133,10 +144,10 @@
                             <span class="badge bg-secondary">{{ team.join_policy }}</span>
                             {% endif %}
                         </dd>
-                        <dt class="col-sm-4 text-muted">Category</dt>
-                        <dd class="col-sm-8">{{ team.category }}</dd>
-                        <dt class="col-sm-4 text-muted">Visibility</dt>
-                        <dd class="col-sm-8">
+                        <dt class="col-sm-5 text-muted">Category</dt>
+                        <dd class="col-sm-7">{{ team.category }}</dd>
+                        <dt class="col-sm-5 text-muted">Visibility</dt>
+                        <dd class="col-sm-7">
                             <span class="badge {% if team.visibility == 'Public' %}bg-success{% else %}bg-secondary{% endif %}">
                                 {{ team.visibility }}
                             </span>
@@ -144,9 +155,7 @@
                     </dl>
                 </div>
             </div>
-        </div>
-        <div class="col-12 col-lg-4">
-            <div class="row g-3 h-100">
+            <div class="row g-3">
                 <div class="col-6 col-lg-12">
                     <div class="card text-center h-100">
                         <div class="card-body py-3">
