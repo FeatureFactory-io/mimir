@@ -26,13 +26,33 @@ urlpatterns = [
     # ── Copy Prompt (Act 17 mockup) ─────────────────────────────────────────
     path("copy-prompt/", views.copy_prompt_index, name="mockup_copy_prompt_index"),
     path(
+        "copy-prompt/activities/",
+        views.copy_prompt_activity_list,
+        name="mockup_copy_prompt_activity_list",
+    ),
+    path(
+        "copy-prompt/activities/empty/",
+        views.copy_prompt_activity_list_empty,
+        name="mockup_copy_prompt_activity_list_empty",
+    ),
+    path(
         "copy-prompt/activities/1/",
         views.copy_prompt_activity_detail,
         name="mockup_copy_prompt_activity_detail",
     ),
     path(
-        "copy-prompt/activities/",
-        views.copy_prompt_activity_list,
-        name="mockup_copy_prompt_activity_list",
+        "copy-prompt/activities/1/guest/",
+        views.copy_prompt_activity_detail_guest,
+        name="mockup_copy_prompt_activity_detail_guest",
+    ),
+    path(
+        "copy-prompt/activities/1/embed/",
+        views.copy_prompt_activity_embed,
+        name="mockup_copy_prompt_activity_embed",
+    ),
+    path(
+        "copy-prompt/activities/1/error/",
+        views.copy_prompt_activity_detail_error,
+        name="mockup_copy_prompt_activity_detail_error",
     ),
 ]

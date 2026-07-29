@@ -1111,8 +1111,21 @@ MOCK_COPY_PROMPT_ACTIVITIES = [
 ]
 
 
+def _copy_prompt_activity_context(*, can_edit=True, is_guest=False, force_clipboard_error=False):
+    """Shared context for Copy Prompt activity mockup screens."""
+    return {
+        "playbook": MOCK_COPY_PROMPT_PLAYBOOK,
+        "workflow": MOCK_COPY_PROMPT_WORKFLOW,
+        "activity": MOCK_COPY_PROMPT_ACTIVITY,
+        "copy_prompt_text": MOCK_COPY_PROMPT_ACTIVITY_TEXT,
+        "can_edit": can_edit,
+        "is_guest": is_guest,
+        "force_clipboard_error": force_clipboard_error,
+    }
+
+
 def copy_prompt_index(request):
-    """FOB-COPY-PROMPT mockup hub — links to VIEW and LIST exemplars."""
+    """FOB-COPY-PROMPT mockup hub — links to VIEW, LIST, guest, embed, and error states."""
     logger.info(
         "Mockup: copy_prompt_index | user=%s",
         getattr(request.user, "username", "anonymous"),
@@ -1126,13 +1139,53 @@ def copy_prompt_activity_detail(request):
         "Mockup: copy_prompt_activity_detail | user=%s",
         getattr(request.user, "username", "anonymous"),
     )
-    context = {
-        "playbook": MOCK_COPY_PROMPT_PLAYBOOK,
-        "workflow": MOCK_COPY_PROMPT_WORKFLOW,
-        "activity": MOCK_COPY_PROMPT_ACTIVITY,
-        "copy_prompt_text": MOCK_COPY_PROMPT_ACTIVITY_TEXT,
-    }
-    return render(request, "mockups/copy-prompt/activity_detail.html", context)
+    return render(
+        request,
+        "mockups/copy-prompt/activity_detail.html",
+        _copy_prompt_activity_context(),
+    )
+
+
+def copy_prompt_activity_detail_guest(request):
+    """FOB-COPY-PROMPT-GUEST-1 mockup — guest browse with Copy Prompt, no edit actions."""
+    logger.info(
+        "Mockup: copy_prompt_activity_detail_guest | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    return render(
+        request,
+        "mockups/copy-prompt/activity_detail.html",
+        _copy_prompt_activity_context(can_edit=False, is_guest=True),
+    )
+
+
+def copy_prompt_activity_detail_error(request):
+    """FOB-COPY-PROMPT-VIEW-12 mockup — simulated clipboard denial."""
+    logger.info(
+        "Mockup: copy_prompt_activity_detail_error | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    return render(
+        request,
+        "mockups/copy-prompt/activity_detail.html",
+        _copy_prompt_activity_context(force_clipboard_error=True),
+    )
+
+
+def copy_prompt_activity_embed(request):
+    """FOB-COPY-PROMPT-VIEW-13 mockup — embed partial with Copy Prompt."""
+    logger.info(
+        "Mockup: copy_prompt_activity_embed | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    return render(
+        request,
+        "mockups/copy-prompt/activity_embed.html",
+        {
+            "activity": MOCK_COPY_PROMPT_ACTIVITY,
+            "copy_prompt_text": MOCK_COPY_PROMPT_ACTIVITY_TEXT,
+        },
+    )
 
 
 def copy_prompt_activity_list(request):
@@ -1145,5 +1198,21 @@ def copy_prompt_activity_list(request):
         "playbook": MOCK_COPY_PROMPT_PLAYBOOK,
         "workflow": MOCK_COPY_PROMPT_WORKFLOW,
         "activities": MOCK_COPY_PROMPT_ACTIVITIES,
+        "show_empty_state": False,
+    }
+    return render(request, "mockups/copy-prompt/activity_list.html", context)
+
+
+def copy_prompt_activity_list_empty(request):
+    """FOB-COPY-PROMPT-LIST mockup — empty list state."""
+    logger.info(
+        "Mockup: copy_prompt_activity_list_empty | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    context = {
+        "playbook": MOCK_COPY_PROMPT_PLAYBOOK,
+        "workflow": MOCK_COPY_PROMPT_WORKFLOW,
+        "activities": [],
+        "show_empty_state": True,
     }
     return render(request, "mockups/copy-prompt/activity_list.html", context)

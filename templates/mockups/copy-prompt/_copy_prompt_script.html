@@ -1,0 +1,67 @@
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var pageId = '{{ mockup_page_id|default:"copy-prompt" }}';
+    var forceError = {{ force_clipboard_error|yesno:"true,false" }};
+    console.log('[mockup:' + pageId + '] page loaded', { forceClipboardError: forceError });
+
+    var toastEl = document.getElementById('copy-prompt-toast');
+    var errorToastEl = document.getElementById('copy-prompt-error-toast');
+    var successToast = toastEl ? new bootstrap.Toast(toastEl) : null;
+    var errorToast = errorToastEl ? new bootstrap.Toast(errorToastEl) : null;
+
+    function showCopySuccess(btn) {
+        if (successToast) successToast.show();
+        var icon = btn.querySelector('i');
+        if (icon) {
+            var prev = icon.className;
+            icon.className = 'fa-solid fa-check';
+            setTimeout(function () { icon.className = prev; }, 1500);
+        }
+    }
+
+    function showCopyError(err) {
+        console.warn('[mockup:' + pageId + '] clipboard failed', err);
+        if (errorToast) errorToast.show();
+    }
+
+    document.querySelectorAll('[data-copy-prompt-trigger]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var sourceId = btn.getAttribute('data-copy-prompt-for');
+            var source = sourceId ? document.getElementById(sourceId) : null;
+            if (!source) {
+                var cell = btn.closest('td');
+                source = cell ? cell.querySelector('[data-copy-prompt-source]') : null;
+            }
+            if (!source) {
+                var wrap = btn.parentElement;
+                source = wrap ? wrap.querySelector('[data-copy-prompt-source]') : null;
+            }
+            if (!source) {
+                source = document.querySelector('[data-copy-prompt-source]');
+            }
+            var text = source ? source.value : '';
+            console.log('[mockup:' + pageId + '] copy clicked', {
+                testid: btn.dataset.testid,
+                length: text.length,
+            });
+
+            if (forceError) {
+                showCopyError(new Error('Simulated clipboard denial'));
+                return;
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () {
+                    console.log('[mockup:' + pageId + '] clipboard write OK');
+                    showCopySuccess(btn);
+                }).catch(showCopyError);
+            } else {
+                showCopyError(new Error('Clipboard API unavailable'));
+            }
+        });
+    });
+
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (el) { return new bootstrap.Tooltip(el); });
+});
+</script>

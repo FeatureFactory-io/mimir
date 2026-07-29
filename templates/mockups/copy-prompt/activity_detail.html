@@ -7,6 +7,18 @@
 {% block content %}
 <div class="container mt-4" data-testid="copy-prompt-activity-detail-page">
 
+    {% if is_guest %}
+    <div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"
+         data-testid="guest-auth-banner"
+         role="status">
+        <span>Sign in to create and edit playbooks.</span>
+        <span class="d-flex gap-2">
+            <a href="#" class="btn btn-sm btn-primary" data-testid="guest-banner-sign-in">Sign In</a>
+            <a href="#" class="btn btn-sm btn-outline-primary" data-testid="guest-banner-register">Register</a>
+        </span>
+    </div>
+    {% endif %}
+
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
@@ -18,7 +30,7 @@
         </ol>
     </nav>
 
-    <div class="hg-page-header mb-3" data-testid="activity-header">
+    <section class="hg-page-header rounded-2 mb-3" data-testid="activity-header">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div class="flex-grow-1 min-w-0">
                 <h1 class="hg-page-title d-flex align-items-center gap-2 mb-1" data-testid="activity-title">
@@ -28,47 +40,49 @@
                 <p class="text-muted small mb-1">
                     <span class="badge bg-secondary me-1 font-monospace">{{ activity.reference_label }}</span>
                     <span class="badge bg-secondary">Order: #{{ activity.order }}</span>
-                    <span class="badge bg-info"><i class="fa-solid fa-bars-progress me-1"></i>{{ activity.phase }}</span>
+                    <span class="badge bg-info"><i class="fa-solid fa-bars-progress me-1" aria-hidden="true"></i>{{ activity.phase }}</span>
                 </p>
                 <p class="text-muted small mb-0">
-                    <i class="fa-solid fa-clock"></i> Updated {{ activity.updated_ago }} ago
+                    <i class="fa-solid fa-clock" aria-hidden="true"></i> Updated {{ activity.updated_ago }} ago
                 </p>
             </div>
             <div role="toolbar"
                  aria-label="Activity actions"
                  class="d-flex flex-wrap gap-2 align-items-center flex-shrink-0"
                  data-testid="activity-header-actions">
+                {% if can_edit %}
                 <a href="#"
                    class="btn btn-outline-danger"
                    data-testid="delete-btn"
                    data-bs-toggle="tooltip"
                    title="Delete this activity (mockup)">
-                    <i class="fa-solid fa-trash"></i> Delete
+                    <i class="fa-solid fa-trash" aria-hidden="true"></i> Delete
                 </a>
                 <a href="#"
                    class="btn btn-primary"
                    data-testid="edit-btn"
                    data-bs-toggle="tooltip"
                    title="Edit this activity (mockup)">
-                    <i class="fa-solid fa-edit"></i> Edit
+                    <i class="fa-solid fa-edit" aria-hidden="true"></i> Edit
                 </a>
+                {% endif %}
                 {% include "mockups/copy-prompt/_copy_prompt_button.html" with copy_prompt_text=copy_prompt_text text_testid="copy-prompt-text-activity-1" %}
                 <a href="{% url 'mockup_copy_prompt_activity_list' %}"
                    class="btn btn-outline-secondary"
                    data-testid="activity-back-btn"
                    data-bs-toggle="tooltip"
                    title="Back to activities list">
-                    <i class="fa-solid fa-arrow-left"></i> Back to List
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to List
                 </a>
             </div>
         </div>
-    </div>
+    </section>
 
     <div class="row">
         <div class="col-md-8">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fa-solid fa-book-open"></i> Guidance</h5>
+            <div class="card border-0 shadow-sm rounded-3 mb-4">
+                <div class="card-header bg-white border-bottom">
+                    <h2 class="h6 mb-0"><i class="fa-solid fa-book-open me-1" aria-hidden="true"></i> Guidance</h2>
                 </div>
                 <div class="card-body markdown-content" data-testid="guidance-content">
                     {{ activity.guidance|markdown }}
@@ -76,8 +90,8 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card mb-4">
-                <div class="card-header"><h5 class="mb-0"><i class="fa-solid fa-info-circle"></i> Details</h5></div>
+            <div class="card border-0 shadow-sm rounded-3 mb-4">
+                <div class="card-header bg-white border-bottom"><h2 class="h6 mb-0"><i class="fa-solid fa-info-circle me-1" aria-hidden="true"></i> Details</h2></div>
                 <div class="card-body">
                     <dl class="row mb-0 small">
                         <dt class="col-sm-5">Workflow:</dt>
@@ -90,7 +104,7 @@
 
             <div class="card border-primary mb-4" data-testid="copy-prompt-preview-card">
                 <div class="card-header bg-primary text-white">
-                    <h6 class="mb-0"><i class="fa-solid fa-clipboard me-1"></i> Clipboard payload preview</h6>
+                    <h2 class="h6 mb-0"><i class="fa-solid fa-clipboard me-1" aria-hidden="true"></i> Clipboard payload preview</h2>
                 </div>
                 <div class="card-body p-0">
                     <pre class="small mb-0 p-3 bg-light" data-testid="copy-prompt-preview" style="max-height: 280px; overflow: auto;">{{ copy_prompt_text }}</pre>
@@ -99,63 +113,18 @@
         </div>
     </div>
 
-    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
-        <div id="copy-prompt-toast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true" data-testid="copy-prompt-toast">
-            <div class="d-flex">
-                <div class="toast-body">
-                    <i class="fa-solid fa-check me-1"></i> Prompt copied to clipboard
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
-    </div>
+    {% include "mockups/copy-prompt/_copy_prompt_toast.html" %}
 
     <div class="alert alert-light border mt-4 small">
         <strong>Mockup screens:</strong>
         <a href="{% url 'mockup_copy_prompt_index' %}">Index</a> ·
         <a href="{% url 'mockup_copy_prompt_activity_detail' %}">Activity detail</a> ·
-        <a href="{% url 'mockup_copy_prompt_activity_list' %}">Activity list</a>
+        <a href="{% url 'mockup_copy_prompt_activity_detail_guest' %}">Guest detail</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_embed' %}">Embed</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_list' %}">Activity list</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_detail_error' %}">Clipboard error</a>
     </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    console.log('[mockup:copy-prompt-activity-detail] page loaded');
-
-    var toastEl = document.getElementById('copy-prompt-toast');
-    var toast = toastEl ? new bootstrap.Toast(toastEl, { delay: 2000 }) : null;
-
-    document.querySelectorAll('[data-copy-prompt-trigger]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var wrap = btn.parentElement;
-            var source = wrap ? wrap.querySelector('[data-copy-prompt-source]') : null;
-            if (!source) {
-                source = document.querySelector('[data-copy-prompt-source]');
-            }
-            var text = source ? source.value : '';
-            console.log('[mockup:copy-prompt-activity-detail] copy clicked, length=' + text.length);
-
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(function () {
-                    console.log('[mockup:copy-prompt-activity-detail] clipboard write OK');
-                    if (toast) toast.show();
-                    var icon = btn.querySelector('i');
-                    if (icon) {
-                        var prev = icon.className;
-                        icon.className = 'fa-solid fa-check';
-                        setTimeout(function () { icon.className = prev; }, 1500);
-                    }
-                }).catch(function (err) {
-                    console.warn('[mockup:copy-prompt-activity-detail] clipboard failed', err);
-                });
-            } else {
-                console.warn('[mockup:copy-prompt-activity-detail] clipboard API unavailable');
-            }
-        });
-    });
-
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (el) { return new bootstrap.Tooltip(el); });
-});
-</script>
+{% include "mockups/copy-prompt/_copy_prompt_script.html" with mockup_page_id="copy-prompt-activity-detail" force_clipboard_error=force_clipboard_error %}
 {% endblock %}

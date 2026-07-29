@@ -12,7 +12,7 @@
         </ol>
     </nav>
 
-    <div class="hg-page-header mb-3">
+    <section class="hg-page-header rounded-2 mb-3">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
                 <h1 class="hg-page-title d-flex align-items-center gap-2 mb-1">
@@ -20,46 +20,122 @@
                     <span>Copy Prompt</span>
                 </h1>
                 <p class="text-muted small mb-0">
-                    Act 17 mockups — server-built AI instructions on VIEW headers and list Actions
+                    Act 17 — server-built AI instructions on VIEW headers and list Actions (Option B)
                 </p>
             </div>
         </div>
-    </div>
+    </section>
 
-    <div class="row g-4">
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
                 <div class="card-body">
-                    <h5 class="card-title"><i class="fa-solid fa-list-check text-primary me-2"></i>Activity detail (VIEW)</h5>
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-list-check text-primary me-2" aria-hidden="true"></i>
+                        Activity detail (VIEW)
+                    </h2>
                     <p class="text-muted small">
-                        Header toolbar: [Copy Prompt] before [Back to List]. Hidden textarea holds server-built prompt.
+                        Header toolbar: [Copy Prompt] before [Back]. Hidden textarea holds server-built prompt.
                     </p>
                     <a href="{% url 'mockup_copy_prompt_activity_detail' %}"
-                       class="btn btn-primary"
+                       class="btn btn-primary btn-sm"
                        data-testid="mockup-link-activity-detail">
-                        Open activity detail mockup
+                        Open detail mockup
                     </a>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
                 <div class="card-body">
-                    <h5 class="card-title"><i class="fa-solid fa-table text-primary me-2"></i>Activities list (LIST+FIND)</h5>
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-table text-primary me-2" aria-hidden="true"></i>
+                        Activities list (LIST+FIND)
+                    </h2>
                     <p class="text-muted small">
-                        Actions column: icon-only copy beside View (eye). Same clipboard payload as detail.
+                        Actions column: icon-only copy beside View (eye). Same payload as detail.
                     </p>
                     <a href="{% url 'mockup_copy_prompt_activity_list' %}"
-                       class="btn btn-primary"
+                       class="btn btn-primary btn-sm"
                        data-testid="mockup-link-activity-list">
-                        Open activities list mockup
+                        Open list mockup
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
+                <div class="card-body">
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-user text-primary me-2" aria-hidden="true"></i>
+                        Guest browse (VIEW)
+                    </h2>
+                    <p class="text-muted small">
+                        Public released activity — Copy Prompt visible, no Edit/Delete, guest banner shown.
+                    </p>
+                    <a href="{% url 'mockup_copy_prompt_activity_detail_guest' %}"
+                       class="btn btn-outline-primary btn-sm"
+                       data-testid="mockup-link-activity-guest">
+                        Open guest detail
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
+                <div class="card-body">
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-window-restore text-primary me-2" aria-hidden="true"></i>
+                        Embed panel
+                    </h2>
+                    <p class="text-muted small">
+                        Content Browser <code>?embed=1</code> — Copy Prompt in embed header, no navbar chrome.
+                    </p>
+                    <a href="{% url 'mockup_copy_prompt_activity_embed' %}"
+                       class="btn btn-outline-primary btn-sm"
+                       data-testid="mockup-link-activity-embed">
+                        Open embed mockup
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
+                <div class="card-body">
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-circle-exclamation text-danger me-2" aria-hidden="true"></i>
+                        Clipboard error
+                    </h2>
+                    <p class="text-muted small">
+                        Simulates denied <code>navigator.clipboard.writeText</code> — danger toast, no navigation.
+                    </p>
+                    <a href="{% url 'mockup_copy_prompt_activity_detail_error' %}"
+                       class="btn btn-outline-danger btn-sm"
+                       data-testid="mockup-link-clipboard-error">
+                        Open error demo
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
+                <div class="card-body">
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-inbox text-muted me-2" aria-hidden="true"></i>
+                        Empty list
+                    </h2>
+                    <p class="text-muted small">LIST+FIND with zero rows — empty state placeholder.</p>
+                    <a href="{% url 'mockup_copy_prompt_activity_list_empty' %}"
+                       class="btn btn-outline-secondary btn-sm"
+                       data-testid="mockup-link-activity-list-empty">
+                        Open empty list
                     </a>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="alert alert-info mt-4 mb-0" role="status" data-testid="copy-prompt-spec-note">
+    <div class="alert alert-info mb-0" role="status" data-testid="copy-prompt-spec-note">
         <strong>Spec:</strong> Production uses <code>CopyPromptService</code> (Option B). Mockups use hardcoded
         <code>MOCK_COPY_PROMPT_*</code> strings. Feature files: <code>docs/features/act-17-copy-prompt/</code>.
     </div>
@@ -68,7 +144,17 @@
         <strong>Mockup screens:</strong>
         <a href="{% url 'mockup_copy_prompt_index' %}">Index</a> ·
         <a href="{% url 'mockup_copy_prompt_activity_detail' %}">Activity detail</a> ·
-        <a href="{% url 'mockup_copy_prompt_activity_list' %}">Activity list</a>
+        <a href="{% url 'mockup_copy_prompt_activity_detail_guest' %}">Guest detail</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_embed' %}">Embed</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_list' %}">Activity list</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_list_empty' %}">Empty list</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_detail_error' %}">Clipboard error</a>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    console.log('[mockup:copy-prompt-index] page loaded');
+});
+</script>
 {% endblock %}

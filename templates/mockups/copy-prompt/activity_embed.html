@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load markdown_filters %}
+
+{% block title %}{{ activity.name }} — Embed mockup{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-3" data-testid="copy-prompt-activity-embed-page">
+
+    <p class="text-muted small mb-3">
+        <i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>
+        Content Browser / canvas embed mockup — no breadcrumbs, no page header chrome.
+    </p>
+
+    <div class="card mm-embed" data-testid="activity-embed">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h5 class="mb-0">
+                    <i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>
+                    <span data-testid="embed-entity-name">{{ activity.name }}</span>
+                </h5>
+                <div class="mt-1">
+                    <span class="badge bg-secondary me-1 font-monospace">{{ activity.reference_label }}</span>
+                    <span class="badge bg-secondary me-1">#{{ activity.order }}</span>
+                    <span class="badge bg-info">{{ activity.phase }}</span>
+                </div>
+            </div>
+            <div role="toolbar"
+                 aria-label="Embed activity actions"
+                 class="d-flex gap-2 flex-shrink-0"
+                 data-testid="activity-header-actions">
+                {% include "mockups/copy-prompt/_copy_prompt_button.html" with copy_prompt_text=copy_prompt_text text_testid="copy-prompt-text-activity-1" %}
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="markdown-content mb-0" data-testid="embed-guidance">
+                {{ activity.guidance|markdown }}
+            </div>
+        </div>
+    </div>
+
+    {% include "mockups/copy-prompt/_copy_prompt_toast.html" %}
+
+    <div class="alert alert-light border mt-4 small">
+        <strong>Mockup screens:</strong>
+        <a href="{% url 'mockup_copy_prompt_index' %}">Index</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_detail' %}">Activity detail</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_detail_guest' %}">Guest detail</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_embed' %}">Embed</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_list' %}">Activity list</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_detail_error' %}">Clipboard error</a>
+    </div>
+</div>
+
+{% include "mockups/copy-prompt/_copy_prompt_script.html" with mockup_page_id="copy-prompt-activity-embed" force_clipboard_error=False %}
+{% endblock %}
