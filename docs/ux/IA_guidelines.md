@@ -210,7 +210,8 @@ Every page follows this structure:
 | **Single-column form** | Create / Edit screens | `col-md-8 col-lg-6`, centred |
 | **Full-width table** | LIST+FIND screens | Card shell + `table-responsive` + `table-hover` (§5.2 LIST+FIND data table) |
 | **Filter row → table** | LIST+FIND screens | Filter controls in a `row` directly above the table card (§5.2) |
-| **8+4 read + context rail** | Entity VIEW screens | `col-md-8` content / `col-md-4` rail (§3.7) |
+| **8+4 read + context rail** | Entity VIEW screens (§3.7) | `col-md-8` content / `col-md-4` rail |
+| **Collection VIEW dashboard** | Collection VIEW screens (§3.7.1) | Full-width or dashboard-style; collection UI is primary |
 
 ### 3.3 Navbar CSS
 
@@ -272,9 +273,11 @@ Screens that combine **filters → table** with **checkbox-driven bulk operation
 
 **Canonical reference:** `ui/templates/ui/fragos/list.html` (`fragos-bulk-bar`).
 
-### 3.7 View page — read column + context rail (8+4)
+### 3.7 Entity VIEW — read column + context rail (8+4)
 
-Every **VIEW** screen for a playbook entity dedicates roughly **⅔ of the content width to the primary body** and **⅓ to a context rail** on the right. You open the page to **read content**; everything else — metadata, relationships, "used in" lists — lives in the rail so you can glance at context **while** you read without it competing for horizontal space with the body.
+Every **entity VIEW** screen (Activity, Skill, Agent, Rule, Artifact, PIP, Team) dedicates roughly **⅔ of the content width to the primary body** and **⅓ to a context rail** on the right. You open the page to **read content**; everything else — metadata, relationships, "used in" lists — lives in the rail so you can glance at context **while** you read without it competing for horizontal space with the body.
+
+**Not entity VIEW:** Playbook, Phase, and Workflow are **collections** — their VIEW pages exist to browse contained entities (Activities Flow, activity tables, Quick Stats, nested workflow lists). Those screens use **§3.7.1 Collection VIEW** instead of the 8+4 split.
 
 #### Layout
 
@@ -319,28 +322,50 @@ Every **VIEW** screen for a playbook entity dedicates roughly **⅔ of the conte
 |---|---|---|---|
 | **Activity** | `templates/activities/detail.html` | **Guidance** (Markdown + Mermaid) | Details, Workflow, Assigned Agent, Required Skills, Rules, Input / Output Artifacts |
 
-**Activity VIEW** is the structural reference — all production entity VIEW templates listed below now follow the same pattern.
+**Activity VIEW** is the structural reference — all production **entity** VIEW templates listed below follow the same pattern.
 
-Tabbed VIEW screens (e.g. Playbook tabs) keep the **8+4 split inside each tab's content area**, with the tab bar and page header remaining full width above.
+Tabbed VIEW screens (e.g. Playbook tabs) apply **§3.7.1** on collection tabs and **§3.7** only where a tab shows a single entity's readable body.
 
-#### Adoption audit (July 2026)
+#### 3.7.1 Collection VIEW — dashboard layout (Playbook, Phase, Workflow)
 
-Production VIEW templates under `templates/*/detail.html`. **Compliant** = `col-md-8` / `col-md-4` (or `col-lg-8` / `col-lg-4`) with **content only** in the read column and all supplementary cards in the rail.
+**Collection** VIEW pages group other entities. The **primary content is the collection itself** — not a Markdown body with metadata in a side rail.
+
+| Collection | Primary content (main column / full width) | Secondary (optional rail or below) |
+|---|---|---|
+| **Playbook** | Description (full width); Overview tab: Quick Stats + Workflows preview (`col-md-8`) | Metadata card (`col-md-4`) on Overview tab only |
+| **Workflow** | Description (optional card); **Activities Flow** diagram (full width) | — |
+| **Phase** | Description card; **Activities in this Phase** tables (full width, grouped by workflow) | — |
+
+**Rules:**
+
+- Do **not** force §3.7 8+4 on collections — e.g. do not put Activities Flow or phase activity tables in a `col-md-4` rail.
+- Optional short description may appear above the collection UI; it is not the page's reason for being.
+- Nested **entity** rows inside a collection (e.g. activity rows on Phase detail) keep their own Copy Prompt / View actions per §3.7 entity conventions on those rows only.
+- **Copy Prompt** is for **entities** only — not on Playbook, Phase, or Workflow VIEW headers or LIST rows.
+
+#### Adoption audit — entity VIEW (July 2026)
+
+Production VIEW templates under `templates/*/detail.html`. **Entity §3.7 compliant** = `col-md-8` / `col-md-4` with **content only** in the read column and all supplementary cards in the rail.
 
 | Entity | Template | Status | Read column | Context rail |
 |---|---|---|---|---|
-| **Activity** | `activities/detail.html` | ✅ Compliant | Guidance | Details, Workflow, Agent, Skills, Rules, Input / Output Artifacts |
-| **Artifact** | `artifacts/detail.html` | ✅ Compliant | Description | Metadata, Producer, Consumer Activities, Template File |
-| **Skill** | `skills/detail.html` | ✅ Compliant | Content | Details, Playbook, Activities Using This Skill |
-| **Agent** | `agents/detail.html` | ✅ Compliant | Description | Details, Playbook, Used in Activities |
-| **Rule** | `rules/detail.html` | ✅ Compliant | Content | Details, Playbook, Activities |
-| **Workflow** | `workflows/detail.html` | ✅ Compliant | Description | Details, Playbook, Activities Flow |
-| **Phase** | `phases/detail.html` | ✅ Compliant | Description | Details, Playbook, Activities in Phase |
-| **Playbook** | `playbooks/detail.html` | ⚠️ Exception (Overview tab) | Description full width; col-8 Quick Stats + Workflows | col-4 Metadata only — **not** strict §3.7; dashboard-style layout retained |
-| **PIP** | `pips/detail.html` | ✅ Compliant | Summary + Changes | Details, Target Playbook |
-| **Team** | `teams/detail.html` | ✅ Compliant | About (description) | Details, member/playbook counts |
+| **Activity** | `activities/detail.html` | ✅ Entity §3.7 | Guidance | Details, Workflow, Agent, Skills, Rules, Input / Output Artifacts |
+| **Artifact** | `artifacts/detail.html` | ✅ Entity §3.7 | Description | Metadata, Producer, Consumer Activities, Template File |
+| **Skill** | `skills/detail.html` | ✅ Entity §3.7 | Content | Details, Playbook, Activities Using This Skill |
+| **Agent** | `agents/detail.html` | ✅ Entity §3.7 | Description | Details, Playbook, Used in Activities |
+| **Rule** | `rules/detail.html` | ✅ Entity §3.7 | Content | Details, Playbook, Activities |
+| **PIP** | `pips/detail.html` | ✅ Entity §3.7 | Summary + Changes | Details, Target Playbook |
+| **Team** | `teams/detail.html` | ✅ Entity §3.7 | About (description) | Details, member/playbook counts |
 
-**Out of scope for §3.7:** embed fragments (`templates/*/_embed.html` — content-browser panes), mockups (`templates/mockups/**`), PIP Preview / Admin Review (derivative flows; apply the same split if they become primary VIEW surfaces).
+#### Adoption audit — collection VIEW (July 2026)
+
+| Collection | Template | Status | Primary content |
+|---|---|---|---|
+| **Playbook** | `playbooks/detail.html` | ✅ Collection §3.7.1 | Dashboard Overview: full-width description; col-8 Quick Stats + Workflows; col-4 Metadata |
+| **Workflow** | `workflows/detail.html` | ✅ Collection §3.7.1 | Full-width Activities Flow; optional description card |
+| **Phase** | `phases/detail.html` | ✅ Collection §3.7.1 | Full-width description + activities-by-workflow tables |
+
+**Out of scope for §3.7 / §3.7.1:** embed fragments (`templates/*/_embed.html` — content-browser panes), mockups (`templates/mockups/**`), PIP Preview / Admin Review (derivative flows).
 
 Shared rail utilities: `.mm-view-rail-scroll` / `.mm-view-rail-scroll-x` in `static/css/mimir-app.css` for long lists and wide graphs in the rail.
 

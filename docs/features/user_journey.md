@@ -3021,19 +3021,19 @@ Read the '<ref> <name>' <entity_type> from playbook '<playbook>' …
 <raw Markdown or text body>
 ```
 
-Entity-specific bodies: Activity → full `guidance`; Skill → `content` + metadata; Rule → slug + `always_apply` + body; Workflow/Phase/Playbook → summary/index (not every activity body); PIP → summary + change list (no Galdr reasoning).
+Entity-specific bodies: Activity → full `guidance`; Skill → `content` + metadata; Rule → slug + `always_apply` + body; PIP → summary + change list (no Galdr reasoning).
 
 **Entry points**:
 
 | Surface | Screen ID | Where [Copy Prompt] appears |
 |---|---|---|
-| Entity VIEW (all types below) | `FOB-COPY-PROMPT-VIEW-1` (pattern) | Header toolbar (`role="toolbar"`), **before** [Back] / after edit actions |
+| Entity VIEW (types below) | `FOB-COPY-PROMPT-VIEW-1` (pattern) | Header toolbar (`role="toolbar"`), **before** [Back] / after edit actions |
 | LIST+FIND row Actions | `FOB-COPY-PROMPT-LIST-1` (pattern) | `btn-group-sm` beside existing View (eye) icon |
 | Content Browser embed | (same as VIEW embed) | Inside `?embed=1` partial — no navbar |
 
-**Entity types in scope**: Activity, Skill, Agent, Rule, Artifact, Workflow, Phase, Playbook, PIP.
+**Entity types in scope**: Activity, Skill, Agent, Rule, Artifact, PIP.
 
-**Out of scope**: Teams; Profile API token copy (Act 14); Use Cases sample commands; PIP admin-review; create/edit forms; playbook list **cards** (table Actions only for lists).
+**Out of scope (collections — no Copy Prompt)**: Playbook, Phase, Workflow VIEW headers and LIST rows; Teams; Profile API token copy (Act 14); Use Cases sample commands; PIP admin-review; create/edit forms; playbook list **cards** (table Actions only for lists).
 
 **UI conventions** (see `docs/ux/IA_guidelines.md` §3.4):
 
@@ -3046,9 +3046,9 @@ Entity-specific bodies: Activity → full `guidance`; Skill → `content` + meta
 **LIST surfaces with Actions column**:
 
 - Activities: workflow-scoped, playbook-scoped, global `/activities/`
-- Skills, Agents, Rules, Artifacts, Workflows, Phases: playbook-scoped + global lists
+- Skills, Agents, Rules, Artifacts: playbook-scoped + global lists
 - PIPs: `/pips/` list
-- Nested: Playbook → Workflows tab table; Phase detail → activities table
+- Nested: Phase detail → activities table (entity rows only)
 
 **Access control**:
 

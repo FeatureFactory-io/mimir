@@ -7,7 +7,6 @@ from methodology.models import (
     Activity,
     Agent,
     Artifact,
-    Phase,
     PipChange,
     Playbook,
     ProcessImprovementProposal,
@@ -118,91 +117,6 @@ class TestCopyPromptService:
         assert "Document" in prompt
         assert "Required: true" in prompt
         assert "Spec for the component API." in prompt
-
-    def test_workflow_prompt_lists_activity_names_without_guidance(self, playbook, workflow):
-        Activity.objects.create(
-            workflow=workflow,
-            name="Setup component structure",
-            guidance="Secret guidance body",
-            order=1,
-        )
-        Activity.objects.create(
-            workflow=workflow,
-            name="Implement component",
-            guidance="More secret guidance",
-            order=2,
-        )
-        prompt = CopyPromptService.build_workflow_prompt(workflow)
-        assert "Build UI components" in prompt
-        assert "Setup component structure" in prompt
-        assert "Implement component" in prompt
-        assert prompt.index("Setup component structure") < prompt.index("Implement component")
-        assert "Secret guidance body" not in prompt
-
-    def test_phase_prompt_lists_assigned_activities(self, playbook, workflow):
-        phase = Phase.objects.create(
-            playbook=playbook,
-            name="Planning",
-            description="Plan work",
-            order=1,
-        )
-        Activity.objects.create(
-            workflow=workflow,
-            name="Setup component structure",
-            guidance="g1",
-            order=1,
-            phase=phase,
-        )
-        Activity.objects.create(
-            workflow=workflow,
-            name="Define API",
-            guidance="g2",
-            order=2,
-            phase=phase,
-        )
-        prompt = CopyPromptService.build_phase_prompt(phase)
-        assert "React Frontend Development" in prompt
-        assert "Planning" in prompt
-        assert "Setup component structure" in prompt
-        assert "Define API" in prompt
-        assert prompt.index("Setup component structure") < prompt.index("Define API")
-
-    def test_playbook_prompt_summarizes_structure_without_all_guidance(self, playbook):
-        wf1 = Workflow.objects.create(
-            playbook=playbook,
-            name="Alpha",
-            description="d",
-            order=1,
-        )
-        wf2 = Workflow.objects.create(
-            playbook=playbook,
-            name="Beta",
-            description="d",
-            order=2,
-        )
-        wf3 = Workflow.objects.create(
-            playbook=playbook,
-            name="Gamma",
-            description="d",
-            order=3,
-        )
-        for wf in (wf1, wf2, wf3):
-            for idx in range(8):
-                Activity.objects.create(
-                    workflow=wf,
-                    name=f"Act {wf.name} {idx}",
-                    guidance=f"Long guidance {idx} " * 20,
-                    order=idx + 1,
-                )
-        prompt = CopyPromptService.build_playbook_prompt(playbook)
-        assert "React Frontend Development" in prompt
-        assert "1.2" in prompt
-        assert "Released" in prompt
-        assert "## Frontend standards" in prompt
-        assert "3 workflow" in prompt
-        assert "24 activit" in prompt
-        assert "Alpha" in prompt
-        assert "Long guidance" not in prompt
 
     def test_pip_prompt_includes_summary_and_changes_without_galdr(self, playbook):
         pip = ProcessImprovementProposal.objects.create(

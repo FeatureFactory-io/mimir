@@ -58,36 +58,16 @@ Feature: FOB-COPY-PROMPT-LIST-1 Copy Prompt in list-row Actions
     Given Maria is on "/artifacts/"
     Then each visible artifact row includes data-testid "copy-prompt-btn-artifact-<pk>"
 
-  Scenario: FOB-COPY-PROMPT-LIST-12 Playbook-scoped workflows list row Actions
-    Given Maria is on FOB-WORKFLOWS-LIST+FIND-1
-    Then each workflow row includes data-testid "copy-prompt-btn-workflow-<pk>"
-
-  Scenario: FOB-COPY-PROMPT-LIST-13 Global workflows list row Actions
-    Given Maria is on "/workflows/"
-    Then each visible workflow row includes data-testid "copy-prompt-btn-workflow-<pk>"
-
-  Scenario: FOB-COPY-PROMPT-LIST-14 Playbook-scoped phases list row Actions
-    Given Maria is on FOB-PHASES-LIST+FIND-1
-    Then each phase row includes data-testid "copy-prompt-btn-phase-<pk>"
-
-  Scenario: FOB-COPY-PROMPT-LIST-15 Global phases list row Actions
-    Given Maria is on "/phases/"
-    Then each visible phase row includes data-testid "copy-prompt-btn-phase-<pk>"
-
-  Scenario: FOB-COPY-PROMPT-LIST-16 PIP list row Actions beside View
+  Scenario: FOB-COPY-PROMPT-LIST-12 PIP list row Actions beside View
     Given Maria is on FOB-PIP-LIST-1
     Then PIP-42 row Actions includes data-testid "copy-prompt-btn-pip-42"
     And [Copy Prompt] sits beside the View (eye) button in the same btn-group
 
-  Scenario: FOB-COPY-PROMPT-LIST-17 Playbook Workflows tab nested table Actions
-    Given Maria is on FOB-PLAYBOOKS-VIEW_PLAYBOOK-1 Workflows tab
-    Then each row in data-testid "workflows-table" includes copy-prompt-btn-workflow-<pk>
-
-  Scenario: FOB-COPY-PROMPT-LIST-18 Phase detail nested activities table Actions
+  Scenario: FOB-COPY-PROMPT-LIST-13 Phase detail nested activities table Actions
     Given Maria is on FOB-PHASES-VIEW_PHASE-1 with assigned activities
     Then each activity row in the phase activities table includes copy-prompt-btn-activity-<pk>
 
-  Scenario: FOB-COPY-PROMPT-LIST-19 List copy matches detail copy for the same entity
+  Scenario: FOB-COPY-PROMPT-LIST-14 List copy matches detail copy for the same entity
     Given activity "Setup component structure" exists
     When Maria copies from the global activities list row
     And Maria copies from FOB-ACTIVITIES-VIEW_ACTIVITY-1 header
