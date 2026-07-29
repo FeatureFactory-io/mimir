@@ -6,6 +6,16 @@
   color: #fff;
 }
 
+/* VIEW pages — §3.7 context rail scroll for long relationship lists */
+.mm-view-rail-scroll {
+  max-height: 24rem;
+  overflow-y: auto;
+}
+
+.mm-view-rail-scroll-x {
+  overflow-x: auto;
+}
+
 /* Landing — hide footer for full-page hero */
 body.hg-landing footer.footer {
   display: none;
