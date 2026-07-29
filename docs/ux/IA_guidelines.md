@@ -313,24 +313,38 @@ Every **VIEW** screen for a playbook entity dedicates roughly **⅔ of the conte
 
 **Rule of thumb:** if it is not the sentence-level content the user came to read, it belongs in the rail — including long lists (e.g. 12 consumer activities). The rail is reference while reading, not a second content column.
 
-#### Canonical references (production)
+#### Canonical reference
 
-| Entity | Template | Primary column | Context rail |
+| Entity | Template | Read column | Context rail |
 |---|---|---|---|
-| **Activity** | `templates/activities/detail.html` | **Guidance** card (Markdown + Mermaid) | Details, Workflow, Assigned Agent, Required Skills, Rules, Input / Output Artifacts |
-| **Artifact** | `templates/artifacts/detail.html` | **Description** (Markdown) only | Metadata, Producer Activity, Consumer Activities, Template File *(target layout — producer / consumers currently in primary column; migrate to rail)* |
+| **Activity** | `templates/activities/detail.html` | **Guidance** (Markdown + Mermaid) | Details, Workflow, Assigned Agent, Required Skills, Rules, Input / Output Artifacts |
 
-**Activity VIEW** is the reference implementation for the split. **Artifact VIEW** is a partial adopter: move producer / consumer sections to the rail when aligning to this guideline.
+**Activity VIEW** is the only fully compliant production template — use it as the structural reference for migrations (see adoption audit below).
 
-#### Adoption
+Tabbed VIEW screens (e.g. Playbook tabs) keep the **8+4 split inside each tab's content area**, with the tab bar and page header remaining full width above.
 
-Apply this pattern to all playbook-entity **VIEW** templates (Skill, Agent, Rule, Workflow, Phase, PIP, Team, …). Surfaces that still use a single full-width column, or that mix relationship lists into the primary column, are **migration targets**.
+#### Adoption audit (July 2026)
 
-Playbook VIEW uses a variant inside the Overview tab: description in the read column, stats and sidebar cards in the rail (`templates/playbooks/detail.html`).
+Production VIEW templates under `templates/*/detail.html`. **Compliant** = `col-md-8` / `col-md-4` (or `col-lg-8` / `col-lg-4`) with **content only** in the read column and all supplementary cards in the rail.
 
-Tabbed VIEW screens (e.g. Playbook tabs, RoE VIEW — §5.2) keep the **8+4 split inside each tab's content area**, with the tab bar and page header remaining full width above.
+| Entity | Template | Status | Read column (today) | Should move to rail |
+|---|---|---|---|---|
+| **Activity** | `activities/detail.html` | ✅ Compliant | Guidance | — |
+| **Artifact** | `artifacts/detail.html` | ❌ Partial | Description **and** Producer, Consumers, Template File | Producer Activity, Consumer Activities, Template File |
+| **Skill** | `skills/detail.html` | ❌ Missing split | *(full width)* Content + Activities + Metadata stacked | Add 8+4; rail: Metadata, Playbook, Activities Using This Skill |
+| **Agent** | `agents/detail.html` | ❌ Missing split | *(full width)* Description + Used in Activities | Add 8+4; rail: Details (dates), Playbook, Used in Activities |
+| **Rule** | `rules/detail.html` | ❌ Missing split | *(full width)* Content + Activities | Add 8+4; rail: Details (slug, always_apply, dates), Playbook, Activities |
+| **Workflow** | `workflows/detail.html` | ❌ Missing split | *(full width)* Description + Activities Flow diagram | Add 8+4; read: Description; rail: Details (order, code), Playbook, Activities Flow |
+| **Phase** | `phases/detail.html` | ❌ Missing split | *(full width)* Description + Activities table | Add 8+4; read: Description; rail: Details (order, count, dates), Playbook, Activities in Phase |
+| **Playbook** | `playbooks/detail.html` | ❌ Partial (Overview tab) | Description full width **above** row; col-8 holds Quick Stats + Workflows | Overview tab: read = Description only; rail = Metadata, Quick Stats, Workflows list |
+| **PIP** | `pips/detail.html` | ❌ Missing split | *(full width)* Summary + Changes accordion | Add 8+4; read: Summary + Changes; rail: Details (status, target playbook, author, dates), actions context |
+| **Team** | `teams/detail.html` | ❌ Partial | col-8 mixes About **and** metadata `<dl>`; rail = stat counters only | read: description only; rail: Admin, join policy, visibility, category, member/playbook counts |
 
----
+**Out of scope for §3.7:** embed fragments (`templates/*/_embed.html` — content-browser panes), mockups (`templates/mockups/**`), PIP Preview / Admin Review (derivative flows; apply the same split if they become primary VIEW surfaces).
+
+**Migration order (suggested):** Artifact (smallest delta) → Skill / Agent / Rule (same shape) → Phase → Workflow → Playbook Overview → PIP → Team.
+
+Each migration should preserve existing `data-testid` hooks; add integration tests that assert the read column contains only the content card and relationship cards appear under `col-md-4`.
 
 ## 4. Navigation
 
