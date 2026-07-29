@@ -204,17 +204,137 @@
     <div class="tab-content">
         <!-- Overview Tab -->
         <div class="tab-pane fade show active" id="overview" role="tabpanel">
+            <!-- Description -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-align-left"></i> Description</h5>
+                </div>
+                <div class="card-body markdown-content" data-testid="playbook-description">
+                    {% if playbook.description %}
+                        {{ playbook.description|markdown }}
+                    {% else %}
+                        <p class="text-muted fst-italic mb-0">No description provided.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Stats & Content Row -->
             <div class="row">
                 <div class="col-md-8">
+                    <!-- Quick Stats Card -->
                     <div class="card mb-4">
                         <div class="card-header">
-                            <h5 class="mb-0"><i class="fa-solid fa-align-left"></i> Description</h5>
+                            <h5 class="mb-0"><i class="fa-solid fa-chart-bar"></i> Quick Stats</h5>
                         </div>
-                        <div class="card-body markdown-content" data-testid="playbook-description">
-                            {% if playbook.description %}
-                                {{ playbook.description|markdown }}
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-4 mb-3" data-testid="stat-workflows">
+                                    <a href="{% url 'workflow_list' playbook.pk %}"
+                                       class="d-block text-decoration-none text-reset p-3 border rounded h-100 quick-stat-link"
+                                       data-testid="stat-workflows-link"
+                                       data-bs-toggle="tooltip"
+                                       title="View workflows in this playbook">
+                                        <i class="fa-solid fa-diagram-project fa-2x text-primary mb-2"></i>
+                                        <h3 class="mb-0">{{ quick_stats.workflows }}</h3>
+                                        <small class="text-muted">Workflows</small>
+                                    </a>
+                                </div>
+                                <div class="col-md-4 mb-3" data-testid="stat-phases">
+                                    <a href="{% url 'phase_list_global' %}?playbook={{ playbook.pk }}"
+                                       class="d-block text-decoration-none text-reset p-3 border rounded h-100 quick-stat-link"
+                                       data-testid="stat-phases-link"
+                                       data-bs-toggle="tooltip"
+                                       title="View phases in global list (filtered to this playbook)">
+                                        <i class="fa-solid fa-bars-progress fa-2x text-info mb-2"></i>
+                                        <h3 class="mb-0">{{ quick_stats.phases }}</h3>
+                                        <small class="text-muted">Phases</small>
+                                    </a>
+                                </div>
+                                <div class="col-md-4 mb-3" data-testid="stat-activities">
+                                    <a href="{% url 'activity_list_for_playbook' playbook.pk %}"
+                                       class="d-block text-decoration-none text-reset p-3 border rounded h-100 quick-stat-link"
+                                       data-testid="stat-activities-link"
+                                       data-bs-toggle="tooltip"
+                                       title="View all activities in this playbook">
+                                        <i class="fa-solid fa-list-check fa-2x text-success mb-2"></i>
+                                        <h3 class="mb-0">{{ quick_stats.activities }}</h3>
+                                        <small class="text-muted">Activities</small>
+                                    </a>
+                                </div>
+                                <div class="col-md-4 mb-3" data-testid="stat-artifacts">
+                                    <a href="{% url 'artifact_list' playbook_id=playbook.pk %}"
+                                       class="d-block text-decoration-none text-reset p-3 border rounded h-100 quick-stat-link"
+                                       data-testid="stat-artifacts-link"
+                                       data-bs-toggle="tooltip"
+                                       title="View artifacts for this playbook">
+                                        <i class="fa-solid fa-gift fa-2x text-warning mb-2"></i>
+                                        <h3 class="mb-0">{{ quick_stats.artifacts }}</h3>
+                                        <small class="text-muted">Artifacts</small>
+                                    </a>
+                                </div>
+                                <div class="col-md-4 mb-3" data-testid="stat-agents">
+                                    <a href="{% url 'agent_list_for_playbook' playbook.pk %}"
+                                       class="d-block text-decoration-none text-reset p-3 border rounded h-100 quick-stat-link"
+                                       data-testid="stat-agents-link"
+                                       data-bs-toggle="tooltip"
+                                       title="View agents for this playbook">
+                                        <i class="fa-solid fa-brain-circuit fa-2x text-primary mb-2"></i>
+                                        <h3 class="mb-0">{{ quick_stats.agents }}</h3>
+                                        <small class="text-muted">Agents</small>
+                                    </a>
+                                </div>
+                                <div class="col-md-4 mb-3" data-testid="stat-skills">
+                                    <a href="{% url 'skill_list_playbook' playbook.pk %}"
+                                       class="d-block text-decoration-none text-reset p-3 border rounded h-100 quick-stat-link"
+                                       data-testid="stat-skills-link"
+                                       data-bs-toggle="tooltip"
+                                       title="View skills for this playbook">
+                                        <i class="fa-solid fa-hand-holding-magic fa-2x text-danger mb-2"></i>
+                                        <h3 class="mb-0">{{ quick_stats.skills }}</h3>
+                                        <small class="text-muted">Skills</small>
+                                    </a>
+                                </div>
+                                <div class="col-md-4 mb-3" data-testid="stat-rules">
+                                    <a href="{% url 'rule_list_playbook' playbook.pk %}"
+                                       class="d-block text-decoration-none text-reset p-3 border rounded h-100 quick-stat-link"
+                                       data-testid="stat-rules-link"
+                                       data-bs-toggle="tooltip"
+                                       title="View rules for this playbook">
+                                        <i class="fa-solid fa-scale-balanced fa-2x text-secondary mb-2"></i>
+                                        <h3 class="mb-0">{{ quick_stats.rules }}</h3>
+                                        <small class="text-muted">Rules</small>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Workflows Section -->
+                    <div class="card mb-4" data-testid="workflows-section">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fa-solid fa-diagram-project"></i> Workflows</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if workflows %}
+                                <ul class="list-group list-group-flush">
+                                    {% for workflow in workflows %}
+                                        <li class="list-group-item">
+                                            <i class="fa-solid fa-diagram-project text-primary"></i>
+                                            {% if workflow.abbreviation %}
+                                            <span class="badge bg-secondary font-monospace me-1"
+                                                  data-testid="workflow-code-{{ workflow.pk }}">{{ workflow.abbreviation }}</span>
+                                            {% endif %}
+                                            <a href="{% url 'workflow_detail' playbook.pk workflow.pk %}"
+                                               class="text-decoration-none fw-semibold"
+                                               data-testid="workflow-name-link-{{ workflow.pk }}">{{ workflow.name }}</a>
+                                            {% if workflow.description %}
+                                                <p class="mb-0 text-muted small">{{ workflow.description|markdown|striptags|truncatewords:20 }}</p>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
                             {% else %}
-                                <p class="text-muted fst-italic mb-0">No description provided.</p>
+                                <p class="text-muted mb-0">No workflows added yet.</p>
                             {% endif %}
                         </div>
                     </div>
@@ -249,124 +369,6 @@
                                 </dd>
                                 {% endif %}
                             </dl>
-                        </div>
-                    </div>
-
-                    <!-- Quick Stats Card -->
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h5 class="mb-0"><i class="fa-solid fa-chart-bar"></i> Quick Stats</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row text-center g-2">
-                                <div class="col-6" data-testid="stat-workflows">
-                                    <a href="{% url 'workflow_list' playbook.pk %}"
-                                       class="d-block text-decoration-none text-reset p-2 border rounded h-100 quick-stat-link"
-                                       data-testid="stat-workflows-link"
-                                       data-bs-toggle="tooltip"
-                                       title="View workflows in this playbook">
-                                        <i class="fa-solid fa-diagram-project fa-lg text-primary mb-1"></i>
-                                        <h4 class="mb-0">{{ quick_stats.workflows }}</h4>
-                                        <small class="text-muted">Workflows</small>
-                                    </a>
-                                </div>
-                                <div class="col-6" data-testid="stat-phases">
-                                    <a href="{% url 'phase_list_global' %}?playbook={{ playbook.pk }}"
-                                       class="d-block text-decoration-none text-reset p-2 border rounded h-100 quick-stat-link"
-                                       data-testid="stat-phases-link"
-                                       data-bs-toggle="tooltip"
-                                       title="View phases in global list (filtered to this playbook)">
-                                        <i class="fa-solid fa-bars-progress fa-lg text-info mb-1"></i>
-                                        <h4 class="mb-0">{{ quick_stats.phases }}</h4>
-                                        <small class="text-muted">Phases</small>
-                                    </a>
-                                </div>
-                                <div class="col-6" data-testid="stat-activities">
-                                    <a href="{% url 'activity_list_for_playbook' playbook.pk %}"
-                                       class="d-block text-decoration-none text-reset p-2 border rounded h-100 quick-stat-link"
-                                       data-testid="stat-activities-link"
-                                       data-bs-toggle="tooltip"
-                                       title="View all activities in this playbook">
-                                        <i class="fa-solid fa-list-check fa-lg text-success mb-1"></i>
-                                        <h4 class="mb-0">{{ quick_stats.activities }}</h4>
-                                        <small class="text-muted">Activities</small>
-                                    </a>
-                                </div>
-                                <div class="col-6" data-testid="stat-artifacts">
-                                    <a href="{% url 'artifact_list' playbook_id=playbook.pk %}"
-                                       class="d-block text-decoration-none text-reset p-2 border rounded h-100 quick-stat-link"
-                                       data-testid="stat-artifacts-link"
-                                       data-bs-toggle="tooltip"
-                                       title="View artifacts for this playbook">
-                                        <i class="fa-solid fa-gift fa-lg text-warning mb-1"></i>
-                                        <h4 class="mb-0">{{ quick_stats.artifacts }}</h4>
-                                        <small class="text-muted">Artifacts</small>
-                                    </a>
-                                </div>
-                                <div class="col-6" data-testid="stat-agents">
-                                    <a href="{% url 'agent_list_for_playbook' playbook.pk %}"
-                                       class="d-block text-decoration-none text-reset p-2 border rounded h-100 quick-stat-link"
-                                       data-testid="stat-agents-link"
-                                       data-bs-toggle="tooltip"
-                                       title="View agents for this playbook">
-                                        <i class="fa-solid fa-brain-circuit fa-lg text-primary mb-1"></i>
-                                        <h4 class="mb-0">{{ quick_stats.agents }}</h4>
-                                        <small class="text-muted">Agents</small>
-                                    </a>
-                                </div>
-                                <div class="col-6" data-testid="stat-skills">
-                                    <a href="{% url 'skill_list_playbook' playbook.pk %}"
-                                       class="d-block text-decoration-none text-reset p-2 border rounded h-100 quick-stat-link"
-                                       data-testid="stat-skills-link"
-                                       data-bs-toggle="tooltip"
-                                       title="View skills for this playbook">
-                                        <i class="fa-solid fa-hand-holding-magic fa-lg text-danger mb-1"></i>
-                                        <h4 class="mb-0">{{ quick_stats.skills }}</h4>
-                                        <small class="text-muted">Skills</small>
-                                    </a>
-                                </div>
-                                <div class="col-6" data-testid="stat-rules">
-                                    <a href="{% url 'rule_list_playbook' playbook.pk %}"
-                                       class="d-block text-decoration-none text-reset p-2 border rounded h-100 quick-stat-link"
-                                       data-testid="stat-rules-link"
-                                       data-bs-toggle="tooltip"
-                                       title="View rules for this playbook">
-                                        <i class="fa-solid fa-scale-balanced fa-lg text-secondary mb-1"></i>
-                                        <h4 class="mb-0">{{ quick_stats.rules }}</h4>
-                                        <small class="text-muted">Rules</small>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Workflows Section -->
-                    <div class="card mb-4 mm-view-rail-scroll" data-testid="workflows-section">
-                        <div class="card-header">
-                            <h5 class="mb-0"><i class="fa-solid fa-diagram-project"></i> Workflows</h5>
-                        </div>
-                        <div class="card-body">
-                            {% if workflows %}
-                                <ul class="list-group list-group-flush">
-                                    {% for workflow in workflows %}
-                                        <li class="list-group-item px-0">
-                                            <i class="fa-solid fa-diagram-project text-primary"></i>
-                                            {% if workflow.abbreviation %}
-                                            <span class="badge bg-secondary font-monospace me-1"
-                                                  data-testid="workflow-code-{{ workflow.pk }}">{{ workflow.abbreviation }}</span>
-                                            {% endif %}
-                                            <a href="{% url 'workflow_detail' playbook.pk workflow.pk %}"
-                                               class="text-decoration-none fw-semibold"
-                                               data-testid="workflow-name-link-{{ workflow.pk }}">{{ workflow.name }}</a>
-                                            {% if workflow.description %}
-                                                <p class="mb-0 text-muted small">{{ workflow.description|markdown|striptags|truncatewords:20 }}</p>
-                                            {% endif %}
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            {% else %}
-                                <p class="text-muted mb-0">No workflows added yet.</p>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
