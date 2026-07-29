@@ -82,10 +82,6 @@ def phase_list_global(request):
         (" (" + ", ".join(log_extra) + ")") if log_extra else "",
     )
 
-    CopyPromptService.attach_copy_prompts(
-        phases, CopyPromptService.build_phase_prompt
-    )
-
     context = {
         'phases': phases,
         'query': query,
@@ -154,10 +150,6 @@ def phase_list(request, playbook_pk):
     )
     logger.info("User %s viewing phases for playbook %s", user_label, playbook_pk)
     
-    CopyPromptService.attach_copy_prompts(
-        phases, CopyPromptService.build_phase_prompt
-    )
-
     context = {
         'playbook': playbook,
         'phases': phases,
@@ -270,8 +262,6 @@ def phase_detail(request, playbook_pk, phase_pk):
         'artifacts': phase_data['artifacts'],
         'can_edit': playbook.can_edit(request.user) if request.user.is_authenticated else False,
         'is_guest_browse': not request.user.is_authenticated,
-        'copy_prompt_text': CopyPromptService.build_phase_prompt(phase),
-        'copy_prompt_text_testid': f"copy-prompt-text-phase-{phase.pk}",
     }
     return render(request, 'phases/detail.html', context)
 

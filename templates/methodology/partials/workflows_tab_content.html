@@ -52,7 +52,6 @@
                            data-testid="view-workflow-{{ workflow.pk }}">
                             <i class="fa-solid fa-eye"></i>
                         </a>
-                        {% include "partials/copy_prompt/row_button.html" with entity_type="workflow" entity_pk=workflow.pk entity_name=workflow.name copy_prompt_text=workflow.copy_prompt_text %}
                         {% if can_edit %}
                         <a href="{% url 'workflow_edit' playbook.pk workflow.pk %}" 
                            class="btn btn-outline-secondary"

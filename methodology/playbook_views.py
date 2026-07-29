@@ -22,7 +22,6 @@ from methodology.forms.playbook_forms import (
     PlaybookWorkflowForm,
 )
 from methodology.models import Playbook
-from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.services.playbook_service import PlaybookService
 from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
@@ -365,10 +364,6 @@ def playbook_detail(request, pk):
         pk,
     )
 
-    CopyPromptService.attach_copy_prompts(
-        workflows, CopyPromptService.build_workflow_prompt
-    )
-
     from methodology.services.playbook_history_service import list_playbook_version_rows
 
     context = {
@@ -380,8 +375,6 @@ def playbook_detail(request, pk):
         "phases": phases,
         "version_history": list_playbook_version_rows(playbook),
         "is_guest_browse": not request.user.is_authenticated,
-        "copy_prompt_text": CopyPromptService.build_playbook_prompt(playbook),
-        "copy_prompt_text_testid": f"copy-prompt-text-playbook-{playbook.pk}",
     }
     if request.GET.get("embed") == "1":
         return render(request, "playbooks/_embed.html", context)
