@@ -155,9 +155,18 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
     And she does NOT see [Edit PIP]
     And she does NOT see [Submit for Review]
 
-  Scenario: FOB-PIP-DETAIL-14 Reviewed / Accepted / Rejected PIPs are read-only for submitter
+  Scenario: FOB-PIP-DETAIL-14 Reviewed PIP shows Withdraw and Cancel PIP buttons
     Given PIP-42 has status "Reviewed"
     When Maria opens FOB-PIP-DETAIL-1 for PIP-42
+    Then she sees [Withdraw] button
+    And she sees [Cancel PIP] button
+    And she does NOT see [Edit PIP]
+    And she does NOT see [Submit for Review]
+    And the status banner reads "Reviewed — awaiting Administrator decision."
+
+  Scenario: FOB-PIP-DETAIL-14b Accepted and Rejected PIPs are read-only for submitter
+    Given PIP-38 has status "Accepted"
+    When Maria opens FOB-PIP-DETAIL-1 for PIP-38
     Then she sees no action buttons (view-only)
     And the status banner explains current state
 
@@ -269,8 +278,24 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
     And within seconds transitions to "Processing (Galdr)"
     And a notification appears: "PIP 'Rename Discovery Activity' submitted — Galdr is reviewing your changes."
 
-  Scenario: FOB-PIP-DETAIL-26 Reviewed PIP does not show Withdraw button
+  Scenario: FOB-PIP-DETAIL-26 Reviewed PIP shows Withdraw and Cancel PIP buttons
     Given PIP-42 has status "Reviewed"
     When Maria opens FOB-PIP-DETAIL-1 for PIP-42
-    Then she does NOT see [Withdraw]
-    And she sees no action buttons (view-only)
+    Then she sees [Withdraw] button
+    And she sees [Cancel PIP] button
+    And she does NOT see [Edit PIP]
+    And she does NOT see [Submit for Review]
+
+  Scenario: FOB-PIP-DETAIL-27 Confirming Withdraw on Reviewed PIP clears Galdr output and reverts to Draft
+    Given PIP-42 has status "Reviewed"
+    And PIP-42 Changes have galdr_recommendation and galdr_reasoning populated
+    And Maria is on FOB-PIP-DETAIL-1 for PIP-42
+    When she clicks [Withdraw] and confirms
+    Then PIP-42 status becomes "Draft"
+    And all Galdr recommendations on PIP-42 Changes are cleared
+    And no galdr_verdict badges appear on any Change card
+    And she sees [Edit PIP] button
+    And she sees [Submit for Review] button
+    And the status banner reads "Draft — not yet submitted."
+    # Primary use case: Galdr flagged NEEDS_CLARIFICATION — author withdraws,
+    # addresses feedback, and resubmits without creating a new PIP.

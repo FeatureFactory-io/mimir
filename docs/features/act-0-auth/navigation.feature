@@ -55,6 +55,7 @@ Feature: FOB-DASHBOARD-1 Dashboard and Navigation
     When she uses global search for "Component"
     Then she sees results across: Playbooks, Workflows, Activities
     And she can navigate to any result
+    # Extended NAV-06 scenarios: docs/features/act-0-auth/global-search.feature (FOB-GLOBAL-SEARCH-01..18)
 
   # Recently Contributed feed (Activity rows) — time-window filter FOB-DASHBOARD-09..13
   # Current slice: Activity entities sorted by last access/update; not the full usage-count table in 02.

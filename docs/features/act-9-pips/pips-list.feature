@@ -75,7 +75,7 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
     Then PIP-30 (Draft) row actions dropdown shows: View, Edit, Cancel
     And PIP-28 (Submitted) row actions dropdown shows: View, Withdraw, Cancel PIP
     And PIP-27 (Processing (Galdr)) row actions dropdown shows: View, Withdraw, Cancel PIP
-    And PIP-42 (Reviewed) row actions dropdown shows: View only
+    And PIP-42 (Reviewed) row actions dropdown shows: View, Withdraw, Cancel PIP
     And PIP-38 (Accepted) row actions dropdown shows: View only
     And PIP-35 (Rejected) row actions dropdown shows: View only
   # ============================================================================
@@ -199,8 +199,18 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
     And PIP-28 row actions dropdown shows: View, Edit, Cancel
     And PIP-28 row does NOT show: Withdraw, Cancel PIP
 
-  Scenario: FOB-PIP-LIST-25 Withdraw not available for terminal-state PIPs
+  Scenario: FOB-PIP-LIST-25 Withdraw not available for finalized PIPs
     Given Maria is on FOB-PIP-LIST-1
-    Then PIP-42 (Reviewed) row actions dropdown does NOT show: Withdraw
-    And PIP-38 (Accepted) row actions dropdown does NOT show: Withdraw
+    Then PIP-38 (Accepted) row actions dropdown does NOT show: Withdraw
     And PIP-35 (Rejected) row actions dropdown does NOT show: Withdraw
+
+  Scenario: FOB-PIP-LIST-26 Withdraw from Reviewed reverts PIP to Draft and clears Galdr output
+    Given Maria is on FOB-PIP-LIST-1
+    And PIP-42 has status "Reviewed" with Galdr recommendations on its Changes
+    When she clicks [Withdraw] on PIP-42
+    Then a confirmation modal appears: "Withdraw PIP-42? It will return to Draft and Galdr's assessment will be cleared."
+    When she confirms
+    Then PIP-42 status badge changes to "Draft" (gray)
+    And PIP-42 row actions dropdown shows: View, Edit, Cancel
+    And PIP-42 row does NOT show: Withdraw, Cancel PIP
+    # Use case: Galdr flagged NEEDS_CLARIFICATION — author withdraws, fixes, resubmits same PIP.
