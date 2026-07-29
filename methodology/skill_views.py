@@ -14,6 +14,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 
 from methodology.models import Playbook, Skill
+from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.services.skill_service import SkillService
 from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
@@ -87,6 +88,10 @@ def skill_list_global(request):
         f", query={query!r}" if query else '',
     )
 
+    CopyPromptService.attach_copy_prompts(
+        skills, CopyPromptService.build_skill_prompt
+    )
+
     context = {
         'skills': skills,
         'query': query,
@@ -145,6 +150,10 @@ def skill_list(request, playbook_pk):
         domain_filter,
         stack_filter,
         unlinked_only,
+    )
+
+    CopyPromptService.attach_copy_prompts(
+        skills, CopyPromptService.build_skill_prompt
     )
 
     context = {
@@ -255,6 +264,8 @@ def skill_detail(request, playbook_pk, skill_pk):
         'activities': activities,
         'can_edit': can_edit,
         'is_guest_browse': not request.user.is_authenticated,
+        'copy_prompt_text': CopyPromptService.build_skill_prompt(skill),
+        'copy_prompt_text_testid': f"copy-prompt-text-skill-{skill.pk}",
     }
     if request.GET.get('embed') == '1':
         return render(request, 'skills/_embed.html', context)

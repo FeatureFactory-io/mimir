@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from methodology.models import Agent, Playbook
 from methodology.services.agent_service import AgentService
+from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
 
@@ -67,6 +68,10 @@ def agent_list_global(request):
         f", query={query!r}" if query else "",
     )
 
+    CopyPromptService.attach_copy_prompts(
+        agents, CopyPromptService.build_agent_prompt
+    )
+
     context = {
         'agents': agents,
         'query': query,
@@ -91,6 +96,10 @@ def agent_list_for_playbook(request, playbook_pk):
         playbook_pk,
         cnt,
     )
+    CopyPromptService.attach_copy_prompts(
+        agents, CopyPromptService.build_agent_prompt
+    )
+
     return render(request, 'agents/playbook_list.html', {
         'playbook': playbook,
         'agents': agents,
@@ -226,6 +235,8 @@ def agent_detail(request, pk):
         'activities': activities,
         'can_edit': can_edit,
         'is_guest_browse': not request.user.is_authenticated,
+        'copy_prompt_text': CopyPromptService.build_agent_prompt(agent),
+        'copy_prompt_text_testid': f"copy-prompt-text-agent-{agent.pk}",
     }
     if request.GET.get('embed') == '1':
         return render(request, 'agents/_embed.html', context)

@@ -65,6 +65,7 @@
                 <i class="fa-solid fa-lightbulb"></i> Submit PIP
             </a>
             {% endif %}
+            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
             <a href="{% url 'workflow_list' playbook.pk %}"
                class="btn btn-outline-secondary"
                data-testid="workflow-back-btn"

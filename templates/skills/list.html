@@ -99,12 +99,15 @@
                             </td>
                             <td class="text-muted small">{{ skill.playbook.name }}</td>
                             <td>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Actions for {{ skill.title }}">
                                 <a href="{% url 'skill_detail' playbook_pk=skill.playbook.pk skill_pk=skill.pk %}"
                                    class="btn btn-outline-primary btn-sm"
                                    data-testid="view-skill-{{ skill.id }}"
                                    data-bs-toggle="tooltip" title="View skill details">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
+                                {% include "partials/copy_prompt/row_button.html" with entity_type="skill" entity_pk=skill.pk entity_name=skill.title copy_prompt_text=skill.copy_prompt_text %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}

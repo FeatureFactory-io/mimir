@@ -26,8 +26,8 @@
                 </h1>
                 <p class="text-muted small mb-0"><code>{{ rule.slug }}</code> &middot; always_apply: {{ rule.always_apply|yesno:"yes,no" }}</p>
             </div>
-            {% if can_edit %}
             <div role="toolbar" aria-label="Rule actions" class="d-flex flex-wrap gap-2 align-items-center flex-shrink-0">
+            {% if can_edit %}
                 <a href="{% url 'rule_edit' playbook_pk=playbook.pk rule_pk=rule.pk %}" class="btn btn-primary" data-testid="edit-rule-btn">
                     <i class="fa-solid fa-edit"></i> Edit
                 </a>
@@ -36,8 +36,9 @@
                         hx-target="#rule-delete-modal-container" hx-swap="innerHTML">
                     <i class="fa-solid fa-trash"></i>
                 </button>
-            </div>
             {% endif %}
+            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
+            </div>
         </div>
     </div>
 

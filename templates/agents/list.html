@@ -79,6 +79,7 @@
                             </td>
                             <td class="text-muted small">{{ agent.playbook.name }}</td>
                             <td>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Actions for {{ agent.name }}">
                                 <a href="{% url 'agent_detail' pk=agent.id %}"
                                    class="btn btn-outline-primary btn-sm"
                                    data-testid="view-agent-{{ agent.id }}"
@@ -86,6 +87,8 @@
                                    title="View agent">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
+                                {% include "partials/copy_prompt/row_button.html" with entity_type="agent" entity_pk=agent.pk entity_name=agent.name copy_prompt_text=agent.copy_prompt_text %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}

@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from methodology.models import Playbook, Workflow
 from methodology.services.workflow_service import WorkflowService
 from methodology.services.activity_service import ActivityService
+from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
 
@@ -50,6 +51,10 @@ def workflow_global_list(request):
         user_label,
         workflows.count(),
         total_activity_count,
+    )
+
+    CopyPromptService.attach_copy_prompts(
+        workflows, CopyPromptService.build_workflow_prompt
     )
 
     return render(request, 'workflows/global_list.html', {
@@ -183,6 +188,8 @@ def workflow_detail(request, playbook_pk, pk):
         'has_activities': activity_count > 0,
         'activities': activities,
         'is_guest_browse': not request.user.is_authenticated,
+        'copy_prompt_text': CopyPromptService.build_workflow_prompt(workflow),
+        'copy_prompt_text_testid': f"copy-prompt-text-workflow-{workflow.pk}",
     }
     if request.GET.get('embed') == '1':
         return render(request, 'workflows/_embed.html', context)
@@ -203,6 +210,10 @@ def workflow_list(request, playbook_pk):
         user_label,
         playbook_pk,
         len(workflows),
+    )
+
+    CopyPromptService.attach_copy_prompts(
+        workflows, CopyPromptService.build_workflow_prompt
     )
 
     return render(request, 'workflows/list.html', {

@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from methodology.models import Playbook, Rule
+from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.services.rule_service import RuleService
 from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
@@ -54,6 +55,10 @@ def rule_list_global(request):
         user_label,
         f', query={query!r}' if query else '',
     )
+    CopyPromptService.attach_copy_prompts(
+        rules, CopyPromptService.build_rule_prompt
+    )
+
     return render(
         request,
         'rules/list.html',
@@ -85,6 +90,10 @@ def rule_list(request, playbook_pk):
         user_label,
         playbook_pk,
     )
+    CopyPromptService.attach_copy_prompts(
+        rules, CopyPromptService.build_rule_prompt
+    )
+
     return render(
         request,
         'rules/playbook_list.html',
@@ -155,6 +164,8 @@ def rule_detail(request, playbook_pk, rule_pk):
         'activities': activities,
         'can_edit': can_edit,
         'is_guest_browse': not request.user.is_authenticated,
+        'copy_prompt_text': CopyPromptService.build_rule_prompt(rule),
+        'copy_prompt_text_testid': f"copy-prompt-text-rule-{rule.pk}",
     }
     if request.GET.get('embed') == '1':
         return render(request, 'rules/_embed.html', context)

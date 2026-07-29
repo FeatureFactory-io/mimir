@@ -82,6 +82,7 @@
                                    title="View phase details">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
+                                {% include "partials/copy_prompt/row_button.html" with entity_type="phase" entity_pk=phase.pk entity_name=phase.name copy_prompt_text=phase.copy_prompt_text %}
                                 {% if playbook.status == 'draft' %}
                                 <a href="{% url 'phase_edit' playbook.pk phase.id %}"
                                    class="btn btn-outline-secondary"

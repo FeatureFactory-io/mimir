@@ -157,6 +157,7 @@
                                    data-testid="pip-action-view-{{ pip.pk }}">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
+                                {% include "partials/copy_prompt/row_button.html" with entity_type="pip" entity_pk=pip.pk entity_name=pip.title copy_prompt_text=pip.copy_prompt_text %}
                                 <a href="{% url 'pip_preview' pip.pk %}"
                                    class="btn btn-outline-secondary"
                                    data-bs-toggle="tooltip"

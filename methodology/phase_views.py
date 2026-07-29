@@ -13,6 +13,7 @@ from django.core.exceptions import ValidationError, PermissionDenied
 from methodology.models import Playbook, Phase
 from methodology.services.phase_service import PhaseService
 from methodology.services.playbook_service import PlaybookService
+from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
 
@@ -79,6 +80,10 @@ def phase_list_global(request):
         "User %s viewing global phase list%s",
         user_label,
         (" (" + ", ".join(log_extra) + ")") if log_extra else "",
+    )
+
+    CopyPromptService.attach_copy_prompts(
+        phases, CopyPromptService.build_phase_prompt
     )
 
     context = {
@@ -149,6 +154,10 @@ def phase_list(request, playbook_pk):
     )
     logger.info("User %s viewing phases for playbook %s", user_label, playbook_pk)
     
+    CopyPromptService.attach_copy_prompts(
+        phases, CopyPromptService.build_phase_prompt
+    )
+
     context = {
         'playbook': playbook,
         'phases': phases,
@@ -245,18 +254,24 @@ def phase_detail(request, playbook_pk, phase_pk):
     logger.info("User %s viewing phase %s", user_label, phase_pk)
     
     # Transform workflow_activities dict to list of dicts for template
+    CopyPromptService.attach_activity_copy_prompts_grouped(
+        phase_data['workflow_activities']
+    )
     workflow_activities_list = [
         {'workflow': workflow, 'activities': activities}
         for workflow, activities in phase_data['workflow_activities'].items()
     ]
     
+    phase = phase_data['phase']
     context = {
         'playbook': playbook,
-        'phase': phase_data['phase'],
+        'phase': phase,
         'workflow_activities': workflow_activities_list,
         'artifacts': phase_data['artifacts'],
         'can_edit': playbook.can_edit(request.user) if request.user.is_authenticated else False,
         'is_guest_browse': not request.user.is_authenticated,
+        'copy_prompt_text': CopyPromptService.build_phase_prompt(phase),
+        'copy_prompt_text_testid': f"copy-prompt-text-phase-{phase.pk}",
     }
     return render(request, 'phases/detail.html', context)
 

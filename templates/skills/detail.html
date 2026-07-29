@@ -45,8 +45,8 @@
                     <i class="fa-solid fa-clock"></i> Updated {{ skill.updated_at|timesince }} ago
                 </p>
             </div>
-            {% if can_edit %}
             <div role="toolbar" aria-label="Skill actions" class="d-flex flex-wrap gap-2 align-items-center flex-shrink-0">
+            {% if can_edit %}
                 <a href="{% url 'skill_edit' playbook_pk=playbook.pk skill_pk=skill.pk %}"
                    class="btn btn-primary"
                    data-testid="edit-skill-btn"
@@ -64,8 +64,9 @@
                         hx-swap="innerHTML">
                     <i class="fa-solid fa-trash"></i> Delete
                 </button>
-            </div>
             {% endif %}
+            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
+            </div>
         </div>
     </div>
 

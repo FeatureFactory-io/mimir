@@ -33,15 +33,16 @@
                     {% endif %}
                 </p>
             </div>
-            {% if can_edit %}
             <div role="toolbar" aria-label="Artifact actions" class="d-flex flex-wrap gap-2 align-items-center flex-shrink-0">
+            {% if can_edit %}
                 <a href="{% url 'artifact_edit' pk=artifact.pk %}"
                    class="btn btn-outline-primary"
                    data-testid="edit-btn">
                     <i class="fa-solid fa-edit"></i> Edit
                 </a>
-            </div>
             {% endif %}
+            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
+            </div>
         </div>
     </div>
 

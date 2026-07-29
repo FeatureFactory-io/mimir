@@ -14,6 +14,7 @@ from django.views.generic import RedirectView
 
 from methodology.models import PipChange
 from methodology.models import ProcessImprovementProposal as PipModel
+from methodology.services.copy_prompt_service import CopyPromptService
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +221,8 @@ def _pip_detail_context(pip, user):
         "can_revert_to_draft": revertable and pip.created_by_id == user.pk,
         "can_preview": True,
         "admin_review_url": None,
+        "copy_prompt_text": CopyPromptService.build_pip_prompt(pip),
+        "copy_prompt_text_testid": f"copy-prompt-text-pip-{pip.pk}",
     }
     if (
         getattr(user, "is_staff", False)
@@ -301,9 +304,13 @@ def pip_list(request):
             status_filters=status_filters or None,
             playbook_id=playbook_pk,
         )
+    pips = list(queryset)
+    CopyPromptService.attach_copy_prompts(
+        pips, CopyPromptService.build_pip_prompt
+    )
     rows = [
         {"pip": pip, "unread_dot": pip.status_changed_since_visit(last_visit)}
-        for pip in queryset
+        for pip in pips
     ]
     filter_ids = queryset.values_list("playbook_id", flat=True).distinct()
     filter_playbooks = Playbook.objects.filter(pk__in=filter_ids).order_by("name")

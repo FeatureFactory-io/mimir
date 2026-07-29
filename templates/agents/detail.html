@@ -39,8 +39,8 @@
                     <i class="fa-solid fa-calendar"></i> Created {{ agent.created_at|timesince }} ago
                 </p>
             </div>
-            {% if can_edit %}
             <div role="toolbar" aria-label="Agent actions" class="d-flex flex-wrap gap-2 align-items-center flex-shrink-0">
+            {% if can_edit %}
                 <a href="{% url 'agent_edit' pk=agent.pk %}"
                    class="btn btn-primary"
                    data-testid="edit-agent-btn"
@@ -58,8 +58,9 @@
                         hx-swap="innerHTML">
                     <i class="fa-solid fa-trash-can"></i> Delete
                 </button>
-            </div>
             {% endif %}
+            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
+            </div>
         </div>
     </div>
 

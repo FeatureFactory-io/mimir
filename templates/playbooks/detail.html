@@ -108,6 +108,7 @@
                title="Explore this playbook as an interactive graph">
                 <i class="fa-solid fa-diagram-project"></i> Content Browser
             </a>
+            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
             <a href="{% url 'playbook_list' %}"
                class="btn btn-outline-secondary"
                data-bs-toggle="tooltip"

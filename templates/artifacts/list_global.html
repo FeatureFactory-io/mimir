@@ -88,6 +88,7 @@
                             </td>
                             <td class="text-muted small">{{ artifact.produced_by.name }}</td>
                             <td>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Actions for {{ artifact.name }}">
                                 <a href="{% url 'artifact_detail' pk=artifact.id %}"
                                    class="btn btn-outline-primary btn-sm"
                                    data-testid="view-artifact-{{ artifact.id }}"
@@ -95,6 +96,8 @@
                                    title="View artifact details">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
+                                {% include "partials/copy_prompt/row_button.html" with entity_type="artifact" entity_pk=artifact.pk entity_name=artifact.name copy_prompt_text=artifact.copy_prompt_text %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}

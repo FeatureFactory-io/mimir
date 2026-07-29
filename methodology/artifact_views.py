@@ -14,6 +14,7 @@ from django.core.exceptions import ValidationError
 from methodology.models import Playbook, Artifact
 from methodology.services.artifact_service import ArtifactService
 from methodology.services.activity_service import ActivityService
+from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
 
@@ -66,6 +67,10 @@ def artifact_list_global(request):
         "User %s viewing global artifact list%s",
         user_label,
         f", query={query!r}" if query else "",
+    )
+
+    CopyPromptService.attach_copy_prompts(
+        artifacts, CopyPromptService.build_artifact_prompt
     )
 
     context = {
@@ -232,6 +237,8 @@ def artifact_detail(request, pk):
         "consumers": consumers,
         "can_edit": can_edit,
         "is_guest_browse": not request.user.is_authenticated,
+        "copy_prompt_text": CopyPromptService.build_artifact_prompt(artifact),
+        "copy_prompt_text_testid": f"copy-prompt-text-artifact-{artifact.pk}",
     }
     if request.GET.get('embed') == '1':
         return render(request, 'artifacts/_embed.html', context)
@@ -396,6 +403,9 @@ def artifact_list(request, playbook_id):
         type_filter=filters['type_filter'],
         required_filter=filters['required_filter'],
         activity_filter=filters['activity_filter'],
+    )
+    CopyPromptService.attach_copy_prompts(
+        artifacts, CopyPromptService.build_artifact_prompt
     )
 
     context = _build_list_context(
