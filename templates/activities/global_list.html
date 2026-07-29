@@ -106,13 +106,16 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{% url 'activity_detail' playbook_pk=activity.workflow.playbook.pk workflow_pk=activity.workflow.pk activity_pk=activity.pk %}"
-                                   class="btn btn-outline-primary btn-sm"
-                                   data-testid="view-activity-{{ activity.id }}"
-                                   data-bs-toggle="tooltip"
-                                   title="View activity details">
-                                    <i class="fa-solid fa-eye"></i>
-                                </a>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Actions for {{ activity.name }}">
+                                    <a href="{% url 'activity_detail' playbook_pk=activity.workflow.playbook.pk workflow_pk=activity.workflow.pk activity_pk=activity.pk %}"
+                                       class="btn btn-outline-primary btn-sm"
+                                       data-testid="view-activity-{{ activity.id }}"
+                                       data-bs-toggle="tooltip"
+                                       title="View activity details">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </a>
+                                    {% include "partials/copy_prompt/row_button.html" with entity_type="activity" entity_pk=activity.id entity_name=activity.name copy_prompt_text=activity.copy_prompt_text %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}

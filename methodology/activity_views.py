@@ -19,6 +19,7 @@ from methodology.services.rule_service import RuleService
 from methodology.services.agent_service import AgentService
 from methodology.services.skill_service import SkillService
 from methodology.services.artifact_service import ArtifactService
+from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
 
@@ -100,6 +101,10 @@ def activity_global_list(request):
         user_label,
         activities.count(),
     )
+
+    CopyPromptService.attach_copy_prompts(
+        activities, CopyPromptService.build_activity_prompt
+    )
     
     return render(request, 'activities/global_list.html', {
         'activities': activities,
@@ -126,6 +131,9 @@ def activity_list_for_playbook(request, playbook_pk):
         user_label,
         playbook_pk,
         cnt,
+    )
+    CopyPromptService.attach_copy_prompts(
+        activities_qs, CopyPromptService.build_activity_prompt
     )
     return render(request, 'activities/playbook_list.html', {
         'playbook': playbook,
@@ -181,6 +189,8 @@ def activity_list(request, playbook_pk, workflow_pk):
     )
     
     logger.info(f"Loaded {total_activities} activities with {len(activities_by_phase)} phases for workflow {workflow_pk}")
+
+    CopyPromptService.attach_activity_copy_prompts_grouped(activities_by_phase)
     
     context = {
         'playbook': playbook,
@@ -404,6 +414,8 @@ def activity_detail(request, playbook_pk, workflow_pk, activity_pk):
         'artifact_inputs': artifact_inputs,
         'artifact_outputs': artifact_outputs,
         'is_guest_browse': not request.user.is_authenticated,
+        'copy_prompt_text': CopyPromptService.build_activity_prompt(activity),
+        'copy_prompt_text_testid': f"copy-prompt-text-activity-{activity.pk}",
     }
     if request.GET.get('embed') == '1':
         return render(request, 'activities/_embed.html', context)

@@ -1,4 +1,4 @@
-@wip @copy_prompt
+@copy_prompt
 Feature: FOB-COPY-PROMPT-SERVICE-1 Copy Prompt — server-built text
   As a developer
   I want CopyPromptService to assemble consistent AI instructions per entity type

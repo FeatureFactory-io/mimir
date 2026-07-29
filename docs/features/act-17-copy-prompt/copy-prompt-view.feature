@@ -1,4 +1,4 @@
-@wip @copy_prompt
+@copy_prompt
 Feature: FOB-COPY-PROMPT-VIEW-1 Copy Prompt on entity detail pages
   As a methodology author (Maria)
   I want [Copy Prompt] on every entity VIEW header toolbar
@@ -15,7 +15,7 @@ Feature: FOB-COPY-PROMPT-VIEW-1 Copy Prompt on entity detail pages
     Given Maria is on FOB-ACTIVITIES-VIEW_ACTIVITY-1 for "Setup component structure"
     Then she sees [Copy Prompt] with data-testid "copy-prompt-btn"
     And [Copy Prompt] is inside data-testid "activity-header-actions"
-    And the button tooltip reads "Copy prompt to clipboard"
+    And the button tooltip reads "Copy prompt to use in your ADE"
 
   Scenario: FOB-COPY-PROMPT-VIEW-02 Maria clicks Copy Prompt on activity detail
     Given Maria is on FOB-ACTIVITIES-VIEW_ACTIVITY-1 for "Setup component structure"

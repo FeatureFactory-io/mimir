@@ -1,4 +1,4 @@
-@wip @copy_prompt
+@copy_prompt
 Feature: FOB-COPY-PROMPT-LIST-1 Copy Prompt in list-row Actions
   As a methodology author (Maria)
   I want [Copy Prompt] beside [View] in table Actions columns

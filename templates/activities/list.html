@@ -112,6 +112,7 @@
                                                    title="View activity details">
                                                     <i class="fa-solid fa-eye"></i>
                                                 </a>
+                                                {% include "partials/copy_prompt/row_button.html" with entity_type="activity" entity_pk=activity.id entity_name=activity.name copy_prompt_text=activity.copy_prompt_text %}
                                                 {% if can_edit %}
                                                 <a href="{% url 'activity_edit' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}"
                                                    class="btn btn-outline-secondary btn-sm"
@@ -191,6 +192,7 @@
                                                    title="View activity details">
                                                     <i class="fa-solid fa-eye"></i>
                                                 </a>
+                                                {% include "partials/copy_prompt/row_button.html" with entity_type="activity" entity_pk=activity.id entity_name=activity.name copy_prompt_text=activity.copy_prompt_text %}
                                                 {% if can_edit %}
                                                 <a href="{% url 'activity_edit' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}"
                                                    class="btn btn-outline-secondary btn-sm"

@@ -1,15 +1,23 @@
 {% load markdown_filters %}
 <div class="card mm-embed" data-testid="activity-embed">
-  <div class="card-header">
-    <h5 class="mb-0">
-      <i class="fa-solid fa-list-check me-1"></i>
-      <span data-testid="embed-entity-name">{{ activity.name }}</span>
-    </h5>
-    <div class="mt-1">
-      <span class="badge bg-secondary me-1">#{{ activity.order }}</span>
-      {% if activity.phase %}
-      <span class="badge bg-info me-1">{{ activity.phase.name }}</span>
-      {% endif %}
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+      <h5 class="mb-0">
+        <i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>
+        <span data-testid="embed-entity-name">{{ activity.name }}</span>
+      </h5>
+      <div class="mt-1">
+        <span class="badge bg-secondary me-1">#{{ activity.order }}</span>
+        {% if activity.phase %}
+        <span class="badge bg-info me-1">{{ activity.phase.name }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div role="toolbar"
+         aria-label="Embed activity actions"
+         class="d-flex gap-2 flex-shrink-0"
+         data-testid="activity-header-actions">
+      {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid testid="copy-prompt-btn" %}
     </div>
   </div>
   <div class="card-body">

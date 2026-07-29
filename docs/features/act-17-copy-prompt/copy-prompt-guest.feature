@@ -1,4 +1,4 @@
-@wip @copy_prompt @guest_access
+@copy_prompt @guest_access
 Feature: FOB-COPY-PROMPT-GUEST-1 Copy Prompt for guests and non-owners
   As an anonymous visitor (Bob) or non-owner (Maria)
   I want Copy Prompt on readable public playbook entities
