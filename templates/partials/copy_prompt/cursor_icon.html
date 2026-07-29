@@ -1,0 +1,10 @@
+{% load static %}
+<span class="mm-copy-prompt-icon-wrap{% if extra_class %} {{ extra_class }}{% endif %}"
+      data-copy-prompt-icon-wrap>
+    <img src="{% static 'images/cursor.svg' %}"
+         alt=""
+         class="mm-copy-prompt-cursor-icon"
+         data-copy-prompt-cursor-icon
+         aria-hidden="true">
+    <i class="fa-solid fa-check mm-copy-prompt-success-icon d-none" aria-hidden="true"></i>
+</span>

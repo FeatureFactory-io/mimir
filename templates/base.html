@@ -549,6 +549,9 @@
         })();
     </script>
 
+    {% include "partials/copy_prompt/toast.html" %}
+    <script src="{% static 'js/copy_prompt.js' %}"></script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

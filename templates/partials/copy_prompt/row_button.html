@@ -1,0 +1,17 @@
+<button type="button"
+        class="btn btn-outline-secondary btn-sm mm-copy-prompt-btn-icon"
+        data-testid="copy-prompt-btn-{{ entity_type }}-{{ entity_pk }}"
+        data-bs-toggle="tooltip"
+        title="Copy prompt to use in your ADE"
+        aria-label="Copy prompt to use in your ADE for {{ entity_name }}"
+        data-copy-prompt-trigger
+        data-copy-prompt-for="copy-prompt-text-{{ entity_type }}-{{ entity_pk }}">
+    {% include "partials/copy_prompt/cursor_icon.html" %}
+</button>
+<textarea class="visually-hidden"
+          readonly
+          aria-hidden="true"
+          tabindex="-1"
+          id="copy-prompt-text-{{ entity_type }}-{{ entity_pk }}"
+          data-testid="copy-prompt-text-{{ entity_type }}-{{ entity_pk }}"
+          data-copy-prompt-source>{{ copy_prompt_text }}</textarea>

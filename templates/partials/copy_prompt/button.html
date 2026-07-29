@@ -1,0 +1,16 @@
+<button type="button"
+        class="btn btn-outline-secondary mm-copy-prompt-btn"
+        data-testid="{{ testid|default:'copy-prompt-btn' }}"
+        data-bs-toggle="tooltip"
+        title="Copy prompt to use in your ADE"
+        aria-label="Copy prompt to use in your ADE"
+        data-copy-prompt-trigger>
+    {% include "partials/copy_prompt/cursor_icon.html" with extra_class="me-1" %}
+    Copy Prompt
+</button>
+<textarea class="visually-hidden"
+          readonly
+          aria-hidden="true"
+          tabindex="-1"
+          data-testid="{{ text_testid|default:'copy-prompt-text' }}"
+          data-copy-prompt-source>{{ copy_prompt_text }}</textarea>
