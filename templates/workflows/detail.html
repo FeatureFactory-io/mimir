@@ -77,65 +77,100 @@
         </div>
     </div>
 
-    <!-- Description -->
-    {% if workflow.description %}
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Description</h5>
-            <div class="card-text markdown-content" data-testid="workflow-description">{{ workflow.description|markdown }}</div>
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-align-left"></i> Description</h5>
+                </div>
+                <div class="card-body markdown-content" data-testid="workflow-description">
+                    {% if workflow.description %}
+                        {{ workflow.description|markdown }}
+                    {% else %}
+                        <p class="text-muted fst-italic mb-0">No description provided.</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
-    </div>
-    {% endif %}
 
-    <!-- Activities Flow Diagram -->
-    <div class="card mb-4" data-testid="activities-section">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-                <i class="fa-solid fa-diagram-project"></i> Activities Flow ({{ activity_count }})
-            </h5>
-            {% if can_edit %}
-            <a href="{% url 'activity_create' playbook_pk=playbook.pk workflow_pk=workflow.pk %}" 
-               class="btn btn-sm btn-primary"
-               data-testid="add-activity-btn"
-               data-bs-toggle="tooltip"
-               data-bs-placement="left"
-               title="Create a new activity in this workflow">
-                <i class="fa-solid fa-plus"></i> Add Activity
-            </a>
-            {% endif %}
-        </div>
-        <div class="card-body">
-            {% if has_activities %}
-                {% if activities_svg %}
-                    <!-- Graphviz SVG Flow Diagram -->
-                    <div class="graph-container" data-testid="activities-graph">
-                        {{ activities_svg|safe }}
-                    </div>
-                {% else %}
-                    <!-- Graph generation failed - show message -->
-                    <div class="alert alert-warning" role="alert">
-                        <i class="fa-solid fa-exclamation-triangle"></i>
-                        <strong>Graph visualization unavailable.</strong>
-                        Unable to generate activity flow diagram. Graphviz may not be installed.
-                    </div>
-                {% endif %}
-            {% else %}
-                <!-- Empty State -->
-                <div class="text-center py-5" data-testid="empty-activities-state">
-                    <i class="fa-solid fa-diagram-project fa-4x text-muted mb-3"></i>
-                    <h5>No Activities Yet</h5>
-                    <p class="text-muted">This workflow doesn't have any activities defined.</p>
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-info-circle"></i> Details</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Order:</dt>
+                        <dd class="col-sm-7">#{{ workflow.order }}</dd>
+                        {% if workflow.abbreviation %}
+                        <dt class="col-sm-5">Code:</dt>
+                        <dd class="col-sm-7"><code>{{ workflow.abbreviation }}</code></dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-book-sparkles"></i> Playbook</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-title mb-1">{{ playbook.name }}</h6>
+                    <p class="card-text small text-muted mb-2">v{{ playbook.version }}</p>
+                    <a href="{% url 'playbook_detail' playbook.pk %}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-arrow-right"></i> View Playbook
+                    </a>
+                </div>
+            </div>
+
+            <div class="card mb-4" data-testid="activities-section">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-diagram-project"></i> Activities Flow ({{ activity_count }})
+                    </h5>
                     {% if can_edit %}
-                    <a href="{% url 'activity_create' playbook_pk=playbook.pk workflow_pk=workflow.pk %}" 
-                       class="btn btn-primary"
-                       data-testid="create-first-activity-btn"
+                    <a href="{% url 'activity_create' playbook_pk=playbook.pk workflow_pk=workflow.pk %}"
+                       class="btn btn-sm btn-primary"
+                       data-testid="add-activity-btn"
                        data-bs-toggle="tooltip"
-                       title="Create the first activity for this workflow">
-                        <i class="fa-solid fa-plus"></i> Create First Activity
+                       data-bs-placement="left"
+                       title="Create a new activity in this workflow">
+                        <i class="fa-solid fa-plus"></i> Add Activity
                     </a>
                     {% endif %}
                 </div>
-            {% endif %}
+                <div class="card-body mm-view-rail-scroll-x">
+                    {% if has_activities %}
+                        {% if activities_svg %}
+                            <div class="graph-container" data-testid="activities-graph">
+                                {{ activities_svg|safe }}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning mb-0" role="alert">
+                                <i class="fa-solid fa-exclamation-triangle"></i>
+                                <strong>Graph visualization unavailable.</strong>
+                                Unable to generate activity flow diagram. Graphviz may not be installed.
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-4" data-testid="empty-activities-state">
+                            <i class="fa-solid fa-diagram-project fa-3x text-muted mb-3"></i>
+                            <h6>No Activities Yet</h6>
+                            <p class="text-muted small">This workflow doesn't have any activities defined.</p>
+                            {% if can_edit %}
+                            <a href="{% url 'activity_create' playbook_pk=playbook.pk workflow_pk=workflow.pk %}"
+                               class="btn btn-primary btn-sm"
+                               data-testid="create-first-activity-btn"
+                               data-bs-toggle="tooltip"
+                               title="Create the first activity for this workflow">
+                                <i class="fa-solid fa-plus"></i> Create First Activity
+                            </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>

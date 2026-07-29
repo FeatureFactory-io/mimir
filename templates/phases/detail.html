@@ -53,90 +53,120 @@
             </a>
         {% endif %}
         {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
+        <a href="{% url 'phase_list' playbook.pk %}"
+           class="btn btn-outline-secondary"
+           data-bs-toggle="tooltip"
+           title="Return to phases list">
+            <i class="fa-solid fa-arrow-left"></i> Back to List
+        </a>
         </div>
     </div>
 </div>
 
-<!-- Description -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="fa-solid fa-info-circle"></i> Description</h5>
-    </div>
-    <div class="card-body markdown-content" data-testid="phase-description">
-        {% if phase.description %}
-        {{ phase.description|markdown }}
-        {% else %}
-        <p class="text-muted fst-italic mb-0">No description provided</p>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Activities in this Phase -->
-<div class="card">
-    <div class="card-header">
-        <h5 class="mb-0">
-            <i class="fa-solid fa-list-check"></i> Activities in this Phase
-            <span class="badge bg-secondary">{{ phase.activity_count }}</span>
-        </h5>
-    </div>
-    <div class="card-body">
-        {% if workflow_activities %}
-        {% for workflow_data in workflow_activities %}
-        <h6 class="mt-3 mb-2">
-            <a href="{% url 'workflow_detail' playbook.pk workflow_data.workflow.id %}">
-                {{ workflow_data.workflow.name }}
-            </a>
-        </h6>
-        <div class="table-responsive">
-            <table class="table table-hover table-sm">
-                <thead>
-                    <tr>
-                        <th>Order</th>
-                        <th>Name</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for activity in workflow_data.activities %}
-                    <tr>
-                        <td><span class="badge bg-secondary">#{{ activity.order }}</span></td>
-                        <td>
-                            <a href="{% url 'activity_detail' playbook.pk activity.workflow.id activity.id %}">
-                                {{ activity.name }}
-                            </a>
-                        </td>
-                        <td>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <a href="{% url 'activity_detail' playbook.pk activity.workflow.id activity.id %}"
-                                   class="btn btn-sm btn-outline-primary"
-                                   data-bs-toggle="tooltip"
-                                   title="View activity details">
-                                    <i class="fa-solid fa-eye"></i>
-                                </a>
-                                {% include "partials/copy_prompt/row_button.html" with entity_type="activity" entity_pk=activity.id entity_name=activity.name copy_prompt_text=activity.copy_prompt_text %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fa-solid fa-align-left"></i> Description</h5>
+            </div>
+            <div class="card-body markdown-content" data-testid="phase-description">
+                {% if phase.description %}
+                {{ phase.description|markdown }}
+                {% else %}
+                <p class="text-muted fst-italic mb-0">No description provided</p>
+                {% endif %}
+            </div>
         </div>
-        {% endfor %}
-        {% else %}
-        <div class="alert alert-info mb-0">
-            <i class="fa-solid fa-info-circle"></i> No activities assigned to this phase yet.
-        </div>
-        {% endif %}
     </div>
-</div>
 
-<!-- Back Button -->
-<div class="mt-4">
-    <a href="{% url 'phase_list' playbook.pk %}"
-       class="btn btn-secondary"
-       data-bs-toggle="tooltip"
-       title="Return to phases list">
-        <i class="fa-solid fa-arrow-left"></i> Back to Phases
-    </a>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fa-solid fa-info-circle"></i> Details</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Order:</dt>
+                    <dd class="col-sm-7">#{{ phase.order }}</dd>
+                    <dt class="col-sm-5">Activities:</dt>
+                    <dd class="col-sm-7">{{ phase.activity_count }}</dd>
+                    <dt class="col-sm-5">Updated:</dt>
+                    <dd class="col-sm-7">{{ phase.updated_at|date:"M d, Y" }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fa-solid fa-book-sparkles"></i> Playbook</h5>
+            </div>
+            <div class="card-body">
+                <h6 class="card-title mb-1">{{ playbook.name }}</h6>
+                <p class="card-text small text-muted mb-2">v{{ playbook.version }}</p>
+                <a href="{% url 'playbook_detail' pk=playbook.pk %}"
+                   class="btn btn-sm btn-outline-primary">
+                    <i class="fa-solid fa-arrow-right"></i> View Playbook
+                </a>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fa-solid fa-list-check"></i> Activities in this Phase
+                    <span class="badge bg-secondary ms-2">{{ phase.activity_count }}</span>
+                </h5>
+            </div>
+            <div class="card-body mm-view-rail-scroll">
+                {% if workflow_activities %}
+                {% for workflow_data in workflow_activities %}
+                <h6 class="mt-3 mb-2 {% if forloop.first %}mt-0{% endif %}">
+                    <a href="{% url 'workflow_detail' playbook.pk workflow_data.workflow.id %}">
+                        {{ workflow_data.workflow.name }}
+                    </a>
+                </h6>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm mb-3">
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Name</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for activity in workflow_data.activities %}
+                            <tr>
+                                <td><span class="badge bg-secondary">#{{ activity.order }}</span></td>
+                                <td>
+                                    <a href="{% url 'activity_detail' playbook.pk activity.workflow.id activity.id %}">
+                                        {{ activity.name }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{% url 'activity_detail' playbook.pk activity.workflow.id activity.id %}"
+                                           class="btn btn-sm btn-outline-primary"
+                                           data-bs-toggle="tooltip"
+                                           title="View activity details">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </a>
+                                        {% include "partials/copy_prompt/row_button.html" with entity_type="activity" entity_pk=activity.id entity_name=activity.name copy_prompt_text=activity.copy_prompt_text %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="alert alert-info mb-0">
+                    <i class="fa-solid fa-info-circle"></i> No activities assigned to this phase yet.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
