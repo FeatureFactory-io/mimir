@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+---
+
+**Mimir metadata:** slug `do-assert-log-story`; `always_apply: false` (link to BPE-02 / MIN-04 / TFK-02).
+
+When a plan or iteration manifest declares a **Log Story Script** (or `log_story_script[]` / `log_tests[]`), you MUST prove those beats with pytest `caplog` (or equivalent log capture) — not by grepping `logs/app.log` alone, and not by “logging statements exist” checklists.
+
+## Requirements
+
+1. For each Log Story Script row, a test asserts the `where` + `beat` + `must_include` fragments appear in captured logs at the declared level (default INFO; WARNING/ERROR when the script says so).
+2. Cover **happy** and **reject** paths when the scenario has both (`test_*_log_story_happy` / `test_*_log_story_reject`).
+3. Use the shared helper from skill *Pytest Log Story Assertions* (`tests/support/log_story.py` → `assert_log_story(...)`) once TFK-02 has bootstrapped it.
+4. Log-story tests ship in the **same commit** as behavior green — never a deferred logging slice.
+5. Never assert on raw secrets, tokens, or passwords in log lines.
+
+## Anti-patterns
+
+- Behavior test green while log story absent or weakened to `logger.info("done")`
+- Manual `logs/app.log` inspection as the only DoD for observability
+- Skipping `checkpoint.log_story_command` when the manifest lists `log_tests`

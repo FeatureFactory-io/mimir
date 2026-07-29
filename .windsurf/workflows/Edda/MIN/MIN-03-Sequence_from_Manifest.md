@@ -3,13 +3,16 @@
 **Activity ID**: 180
 **Order**: 3
 **Phase**: None
-**Dependencies**: None
+**Dependencies**: Predecessor: Activity 179 (Load Context from PIN Artifacts)
+Successor: Activity 181 (Execute)
 
 ## Description
 
 Sequence from Manifest
 
 ## Guidance
+
+**Sequencing (authoritative):** Predecessor = Load Context from PIN Artifacts (Activity 179 / MIN-02).
 
 ## Purpose
 Derive the execution queue from the PIN-built manifest. Do NOT rebuild the dependency graph or conflict map — PIN-02 already computed them from actual skeleton commits. This activity reads and validates.

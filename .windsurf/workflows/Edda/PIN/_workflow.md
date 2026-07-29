@@ -1,11 +1,11 @@
 # Plan Iteration
 
-**Playbook**: Edda v55.0 (Released)
+**Playbook**: Edda v64.0 (Released)
 **Workflow ID**: 16
 **Description**: The goal of this workflow is to prepare for the AI-driven sprint run — ensure all artifacts are in place and preconditions met: feature specs (BDD), architecture (SAO.md), AI IDE config (CLAUDE.md), code skeletons, execution manifest, and GitHub/GitLab milestone with issues. Human acceptance gate at the end before handing off to MIN.
 **Phase Organization**: Uses phases
 **Total Activities**: 5
-**Export Date**: 2026-07-27 10:52 UTC
+**Export Date**: 2026-07-29 14:35 UTC
 
 ## Activities
 

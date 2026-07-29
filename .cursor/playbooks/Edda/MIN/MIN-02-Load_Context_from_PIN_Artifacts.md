@@ -3,13 +3,16 @@
 **Activity ID**: 179
 **Order**: 2
 **Phase**: None
-**Dependencies**: None
+**Dependencies**: Predecessor: Activity 178 (Activate Iteration)
+Successor: Activity 180 (Sequence from Manifest)
 
 ## Description
 
 Load Context from PIN Artifacts
 
 ## Guidance
+
+**Sequencing (authoritative):** Predecessor = Activate Iteration (Activity 178 / MIN-01).
 
 ## Purpose
 Restore the distilled context that PIN already built. Do NOT re-read SAO.md, user_journey.md, mockups, or BDD specs from scratch — PIN-02 and PIN-03 already did that work.

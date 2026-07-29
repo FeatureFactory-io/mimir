@@ -24,12 +24,13 @@ Verify CLAUDE.md iteration protocol is current, obtain explicit human approval, 
 ## Steps
 
 ### Step 1: Verify CLAUDE.md Iteration Protocol
-Read the `## Iteration Protocol`, `## Drift Handling`, `## Session Resume Protocol`, and `## Authority Model (Jedao)` sections of CLAUDE.md. Verify they match `doctrine_version` in the manifest.
+Read the `## Iteration Protocol`, `## Drift Handling`, `## Session Resume Protocol`, and `## Authority Model` sections of CLAUDE.md. Verify they match `doctrine_version` in the manifest.
 
 Required sections:
 - **Iteration Protocol** — references `<!-- MANIFEST -->` block, `status-queued`, BPE-02 → BPE-05
 - **Drift Handling** — matches manifest `drift_thresholds` (absorbed: checkpoint_fail retry once; escalated: footprint_violation, method_explosion, sao_violation, checkpoint_fail_after_retry)
 - **Session Resume Protocol** — find `status-in-progress` → re-run checkpoint → PASS: close and continue / FAIL: retry
+- **Authority Model** — can-decide / must-escalate / cannot-do bounds for the iteration runner (dr-dobbs for MIN-04 execution)
 
 If any section missing or thresholds do not match: update CLAUDE.md and commit:
 ```bash

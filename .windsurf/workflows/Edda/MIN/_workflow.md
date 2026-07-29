@@ -1,11 +1,11 @@
 # Manage Iteration
 
-**Playbook**: Edda v55.0 (Released)
+**Playbook**: Edda v64.0 (Released)
 **Workflow ID**: 17
-**Description**: AI-driven autonomous execution workflow. Activates on a human milestone request, ingests all relevant architecture and UX context, builds a dependency-aware execution plan, dispatches dr-dobbs subagents for parallel issue implementation, and closes the iteration with a DoD check, release, and acceptance test session.
+**Description**: AI-driven autonomous execution workflow. Linear activity chain: Activate Iteration → Load Context from PIN Artifacts → Sequence from Manifest → Execute → Close Iteration → Acceptance, Bug Reports & Deploy Fixes.
 **Phase Organization**: No phase organization
 **Total Activities**: 6
-**Export Date**: 2026-07-27 10:52 UTC
+**Export Date**: 2026-07-29 14:35 UTC
 
 ## Activities
 

@@ -3,7 +3,7 @@
 **Activity ID**: 178
 **Order**: 1
 **Phase**: None
-**Dependencies**: None
+**Dependencies**: Successor: Activity 179 (Load Context from PIN Artifacts)
 
 ## Description
 

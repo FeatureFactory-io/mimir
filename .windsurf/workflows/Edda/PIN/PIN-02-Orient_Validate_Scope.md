@@ -19,7 +19,7 @@ If `docs/plans/iterations/pin-orient-{today's date}.md` already exists → skip 
 
 ## Prerequisites
 - `target_act` and `feature_files[]` from PIN-01
-- `docs/lessons_learned/log.yaml` (may not exist on first iteration)
+- `docs/lessons_learned/ITER-*.md` files (may not exist on first iteration)
 
 ## Steps
 
@@ -31,20 +31,31 @@ For each file in `feature_files[]`, read the BDD scenarios. Extract:
 
 ### Step 2: Read Learning Log
 ```bash
-cat docs/lessons_learned/log.yaml 2>/dev/null
+ls -t docs/lessons_learned/ITER-*.md 2>/dev/null | head -5
 ```
-If missing → first iteration. Create:
+If no files found → first iteration. Create the directory and continue with first-iteration defaults:
 ```bash
 mkdir -p docs/lessons_learned
-cat > docs/lessons_learned/log.yaml << 'EOF'
-# Iteration learning log — append only
-entries: []
-EOF
 ```
-If exists → read last 5 entries. Compute:
-- **velocity_ratio trend**: improving / stable / degrading
-- **dominant_drift**: most frequent signal type
+- `velocity_ratio`: unknown
+- `dominant_drift`: none
+- `footprint_accuracy`: unknown
+
+If files found → read the 5 most recent. Each file has YAML frontmatter. Extract:
+```bash
+for f in $(ls -t docs/lessons_learned/ITER-*.md | head -5); do
+  awk '/^---/{p++} p==1{print} p==2{exit}' "$f"
+done
+```
+Compute across the 5 most recent entries:
+- **velocity_ratio trend**: improving (trend up) / stable / degrading (trend down)
+- **dominant_drift**: most frequent non-none value (or "none" if all none)
 - **footprint_accuracy trend**: improving / stable / degrading
+
+Also scan the body of the most recent file for flagged SAO.md decisions. If any are present:
+> "Prior iteration flagged SAO.md decisions not yet applied: {list}. Verify they were committed before this iteration begins."
+
+**Note:** `docs/lessons_learned/log.yaml` is deprecated. If it exists, ignore it.
 
 ### Step 3: Validate Scope
 - If `velocity_ratio` degrading AND >2 scenarios: flag scope risk

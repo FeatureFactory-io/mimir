@@ -3,13 +3,15 @@
 **Activity ID**: 183
 **Order**: 6
 **Phase**: None
-**Dependencies**: None
+**Dependencies**: Predecessor: Activity 182 (Close Iteration)
 
 ## Description
 
 Acceptance, Bug Reports & Deploy Fixes
 
 ## Guidance
+
+**Sequencing (authoritative):** Predecessor = Close Iteration (Activity 182 / MIN-05).
 
 ## Purpose
 User acceptance loop: demo the delivered iteration to the user guided by feature files, collect bugs, file them, fix them, and deploy a patch release.
