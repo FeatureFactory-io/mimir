@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Copy Prompt — Mockup{% endblock %}
 
@@ -16,7 +17,13 @@
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
                 <h1 class="hg-page-title d-flex align-items-center gap-2 mb-1">
-                    <i class="fa-regular fa-copy hg-page-title-icon text-primary" aria-hidden="true"></i>
+                    <img src="{% static 'images/cursor.svg' %}"
+                         height="20"
+                         width="20"
+                         alt=""
+                         class="hg-page-title-icon"
+                         aria-hidden="true"
+                         style="vertical-align: text-top;">
                     <span>Copy Prompt</span>
                 </h1>
                 <p class="text-muted small mb-0">

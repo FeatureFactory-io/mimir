@@ -3037,7 +3037,7 @@ Entity-specific bodies: Activity → full `guidance`; Skill → `content` + meta
 
 **UI conventions** (see `docs/ux/IA_guidelines.md` §3.4):
 
-- Detail toolbar: `btn btn-outline-secondary`, icon `fa-regular fa-copy`, label **Copy Prompt**, `data-testid="copy-prompt-btn"`, tooltip **Copy prompt to clipboard**
+- Detail toolbar: `btn btn-outline-secondary`, Cursor icon (`static/images/cursor.svg`, same as home MCP tab), label **Copy Prompt**, `data-testid="copy-prompt-btn"`, tooltip **Copy prompt to clipboard**
 - List row: icon-only copy button in Actions group, `data-testid="copy-prompt-btn-<type>-<pk>"`
 - Hidden store: visually hidden `<textarea data-testid="copy-prompt-text-<type>-<pk>">` — not `data-copy` attributes (large Markdown)
 - Success feedback: brief check icon or toast; no navigation

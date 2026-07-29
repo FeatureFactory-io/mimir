@@ -7,5 +7,5 @@
         aria-label="Copy prompt for {{ entity_name }}"
         data-copy-prompt-trigger
         data-copy-prompt-for="copy-prompt-text-{{ entity_type }}-{{ entity_pk }}">
-    <i class="fa-regular fa-copy" aria-hidden="true"></i>
+    {% include "mockups/copy-prompt/_cursor_icon.html" with size=14 %}
 </button>

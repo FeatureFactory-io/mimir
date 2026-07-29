@@ -11,6 +11,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function showCopySuccess(btn) {
         if (successToast) successToast.show();
+        var iconWrap = btn.querySelector('[data-copy-prompt-icon-wrap]');
+        if (iconWrap) {
+            var cursorImg = iconWrap.querySelector('[data-copy-prompt-cursor-icon]');
+            var check = iconWrap.querySelector('.mm-copy-prompt-success-icon');
+            if (cursorImg && check) {
+                cursorImg.classList.add('d-none');
+                check.classList.remove('d-none');
+                setTimeout(function () {
+                    cursorImg.classList.remove('d-none');
+                    check.classList.add('d-none');
+                }, 1500);
+                return;
+            }
+        }
         var icon = btn.querySelector('i');
         if (icon) {
             var prev = icon.className;

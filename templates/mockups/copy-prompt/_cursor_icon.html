@@ -1,0 +1,14 @@
+{% load static %}
+{# Cursor brand icon — same asset as home page MCP tabs (methodology/index.html) #}
+<span class="d-inline-flex align-items-center mm-copy-prompt-icon-wrap{% if extra_class %} {{ extra_class }}{% endif %}"
+      data-copy-prompt-icon-wrap>
+    <img src="{% static 'images/cursor.svg' %}"
+         height="{{ size|default:16 }}"
+         width="{{ size|default:16 }}"
+         alt=""
+         class="mm-copy-prompt-cursor-icon"
+         data-copy-prompt-cursor-icon
+         aria-hidden="true"
+         style="vertical-align: text-top;">
+    <i class="fa-solid fa-check mm-copy-prompt-success-icon d-none" aria-hidden="true"></i>
+</span>

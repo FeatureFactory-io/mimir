@@ -4,7 +4,7 @@ Feature: FOB-COPY-PROMPT-VIEW-1 Copy Prompt on entity detail pages
   I want [Copy Prompt] on every entity VIEW header toolbar
   So that I can paste playbook context into my IDE without opening MCP tools
 
-  # Icon: fa-regular fa-copy · Button: btn-outline-secondary · Tooltip: Copy prompt to clipboard
+  # Icon: Cursor SVG (static/images/cursor.svg) · Button: btn-outline-secondary · Tooltip: Copy prompt to clipboard
   # Placement: header toolbar before [Back]; visible regardless of can_edit.
 
   Background:
