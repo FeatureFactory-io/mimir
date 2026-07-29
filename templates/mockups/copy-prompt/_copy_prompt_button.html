@@ -1,0 +1,16 @@
+{# Shared Copy Prompt control — detail toolbar (Act 17 mockup) #}
+<button type="button"
+        class="btn btn-outline-secondary"
+        data-testid="{{ testid|default:'copy-prompt-btn' }}"
+        data-bs-toggle="tooltip"
+        title="Copy prompt to clipboard"
+        aria-label="Copy prompt to clipboard"
+        data-copy-prompt-trigger>
+    <i class="fa-regular fa-copy" aria-hidden="true"></i> Copy Prompt
+</button>
+<textarea class="visually-hidden"
+          readonly
+          aria-hidden="true"
+          tabindex="-1"
+          data-testid="{{ text_testid|default:'copy-prompt-text-activity-1' }}"
+          data-copy-prompt-source>{{ copy_prompt_text }}</textarea>

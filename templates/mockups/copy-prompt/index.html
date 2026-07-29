@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Copy Prompt — Mockup{% endblock %}
+
+{% block content %}
+<div class="container mt-4" data-testid="copy-prompt-index-page">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Copy Prompt (mockup)</li>
+        </ol>
+    </nav>
+
+    <div class="hg-page-header mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <h1 class="hg-page-title d-flex align-items-center gap-2 mb-1">
+                    <i class="fa-regular fa-copy hg-page-title-icon text-primary" aria-hidden="true"></i>
+                    <span>Copy Prompt</span>
+                </h1>
+                <p class="text-muted small mb-0">
+                    Act 17 mockups — server-built AI instructions on VIEW headers and list Actions
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fa-solid fa-list-check text-primary me-2"></i>Activity detail (VIEW)</h5>
+                    <p class="text-muted small">
+                        Header toolbar: [Copy Prompt] before [Back to List]. Hidden textarea holds server-built prompt.
+                    </p>
+                    <a href="{% url 'mockup_copy_prompt_activity_detail' %}"
+                       class="btn btn-primary"
+                       data-testid="mockup-link-activity-detail">
+                        Open activity detail mockup
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fa-solid fa-table text-primary me-2"></i>Activities list (LIST+FIND)</h5>
+                    <p class="text-muted small">
+                        Actions column: icon-only copy beside View (eye). Same clipboard payload as detail.
+                    </p>
+                    <a href="{% url 'mockup_copy_prompt_activity_list' %}"
+                       class="btn btn-primary"
+                       data-testid="mockup-link-activity-list">
+                        Open activities list mockup
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-info mt-4 mb-0" role="status" data-testid="copy-prompt-spec-note">
+        <strong>Spec:</strong> Production uses <code>CopyPromptService</code> (Option B). Mockups use hardcoded
+        <code>MOCK_COPY_PROMPT_*</code> strings. Feature files: <code>docs/features/act-17-copy-prompt/</code>.
+    </div>
+
+    <div class="alert alert-light border mt-4 small">
+        <strong>Mockup screens:</strong>
+        <a href="{% url 'mockup_copy_prompt_index' %}">Index</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_detail' %}">Activity detail</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_list' %}">Activity list</a>
+    </div>
+</div>
+{% endblock %}

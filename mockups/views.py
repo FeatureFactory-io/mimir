@@ -666,3 +666,481 @@ def teams_manage(request, team_id):
         "active_page": "teams",
     }
     return render(request, "mockups/teams/manage.html", context)
+
+
+# ---------------------------------------------------------------------------
+# Global search (NAV-06) — mock data
+# ---------------------------------------------------------------------------
+
+SEARCH_ENTITY_META = [
+    {
+        "key": "playbooks",
+        "label": "Playbooks",
+        "label_singular": "Playbook",
+        "icon": "fa-book-sparkles",
+        "icon_class": "text-primary",
+        "badge_class": "bg-primary",
+    },
+    {
+        "key": "workflows",
+        "label": "Workflows",
+        "label_singular": "Workflow",
+        "icon": "fa-diagram-project",
+        "icon_class": "text-info",
+        "badge_class": "bg-info",
+    },
+    {
+        "key": "phases",
+        "label": "Phases",
+        "label_singular": "Phase",
+        "icon": "fa-layer-group",
+        "icon_class": "mm-search-icon-phase",
+        "badge_class": "mm-search-badge-phase",
+    },
+    {
+        "key": "activities",
+        "label": "Activities",
+        "label_singular": "Activity",
+        "icon": "fa-list-check",
+        "icon_class": "text-success",
+        "badge_class": "bg-success",
+    },
+    {
+        "key": "artifacts",
+        "label": "Artifacts",
+        "label_singular": "Artifact",
+        "icon": "fa-file-lines",
+        "icon_class": "text-warning",
+        "badge_class": "bg-warning text-dark",
+    },
+    {
+        "key": "skills",
+        "label": "Skills",
+        "label_singular": "Skill",
+        "icon": "fa-wand-magic-sparkles",
+        "icon_class": "mm-search-icon-skill",
+        "badge_class": "mm-search-badge-skill",
+    },
+    {
+        "key": "agents",
+        "label": "Agents",
+        "label_singular": "Agent",
+        "icon": "fa-robot",
+        "icon_class": "mm-search-icon-agent",
+        "badge_class": "mm-search-badge-agent",
+    },
+    {
+        "key": "rules",
+        "label": "Rules",
+        "label_singular": "Rule",
+        "icon": "fa-gavel",
+        "icon_class": "text-secondary",
+        "badge_class": "bg-secondary",
+    },
+]
+
+MOCK_SEARCH_ITEMS = [
+    {
+        "entity_key": "playbooks",
+        "id": 1,
+        "title": "React Frontend Development",
+        "context": "Mike Chen · v1.2 · Development",
+        "snippet": "Modern React patterns and component architecture for production frontends.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "playbooks",
+        "id": 2,
+        "title": "React Testing Patterns",
+        "context": "Community · v1.0 · Released",
+        "snippet": "Jest, React Testing Library, and component integration testing workflows.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "workflows",
+        "id": 10,
+        "title": "Component Development",
+        "context": "React Frontend Development · 8 activities",
+        "snippet": "Build and refine React components with state, props, and composition.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "workflows",
+        "id": 11,
+        "title": "Testing & Documentation",
+        "context": "React Frontend Development · 6 activities",
+        "snippet": "React component tests, storybook docs, and accessibility checks.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "workflows",
+        "id": 12,
+        "title": "State Management Setup",
+        "context": "React Frontend Development · 4 activities",
+        "snippet": "Redux Toolkit store wiring for React applications.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "phases",
+        "id": 3,
+        "title": "Construction",
+        "context": "React Frontend Development",
+        "snippet": "Implementation phase covering React build-out and integration.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "activities",
+        "id": 20,
+        "title": "Setup React Project",
+        "context": "React Frontend Development › Component Development",
+        "snippet": "Initialize Vite + React, configure ESLint, and scaffold the repo.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "activities",
+        "id": 21,
+        "title": "Create React Components",
+        "context": "React Frontend Development › Component Development",
+        "snippet": "Define presentational and container components with typed props.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "activities",
+        "id": 22,
+        "title": "Component Testing",
+        "context": "React Frontend Development › Testing & Documentation",
+        "snippet": "Write Jest tests for React components including axe-core checks.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "artifacts",
+        "id": 30,
+        "title": "Component Library Spec",
+        "context": "React Frontend Development · Document",
+        "snippet": "Catalog of React components, props, and usage examples.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "artifacts",
+        "id": 31,
+        "title": "Storybook Export",
+        "context": "React Frontend Development · Template",
+        "snippet": "Exported React story templates for design review.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "skills",
+        "id": 40,
+        "title": "React Form Component",
+        "context": "GUI_FORM · React+Redux",
+        "snippet": "Install deps, wire Redux store, validate on submit with React Hook Form.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "skills",
+        "id": 41,
+        "title": "React Router Setup",
+        "context": "NAV_ROUTING · React+Router",
+        "snippet": "Configure routes, loaders, and nested layouts in React Router v6.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "skills",
+        "id": 42,
+        "title": "React Query Data Fetch",
+        "context": "API_FETCH · React+TanStack",
+        "snippet": "Fetch and cache server state with TanStack Query in React apps.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "agents",
+        "id": 50,
+        "title": "Cautious Developer",
+        "context": "React Frontend Development",
+        "snippet": "Careful, test-driven React implementation with regression checks.",
+        "detail_url_name": "mockup_search_results",
+    },
+    {
+        "entity_key": "rules",
+        "id": 60,
+        "title": "do-react-testing",
+        "context": "React Frontend Development · alwaysApply",
+        "snippet": "Always add React Testing Library tests when changing components.",
+        "detail_url_name": "mockup_search_results",
+    },
+]
+
+_SEARCH_META_BY_KEY = {m["key"]: m for m in SEARCH_ENTITY_META}
+
+_ENTITY_TESTID_SINGULAR = {
+    "playbooks": "playbook",
+    "workflows": "workflow",
+    "phases": "phase",
+    "activities": "activity",
+    "artifacts": "artifact",
+    "skills": "skill",
+    "agents": "agent",
+    "rules": "rule",
+}
+
+
+def _mock_search_matches(query: str):
+    """Return items whose title, context, or snippet match query (case-insensitive)."""
+    needle = (query or "").strip().lower()
+    if not needle:
+        return []
+    matches = []
+    for item in MOCK_SEARCH_ITEMS:
+        haystack = " ".join(
+            [item["title"], item.get("context", ""), item.get("snippet", "")]
+        ).lower()
+        if needle in haystack:
+            enriched = dict(item)
+            meta = _SEARCH_META_BY_KEY[item["entity_key"]]
+            enriched.update(
+                {
+                    "type_label": meta["label_singular"],
+                    "icon": meta["icon"],
+                    "icon_class": meta["icon_class"],
+                    "badge_class": meta["badge_class"],
+                    "testid": (
+                        f"global-search-result-"
+                        f"{_ENTITY_TESTID_SINGULAR[item['entity_key']]}-{item['id']}"
+                    ),
+                }
+            )
+            matches.append(enriched)
+    return matches
+
+
+def _mock_search_grouped(query: str, type_filter: str):
+    """Group matching items by entity type; honour optional type_filter."""
+    matches = _mock_search_matches(query)
+    grouped = {meta["key"]: [] for meta in SEARCH_ENTITY_META}
+    for item in matches:
+        grouped[item["entity_key"]].append(item)
+
+    sections = []
+    total = 0
+    for meta in SEARCH_ENTITY_META:
+        key = meta["key"]
+        if type_filter and type_filter != key:
+            continue
+        items = grouped[key]
+        if not items:
+            continue
+        total += len(items)
+        sections.append(
+            {
+                "key": key,
+                "label": meta["label"],
+                "testid": f"global-search-{key}",
+                "items": items,
+                "count": len(items),
+                "icon": meta["icon"],
+                "icon_class": meta["icon_class"],
+            }
+        )
+    return sections, total
+
+
+def search_results(request):
+    """FOB Search Results (NAV-06): grouped global search mockup.
+
+    Query params:
+      q     — search text (default demo: React when unset on first visit is handled in template)
+      type  — entity type key (playbooks, workflows, …) or empty for all
+    """
+    query = (request.GET.get("q") or "").strip()
+    type_filter = (request.GET.get("type") or "").strip()
+    if type_filter and type_filter not in _SEARCH_META_BY_KEY:
+        type_filter = ""
+
+    logger.info(
+        "Mockup: search_results | q=%r type=%r user=%s",
+        query,
+        type_filter or "all",
+        getattr(request.user, "username", "anonymous"),
+    )
+
+    sections, total_count = _mock_search_grouped(query, type_filter)
+    type_choices = [{"value": "", "label": "All types"}] + [
+        {"value": m["key"], "label": m["label"]} for m in SEARCH_ENTITY_META
+    ]
+
+    context = {
+        "query": query,
+        "type_filter": type_filter,
+        "type_choices": type_choices,
+        "sections": sections,
+        "total_count": total_count,
+        "has_query": bool(query),
+        "show_empty_state": bool(query) and total_count == 0,
+        "show_no_query_prompt": not query,
+        "entity_meta": SEARCH_ENTITY_META,
+        "active_page": "search",
+    }
+    return render(request, "mockups/search/results.html", context)
+
+
+def search_suggestions(request):
+    """FOB Global Search suggestions dropdown mockup (navbar HTMX fragment)."""
+    query = (request.GET.get("q") or "").strip()
+    logger.info(
+        "Mockup: search_suggestions | q=%r user=%s",
+        query,
+        getattr(request.user, "username", "anonymous"),
+    )
+
+    if not query:
+        return render(
+            request,
+            "mockups/search/partials/suggestions.html",
+            {"query": "", "sections": [], "total_count": 0},
+        )
+
+    matches = _mock_search_matches(query)
+    grouped = {meta["key"]: [] for meta in SEARCH_ENTITY_META}
+    for item in matches:
+        grouped[item["entity_key"]].append(item)
+
+    sections = []
+    total = 0
+    for meta in SEARCH_ENTITY_META:
+        items = grouped[meta["key"]][:5]
+        if not items:
+            continue
+        total += len(grouped[meta["key"]])
+        sections.append(
+            {
+                "key": meta["key"],
+                "label": meta["label"],
+                "items": items,
+                "count": len(grouped[meta["key"]]),
+            }
+        )
+
+    return render(
+        request,
+        "mockups/search/partials/suggestions.html",
+        {"query": query, "sections": sections, "total_count": total},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Copy Prompt mockup (Act 17)
+# ---------------------------------------------------------------------------
+
+MOCK_COPY_PROMPT_PLAYBOOK = {
+    "name": "React Frontend Development",
+    "version": "1.2",
+    "status": "Released",
+}
+
+MOCK_COPY_PROMPT_WORKFLOW = {
+    "name": "Component Development",
+}
+
+MOCK_COPY_PROMPT_ACTIVITY = {
+    "id": 1,
+    "name": "Setup component structure",
+    "reference_label": "CD-01",
+    "order": 1,
+    "phase": "Planning",
+    "updated_ago": "2 days",
+    "guidance": (
+        "## Overview\n\n"
+        "Scaffold the component folder structure before implementation.\n\n"
+        "## Steps\n\n"
+        "1. Create `components/` directory\n"
+        "2. Add index barrel export\n"
+        "3. Document naming conventions\n"
+    ),
+}
+
+MOCK_COPY_PROMPT_ACTIVITY_TEXT = (
+    "Read the 'CD-01 Setup component structure' activity from playbook "
+    "'React Frontend Development' (workflow 'Component Development'). "
+    "Follow its guidance when assisting me.\n\n"
+    "## Overview\n\n"
+    "Scaffold the component folder structure before implementation.\n\n"
+    "## Steps\n\n"
+    "1. Create `components/` directory\n"
+    "2. Add index barrel export\n"
+    "3. Document naming conventions\n"
+)
+
+MOCK_COPY_PROMPT_ACTIVITIES = [
+    {
+        "id": 1,
+        "name": "Setup component structure",
+        "reference_label": "CD-01",
+        "order": 1,
+        "phase": "Planning",
+        "copy_prompt_text": MOCK_COPY_PROMPT_ACTIVITY_TEXT,
+    },
+    {
+        "id": 2,
+        "name": "Implement component",
+        "reference_label": "CD-02",
+        "order": 2,
+        "phase": "Execution",
+        "copy_prompt_text": (
+            "Read the 'CD-02 Implement component' activity from playbook "
+            "'React Frontend Development' (workflow 'Component Development'). "
+            "Follow its guidance when assisting me.\n\n"
+            "(Mock body — implement the component per design spec.)\n"
+        ),
+    },
+    {
+        "id": 3,
+        "name": "Component testing",
+        "reference_label": "CD-03",
+        "order": 3,
+        "phase": "Execution",
+        "copy_prompt_text": (
+            "Read the 'CD-03 Component testing' activity from playbook "
+            "'React Frontend Development' (workflow 'Component Development'). "
+            "Follow its guidance when assisting me.\n\n"
+            "(Mock body — add Jest tests for the component.)\n"
+        ),
+    },
+]
+
+
+def copy_prompt_index(request):
+    """FOB-COPY-PROMPT mockup hub — links to VIEW and LIST exemplars."""
+    logger.info(
+        "Mockup: copy_prompt_index | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    return render(request, "mockups/copy-prompt/index.html")
+
+
+def copy_prompt_activity_detail(request):
+    """FOB-COPY-PROMPT-VIEW-1 mockup — activity detail with header Copy Prompt."""
+    logger.info(
+        "Mockup: copy_prompt_activity_detail | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    context = {
+        "playbook": MOCK_COPY_PROMPT_PLAYBOOK,
+        "workflow": MOCK_COPY_PROMPT_WORKFLOW,
+        "activity": MOCK_COPY_PROMPT_ACTIVITY,
+        "copy_prompt_text": MOCK_COPY_PROMPT_ACTIVITY_TEXT,
+    }
+    return render(request, "mockups/copy-prompt/activity_detail.html", context)
+
+
+def copy_prompt_activity_list(request):
+    """FOB-COPY-PROMPT-LIST-1 mockup — activities table with row Copy Prompt."""
+    logger.info(
+        "Mockup: copy_prompt_activity_list | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    context = {
+        "playbook": MOCK_COPY_PROMPT_PLAYBOOK,
+        "workflow": MOCK_COPY_PROMPT_WORKFLOW,
+        "activities": MOCK_COPY_PROMPT_ACTIVITIES,
+    }
+    return render(request, "mockups/copy-prompt/activity_list.html", context)

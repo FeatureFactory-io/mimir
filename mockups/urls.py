@@ -20,4 +20,19 @@ urlpatterns = [
     path("teams/create/", views.teams_create, name="mockup_teams_create"),
     path("teams/<int:team_id>/", views.teams_detail, name="mockup_teams_detail"),
     path("teams/<int:team_id>/manage/", views.teams_manage, name="mockup_teams_manage"),
+    # ── Global search (NAV-06 mockup) ───────────────────────────────────────
+    path("search/", views.search_results, name="mockup_search_results"),
+    path("search/suggestions/", views.search_suggestions, name="mockup_search_suggestions"),
+    # ── Copy Prompt (Act 17 mockup) ─────────────────────────────────────────
+    path("copy-prompt/", views.copy_prompt_index, name="mockup_copy_prompt_index"),
+    path(
+        "copy-prompt/activities/1/",
+        views.copy_prompt_activity_detail,
+        name="mockup_copy_prompt_activity_detail",
+    ),
+    path(
+        "copy-prompt/activities/",
+        views.copy_prompt_activity_list,
+        name="mockup_copy_prompt_activity_list",
+    ),
 ]

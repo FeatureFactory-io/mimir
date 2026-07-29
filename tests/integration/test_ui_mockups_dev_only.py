@@ -13,3 +13,6 @@ def test_mockup_urls_return_404_when_debug_false(client: Client):
     assert client.get("/mockups/auth/login/").status_code == 404
     assert client.get("/mockups/pips/").status_code == 404
     assert client.get("/mockups/profile/").status_code == 404
+    assert client.get("/mockups/search/").status_code == 404
+    assert client.get("/mockups/search/suggestions/").status_code == 404
+    assert client.get("/mockups/copy-prompt/").status_code == 404

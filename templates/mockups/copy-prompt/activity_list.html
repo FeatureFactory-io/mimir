@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Activities — Copy Prompt Mockup{% endblock %}
+
+{% block content %}
+<div class="container mt-4" data-testid="copy-prompt-activity-list-page">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'mockup_copy_prompt_index' %}">Copy Prompt</a></li>
+            <li class="breadcrumb-item"><a href="#">{{ playbook.name }}</a></li>
+            <li class="breadcrumb-item"><a href="#">{{ workflow.name }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Activities</li>
+        </ol>
+    </nav>
+
+    <div class="hg-page-header mb-3" data-testid="activities-list-header">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <h1 class="hg-page-title d-flex align-items-center gap-2 mb-1">
+                    <i class="fa-solid fa-list-check hg-page-title-icon text-primary" aria-hidden="true"></i>
+                    <span>Activities in {{ workflow.name }}</span>
+                </h1>
+                <p class="text-muted small mb-0">
+                    <span data-testid="activities-count-badge">{{ activities|length }} activities</span>
+                    · {{ playbook.name }}
+                </p>
+            </div>
+            <div role="toolbar" aria-label="Activity list actions" class="d-flex flex-wrap gap-2">
+                <a href="#" class="btn btn-primary" data-testid="create-activity-btn"
+                   data-bs-toggle="tooltip" title="Create a new activity (mockup)">
+                    <i class="fa-solid fa-plus"></i> Create New Activity
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-body p-0">
+            <div class="table-responsive" data-testid="activities-table-wrap">
+                <table class="table table-hover align-middle mb-0" data-testid="activities-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Phase</th>
+                            <th scope="col">Order</th>
+                            <th scope="col" style="width: 15%">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for activity in activities %}
+                        <tr data-testid="activity-row-{{ activity.id }}">
+                            <td>
+                                <a href="{% if activity.id == 1 %}{% url 'mockup_copy_prompt_activity_detail' %}{% else %}#{% endif %}">
+                                    <strong>{{ activity.name }}</strong>
+                                </a>
+                                {% if activity.reference_label %}
+                                <span class="badge bg-secondary ms-1 font-monospace">{{ activity.reference_label }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ activity.phase }}</td>
+                            <td>#{{ activity.order }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Actions for {{ activity.name }}">
+                                    <a href="{% if activity.id == 1 %}{% url 'mockup_copy_prompt_activity_detail' %}{% else %}#{% endif %}"
+                                       class="btn btn-outline-primary btn-sm"
+                                       data-testid="view-btn-{{ activity.id }}"
+                                       data-bs-toggle="tooltip"
+                                       title="View activity details">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </a>
+                                    {% include "mockups/copy-prompt/_copy_prompt_row_button.html" with entity_type="activity" entity_pk=activity.id entity_name=activity.name %}
+                                    <a href="#"
+                                       class="btn btn-outline-secondary btn-sm"
+                                       data-testid="edit-btn-{{ activity.id }}"
+                                       data-bs-toggle="tooltip"
+                                       title="Edit this activity (mockup)">
+                                        <i class="fa-solid fa-edit"></i>
+                                    </a>
+                                </div>
+                                <textarea class="visually-hidden"
+                                          readonly
+                                          aria-hidden="true"
+                                          tabindex="-1"
+                                          id="copy-prompt-text-activity-{{ activity.id }}"
+                                          data-testid="copy-prompt-text-activity-{{ activity.id }}"
+                                          data-copy-prompt-source>{{ activity.copy_prompt_text }}</textarea>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
+        <div id="copy-prompt-toast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true" data-testid="copy-prompt-toast">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fa-solid fa-check me-1"></i> Prompt copied to clipboard
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-light border mt-4 small">
+        <strong>Mockup screens:</strong>
+        <a href="{% url 'mockup_copy_prompt_index' %}">Index</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_detail' %}">Activity detail</a> ·
+        <a href="{% url 'mockup_copy_prompt_activity_list' %}">Activity list</a>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    console.log('[mockup:copy-prompt-activity-list] page loaded');
+
+    var toastEl = document.getElementById('copy-prompt-toast');
+    var toast = toastEl ? new bootstrap.Toast(toastEl, { delay: 2000 }) : null;
+
+    document.querySelectorAll('[data-copy-prompt-trigger]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var sourceId = btn.getAttribute('data-copy-prompt-for');
+            var source = sourceId ? document.getElementById(sourceId) : null;
+            if (!source) {
+                var cell = btn.closest('td');
+                source = cell ? cell.querySelector('[data-copy-prompt-source]') : null;
+            }
+            if (!source) {
+                source = document.querySelector('[data-copy-prompt-source]');
+            }
+            var text = source ? source.value : '';
+            console.log('[mockup:copy-prompt-activity-list] copy clicked, testid=' + btn.dataset.testid + ', length=' + text.length);
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function () {
+                    console.log('[mockup:copy-prompt-activity-list] clipboard write OK');
+                    if (toast) toast.show();
+                    var icon = btn.querySelector('i');
+                    if (icon) {
+                        var prev = icon.className;
+                        icon.className = 'fa-solid fa-check';
+                        setTimeout(function () { icon.className = prev; }, 1500);
+                    }
+                }).catch(function (err) {
+                    console.warn('[mockup:copy-prompt-activity-list] clipboard failed', err);
+                });
+            }
+        });
+    });
+
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (el) { return new bootstrap.Tooltip(el); });
+});
+</script>
+{% endblock %}

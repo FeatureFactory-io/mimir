@@ -1,0 +1,11 @@
+{# Icon-only Copy Prompt — list row Actions (Act 17 mockup) #}
+<button type="button"
+        class="btn btn-outline-secondary btn-sm"
+        data-testid="copy-prompt-btn-{{ entity_type }}-{{ entity_pk }}"
+        data-bs-toggle="tooltip"
+        title="Copy prompt to clipboard"
+        aria-label="Copy prompt for {{ entity_name }}"
+        data-copy-prompt-trigger
+        data-copy-prompt-for="copy-prompt-text-{{ entity_type }}-{{ entity_pk }}">
+    <i class="fa-regular fa-copy" aria-hidden="true"></i>
+</button>
