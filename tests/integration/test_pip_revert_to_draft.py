@@ -330,3 +330,50 @@ def test_withdraw_pip_from_reviewed_status(alice, submitted_pip):
     PIPService.withdraw_pip(submitted_pip, alice)
     submitted_pip.refresh_from_db()
     assert submitted_pip.status == ProcessImprovementProposal.STATUS_WITHDRAWN
+
+
+# ---------------------------------------------------------------------------
+# Full Galdr feedback loop: Reviewed → revert → fix → resubmit
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+def test_full_galdr_feedback_loop_revert_and_resubmit(alice, submitted_pip, released_pb):
+    """Reviewed PIP can be reverted, fixed, and resubmitted — the core Galdr loop."""
+    submitted_pip.status = ProcessImprovementProposal.STATUS_REVIEWED
+    submitted_pip.save(update_fields=["status"])
+
+    PIPService.revert_to_draft(submitted_pip, alice)
+    submitted_pip.refresh_from_db()
+    assert submitted_pip.status == ProcessImprovementProposal.STATUS_DRAFT
+    assert submitted_pip.galdr_holistic_assessment == ""
+    for change in submitted_pip.changes.all():
+        assert change.galdr_recommendation == ""
+        assert change.galdr_reasoning == ""
+
+    act = released_pb.workflows.first().activities.first()
+    PIPService.add_change(
+        actor=alice,
+        pip=submitted_pip,
+        change_type=PipChange.CHANGE_ALTER,
+        entity_type=PipChange.ENTITY_ACTIVITY,
+        target_id=act.pk,
+        content="revised guidance after Galdr feedback",
+        name="",
+    )
+
+    result = PIPService.submit_for_review(actor=alice, pip=submitted_pip)
+    result.refresh_from_db()
+    assert result.status in (
+        ProcessImprovementProposal.STATUS_PROCESSING_GALDR,
+        ProcessImprovementProposal.STATUS_REVIEWED,
+    ), f"Expected resubmitted status, got: {result.status}"
+
+
+@pytest.mark.django_db
+def test_submit_directly_from_reviewed_raises(alice, submitted_pip):
+    """submit_for_review must be blocked when PIP is already Reviewed (revert first)."""
+    submitted_pip.status = ProcessImprovementProposal.STATUS_REVIEWED
+    submitted_pip.save(update_fields=["status"])
+
+    with pytest.raises(ValidationError, match="Submit is only allowed from Draft"):
+        PIPService.submit_for_review(actor=alice, pip=submitted_pip)
