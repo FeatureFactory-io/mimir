@@ -1,11 +1,11 @@
 {# Icon-only Copy Prompt — list row Actions (Act 17 mockup) #}
 <button type="button"
-        class="btn btn-outline-secondary btn-sm"
+        class="btn btn-outline-secondary btn-sm mm-copy-prompt-btn-icon"
         data-testid="copy-prompt-btn-{{ entity_type }}-{{ entity_pk }}"
         data-bs-toggle="tooltip"
         title="Copy prompt to use in your ADE"
         aria-label="Copy prompt to use in your ADE for {{ entity_name }}"
         data-copy-prompt-trigger
         data-copy-prompt-for="copy-prompt-text-{{ entity_type }}-{{ entity_pk }}">
-    {% include "mockups/copy-prompt/_cursor_icon.html" with size=14 %}
+    {% include "mockups/copy-prompt/_cursor_icon.html" %}
 </button>

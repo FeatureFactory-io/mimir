@@ -588,3 +588,39 @@ mark.mm-search-highlight {
   border-radius: 0.15rem;
   font-weight: 600;
 }
+
+/* Copy Prompt — Cursor SVG aligned with Font Awesome icons in buttons */
+.mm-copy-prompt-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.mm-copy-prompt-cursor-icon {
+  display: block;
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
+}
+
+.mm-copy-prompt-success-icon {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.btn.mm-copy-prompt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  line-height: 1;
+}
+
+.btn.mm-copy-prompt-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
