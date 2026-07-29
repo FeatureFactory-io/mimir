@@ -64,6 +64,13 @@
                 return inToolbar;
             }
         }
+        var control = btn.closest(".mm-copy-prompt-control");
+        if (control) {
+            var inControl = control.querySelector("[data-copy-prompt-source]");
+            if (inControl) {
+                return inControl;
+            }
+        }
         return btn.parentElement
             ? btn.parentElement.querySelector("[data-copy-prompt-source]")
             : null;
