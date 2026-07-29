@@ -1,6 +1,5 @@
 @manual @uat @mcp-uat-flow
 Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
-
   Execute in AGENT MODE only. CallMcpTool is only available to the parent agent
   (Cursor IDE context). Do NOT delegate these scenarios to a browser-use subagent.
 
@@ -87,8 +86,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     <PIP_PROTO_PK>            — protocol PIP RECORD (MCP-09 step PP-02)
     <DRAFT_NEG_PB_ID>         — draft playbook for negative PIP test (MCP-08c)
     <ADMIN_PUBLIC_WF_ID>      — any workflow id inside <ADMIN_PUBLIC_PB_ID> (MCP-01c; read from list_workflows)
-
-
 #############################################################################
 # MCP-00 — Configure mcp.json → Docker container with UAT token
 ############################################################################
@@ -105,8 +102,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "list_playbooks" arguments {"status": "all"}
     # SEE: response is a JSON array (may be empty); no auth error
     # IF DIFFER: MCP-00 smoke — verify Docker is running and <BASE_URL> is reachable from container
-
-
 #############################################################################
 # MCP-01 — Negative guards
 ############################################################################
@@ -127,8 +122,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "update_activity" arguments {"activity_id": 990000001, "guidance": "## phantom"}
     # SEE: error payload contains substring `990000001 not found`
     # IF DIFFER: MCP-01 update-activity-not-found
-
-
 #############################################################################
 # MCP-01b — MCP list/get follow can_view (same as web: public released cross-user; draft/other rules)
 #############################################################################
@@ -188,8 +181,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "delete_playbook" arguments {"playbook_id": <UAT_PUBLIC_PB_ID>}
     # SEE: `deleted`: true
     # IF DIFFER: MCP-01b cleanup-delete-uat-public
-
-
 #############################################################################
 # MCP-01c — Resource access parity: public playbook resources readable cross-user (bug #115)
 #############################################################################
@@ -245,8 +236,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "update_workflow" arguments {"workflow_id": <ADMIN_PUBLIC_WF_ID>, "name": "Should fail — not owner"}
     # SEE: error payload (403 or similar); name must NOT change
     # IF DIFFER: MCP-01c cross-mutation-denied — visitor must NOT be able to write to others' playbook
-
-
 #############################################################################
 # MCP-02 — Build complete playbook via MCP (all create/update/link tools)
 ############################################################################
@@ -384,8 +373,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "set_activity_rules" arguments {"activity_id": <MCP_ACT1_PK>, "rule_ids": [<MCP_RULE_PK>]}
     # SEE: JSON `.activity_id` = `<MCP_ACT1_PK>`
     # IF DIFFER: MCP-02 RU-03
-
-
 #############################################################################
 # MCP-03 — Read-back verification (all list/get tools)
 ############################################################################
@@ -471,8 +458,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "get_rule" arguments {"rule_id": <MCP_RULE_PK>}
     # SEE: `.title` = `MCP UAT Rule`
     # IF DIFFER: MCP-03 get_rule
-
-
 #############################################################################
 # MCP-04 — Export / import round-trip (export + import + apply_upload_protocol)
 ############################################################################
@@ -495,8 +480,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "apply_upload_protocol" arguments {"protocol_file": "<EXPORT_SUBDIR>/_Upload_Protocol.md"}
     # SEE: JSON `.changes_applied` = 0 AND no error
     # IF DIFFER: MCP-04 EX-03
-
-
 #############################################################################
 # MCP-05 — Delete drill (dedicated mini-playbook; tests all delete/unlink tools)
 ############################################################################
@@ -586,8 +569,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "delete_playbook" arguments {"playbook_id": <DRILL_PB_ID>}
     # SEE: JSON `.deleted` = true
     # IF DIFFER: MCP-05 DL-12
-
-
 #############################################################################
 # MCP-06 — GUI: Release MCP UAT Playbook v1.0 (no release_playbook MCP tool)
 ############################################################################
@@ -604,8 +585,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: fill `[data-testid="release-description-input"]` `MCP UAT release — v1.0 baseline.`; click `[data-testid="release-confirm"]`
     # SEE: `[data-testid="status-badge"]` text `Released` AND `[data-testid="version-badge"]` text `v1.0`
     # IF DIFFER: MCP-06 release
-
-
 #############################################################################
 # MCP-07 — Post-release MCP mutation guard
 ############################################################################
@@ -616,8 +595,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "update_activity" arguments {"activity_id": <MCP_ACT1_PK>, "guidance": "## Illicit post-release edit"}
     # SEE: error payload contains substring `Cannot modify released playbook` OR `Use create_pip instead`
     # IF DIFFER: MCP-07 mutation-denied
-
-
 #############################################################################
 # MCP-08 — PIP lifecycle: create → add changes → preview → list → submit
 ############################################################################
@@ -660,8 +637,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "submit_pip" arguments {"pip_id": <PIP_MAIN_PK>}
     # SEE: JSON `.status` in [`submitted`, `processing_galdr`, `reviewed`] (depends on GALDR_EAGER setting)
     # IF DIFFER: MCP-08 PM-07
-
-
 #############################################################################
 # MCP-08b — Disposable PIP drill: add change → remove → cancel
 ############################################################################
@@ -692,8 +667,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "get_pip" arguments {"pip_id": <PIP_DISP_PK>}
     # SEE: `.status` in [`cancelled`, `withdrawn`]
     # IF DIFFER: MCP-08b PD-05
-
-
 #############################################################################
 # MCP-08c — Negative: create_pip on draft playbook must fail
 ############################################################################
@@ -714,8 +687,43 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "delete_playbook" arguments {"playbook_id": <DRAFT_NEG_PB_ID>}
     # SEE: JSON `.deleted` = true
     # IF DIFFER: MCP-08c PN-03
+#############################################################################
+# MCP-08d — revert_pip_to_draft (Submitted → Draft, Galdr fields cleared)
+############################################################################
 
-
+  @manual @uat @mcp-pip-revert
+  Scenario: MCP-08d revert_pip_to_draft — revert Submitted PIP back to Draft
+    # Precondition: MCP UAT Playbook is Released (v1.0) from MCP-06.
+    #
+    # STEP PR-01 create revert-drill PIP
+    # DO: CallMcpTool server "user-mimir" toolName "create_pip" arguments {"playbook_id": <MCP_PB_ID>, "title": "UAT Revert Drill PIP", "summary": "Created to test revert_pip_to_draft."}
+    # SEE: `.status` = `draft`; RECORD `.id` as `<PIP_REVERT_PK>`
+    # IF DIFFER: MCP-08d PR-01
+    #
+    # STEP PR-02 add a change
+    # DO: CallMcpTool server "user-mimir" toolName "add_pip_change" arguments {"pip_id": <PIP_REVERT_PK>, "change_type": "ALTER", "entity_type": "Activity", "target_id": <MCP_ACT1_PK>, "content": "Revert drill change content"}
+    # SEE: JSON `.change_id` present
+    # IF DIFFER: MCP-08d PR-02
+    #
+    # STEP PR-03 submit the PIP
+    # DO: CallMcpTool server "user-mimir" toolName "submit_pip" arguments {"pip_id": <PIP_REVERT_PK>}
+    # SEE: `.status` in [`submitted`, `processing_galdr`, `reviewed`]
+    # IF DIFFER: MCP-08d PR-03
+    #
+    # STEP PR-04 revert to draft
+    # DO: CallMcpTool server "user-mimir" toolName "revert_pip_to_draft" arguments {"pip_id": <PIP_REVERT_PK>}
+    # SEE: JSON `.reverted` = true; `.pip_id` = <PIP_REVERT_PK>
+    # IF DIFFER: MCP-08d PR-04
+    #
+    # STEP PR-05 get_pip — confirm status reset and Galdr fields cleared
+    # DO: CallMcpTool server "user-mimir" toolName "get_pip" arguments {"pip_id": <PIP_REVERT_PK>}
+    # SEE: `.status` = `draft`; `.galdr_holistic_assessment` = `""` or absent
+    # IF DIFFER: MCP-08d PR-05
+    #
+    # STEP PR-06 cleanup: cancel the reverted PIP
+    # DO: CallMcpTool server "user-mimir" toolName "cancel_pip" arguments {"pip_id": <PIP_REVERT_PK>}
+    # SEE: JSON `.cancelled` = true
+    # IF DIFFER: MCP-08d PR-06
 #############################################################################
 # MCP-09 — create_pip_from_protocol (export released workflow → edit locally → PIP)
 ############################################################################
@@ -753,8 +761,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "submit_pip" arguments {"pip_id": <PIP_PROTO_PK>}
     # SEE: `.status` in [`submitted`, `processing_galdr`, `reviewed`]
     # IF DIFFER: MCP-09 PP-04
-
-
 #############################################################################
 # MCP-10 — GUI: Admin finalize both PIPs (browser step)
 ############################################################################
@@ -780,8 +786,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: select rows for `<PIP_MAIN_PK>` and `<PIP_PROTO_PK>`; run action `Finalize reviewed PIPs (apply accepted changes + notify)`
     # SEE: success flash lines contain `Finalised PIP-<id>` for both PIPs
     # IF DIFFER: MCP-10 mass-finalize
-
-
 #############################################################################
 # MCP-11 — Post-finalize MCP inventory
 ############################################################################
@@ -812,7 +816,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "get_pip" arguments {"pip_id": <PIP_PROTO_PK>}
     # SEE: `.status` = `accepted`
     # IF DIFFER: MCP-11 FN-05
-
 #############################################################################
 # MCP-12 — Playbook version history via extended get_playbook
 #############################################################################
@@ -841,8 +844,6 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     # DO: CallMcpTool server "user-mimir" toolName "get_playbook" arguments {"playbook_id": <MCP_PB_ID>, "version": "99.9"}
     # SEE: error payload contains substring `99.9 not found` OR `version not found`
     # IF DIFFER: MCP-12 VH-04
-
-
 #############################################################################
 # MCP-15 — Team playbook children readable via MCP list tools
 ############################################################################

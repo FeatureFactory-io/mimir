@@ -27,12 +27,20 @@
             <div role="toolbar" aria-label="PIP actions"
                  class="d-flex flex-wrap gap-2 align-items-center flex-shrink-0"
                  data-testid="pip-detail-actions">
+            {% if can_revert_to_draft %}
+            <button type="button" class="btn btn-outline-warning"
+                    data-bs-toggle="modal" data-bs-target="#revertToDraftModal"
+                    data-testid="pip-detail-revert-open"
+                    title="Return this PIP to Draft for editing">
+                <i class="fa-solid fa-rotate-left me-1"></i>Withdraw to Draft
+            </button>
+            {% endif %}
             {% if can_withdraw %}
             <button type="button" class="btn btn-outline-danger"
                     data-bs-toggle="modal" data-bs-target="#withdrawPipModal"
                     data-testid="pip-detail-withdraw-open"
-                    title="Withdraw and delete this proposal">
-                <i class="fa-solid fa-ban me-1"></i>Withdraw / cancel
+                    title="Cancel and permanently delete this proposal">
+                <i class="fa-solid fa-ban me-1"></i>Cancel PIP
             </button>
             {% endif %}
             {% if can_preview %}
@@ -44,6 +52,7 @@
             {% endif %}
             {% if can_edit %}
             <a class="btn btn-outline-secondary" href="{% url 'pip_edit' pip.pk %}"
+               data-testid="pip-detail-edit-draft"
                data-bs-toggle="tooltip"
                title="Edit this draft PIP">
                 <i class="fa-solid fa-pen-to-square me-1"></i>Edit draft
@@ -153,21 +162,42 @@
     {% endwith %}
 </div>
 
+{% if can_revert_to_draft %}
+<div class="modal fade" id="revertToDraftModal" tabindex="-1" aria-labelledby="revertToDraftModalLabel"
+     aria-hidden="true" data-testid="pip-revert-modal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="revertToDraftModalLabel">Return PIP to Draft?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">This will return the PIP to Draft. Galdr assessments will be cleared. You can edit and resubmit.</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><i class="fas fa-xmark me-1"></i>Close</button>
+                <form method="post" action="{% url 'pip_revert_to_draft' pip.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-warning" data-testid="pip-detail-revert-confirm"><i class="fas fa-rotate-left me-1"></i>Return to Draft</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% if can_withdraw %}
 <div class="modal fade" id="withdrawPipModal" tabindex="-1" aria-labelledby="withdrawPipModalLabel"
      aria-hidden="true" data-testid="pip-withdraw-modal">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="withdrawPipModalLabel">Withdraw PIP?</h5>
+                <h5 class="modal-title" id="withdrawPipModalLabel">Cancel PIP?</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">This deletes the proposal. This cannot be undone.</div>
+            <div class="modal-body">This permanently cancels the proposal. This cannot be undone.</div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><i class="fas fa-xmark me-1"></i>Close</button>
                 <form method="post" action="{% url 'pip_withdraw' pip.pk %}">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-danger" data-testid="pip-detail-withdraw-confirm"><i class="fas fa-trash-can me-1"></i>Withdraw now</button>
+                    <button type="submit" class="btn btn-danger" data-testid="pip-detail-withdraw-confirm"><i class="fas fa-trash-can me-1"></i>Cancel now</button>
                 </form>
             </div>
         </div>

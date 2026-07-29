@@ -1,5 +1,5 @@
 """
-E2E acceptance test: all 53 MCP tools via JSON-RPC subprocess.
+E2E acceptance test: all 54 MCP tools via JSON-RPC subprocess.
 
 Starts the real MCP server as a subprocess and exercises every registered
 tool via raw JSON-RPC ``tools/call`` messages in a single coherent scenario.
@@ -7,7 +7,7 @@ tool via raw JSON-RPC ``tools/call`` messages in a single coherent scenario.
 Uses a module-scoped temporary SQLite database (``MIMIR_DB_PATH``) so this
 suite never reads or writes committed ``mimir.db``.
 
-Coverage (53 tools):
+Coverage (54 tools):
     Playbooks   (5): create, list, get, update, delete
     Workflows   (5): create, list, get, update, delete
     Activities  (6): create, list, get, update, set_predecessor, delete
@@ -17,15 +17,16 @@ Coverage (53 tools):
     Rules       (6): create, list, get, update, set_activity_rules, delete
     Phases      (6): create, list, get, update, reorder, delete
     Export/Imp  (4): export, import, apply_protocol, create_pip
+    PIPs        (+1): revert_pip_to_draft
 """
 import json
+import logging
 import os
+import select
 import subprocess
 import tempfile
 import time
 import uuid
-import logging
-import select
 from pathlib import Path
 
 import pytest
@@ -274,6 +275,7 @@ class TestMCPAllTools:
     export_dir: str = None
     protocol_file: str = None
     pip_pb_id: int = None   # Released playbook for create_pip test
+    pip_revert_pk: int = None  # PIP id used for revert_pip_to_draft test
 
     # ------------------------------------------------------------------
     # 1. Playbooks (5 tools)
@@ -807,6 +809,70 @@ class TestMCPAllTools:
             if "released" in str(e).lower() or "draft" in str(e).lower():
                 pytest.skip(f"create_pip requires specific playbook state: {e}")
             raise
+
+    # ------------------------------------------------------------------
+    # 11. PIP revert-to-draft
+    # ------------------------------------------------------------------
+
+    def test_51b_revert_pip_to_draft(self, mcp, uid, db):
+        """Create PIP, submit it, then revert to draft via revert_pip_to_draft."""
+        from decimal import Decimal
+
+        from django.contrib.auth import get_user_model
+
+        from methodology.models import (
+            Activity,
+            PipChange,
+            Playbook,
+            ProcessImprovementProposal,
+            Workflow,
+        )
+        from methodology.services.pip_service import PIPService
+
+        User = get_user_model()
+        actor = User.objects.get(username="admin")
+
+        pb = Playbook.objects.create(
+            name=f"Revert MCP PB {uid}",
+            description="d" * 30,
+            category="development",
+            author=actor,
+            status="released",
+            version=Decimal("1.0"),
+        )
+        wf = Workflow.objects.create(playbook=pb, name="Main", order=1)
+        act = Activity.objects.create(workflow=wf, name="Step", guidance="g" * 20, order=1)
+        pip = PIPService.create_draft_for_playbook(
+            actor=actor, playbook_id=pb.pk, title=f"Revert MCP PIP {uid}", summary=""
+        )
+        PIPService.add_change(
+            actor=actor, pip=pip,
+            change_type=PipChange.CHANGE_ALTER,
+            entity_type=PipChange.ENTITY_ACTIVITY,
+            target_id=act.pk,
+            content="updated guidance", name="",
+        )
+        pip.status = ProcessImprovementProposal.STATUS_SUBMITTED
+        pip.galdr_holistic_assessment = "some holistic"
+        pip.save(update_fields=["status", "galdr_holistic_assessment"])
+        pip.changes.update(
+            galdr_recommendation=PipChange.GALDR_ACCEPT,
+            galdr_reasoning="looks good",
+        )
+        TestMCPAllTools.pip_revert_pk = pip.pk
+
+        result = mcp.call("revert_pip_to_draft", {"pip_id": pip.pk})
+        assert result.get("reverted") is True, f"revert_pip_to_draft: {result}"
+        assert result.get("pip_id") == pip.pk
+
+        pip.refresh_from_db()
+        assert pip.status == ProcessImprovementProposal.STATUS_DRAFT
+        assert pip.galdr_holistic_assessment == ""
+        for ch in pip.changes.all():
+            assert ch.galdr_recommendation == ""
+            assert ch.galdr_reasoning == ""
+
+        logger.info(f"✓ revert_pip_to_draft → reverted=True pip_id={pip.pk}")
 
     # ------------------------------------------------------------------
     # 10. Teardown: delete core resources (in reverse dependency order)

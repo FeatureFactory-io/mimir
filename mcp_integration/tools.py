@@ -22,14 +22,16 @@ import os
 os.environ.setdefault('DJANGO_ALLOW_ASYNC_UNSAFE', 'true')
 
 import logging
-from typing import Literal, Optional
 from decimal import Decimal
+from typing import Literal, Optional
+
+from asgiref.sync import sync_to_async
 from django.core.exceptions import ValidationError
 from fastmcp import FastMCP
-from asgiref.sync import sync_to_async
+
 from methodology.services.playbook_history_service import (
-    list_playbook_version_rows,
     get_playbook_version_by_number,
+    list_playbook_version_rows,
     playbook_versions_ordered,
 )
 
@@ -676,8 +678,8 @@ async def create_activity(workflow_id: int, name: str, guidance: str = "",
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Activity, Workflow
-    from methodology.services.workflow_service import WorkflowService
     from methodology.services.activity_service import ActivityService
+    from methodology.services.workflow_service import WorkflowService
 
     def _load_wf():
         try:
@@ -753,8 +755,8 @@ async def list_activities(workflow_id: int) -> list:
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Workflow
-    from methodology.services.workflow_service import WorkflowService
     from methodology.services.activity_service import ActivityService
+    from methodology.services.workflow_service import WorkflowService
 
     def _load_wf():
         try:
@@ -1234,8 +1236,11 @@ async def import_workflow_from_local(
         _handle_validation_error(e, 'import_workflow_from_local')
     
     if auto_apply and result['playbook_status'] == 'draft':
-        from methodology.services.workflow_protocol_service import WorkflowProtocolService
         import os
+
+        from methodology.services.workflow_protocol_service import (
+            WorkflowProtocolService,
+        )
         protocol_file = os.path.join(source_directory, '_Upload_Protocol.md')
         try:
             apply_result = await sync_to_async(WorkflowProtocolService.apply_upload_protocol)(
@@ -1907,8 +1912,9 @@ async def list_agents(
 
     await _playbook_for_read(playbook_id, user)
 
-    from methodology.services.agent_service import AgentService
     from django.db.models import Count, Q
+
+    from methodology.services.agent_service import AgentService
 
     qs = await sync_to_async(AgentService.list_agents_for_playbook)(playbook_id)
 
@@ -2618,8 +2624,9 @@ async def get_phase(phase_id: int) -> dict:
     
     user = await sync_to_async(get_current_user)()
 
-    from methodology.services.phase_service import PhaseService
     from django.core.exceptions import PermissionDenied
+
+    from methodology.services.phase_service import PhaseService
 
     try:
         phase_data = await sync_to_async(PhaseService.get_phase_with_activities)(phase_id, user)
@@ -3076,6 +3083,24 @@ async def cancel_pip(pip_id: int) -> dict:
     return {"cancelled": True, "pip_id": int(pip_id)}
 
 
+async def revert_pip_to_draft(pip_id: int) -> dict:
+    """Revert a Submitted or Processing PIP back to Draft, clearing Galdr assessments."""
+
+    user = await sync_to_async(get_current_user)()
+
+    def _revert():
+        from methodology.services.pip_service import PIPService
+
+        pip = PIPService.get_pip(pip_id, user)
+        try:
+            PIPService.revert_to_draft(pip, user)
+        except ValidationError as e:
+            _handle_validation_error(e, "revert_pip_to_draft")
+
+    await sync_to_async(_revert)()
+    return {"reverted": True, "pip_id": int(pip_id)}
+
+
 async def preview_pip_diff(pip_id: int) -> dict:
     """Return human-readable preview rows for diff-style inspection."""
 
@@ -3237,10 +3262,10 @@ async def get_team(team_id: int) -> dict:
     logger.info(f"MCP Tool: get_team called - team_id={team_id}")
     user = await sync_to_async(get_current_user)()
 
-    from methodology.services.team_service import TeamService
-    from methodology.models import Team
-
     from django.http import Http404 as _Http404
+
+    from methodology.models import Team
+    from methodology.services.team_service import TeamService
 
     service = TeamService()
     try:
@@ -3381,9 +3406,9 @@ async def move_playbook_to_team(playbook_id: int, team_id: int) -> dict:
     logger.info(f"MCP Tool: move_playbook_to_team called - playbook_id={playbook_id}, team_id={team_id}")
     user = await sync_to_async(get_current_user)()
 
-    from methodology.services.team_service import TeamService
-    from methodology.services.playbook_service import PlaybookService
     from methodology.models import Team
+    from methodology.services.playbook_service import PlaybookService
+    from methodology.services.team_service import TeamService
 
     try:
         team = await sync_to_async(Team.objects.get)(pk=team_id)
@@ -3432,9 +3457,9 @@ async def move_playbook_from_team(playbook_id: int, team_id: int) -> dict:
     logger.info(f"MCP Tool: move_playbook_from_team called - playbook_id={playbook_id}, team_id={team_id}")
     user = await sync_to_async(get_current_user)()
 
-    from methodology.services.team_service import TeamService
-    from methodology.services.playbook_service import PlaybookService
     from methodology.models import Team
+    from methodology.services.playbook_service import PlaybookService
+    from methodology.services.team_service import TeamService
 
     try:
         team = await sync_to_async(Team.objects.get)(pk=team_id)
@@ -3485,8 +3510,8 @@ async def invite_to_team(team_id: int, emails: list[str], welcome_text: str = ""
     logger.info(f"MCP Tool: invite_to_team called - team_id={team_id}, emails={emails}")
     user = await sync_to_async(get_current_user)()
 
-    from methodology.services.team_invite_service import TeamInviteService
     from methodology.models import Team
+    from methodology.services.team_invite_service import TeamInviteService
 
     try:
         team = await sync_to_async(Team.objects.get)(pk=team_id)
@@ -3539,8 +3564,8 @@ async def manage_team_invite(
     logger.info(f"MCP Tool: manage_team_invite called - team_id={team_id}, request_id={request_id}, action={action}")
     user = await sync_to_async(get_current_user)()
 
+    from methodology.models import JoinRequest, Team
     from methodology.services.team_service import TeamService
-    from methodology.models import Team, JoinRequest
 
     try:
         team = await sync_to_async(Team.objects.get)(pk=team_id)
@@ -3625,6 +3650,7 @@ def initialize_mcp():
     mcp.tool()(remove_pip_change)
     mcp.tool()(submit_pip)
     mcp.tool()(cancel_pip)
+    mcp.tool()(revert_pip_to_draft)
     mcp.tool()(preview_pip_diff)
     mcp.tool()(report_bug)
 
@@ -3681,6 +3707,6 @@ def initialize_mcp():
     mcp.tool()(invite_to_team)
     mcp.tool()(manage_team_invite)
 
-    logger.info("MCP: All tools registered (57 tools: 50 previous + 7 team tools)")
+    logger.info("MCP: All tools registered (58 tools: 57 previous + revert_pip_to_draft)")
     return mcp
 

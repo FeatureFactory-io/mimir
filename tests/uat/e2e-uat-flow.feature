@@ -1,6 +1,5 @@
 @manual @uat @e2e-uat-flow
 Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → release → PIP GUI → admin finalize)
-
   BROWSER STEPS ONLY — no CallMcpTool calls in this file.
   All MCP tool scenarios live in tests/uat/mcp-uat-flow.feature (run in agent mode).
 
@@ -13,7 +12,7 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     5. J5 here  (release via GUI)
     6. mcp-uat-flow.feature MCP-06/07  (release + post-release guard)
     7. J6 browser here  (PIP UI)
-    8. mcp-uat-flow.feature MCP-08/08b/08c/09  (PIP MCP lifecycle)
+    8. mcp-uat-flow.feature MCP-08/08b/08c/08d/09  (PIP MCP lifecycle)
     9. J7 here  (admin finalize + GUI verify)
    10. mcp-uat-flow.feature MCP-11  (post-finalize inventory)
 
@@ -26,7 +25,7 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     | J3      | UAT-03-00 … UAT-03-03 + CRUDL splits                 | MCP-01/02/03                           |
     | J3B     | UAT-03-05, UAT-03-05b (GUI visibility isolation)     | MCP-01b (MCP author-scoping proof)     |
     | J5      | UAT-05-00, UAT-05-01                                 | MCP-06 (release), MCP-07 (guard)       |
-    | J6 GUI  | UAT-06-00, UAT-06-01-neg, UAT-06-02, UAT-06-06      | MCP-08/08b/08c/09                      |
+    | J6 GUI  | UAT-06-00, UAT-06-01-neg, UAT-06-02, UAT-06-06, UAT-06-07 | MCP-08/08b/08c/08d/09             |
     | J7      | UAT-07-01, UAT-07-02                                 | MCP-11 (post-finalize inventory)       |
     | J8      | UAT-08-00 … UAT-08-10 (Teams: browse/create/detail/join/manage/leave/profile) | — |
 
@@ -145,7 +144,6 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     # SEE: no Create workflow button (or links to login)
     # SEE: workflows from `<ADMIN_PRIVATE_PB_ID>` absent
     # IF DIFFER: UAT-00-07
-
 #############################################################################
 # Journey 1 — Registration + verify + profile token
 ############################################################################
@@ -351,7 +349,6 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     # SEE: `[data-testid=\"pip-list-page\"]`; optional badge `[data-testid=\"pip-list-count\"]` textual `PIPs (`
     # DO: playbook list locate `[data-testid=\"playbook-book-card-<GUI_PLAYBOOK_ID>\"]`
     # SEE: quick stats still ≥2 Activities (post-PIP bumps come after mcp-uat-flow MCP-08)
-
 #############################################################################
 # Journey 3B — Visibility isolation: public vs private playbooks in GUI
 #############################################################################
@@ -428,7 +425,6 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     # SEE: `[data-testid="delete-modal"]` (or equivalent) renders with warning text referencing cascading deletion
     # DO: click Cancel; playbook detail still visible; playbook not deleted
     # NOTE: leave `<GUI_PLAYBOOK_ID>` as Private for Journey 5 (release flow)
-
   # → MCP author-scoping proof (list_playbooks/get_playbook ignore GUI visibility)
   #   is covered by mcp-uat-flow.feature MCP-01b.
 #############################################################################
@@ -438,7 +434,6 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
   # MCP-02: MCP read/write/link verbs against GUI entities (GUI-01 … GUI-19)
   # MCP-03: read-back verification (list/get all entity types)
   # Run mcp-uat-flow.feature MCP-01/02/03 after completing Journey 3.
-
   # → MCP full lifecycle sandbox (53 tools + export/import + teardown)
   #   is covered by mcp-uat-flow.feature MCP-02 through MCP-05.
 #############################################################################
@@ -517,13 +512,43 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     # STEP Submit awaiting Galdr
     # DO: `[data-testid=\"pip-submit-review\"]` POST form `[data-testid=\"pip-submit-form\"]`
     # SEE: redirected `/pips/<PIP_GUI_PK>/`; banner `[data-testid=\"pip-status-banner\"]` substring `Submitted — awaiting Galdr processing.` (text from ``PIP_DETAIL_STATIC_BANNERS[submitted]``)
-
   # → MCP PIP lifecycle (create_pip, add_pip_change, get_pip, list_pips, submit_pip,
-  #   remove_pip_change, cancel_pip, and negatives) is covered by:
+  #   remove_pip_change, cancel_pip, revert_pip_to_draft, and negatives) is covered by:
   #   mcp-uat-flow.feature MCP-08 (main PIP MCP flow RECORD <PIP_MCP_PK>)
   #   mcp-uat-flow.feature MCP-08b (disposable PIP drill)
   #   mcp-uat-flow.feature MCP-08c (create_pip on draft → error)
+  #   mcp-uat-flow.feature MCP-08d (revert_pip_to_draft)
   # Run those scenarios after UAT-06-02.
+
+  @manual @uat @act-9-revert-browser
+  Scenario: UAT-06-07 GUI PIP Withdraw-to-Draft — submitted PIP reverts to Draft
+    # Precondition: UAT-06-02 completed — `<PIP_GUI_PK>` is Submitted.
+    # If Galdr has already moved `<PIP_GUI_PK>` to Reviewed, reuse <PIP_NEG_PK> (still Draft) and submit it first.
+    #
+    # STEP navigate to detail
+    # DO: GET `<BASE_URL>/pips/<PIP_GUI_PK>/`
+    # SEE: `[data-testid="pip-status-badge"]` text `Submitted` (or `Processing Galdr`)
+    # IF DIFFER: UAT-06-07 navigate
+    #
+    # STEP verify both action buttons present
+    # SEE: `[data-testid="pip-detail-revert-open"]` visible
+    # SEE: `[data-testid="pip-detail-withdraw-open"]` visible
+    # SEE: `[data-testid="pip-detail-edit-draft"]` NOT visible
+    # IF DIFFER: UAT-06-07 buttons
+    #
+    # STEP open revert modal
+    # DO: click `[data-testid="pip-detail-revert-open"]`
+    # SEE: `[data-testid="pip-revert-modal"]` visible; body text includes `Return to Draft`
+    # IF DIFFER: UAT-06-07 modal
+    #
+    # STEP confirm revert
+    # DO: click `[data-testid="pip-detail-revert-confirm"]`
+    # SEE: redirect back to `/pips/<PIP_GUI_PK>/`
+    # SEE: `[data-testid="alert-message"]` substring `returned to Draft` OR `PIP returned to Draft`
+    # SEE: `[data-testid="pip-status-badge"]` text `Draft`
+    # SEE: `[data-testid="pip-detail-edit-draft"]` visible (edit button re-appears for Draft)
+    # SEE: `[data-testid="pip-detail-revert-open"]` NOT visible
+    # IF DIFFER: UAT-06-07 post-revert state
 
   @manual @uat @act-9-galdr-detail
   Scenario: UAT-06-06 Detail Galdr + admin accordion instrumentation (dual PIPs)
@@ -550,7 +575,6 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     # DO: playbook history tab `[data-testid=\"tab-history\"]`
     # SEE: references both PIPs / history rows cross-linking bumped versions narrative
     # DO: BOTH `/pips/<PIP_GUI_PK>/` + `/pips/<PIP_MCP_PK>/` status `Accepted`; badges `[data-testid=\"admin-verdict-<order>\"]`
-
   # → Post-finalize MCP inventory (list_playbooks released, list_activities,
   #   get_pip status accepted) is covered by mcp-uat-flow.feature MCP-11.
   # Run mcp-uat-flow.feature MCP-11 after completing UAT-07-02.
@@ -726,7 +750,6 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     # DO: Navigate to `[data-testid="nav-artifacts"]` → `/artifacts/`
     # SEE: Team artifact name visible in global artifacts list
     # IF DIFFER: UAT-08-15
-
 #############################################################################
 # APPENDIX A — MCP 61-tool checklist → see mcp-uat-flow.feature
 #############################################################################

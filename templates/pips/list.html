@@ -186,6 +186,32 @@
                                     {% csrf_token %}
                                 </form>
                                 {% endif %}
+                                {% if pip.status in 'submitted,processing_galdr' and pip.created_by == request.user %}
+                                <button type="button"
+                                        class="btn btn-outline-warning"
+                                        data-bs-toggle="tooltip"
+                                        title="Return to Draft"
+                                        onclick="if(confirm('Return this PIP to Draft? Galdr assessments will be cleared.')) document.getElementById('revert-form-{{ pip.pk }}').submit()"
+                                        data-testid="pip-action-revert-{{ pip.pk }}">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                                <form id="revert-form-{{ pip.pk }}" method="post" action="{% url 'pip_revert_to_draft' pip.pk %}" class="d-none">
+                                    {% csrf_token %}
+                                </form>
+                                {% endif %}
+                                {% if pip.status in 'draft,submitted,processing_galdr' and pip.created_by == request.user %}
+                                <button type="button"
+                                        class="btn btn-outline-danger"
+                                        data-bs-toggle="tooltip"
+                                        title="Cancel PIP permanently"
+                                        onclick="if(confirm('Cancel this PIP permanently? This cannot be undone.')) document.getElementById('cancel-form-{{ pip.pk }}').submit()"
+                                        data-testid="pip-action-cancel-{{ pip.pk }}">
+                                    <i class="fa-solid fa-ban"></i>
+                                </button>
+                                <form id="cancel-form-{{ pip.pk }}" method="post" action="{% url 'pip_withdraw' pip.pk %}" class="d-none">
+                                    {% csrf_token %}
+                                </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

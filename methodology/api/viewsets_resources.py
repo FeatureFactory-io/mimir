@@ -6,26 +6,43 @@ Continuation of viewsets.py for remaining resources.
 
 import logging
 from decimal import Decimal
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
-from django.db.models import Count
-from django.core.exceptions import ValidationError
 
-from methodology.models import (
-    Playbook, Skill, Agent, Artifact, ArtifactInput, Phase, Rule,
-    ProcessImprovementProposal, PipChange, Team, JoinRequest
-)
+from django.core.exceptions import ValidationError
+from django.db.models import Count
+from django.shortcuts import get_object_or_404
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from methodology.api.permissions import IsDraftPlaybook, IsOwnerOrReadOnly
 from methodology.api.serializers import (
-    SkillSerializer, AgentSerializer, ArtifactSerializer,
-    ArtifactInputSerializer, PhaseSerializer, RuleSerializer,
-    PIPSerializer, PIPListSerializer, TeamSerializer, TeamListSerializer,
-    JoinRequestSerializer
+    AgentSerializer,
+    ArtifactInputSerializer,
+    ArtifactSerializer,
+    JoinRequestSerializer,
+    PhaseSerializer,
+    PIPListSerializer,
+    PIPSerializer,
+    RuleSerializer,
+    SkillSerializer,
+    TeamListSerializer,
+    TeamSerializer,
 )
-from methodology.api.permissions import IsOwnerOrReadOnly, IsDraftPlaybook
 from methodology.api.viewsets import _accessible_playbook_ids
+from methodology.models import (
+    Agent,
+    Artifact,
+    ArtifactInput,
+    JoinRequest,
+    Phase,
+    PipChange,
+    Playbook,
+    ProcessImprovementProposal,
+    Rule,
+    Skill,
+    Team,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -284,8 +301,8 @@ class RuleViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """Create rule, delegating slug generation to RuleService."""
-        from methodology.services.rule_service import RuleService
         from methodology.services.playbook_service import PlaybookService
+        from methodology.services.rule_service import RuleService
 
         playbook_id = request.data.get('playbook_id')
         title = request.data.get('title', '')
@@ -474,6 +491,22 @@ class PIPViewSet(viewsets.GenericViewSet):
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"cancelled": True, "pip_id": int(pk)})
 
+    @action(detail=True, methods=['post'], url_path='revert-to-draft')
+    def revert_to_draft(self, request, pk=None):
+        """Revert a Submitted or Processing PIP back to Draft."""
+        logger.info("API: revert_pip_to_draft user=%s pip=%s", request.user.pk, pk)
+        from methodology.services.pip_service import PIPService
+        try:
+            pip = PIPService.get_pip(int(pk), request.user)
+            PIPService.revert_to_draft(pip, request.user)
+        except ProcessImprovementProposal.DoesNotExist:
+            return Response({"error": f"PIP {pk} not found"}, status=status.HTTP_404_NOT_FOUND)
+        except PermissionError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except (ValidationError, ValueError) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"reverted": True, "pip_id": int(pk)})
+
     @action(detail=True, methods=['get'], url_path='preview')
     def preview(self, request, pk=None):
         """Return preview diff rows for a PIP."""
@@ -542,8 +575,8 @@ class TeamViewSet(viewsets.ModelViewSet):
     def move_playbook_to_team(self, request, pk=None):
         """Add a playbook to team (admin only)."""
         logger.info(f'API: move_playbook_to_team team_id={pk} user={request.user.pk}')
-        from methodology.services.team_service import TeamService
         from methodology.services.playbook_service import PlaybookService
+        from methodology.services.team_service import TeamService
         
         team = self.get_object()
         
@@ -580,8 +613,8 @@ class TeamViewSet(viewsets.ModelViewSet):
     def move_playbook_from_team(self, request, pk=None):
         """Remove a playbook from team (admin only)."""
         logger.info(f'API: move_playbook_from_team team_id={pk} user={request.user.pk}')
-        from methodology.services.team_service import TeamService
         from methodology.services.playbook_service import PlaybookService
+        from methodology.services.team_service import TeamService
         
         team = self.get_object()
         

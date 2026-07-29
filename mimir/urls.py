@@ -17,29 +17,36 @@ Including another URLconf
 
 from django.conf import settings
 from django.contrib import admin
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import include, path
 from rest_framework.authtoken.views import obtain_auth_token
-from methodology import views as methodology_views
-from methodology import workflow_views
-from methodology import activity_views
-from methodology import skill_views
-from methodology import rule_views
-from methodology import agent_views
-from methodology import artifact_views
-from methodology import phase_views
-from methodology import pip_views
-from mimir import health_views
-from methodology.api.viewsets import (
-    PlaybookViewSet, WorkflowViewSet, ActivityViewSet
-)
-from methodology.api.viewsets_resources import (
-    SkillViewSet, AgentViewSet, ArtifactViewSet,
-    ArtifactInputViewSet, PhaseViewSet, RuleViewSet, PIPViewSet, TeamViewSet
-)
-from methodology.api.bug_report_views import BugReportSubmitView
-from methodology import feedback_views
+from rest_framework.routers import DefaultRouter
+
 from accounts import legal_views
+from methodology import (
+    activity_views,
+    agent_views,
+    artifact_views,
+    feedback_views,
+    phase_views,
+    pip_views,
+    rule_views,
+    skill_views,
+    workflow_views,
+)
+from methodology import views as methodology_views
+from methodology.api.bug_report_views import BugReportSubmitView
+from methodology.api.viewsets import ActivityViewSet, PlaybookViewSet, WorkflowViewSet
+from methodology.api.viewsets_resources import (
+    AgentViewSet,
+    ArtifactInputViewSet,
+    ArtifactViewSet,
+    PhaseViewSet,
+    PIPViewSet,
+    RuleViewSet,
+    SkillViewSet,
+    TeamViewSet,
+)
+from mimir import health_views
 
 # DRF Router for API endpoints
 router = DefaultRouter()
@@ -98,6 +105,7 @@ urlpatterns = [
     path("pips/<int:pk>/preview/", pip_views.pip_preview, name="pip_preview"),
     path("pips/<int:pk>/submit/", pip_views.pip_submit_review, name="pip_submit_review"),
     path("pips/<int:pk>/withdraw/", pip_views.pip_withdraw, name="pip_withdraw"),
+    path("pips/<int:pk>/revert-to-draft/", pip_views.pip_revert_to_draft, name="pip_revert_to_draft"),
     path("pips/<int:pk>/admin-review/", pip_views.pip_admin_review, name="pip_admin_review"),
     path("search/", methodology_views.global_search, name="global_search"),
     path("search/suggestions/", methodology_views.global_search_suggestions, name="global_search_suggestions"),

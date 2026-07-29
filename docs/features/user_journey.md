@@ -2149,8 +2149,9 @@ Maria navigates to **PIPs** in the top nav. The list page loads and immediately 
 - **Row actions** (dropdown per row):
   - [View] → FOB-PIP-DETAIL
   - [Edit] (Draft only)
-  - [Withdraw] (Submitted and Processing only) — reverts PIP to Draft
-  - [Discard] (Draft only)
+  - [Withdraw] (Submitted and Processing only) — reverts PIP to Draft for editing and resubmission
+  - [Cancel PIP] (Submitted and Processing only) — permanently cancels the PIP
+  - [Discard] (Draft only) — permanently deletes the draft
 - **Example rows** (with blue dot on PIP-42 since it just moved to Reviewed):
 
 ```
@@ -2186,12 +2187,14 @@ Maria opens PIP-42:
 
 - **Status banner** and available actions by state:
   - **Draft**: "Draft — not yet submitted." → [Edit PIP] [Submit for Review] [Discard]
-  - **Submitted**: "Submitted — queued for Galdr review." → [Withdraw]
-  - **Processing (Galdr)**: "Galdr is reviewing your changes — check back shortly." → [Withdraw]
+  - **Submitted**: "Submitted — queued for Galdr review." → [Withdraw] [Cancel PIP]
+  - **Processing (Galdr)**: "Galdr is reviewing your changes — check back shortly." → [Withdraw] [Cancel PIP]
   - **Reviewed**: "Reviewed — awaiting Administrator decision." → (read-only)
   - **Accepted / Rejected**: outcome banner with per-Change verdicts → (read-only)
 
-**[Withdraw]** is available on Submitted and Processing PIPs. Clicking it shows a confirmation modal: "Withdraw PIP-42? It will return to Draft and any in-progress Galdr review will be discarded." On confirm, the PIP status reverts to `Draft`, Galdr processing is aborted, all Galdr recommendations are cleared, and Maria can edit and resubmit.
+**[Withdraw]** and **[Cancel PIP]** are both available on Submitted and Processing PIPs — they have distinct semantics:
+- **[Withdraw]** — reverts PIP to `Draft`; Galdr processing is aborted; all Galdr recommendations are cleared; Maria can edit and resubmit. Confirmation: *"Withdraw PIP-42? It will return to Draft and any in-progress Galdr review will be discarded."*
+- **[Cancel PIP]** — permanently cancels the PIP (no recovery). Confirmation: *"Cancel PIP-42 permanently? This cannot be undone."*
 
 ---
 

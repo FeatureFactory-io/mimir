@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from typing import Literal, Optional
 
-from mcp_integration.facade.client import get_client, check_response, get_server_url
+from mcp_integration.facade.client import check_response, get_client, get_server_url
 from mcp_integration.facade.workspace_mount import (
     ensure_import_supported_on_server,
     ensure_readable_workspace_path,
@@ -1396,6 +1396,18 @@ def cancel_pip(pip_id: int) -> dict:
     logger.info(f'HTTP Tool: cancel_pip id={pip_id}')
     r = get_client().post(f"/api/pips/{pip_id}/cancel/")
     return check_response(r, "cancel_pip")
+
+
+def revert_pip_to_draft(pip_id: int) -> dict:
+    """
+    Revert a Submitted or Processing PIP back to Draft, clearing Galdr assessments.
+
+    :param pip_id: PIP ID. Example: 1
+    :return: Dict with reverted=True and pip_id
+    """
+    logger.info(f'HTTP Tool: revert_pip_to_draft id={pip_id}')
+    r = get_client().post(f"/api/pips/{pip_id}/revert-to-draft/")
+    return check_response(r, "revert_pip_to_draft")
 
 
 def preview_pip_diff(pip_id: int) -> dict:

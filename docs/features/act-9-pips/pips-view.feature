@@ -3,35 +3,34 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
   I want to view the full detail of a PIP including Galdr's per-Change assessment
   So that I understand what decision was made and why
 
+
+  Status: 🔲 TODO
+  Related: act-9-pips/pips-list.feature, act-9-pips/pips-admin-review.feature
   # MVP simplified: Owner or Administrator finalizes after Reviewed status.
   # Public viewers (authenticated but not owner) can view PIP details but cannot finalize.
   # Anonymous guests cannot access PIP routes; playbook content browse does not include PIP list for guests (deferred).
   # MVP: banner says "owner or Administrator"; owner finalize in FOB is @mvp_gap (post-MVP).
   # For MVP the banner may read "Administrator" only until owner finalize UI ships.
 
-  Status: 🔲 TODO
-  Related: act-9-pips/pips-list.feature, act-9-pips/pips-admin-review.feature
-
   Background:
     Given Maria is authenticated in FOB
     And PIP-42 exists:
-      | field           | value                                         |
-      | id              | 42                                            |
-      | title           | Add Accessibility Audit                       |
-      | summary         | React playbook lacks WCAG 2.1 AA coverage     |
-      | target_playbook | React Frontend Dev v1.0 (id=1)                |
-      | submitted_by    | maria                                         |
-      | submitted_at    | 2026-05-14T09:00:00                           |
-      | status          | Reviewed                                      |
+      | field           | value                                     |
+      | id              |                                        42 |
+      | title           | Add Accessibility Audit                   |
+      | summary         | React playbook lacks WCAG 2.1 AA coverage |
+      | target_playbook | React Frontend Dev v1.0 (id=1)            |
+      | submitted_by    | maria                                     |
+      | submitted_at    |                       2026-05-14T09:00:00 |
+      | status          | Reviewed                                  |
     And PIP-42 has the following Changes:
-      | # | type  | entity_type | name / target             | position / rationale                          |
-      | 1 | ADD   | Activity    | Accessibility Audit       | After: Component Testing (id=22)              |
-      | 2 | ALTER | Activity    | Component Testing (id=22) | Add axe-core alongside existing Jest tests    |
+      | # | type  | entity_type | name / target             | position / rationale                       |
+      | 1 | ADD   | Activity    | Accessibility Audit       | After: Component Testing (id=22)           |
+      | 2 | ALTER | Activity    | Component Testing (id=22) | Add axe-core alongside existing Jest tests |
     And Galdr has assessed PIP-42 with the following recommendations:
-      | change | recommendation       | reasoning                                                                                   |
-      |      1 | ACCEPT               | Consistent with Testing phase goal; no upstream conflicts detected.                         |
-      |      2 | REJECT               | Proposed content removes the required Artifact link to "Test Suite", breaking dependencies. |
-
+      | change | recommendation | reasoning                                                                                   |
+      |      1 | ACCEPT         | Consistent with Testing phase goal; no upstream conflicts detected.                         |
+      |      2 | REJECT         | Proposed content removes the required Artifact link to "Test Suite", breaking dependencies. |
   # ============================================================================
   # PAGE LOAD
   # ============================================================================
@@ -46,18 +45,17 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
   Scenario: FOB-PIP-DETAIL-02 Header shows all PIP metadata
     Given Maria is on FOB-PIP-DETAIL-1 for PIP-42
     Then she sees:
-      | field           | value                              |
-      | PIP ID          | PIP-42                             |
-      | Title           | Add Accessibility Audit            |
-      | Target Playbook | React Frontend Dev v1.0            |
-      | Submitted by    | Maria Rodriguez                    |
-      | Submitted at    | 2026-05-14                         |
-      | Status          | Reviewed (purple badge)            |
+      | field           | value                   |
+      | PIP ID          | PIP-42                  |
+      | Title           | Add Accessibility Audit |
+      | Target Playbook | React Frontend Dev v1.0 |
+      | Submitted by    | Maria Rodriguez         |
+      | Submitted at    |              2026-05-14 |
+      | Status          | Reviewed (purple badge) |
 
   Scenario: FOB-PIP-DETAIL-03 Summary section shows author rationale
     Given Maria is on FOB-PIP-DETAIL-1 for PIP-42
     Then she sees the Summary section with text "React playbook lacks WCAG 2.1 AA coverage"
-
   # ============================================================================
   # CHANGE LIST — GALDR RECOMMENDATIONS
   # ============================================================================
@@ -66,20 +64,20 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
     Given Maria is on FOB-PIP-DETAIL-1 for PIP-42 (status=Reviewed)
     Then she sees 2 Change cards
     And Change #1 shows:
-      | field          | value                                                        |
-      | type_badge     | ADD                                                          |
-      | entity_type    | Activity                                                     |
-      | name           | Accessibility Audit                                          |
-      | position       | After: Component Testing (id=22)                            |
-      | galdr_verdict  | ACCEPT (green badge)                                        |
-      | galdr_reason   | Consistent with Testing phase goal; no upstream conflicts.  |
+      | field         | value                                                      |
+      | type_badge    | ADD                                                        |
+      | entity_type   | Activity                                                   |
+      | name          | Accessibility Audit                                        |
+      | position      | After: Component Testing (id=22)                           |
+      | galdr_verdict | ACCEPT (green badge)                                       |
+      | galdr_reason  | Consistent with Testing phase goal; no upstream conflicts. |
     And Change #2 shows:
-      | field          | value                                                        |
-      | type_badge     | ALTER                                                        |
-      | entity_type    | Activity                                                     |
-      | target_name    | Component Testing (id=22)                                   |
-      | galdr_verdict  | REJECT (red badge)                                          |
-      | galdr_reason   | Proposed content removes the required Artifact link to "Test Suite", breaking dependencies. |
+      | field         | value                                                                                       |
+      | type_badge    | ALTER                                                                                       |
+      | entity_type   | Activity                                                                                    |
+      | target_name   | Component Testing (id=22)                                                                   |
+      | galdr_verdict | REJECT (red badge)                                                                          |
+      | galdr_reason  | Proposed content removes the required Artifact link to "Test Suite", breaking dependencies. |
 
   Scenario: FOB-PIP-DETAIL-05 Galdr panel absent while Processing
     Given PIP-28 has status "Processing (Galdr)"
@@ -103,7 +101,6 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
       Install axe-core and jest-axe; add a11y tests to the component suite;
       configure automated checks in CI/CD.
       """
-
   # ============================================================================
   # STATUS BANNERS
   # ============================================================================
@@ -139,7 +136,6 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
     When Maria opens FOB-PIP-DETAIL-1 for PIP-35
     Then she sees banner "Rejected — no changes were applied."
     And each Change card shows Admin verdict "REJECTED" (red)
-
   # ============================================================================
   # ACTIONS AVAILABLE TO SUBMITTER
   # ============================================================================
@@ -151,10 +147,11 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
     And she sees [Cancel] button
     And she sees [Submit for Review] button
 
-  Scenario: FOB-PIP-DETAIL-13 Submitted PIP shows Cancel button
+  Scenario: FOB-PIP-DETAIL-13 Submitted PIP shows Cancel and Withdraw buttons
     Given PIP-28 has status "Submitted"
     When Maria opens FOB-PIP-DETAIL-1 for PIP-28
     Then she sees [Cancel PIP] button
+    And she sees [Withdraw] button
     And she does NOT see [Edit PIP]
     And she does NOT see [Submit for Review]
 
@@ -181,7 +178,6 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
     And a notification appears: "PIP 'Add Figma Integration' submitted — Galdr is reviewing your changes."
     And the [Submit for Review] and [Edit PIP] buttons disappear
     And the [Cancel PIP] button appears
-
   # ============================================================================
   # EMAIL NOTIFICATION CONTENT
   # ============================================================================
@@ -189,45 +185,46 @@ Feature: FOB-PIP-DETAIL-1 View PIP Details with Galdr Recommendations
   Scenario: FOB-PIP-DETAIL-17 Maria receives email when Admin decides — all accepted
     Given PIP-38 is decided by Admin with all Changes ACCEPTED
     Then Maria receives an email:
-      | field   | value                                                          |
-      | subject | Your PIP "State Management Patterns" — Accepted ✓              |
-      | body_contains | Change 1: ADD Activity "Redux Setup" → Accepted      |
-      | body_contains | Reasoning: Consistent with State Management workflow goal. |
-      | body_contains | Change 2: ALTER Activity "Component Testing" → Accepted    |
+      | field         | value                                                       |
+      | subject       | Your PIP "State Management Patterns" — Accepted ✓           |
+      | body_contains | Change 1: ADD Activity "Redux Setup" → Accepted             |
+      | body_contains | Reasoning: Consistent with State Management workflow goal.  |
+      | body_contains | Change 2: ALTER Activity "Component Testing" → Accepted     |
       | body_contains | Overall: Accepted. Version 2.0 published with your changes. |
 
   Scenario: FOB-PIP-DETAIL-18 Maria receives email when Admin decides — partially accepted
     Given PIP-42 is decided by Admin with Change #1 ACCEPT and Change #2 REJECT
     Then Maria receives an email with subject "Your PIP "Add Accessibility Audit" — Partially Accepted"
     And the email body contains:
-      | line                                                                              |
-      | Change 1: ADD Activity "Accessibility Audit" → Accepted                          |
-      | Reasoning: Consistent with Testing phase goal; no upstream conflicts detected.   |
-      | Change 2: ALTER Activity "Component Testing" → Rejected                          |
-      | Reasoning: Proposed content removes the required Artifact link to "Test Suite".  |
-      | Overall: Partially accepted. Version 2.0 published with Change 1 applied.        |
+      | line                                                                            |
+      | Change 1: ADD Activity "Accessibility Audit" → Accepted                         |
+      | Reasoning: Consistent with Testing phase goal; no upstream conflicts detected.  |
+      | Change 2: ALTER Activity "Component Testing" → Rejected                         |
+      | Reasoning: Proposed content removes the required Artifact link to "Test Suite". |
+      | Overall: Partially accepted. Version 2.0 published with Change 1 applied.       |
 
   Scenario: FOB-PIP-DETAIL-19 Maria receives email when Admin decides — fully rejected
     Given PIP-35 is decided by Admin with all Changes REJECTED
     Then Maria receives an email with subject "Your PIP "Drop Legacy IE Support" — Rejected ✗"
     And the email body contains "Overall: Rejected. No changes were applied."
-
   # ============================================================================
   # WITHDRAW (EDIT & RESUBMIT)
   # ============================================================================
 
-  Scenario: FOB-PIP-DETAIL-20 Submitted PIP shows Withdraw button
+  Scenario: FOB-PIP-DETAIL-20 Submitted PIP shows both Withdraw and Cancel PIP buttons
     Given PIP-28 has status "Submitted"
     When Maria opens FOB-PIP-DETAIL-1 for PIP-28
     Then she sees [Withdraw] button
+    And she sees [Cancel PIP] button
     And she does NOT see [Edit PIP]
     And she does NOT see [Submit for Review]
     And the status banner reads "Submitted — queued for Galdr review."
 
-  Scenario: FOB-PIP-DETAIL-21 Processing (Galdr) PIP shows Withdraw button
+  Scenario: FOB-PIP-DETAIL-21 Processing (Galdr) PIP shows both Withdraw and Cancel PIP buttons
     Given PIP-27 has status "Processing (Galdr)"
     When Maria opens FOB-PIP-DETAIL-1 for PIP-27
     Then she sees [Withdraw] button
+    And she sees [Cancel PIP] button
     And the status banner reads "Galdr is reviewing your changes — check back shortly."
 
   Scenario: FOB-PIP-DETAIL-22 Withdraw shows confirmation modal with clear warning

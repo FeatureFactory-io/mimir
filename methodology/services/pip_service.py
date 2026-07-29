@@ -33,7 +33,6 @@ from methodology.services.pip_link_service import (
     validate_link_change_for_persist,
     validate_pending_or_live_ref,
 )
-
 from methodology.services.playbook_service import PlaybookService
 
 logger = logging.getLogger(__name__)
@@ -41,6 +40,13 @@ logger = logging.getLogger(__name__)
 _WITHDRAW_ALLOWED = frozenset(
     {
         ProcessImprovementProposal.STATUS_DRAFT,
+        ProcessImprovementProposal.STATUS_SUBMITTED,
+        ProcessImprovementProposal.STATUS_PROCESSING_GALDR,
+    }
+)
+
+_REVERT_ALLOWED = frozenset(
+    {
         ProcessImprovementProposal.STATUS_SUBMITTED,
         ProcessImprovementProposal.STATUS_PROCESSING_GALDR,
     }
@@ -499,6 +505,52 @@ class PIPService:
         logger.info("PIPService.withdraw_pip set pip=%s to withdrawn actor=%s", pip.pk, actor.pk)
 
     cancel_pip = withdraw_pip
+
+    @staticmethod
+    @transaction.atomic
+    def revert_to_draft(pip: ProcessImprovementProposal, actor) -> None:
+        """
+        Revert a Submitted or Processing PIP back to Draft for editing and resubmission.
+
+        Clears Galdr assessments on all associated changes and the holistic assessment
+        on the PIP itself so the next submission starts fresh.
+
+        :raises ValidationError: if the PIP is not in a revertible state.
+        """
+        logger.info(
+            "PIPService.revert_to_draft entry pip=%s actor=%s status=%s",
+            pip.pk,
+            actor.pk,
+            pip.status,
+        )
+        _pip_require_submitter_for_submitter_tools(pip, actor)
+        if pip.status not in _REVERT_ALLOWED:
+            logger.info(
+                "PIPService.revert_to_draft error cannot revert pip=%s status=%s",
+                pip.pk,
+                pip.status,
+            )
+            raise ValidationError(
+                f"Cannot revert PIP to Draft from status '{pip.status}'."
+            )
+        logger.info(
+            "PIPService.revert_to_draft validation allowed from status=%s pip=%s",
+            pip.status,
+            pip.pk,
+        )
+        changes_cleared = pip.changes.update(galdr_recommendation="", galdr_reasoning="")
+        logger.info(
+            "PIPService.revert_to_draft processing changes_cleared=%s pip=%s",
+            changes_cleared,
+            pip.pk,
+        )
+        pip.status = ProcessImprovementProposal.STATUS_DRAFT
+        pip.galdr_holistic_assessment = ""
+        pip.save(update_fields=["status", "galdr_holistic_assessment"])
+        logger.info(
+            "PIPService.revert_to_draft exit pip=%s status=draft",
+            pip.pk,
+        )
 
     @staticmethod
     @transaction.atomic

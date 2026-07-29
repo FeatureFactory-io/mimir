@@ -73,7 +73,8 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
   Scenario: FOB-PIP-LIST-07 Row actions available based on status
     Given Maria is on FOB-PIP-LIST-1
     Then PIP-30 (Draft) row actions dropdown shows: View, Edit, Cancel
-    And PIP-28 (Submitted) row actions dropdown shows: View, Cancel
+    And PIP-28 (Submitted) row actions dropdown shows: View, Withdraw, Cancel PIP
+    And PIP-27 (Processing (Galdr)) row actions dropdown shows: View, Withdraw, Cancel PIP
     And PIP-42 (Reviewed) row actions dropdown shows: View only
     And PIP-38 (Accepted) row actions dropdown shows: View only
     And PIP-35 (Rejected) row actions dropdown shows: View only
@@ -179,14 +180,14 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
   # WITHDRAW (EDIT & RESUBMIT)
   # ============================================================================
 
-  Scenario: FOB-PIP-LIST-22 Submitted PIP row actions include Withdraw
+  Scenario: FOB-PIP-LIST-22 Submitted PIP row actions include both Withdraw and Cancel PIP
     Given Maria is on FOB-PIP-LIST-1
-    Then PIP-28 (Submitted) row actions dropdown shows: View, Withdraw
+    Then PIP-28 (Submitted) row actions dropdown shows: View, Withdraw, Cancel PIP
     And PIP-28 row does NOT show: Edit, Discard
 
-  Scenario: FOB-PIP-LIST-23 Processing (Galdr) PIP row actions include Withdraw
+  Scenario: FOB-PIP-LIST-23 Processing (Galdr) PIP row actions include both Withdraw and Cancel PIP
     Given Maria is on FOB-PIP-LIST-1
-    Then PIP-27 (Processing (Galdr)) row actions dropdown shows: View, Withdraw
+    Then PIP-27 (Processing (Galdr)) row actions dropdown shows: View, Withdraw, Cancel PIP
     And PIP-27 row does NOT show: Edit, Discard
 
   Scenario: FOB-PIP-LIST-24 Withdraw from list reverts PIP to Draft
@@ -195,8 +196,8 @@ Feature: FOB-PIP-LIST-1 View and Filter PIPs
     Then a confirmation modal appears: "Withdraw PIP-28? It will return to Draft and any in-progress Galdr review will be discarded."
     When she confirms
     Then PIP-28 status badge changes to "Draft" (gray)
-    And PIP-28 row actions dropdown shows: View, Edit, Discard
-    And PIP-28 row does NOT show: Withdraw
+    And PIP-28 row actions dropdown shows: View, Edit, Cancel
+    And PIP-28 row does NOT show: Withdraw, Cancel PIP
 
   Scenario: FOB-PIP-LIST-25 Withdraw not available for terminal-state PIPs
     Given Maria is on FOB-PIP-LIST-1

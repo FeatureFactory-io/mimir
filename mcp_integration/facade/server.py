@@ -138,7 +138,7 @@ def _build_mcp() -> FastMCP:
     mcp.tool()(tools.delete_phase)
     mcp.tool()(tools.reorder_phases)
 
-    # PIPs — Process Improvement Proposals (8)
+    # PIPs — Process Improvement Proposals (9)
     mcp.tool()(tools.list_pips)
     mcp.tool()(tools.get_pip)
     mcp.tool()(tools.create_pip)
@@ -146,6 +146,7 @@ def _build_mcp() -> FastMCP:
     mcp.tool()(tools.remove_pip_change)
     mcp.tool()(tools.submit_pip)
     mcp.tool()(tools.cancel_pip)
+    mcp.tool()(tools.revert_pip_to_draft)
     mcp.tool()(tools.preview_pip_diff)
     mcp.tool()(tools.report_bug)
 
@@ -158,7 +159,7 @@ def _build_mcp() -> FastMCP:
     mcp.tool()(tools.invite_to_team)
     mcp.tool()(tools.manage_team_invite)
 
-    logger.info("MCP Facade: All tools registered (58 tools: 51 previous + 7 team tools)")
+    logger.info("MCP Facade: All tools registered (59 tools: 58 previous + revert_pip_to_draft)")
     return mcp
 
 

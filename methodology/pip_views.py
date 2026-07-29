@@ -12,7 +12,8 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.views.generic import RedirectView
 
-from methodology.models import PipChange, ProcessImprovementProposal as PipModel
+from methodology.models import PipChange
+from methodology.models import ProcessImprovementProposal as PipModel
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +193,10 @@ def _pip_detail_context(pip, user):
         PipModel.STATUS_SUBMITTED,
         PipModel.STATUS_PROCESSING_GALDR,
     }
+    revertable = pip.status in {
+        PipModel.STATUS_SUBMITTED,
+        PipModel.STATUS_PROCESSING_GALDR,
+    }
     banner = _pip_detail_status_banner(pip)
     can_submit = pip.status in {
         PipModel.STATUS_DRAFT,
@@ -210,6 +215,7 @@ def _pip_detail_context(pip, user):
         "can_submit": bool(can_submit),
         "submit_label": submit_label,
         "can_withdraw": withdrawable and pip.created_by_id == user.pk,
+        "can_revert_to_draft": revertable and pip.created_by_id == user.pk,
         "can_preview": True,
         "admin_review_url": None,
     }
@@ -575,6 +581,20 @@ def pip_withdraw(request, pk: int):
     except ValidationError as exc:
         messages.error(request, _format_validation_error(exc))
     return redirect("pip_list")
+
+
+@login_required
+@require_POST
+def pip_revert_to_draft(request, pk: int):
+    from methodology.services.pip_service import PIPService
+
+    pip = PIPService.get_pip(pk, request.user)
+    try:
+        PIPService.revert_to_draft(pip, request.user)
+        messages.success(request, "PIP returned to Draft. Galdr assessments cleared.")
+    except ValidationError as exc:
+        messages.error(request, _format_validation_error(exc))
+    return redirect("pip_detail", pk=pk)
 
 
 @login_required
