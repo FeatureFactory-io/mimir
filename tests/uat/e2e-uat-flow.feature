@@ -12,7 +12,7 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     5. J5 here  (release via GUI)
     6. mcp-uat-flow.feature MCP-06/07  (release + post-release guard)
     7. J6 browser here  (PIP UI)
-    8. mcp-uat-flow.feature MCP-08/08b/08c/08d/09  (PIP MCP lifecycle)
+    8. mcp-uat-flow.feature MCP-08/08b/08c/08d/09  (PIP MCP lifecycle: revert+resubmit loop in MCP-08d)
     9. J7 here  (admin finalize + GUI verify)
    10. mcp-uat-flow.feature MCP-11  (post-finalize inventory)
 
@@ -25,7 +25,7 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     | J3      | UAT-03-00 … UAT-03-03 + CRUDL splits                 | MCP-01/02/03                           |
     | J3B     | UAT-03-05, UAT-03-05b (GUI visibility isolation)     | MCP-01b (MCP author-scoping proof)     |
     | J5      | UAT-05-00, UAT-05-01                                 | MCP-06 (release), MCP-07 (guard)       |
-    | J6 GUI  | UAT-06-00, UAT-06-01-neg, UAT-06-02, UAT-06-06, UAT-06-07 | MCP-08/08b/08c/08d/09             |
+    | J6 GUI  | UAT-06-00, UAT-06-01-neg, UAT-06-02, UAT-06-06, UAT-06-07 | MCP-08/08b/08c/08d(revert+resubmit)/09 |
     | J7      | UAT-07-01, UAT-07-02                                 | MCP-11 (post-finalize inventory)       |
     | J8      | UAT-08-00 … UAT-08-10 (Teams: browse/create/detail/join/manage/leave/profile) | — |
 
@@ -515,24 +515,28 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
   # → MCP PIP lifecycle (create_pip, add_pip_change, get_pip, list_pips, submit_pip,
   #   remove_pip_change, cancel_pip, revert_pip_to_draft, and negatives) is covered by:
   #   mcp-uat-flow.feature MCP-08 (main PIP MCP flow RECORD <PIP_MCP_PK>)
-  #   mcp-uat-flow.feature MCP-08b (disposable PIP drill)
+  #   mcp-uat-flow.feature MCP-08b (disposable PIP drill: cancel from Draft)
   #   mcp-uat-flow.feature MCP-08c (create_pip on draft → error)
-  #   mcp-uat-flow.feature MCP-08d (revert_pip_to_draft)
+  #   mcp-uat-flow.feature MCP-08d (revert_pip_to_draft from Submitted/Reviewed + fix change + resubmit)
+  #     → MCP-08d is the full Galdr feedback loop: submit → Reviewed → revert → fix → resubmit
+  #     → cancel_pip from Reviewed is also exercised in MCP-08d PR-07
   # Run those scenarios after UAT-06-02.
 
   @manual @uat @act-9-revert-browser
-  Scenario: UAT-06-07 GUI PIP Withdraw-to-Draft — submitted PIP reverts to Draft
-    # Precondition: UAT-06-02 completed — `<PIP_GUI_PK>` is Submitted.
-    # If Galdr has already moved `<PIP_GUI_PK>` to Reviewed, reuse <PIP_NEG_PK> (still Draft) and submit it first.
+  Scenario: UAT-06-07 GUI PIP Withdraw-to-Draft — Submitted or Reviewed PIP reverts to Draft
+    # Precondition: UAT-06-02 completed — `<PIP_GUI_PK>` is Submitted or Reviewed.
+    # When GALDR_EAGER=True Galdr may have advanced `<PIP_GUI_PK>` to Reviewed; the Revert
+    # button must be visible in BOTH statuses (Submitted and Reviewed).
+    # If `<PIP_GUI_PK>` has already been reverted, reuse <PIP_NEG_PK>: submit it first.
     #
     # STEP navigate to detail
     # DO: GET `<BASE_URL>/pips/<PIP_GUI_PK>/`
-    # SEE: `[data-testid="pip-status-badge"]` text `Submitted` (or `Processing Galdr`)
+    # SEE: `[data-testid="pip-status-badge"]` text `Submitted`, `Processing`, or `Reviewed`
     # IF DIFFER: UAT-06-07 navigate
     #
-    # STEP verify both action buttons present
-    # SEE: `[data-testid="pip-detail-revert-open"]` visible
-    # SEE: `[data-testid="pip-detail-withdraw-open"]` visible
+    # STEP verify action buttons present for both Submitted and Reviewed statuses
+    # SEE: `[data-testid="pip-detail-revert-open"]` visible (Revert to Draft)
+    # SEE: `[data-testid="pip-detail-withdraw-open"]` visible (Cancel/Withdraw permanently)
     # SEE: `[data-testid="pip-detail-edit-draft"]` NOT visible
     # IF DIFFER: UAT-06-07 buttons
     #
@@ -549,6 +553,13 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     # SEE: `[data-testid="pip-detail-edit-draft"]` visible (edit button re-appears for Draft)
     # SEE: `[data-testid="pip-detail-revert-open"]` NOT visible
     # IF DIFFER: UAT-06-07 post-revert state
+    #
+    # STEP verify fix + resubmit path (Galdr feedback loop)
+    # NOTE: full resubmit loop is exercised via MCP in mcp-uat-flow MCP-08d; browser path optional.
+    # DO (optional): edit `<PIP_GUI_PK>` (`[data-testid="pip-detail-edit-draft"]`); add or alter a change
+    # DO (optional): `[data-testid="pip-submit-review"]` to resubmit
+    # SEE: status returns to `Submitted` or `Processing`
+    # IF DIFFER: UAT-06-07 resubmit
 
   @manual @uat @act-9-galdr-detail
   Scenario: UAT-06-06 Detail Galdr + admin accordion instrumentation (dual PIPs)

@@ -1,5 +1,5 @@
 @manual @uat @mcp-uat-flow
-Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
+Feature: Mimir MCP UAT — all 72 tools exercised end-to-end in agent mode
   Execute in AGENT MODE only. CallMcpTool is only available to the parent agent
   (Cursor IDE context). Do NOT delegate these scenarios to a browser-use subagent.
 
@@ -26,7 +26,7 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     CURSOR_PROMPT — manual one-time IDE action; agent STOPS and waits for confirmation
 
   ==============================================================================
-  TOOL COVERAGE MAP  (all 63 tools — tick [x] during replay)
+  TOOL COVERAGE MAP  (all 72 tools — tick [x] during replay)
   ==============================================================================
     Playbooks   : [ ] create  [ ] list  [ ] get  [ ] update  [ ] delete
     Workflows   : [ ] create  [ ] list×2  [ ] get×2  [ ] update  [ ] delete
@@ -43,8 +43,11 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
                   (list×2: own MCP-03 + cross-user public MCP-01c)
     Export/Import: [ ] export_workflow_to_local×2  [ ] import_workflow_from_local  [ ] apply_upload_protocol
     PIPs        : [ ] create×2  [ ] get×3  [ ] list  [ ] preview_pip_diff
-                  [ ] add_pip_change×3  [ ] remove_pip_change  [ ] submit_pip×2  [ ] cancel_pip
-                  [ ] create_pip_from_protocol
+                  [ ] add_pip_change×3  [ ] remove_pip_change  [ ] submit_pip×3  [ ] cancel_pip×2
+                  [ ] revert_pip_to_draft×2  [ ] create_pip_from_protocol
+                  (submit_pip×3: MCP-08 PM-07 + MCP-08d PR-03 + MCP-08d PR-05c resubmit)
+                  (cancel_pip×2: MCP-08b PD-04 Draft + MCP-08d PR-06 Reviewed/Draft)
+                  (revert_pip_to_draft×2: MCP-08d PR-04 Submitted/Reviewed path + MCP-08d PR-07 cancel)
     Feedback    : [ ] report_bug
     (All covered across MCP-00 → MCP-11 in scenarios below)
 
@@ -84,6 +87,7 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
     <PIP_DISP_PK>             — disposable PIP RECORD (MCP-08b step PD-01)
     <PIP_DISP_CH_PK>          — disposable change RECORD (MCP-08b step PD-02)
     <PIP_PROTO_PK>            — protocol PIP RECORD (MCP-09 step PP-02)
+    <PIP_REVERT_PK>           — revert-drill PIP RECORD (MCP-08d step PR-01)
     <DRAFT_NEG_PB_ID>         — draft playbook for negative PIP test (MCP-08c)
     <ADMIN_PUBLIC_WF_ID>      — any workflow id inside <ADMIN_PUBLIC_PB_ID> (MCP-01c; read from list_workflows)
 #############################################################################
@@ -692,38 +696,62 @@ Feature: Mimir MCP UAT — all 63 tools exercised end-to-end in agent mode
 ############################################################################
 
   @manual @uat @mcp-pip-revert
-  Scenario: MCP-08d revert_pip_to_draft — revert Submitted PIP back to Draft
+  Scenario: MCP-08d revert_pip_to_draft — Submitted/Reviewed → Draft → fix change → resubmit loop
+    # Covers the full Galdr feedback loop: submit → (Galdr reviews) → revert → fix → resubmit.
+    # When GALDR_EAGER=True the PIP will reach `reviewed` at PR-03; revert still applies from there.
     # Precondition: MCP UAT Playbook is Released (v1.0) from MCP-06.
     #
     # STEP PR-01 create revert-drill PIP
-    # DO: CallMcpTool server "user-mimir" toolName "create_pip" arguments {"playbook_id": <MCP_PB_ID>, "title": "UAT Revert Drill PIP", "summary": "Created to test revert_pip_to_draft."}
+    # DO: CallMcpTool server "user-mimir" toolName "create_pip" arguments {"playbook_id": <MCP_PB_ID>, "title": "UAT Revert Drill PIP", "summary": "Created to test revert_pip_to_draft and resubmit loop."}
     # SEE: `.status` = `draft`; RECORD `.id` as `<PIP_REVERT_PK>`
     # IF DIFFER: MCP-08d PR-01
     #
     # STEP PR-02 add a change
-    # DO: CallMcpTool server "user-mimir" toolName "add_pip_change" arguments {"pip_id": <PIP_REVERT_PK>, "change_type": "ALTER", "entity_type": "Activity", "target_id": <MCP_ACT1_PK>, "content": "Revert drill change content"}
+    # DO: CallMcpTool server "user-mimir" toolName "add_pip_change" arguments {"pip_id": <PIP_REVERT_PK>, "change_type": "ALTER", "entity_type": "Activity", "target_id": <MCP_ACT1_PK>, "content": "Revert drill — initial change content."}
     # SEE: JSON `.change_id` present
     # IF DIFFER: MCP-08d PR-02
     #
-    # STEP PR-03 submit the PIP
+    # STEP PR-03 submit the PIP (first submission)
     # DO: CallMcpTool server "user-mimir" toolName "submit_pip" arguments {"pip_id": <PIP_REVERT_PK>}
-    # SEE: `.status` in [`submitted`, `processing_galdr`, `reviewed`]
+    # SEE: `.status` in [`submitted`, `processing_galdr`, `reviewed`] (GALDR_EAGER=True → `reviewed` expected)
     # IF DIFFER: MCP-08d PR-03
     #
-    # STEP PR-04 revert to draft
+    # STEP PR-04 revert to draft (from Submitted or Reviewed — both allowed)
     # DO: CallMcpTool server "user-mimir" toolName "revert_pip_to_draft" arguments {"pip_id": <PIP_REVERT_PK>}
     # SEE: JSON `.reverted` = true; `.pip_id` = <PIP_REVERT_PK>
     # IF DIFFER: MCP-08d PR-04
     #
     # STEP PR-05 get_pip — confirm status reset and Galdr fields cleared
     # DO: CallMcpTool server "user-mimir" toolName "get_pip" arguments {"pip_id": <PIP_REVERT_PK>}
-    # SEE: `.status` = `draft`; `.galdr_holistic_assessment` = `""` or absent
+    # SEE: `.status` = `draft`; changes list present; galdr_recommendation on each change = `""` or absent
     # IF DIFFER: MCP-08d PR-05
     #
-    # STEP PR-06 cleanup: cancel the reverted PIP
+    # STEP PR-05b add_pip_change — apply fix change (simulating author addressing Galdr notes)
+    # DO: CallMcpTool server "user-mimir" toolName "add_pip_change" arguments {"pip_id": <PIP_REVERT_PK>, "change_type": "ALTER", "entity_type": "Activity", "target_id": <MCP_ACT1_PK>, "content": "Revert drill — revised content after Galdr feedback."}
+    # SEE: JSON `.change_id` present; PIP now has an additional change row
+    # IF DIFFER: MCP-08d PR-05b
+    #
+    # STEP PR-05c submit_pip — resubmit after fix (completes the Galdr feedback loop)
+    # DO: CallMcpTool server "user-mimir" toolName "submit_pip" arguments {"pip_id": <PIP_REVERT_PK>}
+    # SEE: `.status` in [`submitted`, `processing_galdr`, `reviewed`]
+    # IF DIFFER: MCP-08d PR-05c
+    #
+    # STEP PR-05d get_pip — confirm re-submitted status
+    # DO: CallMcpTool server "user-mimir" toolName "get_pip" arguments {"pip_id": <PIP_REVERT_PK>}
+    # SEE: `.status` in [`submitted`, `processing_galdr`, `reviewed`]; NOT `draft`
+    # IF DIFFER: MCP-08d PR-05d
+    #
+    # STEP PR-06 revert once more (exercises revert from Reviewed if GALDR_EAGER reached it)
+    # DO: CallMcpTool server "user-mimir" toolName "revert_pip_to_draft" arguments {"pip_id": <PIP_REVERT_PK>}
+    # SEE: JSON `.reverted` = true
+    # IF DIFFER: MCP-08d PR-06
+    #
+    # STEP PR-07 cleanup: cancel_pip from Draft (also validates cancel works post-revert)
+    # NOTE: cancel_pip is also allowed from Reviewed — if PR-06 was skipped and status is `reviewed`,
+    #       cancel_pip will still succeed (verified in service layer; guards accept both statuses).
     # DO: CallMcpTool server "user-mimir" toolName "cancel_pip" arguments {"pip_id": <PIP_REVERT_PK>}
     # SEE: JSON `.cancelled` = true
-    # IF DIFFER: MCP-08d PR-06
+    # IF DIFFER: MCP-08d PR-07
 #############################################################################
 # MCP-09 — create_pip_from_protocol (export released workflow → edit locally → PIP)
 ############################################################################
