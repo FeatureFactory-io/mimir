@@ -42,28 +42,73 @@
         </div>
     </div>
 
-    <div class="card mb-4">
-        <div class="card-header"><h5 class="mb-0">Content</h5></div>
-        <div class="card-body markdown-content" data-testid="rule-content">
-            {% if rule.content %}{{ rule.content|markdown }}{% else %}<p class="text-muted">No body.</p>{% endif %}
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-file-lines"></i> Content</h5>
+                </div>
+                <div class="card-body markdown-content" data-testid="rule-content">
+                    {% if rule.content %}{{ rule.content|markdown }}{% else %}<p class="text-muted mb-0">No body.</p>{% endif %}
+                </div>
+            </div>
         </div>
-    </div>
 
-    <div class="card mb-4">
-        <div class="card-header"><h5 class="mb-0">Activities <span class="badge bg-secondary">{{ activities|length }}</span></h5></div>
-        <div class="card-body" data-testid="rule-activities">
-            {% if activities %}
-            <ul class="list-group list-group-flush">
-                {% for act in activities %}
-                <li class="list-group-item">
-                    <a href="{% url 'activity_detail' playbook_pk=playbook.pk workflow_pk=act.workflow.pk activity_pk=act.pk %}">{{ act.name }}</a>
-                    <small class="text-muted ms-2">{{ act.workflow.name }}</small>
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p class="text-muted mb-0">No activities linked.</p>
-            {% endif %}
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-info-circle"></i> Details</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Slug:</dt>
+                        <dd class="col-sm-7"><code>{{ rule.slug }}</code></dd>
+                        <dt class="col-sm-5">Always apply:</dt>
+                        <dd class="col-sm-7">{{ rule.always_apply|yesno:"Yes,No" }}</dd>
+                        <dt class="col-sm-5">Created:</dt>
+                        <dd class="col-sm-7">{{ rule.created_at|date:"M d, Y" }}</dd>
+                        <dt class="col-sm-5">Updated:</dt>
+                        <dd class="col-sm-7">{{ rule.updated_at|date:"M d, Y" }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fa-solid fa-book-sparkles"></i> Playbook</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-title mb-1">{{ playbook.name }}</h6>
+                    <p class="card-text small text-muted mb-2">v{{ playbook.version }}</p>
+                    <a href="{% url 'playbook_detail' pk=playbook.pk %}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fa-solid fa-arrow-right"></i> View Playbook
+                    </a>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fa-solid fa-list-check"></i> Activities
+                        <span class="badge bg-secondary ms-2">{{ activities|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body mm-view-rail-scroll" data-testid="rule-activities">
+                    {% if activities %}
+                    <ul class="list-group list-group-flush">
+                        {% for act in activities %}
+                        <li class="list-group-item px-0">
+                            <a href="{% url 'activity_detail' playbook_pk=playbook.pk workflow_pk=act.workflow.pk activity_pk=act.pk %}">{{ act.name }}</a>
+                            <small class="text-muted d-block">{{ act.workflow.name }}</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted mb-0">No activities linked.</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>
