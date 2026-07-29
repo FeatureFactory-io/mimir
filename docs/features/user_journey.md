@@ -415,15 +415,23 @@ Full search page — refine and browse matches across **all playbook entity type
 
 **Results layout** (grouped sections — see wireframe below):
 - Summary line: `Showing results for "React" · N matches` (omit type groups with zero hits when **All types** is selected)
-- One collapsible section per entity type that has matches, ordered:
+- **All types** (default): collapsible **accordion** — one section per entity type that has matches, ordered:
   1. Playbooks → 2. Workflows → 3. Phases → 4. Activities → 5. Artifacts → 6. Skills → 7. Agents → 8. Rules
+  - **First section with matches** is expanded on load; all others start **collapsed**
+  - Section header: chevron + entity icon + label + count badge (`data-testid="global-search-section-toggle-<type>"`)
+  - Bootstrap accordion with `data-bs-parent` — expanding one section **collapses** the previously open section (single open panel at a time)
+  - Chevron rotates when expanded/collapsed; default Bootstrap `::after` chevron hidden (custom FA chevron)
+- **Single type** filter: flat card list (no accordion) — one section header + full result list
 - Each result row:
-  - **Title** (link to detail view)
-  - **Context breadcrumb**: `{Playbook name}` or `{Playbook} › {Workflow}` as appropriate
-  - **Snippet**: ~20 words from matched field (name, description, guidance, skill content, etc.)
+  - **Title** (link to detail view) — query matches wrapped in `<mark class="mm-search-highlight">` (case-insensitive)
+  - **Context breadcrumb**: `{Playbook name}` or `{Playbook} › {Workflow}` — same highlight treatment
+  - **Snippet**: ~20 words from matched field — same highlight treatment
   - **Type icon + badge** (matches Content Browser colours: Workflow blue, Activity green, Artifact amber, Skill orange, Agent teal, Rule grey, Phase purple, Playbook primary)
-- When **Type** filter selects a single entity, show only that section (full width list)
+- **Search term highlighting**: server-side wrap of case-insensitive matches in title, context, and snippet; CSS `mark.mm-search-highlight` uses `--hg-yellow` background, inherited text colour, slight padding/radius; multiple occurrences in one field all highlighted
+- When **Type** filter selects a single entity, show only that section (full width list, no accordion)
 - **Empty state** (`data-testid="global-search-empty-state"`): "No results found for …" with hint to broaden query or switch type to All types
+
+**Navbar live suggestions** also highlight the query in title and context subtitle (same `mm-search-highlight` markup).
 
 **Wireframe — FOB Search Results (All types)**:
 
@@ -436,22 +444,18 @@ Full search page — refine and browse matches across **all playbook entity type
 ├──────────────────────────────────────────────────────────────────────────┤
 │  Showing results for "React" · 24 matches                                │
 ├──────────────────────────────────────────────────────────────────────────┤
-│  ▼ Playbooks (2)                                                         │
-│  │ 📘 React Frontend Development          Mike Chen · v1.2 · Development │
-│  │    …modern React patterns and component architecture…                 │
-│  │ 📘 React Testing Patterns              Community · v1.0 · Released    │
+│  ▼ Playbooks (2)          ← expanded (first section with hits)           │
+│  │ 📘 Re[React] Frontend Development     Mike Chen · v1.2 · Development  │
+│  │    …modern Re[React] patterns and component architecture…             │
+│  │ 📘 Re[React] Testing Patterns         Community · v1.0 · Released     │
 │  ├────────────────────────────────────────────────────────────────────── │
-│  ▼ Workflows (3)                                                         │
-│  │ 🔷 Component Development    React Frontend Development · 8 activities │
+│  ▶ Workflows (3)          ← collapsed (chevron right; click to expand)   │
 │  ├────────────────────────────────────────────────────────────────────── │
-│  ▼ Activities (8)                                                        │
-│  │ ✅ Setup React Project       React Frontend Development › Component…  │
+│  ▶ Activities (8)                                                        │
 │  ├────────────────────────────────────────────────────────────────────── │
-│  ▼ Skills (6)                                                            │
-│  │ 🟠 React Form Component      GUI_FORM · React+Redux                   │
-│  ├────────────────────────────────────────────────────────────────────── │
-│  ▼ Artifacts (2)  ·  Agents (1)  ·  Rules (1)  ·  Phases (1)           │
-│     (same row pattern; sections with 0 hits hidden in All-types view)    │
+│  ▶ Skills (6)  ·  ▶ Artifacts (2)  ·  ▶ Agents (1)  ·  ▶ Rules · Phases  │
+│     ([React] = yellow highlight via mark.mm-search-highlight)            │
+│     (sections with 0 hits hidden; only one accordion panel open at once)  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
