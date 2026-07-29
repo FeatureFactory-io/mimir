@@ -652,6 +652,71 @@ mark.mm-search-highlight {
   line-height: 1;
 }
 
+/* Workflow activity lists — fixed columns so Actions align across phase groups */
+.mm-activities-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.mm-activities-table col.mm-col-order {
+  width: 4.5rem;
+}
+
+.mm-activities-table col.mm-col-name {
+  width: 22%;
+}
+
+.mm-activities-table col.mm-col-abbrev {
+  width: 8rem;
+}
+
+.mm-activities-table col.mm-col-guidance {
+  width: auto;
+}
+
+.mm-activities-table col.mm-col-deps {
+  width: 5.5rem;
+}
+
+.mm-activities-table col.mm-col-actions {
+  width: 11.5rem;
+}
+
+.mm-activities-table td.mm-col-name,
+.mm-activities-table td.mm-col-guidance {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-activities-table th.mm-col-actions,
+.mm-activities-table td.mm-col-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.mm-activities-table tr.mm-activities-phase-header td {
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  font-weight: 600;
+}
+
+.mm-activities-table tbody:first-of-type tr.mm-activities-phase-header td {
+  padding-top: 0.5rem;
+}
+
+.mm-activities-table--compact col.mm-col-order {
+  width: 5rem;
+}
+
+.mm-activities-table--compact col.mm-col-name {
+  width: auto;
+}
+
+.mm-activities-table--compact col.mm-col-actions {
+  width: 7rem;
+}
+
 .btn.mm-copy-prompt-btn {
   display: inline-flex;
   align-items: center;

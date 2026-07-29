@@ -1,0 +1,55 @@
+{% load markdown_filters %}
+<tr data-testid="activity-row-{{ activity.id }}">
+    <td class="text-muted">{{ activity.order }}</td>
+    <td class="mm-col-name">
+        <strong>{{ activity.name }}</strong>
+    </td>
+    <td data-testid="activity-ref-{{ activity.id }}">
+        {% if activity.reference_label %}
+            <span class="badge bg-secondary font-monospace">{{ activity.reference_label }}</span>
+        {% else %}
+            <span class="text-muted small">—</span>
+        {% endif %}
+    </td>
+    <td class="mm-col-guidance">
+        <small class="text-muted">{{ activity.guidance|markdown|striptags|truncatewords:15 }}</small>
+    </td>
+    <td class="text-center">
+        {% if activity.predecessor or activity.successor %}
+            <i class="fa-solid fa-link text-warning"
+               data-bs-toggle="tooltip"
+               title="Has dependencies"></i>
+        {% else %}
+            <i class="fa-solid fa-minus text-muted"></i>
+        {% endif %}
+    </td>
+    <td class="mm-col-actions">
+        <div class="btn-group btn-group-sm" role="group">
+            <a href="{% url 'activity_detail' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}"
+               class="btn btn-outline-primary btn-sm"
+               data-testid="view-btn-{{ activity.id }}"
+               data-bs-toggle="tooltip"
+               title="View activity details">
+                <i class="fa-solid fa-eye"></i>
+            </a>
+            {% include "partials/copy_prompt/row_button.html" with entity_type="activity" entity_pk=activity.id entity_name=activity.name copy_prompt_text=activity.copy_prompt_text %}
+            {% if can_edit %}
+            <a href="{% url 'activity_edit' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}"
+               class="btn btn-outline-secondary btn-sm"
+               data-testid="edit-btn-{{ activity.id }}"
+               data-bs-toggle="tooltip"
+               title="Edit this activity">
+                <i class="fa-solid fa-edit"></i>
+            </a>
+            <button type="button"
+                    class="btn btn-outline-danger btn-sm"
+                    data-testid="delete-btn-{{ activity.id }}"
+                    data-bs-toggle="tooltip"
+                    title="Delete this activity"
+                    onclick="window.location.href='{% url 'activity_delete' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}'">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+            {% endif %}
+        </div>
+    </td>
+</tr>

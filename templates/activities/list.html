@@ -54,165 +54,63 @@
     <!-- Activities Content -->
     {% if total_activities > 0 %}
         {% if has_phases %}
-            <!-- Grouped by Phase -->
-            {% for phase_name, activities in activities_by_phase.items %}
-                <div class="card border-0 shadow-sm rounded-3 mb-4" data-testid="phase-group-{{ phase_name|slugify }}">
-                    <div class="card-header bg-light border-0">
-                        <h5 class="mb-0">
-                            <i class="fa-solid fa-bars-progress text-info"></i>
-                            {{ phase_name }}
-                            <span class="badge bg-secondary ms-2">{{ activities|length }}</span>
-                        </h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive" data-testid="activities-table-{{ phase_name|slugify }}-wrap">
-                            <table class="table table-hover align-middle mb-0" data-testid="activities-table-{{ phase_name|slugify }}">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th scope="col" style="width: 5%">#</th>
-                                        <th scope="col" style="width: 22%">Name</th>
-                                        <th scope="col" style="width: 10%">Abbrev.</th>
-                                        <th scope="col" style="width: 38%">Guidance</th>
-                                        <th scope="col" style="width: 10%">Dependencies</th>
-                                        <th scope="col" style="width: 15%">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for activity in activities %}
-                                    <tr data-testid="activity-row-{{ activity.id }}">
-                                        <td class="text-muted">{{ activity.order }}</td>
-                                        <td>
-                                            <strong>{{ activity.name }}</strong>
-                                        </td>
-                                        <td data-testid="activity-ref-{{ activity.id }}">
-                                            {% if activity.reference_label %}
-                                                <span class="badge bg-secondary font-monospace">{{ activity.reference_label }}</span>
-                                            {% else %}
-                                                <span class="text-muted small">—</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <small class="text-muted">{{ activity.guidance|markdown|striptags|truncatewords:15 }}</small>
-                                        </td>
-                                        <td class="text-center">
-                                            {% if activity.predecessor or activity.successor %}
-                                                <i class="fa-solid fa-link text-warning"
-                                                   data-bs-toggle="tooltip"
-                                                   title="Has dependencies"></i>
-                                            {% else %}
-                                                <i class="fa-solid fa-minus text-muted"></i>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <div class="btn-group btn-group-sm" role="group">
-                                                <a href="{% url 'activity_detail' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}"
-                                                   class="btn btn-outline-primary btn-sm"
-                                                   data-testid="view-btn-{{ activity.id }}"
-                                                   data-bs-toggle="tooltip"
-                                                   title="View activity details">
-                                                    <i class="fa-solid fa-eye"></i>
-                                                </a>
-                                                {% include "partials/copy_prompt/row_button.html" with entity_type="activity" entity_pk=activity.id entity_name=activity.name copy_prompt_text=activity.copy_prompt_text %}
-                                                {% if can_edit %}
-                                                <a href="{% url 'activity_edit' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}"
-                                                   class="btn btn-outline-secondary btn-sm"
-                                                   data-testid="edit-btn-{{ activity.id }}"
-                                                   data-bs-toggle="tooltip"
-                                                   title="Edit this activity">
-                                                    <i class="fa-solid fa-edit"></i>
-                                                </a>
-                                                <button type="button"
-                                                        class="btn btn-outline-danger btn-sm"
-                                                        data-testid="delete-btn-{{ activity.id }}"
-                                                        data-bs-toggle="tooltip"
-                                                        title="Delete this activity"
-                                                        onclick="window.location.href='{% url 'activity_delete' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}'">
-                                                    <i class="fa-solid fa-trash"></i>
-                                                </button>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+            <!-- Grouped by Phase — single table keeps Actions column aligned -->
+            <div class="card border-0 shadow-sm rounded-3 mb-4" data-testid="activities-phased-list">
+                <div class="card-body p-0">
+                    <div class="table-responsive" data-testid="activities-table-phased-wrap">
+                        <table class="table table-hover align-middle mb-0 mm-activities-table" data-testid="activities-table-phased">
+                            {% include "activities/_table_colgroup.html" %}
+                            <thead class="table-light">
+                                <tr>
+                                    <th scope="col" class="mm-col-order">#</th>
+                                    <th scope="col" class="mm-col-name">Name</th>
+                                    <th scope="col" class="mm-col-abbrev">Abbrev.</th>
+                                    <th scope="col" class="mm-col-guidance">Guidance</th>
+                                    <th scope="col" class="mm-col-deps">Dependencies</th>
+                                    <th scope="col" class="mm-col-actions">Actions</th>
+                                </tr>
+                            </thead>
+                            {% for phase_name, activities in activities_by_phase.items %}
+                            <tbody data-testid="phase-group-{{ phase_name|slugify }}">
+                                <tr class="mm-activities-phase-header">
+                                    <td colspan="6" class="bg-light border-bottom">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="fa-solid fa-bars-progress text-info" aria-hidden="true"></i>
+                                            <span>{{ phase_name }}</span>
+                                            <span class="badge bg-secondary">{{ activities|length }}</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% for activity in activities %}
+                                    {% include "activities/_activity_row.html" %}
+                                {% endfor %}
+                            </tbody>
+                            {% endfor %}
+                        </table>
                     </div>
                 </div>
-            {% endfor %}
+            </div>
         {% else %}
             <!-- Flat List (No Phases) -->
             <div class="card border-0 shadow-sm rounded-3" data-testid="activities-flat-list">
                 <div class="card-body p-0">
                     <div class="table-responsive" data-testid="activities-table-wrap">
-                        <table class="table table-hover align-middle mb-0" data-testid="activities-table">
+                        <table class="table table-hover align-middle mb-0 mm-activities-table" data-testid="activities-table">
+                            {% include "activities/_table_colgroup.html" %}
                             <thead class="table-light">
                                 <tr>
-                                    <th scope="col" style="width: 5%">#</th>
-                                    <th scope="col" style="width: 22%">Name</th>
-                                    <th scope="col" style="width: 10%">Abbrev.</th>
-                                    <th scope="col" style="width: 38%">Guidance</th>
-                                    <th scope="col" style="width: 10%">Dependencies</th>
-                                    <th scope="col" style="width: 15%">Actions</th>
+                                    <th scope="col" class="mm-col-order">#</th>
+                                    <th scope="col" class="mm-col-name">Name</th>
+                                    <th scope="col" class="mm-col-abbrev">Abbrev.</th>
+                                    <th scope="col" class="mm-col-guidance">Guidance</th>
+                                    <th scope="col" class="mm-col-deps">Dependencies</th>
+                                    <th scope="col" class="mm-col-actions">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for phase_name, activities in activities_by_phase.items %}
                                     {% for activity in activities %}
-                                    <tr data-testid="activity-row-{{ activity.id }}">
-                                        <td class="text-muted">{{ activity.order }}</td>
-                                        <td>
-                                            <strong>{{ activity.name }}</strong>
-                                        </td>
-                                        <td data-testid="activity-ref-{{ activity.id }}">
-                                            {% if activity.reference_label %}
-                                                <span class="badge bg-secondary font-monospace">{{ activity.reference_label }}</span>
-                                            {% else %}
-                                                <span class="text-muted small">—</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <small class="text-muted">{{ activity.guidance|markdown|striptags|truncatewords:15 }}</small>
-                                        </td>
-                                        <td class="text-center">
-                                            {% if activity.predecessor or activity.successor %}
-                                                <i class="fa-solid fa-link text-warning"
-                                                   data-bs-toggle="tooltip"
-                                                   title="Has dependencies"></i>
-                                            {% else %}
-                                                <i class="fa-solid fa-minus text-muted"></i>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <div class="btn-group btn-group-sm" role="group">
-                                                <a href="{% url 'activity_detail' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}"
-                                                   class="btn btn-outline-primary btn-sm"
-                                                   data-testid="view-btn-{{ activity.id }}"
-                                                   data-bs-toggle="tooltip"
-                                                   title="View activity details">
-                                                    <i class="fa-solid fa-eye"></i>
-                                                </a>
-                                                {% include "partials/copy_prompt/row_button.html" with entity_type="activity" entity_pk=activity.id entity_name=activity.name copy_prompt_text=activity.copy_prompt_text %}
-                                                {% if can_edit %}
-                                                <a href="{% url 'activity_edit' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}"
-                                                   class="btn btn-outline-secondary btn-sm"
-                                                   data-testid="edit-btn-{{ activity.id }}"
-                                                   data-bs-toggle="tooltip"
-                                                   title="Edit this activity">
-                                                    <i class="fa-solid fa-edit"></i>
-                                                </a>
-                                                <button type="button"
-                                                        class="btn btn-outline-danger btn-sm"
-                                                        data-testid="delete-btn-{{ activity.id }}"
-                                                        data-bs-toggle="tooltip"
-                                                        title="Delete this activity"
-                                                        onclick="window.location.href='{% url 'activity_delete' playbook_pk=playbook.pk workflow_pk=workflow.pk activity_pk=activity.pk %}'">
-                                                    <i class="fa-solid fa-trash"></i>
-                                                </button>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                    </tr>
+                                        {% include "activities/_activity_row.html" %}
                                     {% endfor %}
                                 {% endfor %}
                             </tbody>

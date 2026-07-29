@@ -86,31 +86,39 @@
     </div>
     <div class="card-body">
         {% if workflow_activities %}
-        {% for workflow_data in workflow_activities %}
-        <h6 class="mt-3 mb-2">
-            <a href="{% url 'workflow_detail' playbook.pk workflow_data.workflow.id %}">
-                {{ workflow_data.workflow.name }}
-            </a>
-        </h6>
         <div class="table-responsive">
-            <table class="table table-hover table-sm">
+            <table class="table table-hover table-sm mm-activities-table mm-activities-table--compact">
+                <colgroup>
+                    <col class="mm-col-order">
+                    <col class="mm-col-name">
+                    <col class="mm-col-actions">
+                </colgroup>
                 <thead>
                     <tr>
-                        <th>Order</th>
-                        <th>Name</th>
-                        <th>Actions</th>
+                        <th class="mm-col-order">Order</th>
+                        <th class="mm-col-name">Name</th>
+                        <th class="mm-col-actions">Actions</th>
                     </tr>
                 </thead>
+                {% for workflow_data in workflow_activities %}
                 <tbody>
+                    <tr class="mm-activities-phase-header">
+                        <td colspan="3" class="bg-light border-bottom">
+                            <a href="{% url 'workflow_detail' playbook.pk workflow_data.workflow.id %}"
+                               class="text-decoration-none">
+                                {{ workflow_data.workflow.name }}
+                            </a>
+                        </td>
+                    </tr>
                     {% for activity in workflow_data.activities %}
                     <tr>
                         <td><span class="badge bg-secondary">#{{ activity.order }}</span></td>
-                        <td>
+                        <td class="mm-col-name">
                             <a href="{% url 'activity_detail' playbook.pk activity.workflow.id activity.id %}">
                                 {{ activity.name }}
                             </a>
                         </td>
-                        <td>
+                        <td class="mm-col-actions">
                             <div class="btn-group btn-group-sm" role="group">
                                 <a href="{% url 'activity_detail' playbook.pk activity.workflow.id activity.id %}"
                                    class="btn btn-sm btn-outline-primary"
@@ -124,9 +132,9 @@
                     </tr>
                     {% endfor %}
                 </tbody>
+                {% endfor %}
             </table>
         </div>
-        {% endfor %}
         {% else %}
         <div class="alert alert-info mb-0">
             <i class="fa-solid fa-info-circle"></i> No activities assigned to this phase yet.
