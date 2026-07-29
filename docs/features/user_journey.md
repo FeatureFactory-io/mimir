@@ -3001,9 +3001,65 @@ Maria searches for non-existent team:
 
 ---
 
+### Act 17: Copy Prompt — Paste Playbook Context into AI
+
+**Goal**: Maria (or guest Bob browsing a public playbook) wants to copy a ready-made AI instruction for any methodology entity — activity guidance, skill content, rule body, etc. — without retyping or manually assembling context from the page.
+
+**Why it matters**: Mimir's value is playbook-anchored AI sessions. Copy Prompt bridges the web UI and the IDE: one click puts an instruction line plus raw Markdown into the clipboard, aligned with the sample commands on **Use Cases** (`/use-cases/`).
+
+**Implementation approach (Option B)**: `CopyPromptService` in `methodology/services/` builds prompt text server-side; detail and list views pass `copy_prompt_text` into a shared partial; client JS calls `navigator.clipboard.writeText` on click.
+
+**Prompt format** (all entity types):
+
+```
+Read the '<ref> <name>' <entity_type> from playbook '<playbook>' …
+
+<raw Markdown or text body>
+```
+
+Entity-specific bodies: Activity → full `guidance`; Skill → `content` + metadata; Rule → slug + `always_apply` + body; Workflow/Phase/Playbook → summary/index (not every activity body); PIP → summary + change list (no Galdr reasoning).
+
+**Entry points**:
+
+| Surface | Screen ID | Where [Copy Prompt] appears |
+|---|---|---|
+| Entity VIEW (all types below) | `FOB-COPY-PROMPT-VIEW-1` (pattern) | Header toolbar (`role="toolbar"`), **before** [Back] / after edit actions |
+| LIST+FIND row Actions | `FOB-COPY-PROMPT-LIST-1` (pattern) | `btn-group-sm` beside existing View (eye) icon |
+| Content Browser embed | (same as VIEW embed) | Inside `?embed=1` partial — no navbar |
+
+**Entity types in scope**: Activity, Skill, Agent, Rule, Artifact, Workflow, Phase, Playbook, PIP.
+
+**Out of scope**: Teams; Profile API token copy (Act 14); Use Cases sample commands; PIP admin-review; create/edit forms; playbook list **cards** (table Actions only for lists).
+
+**UI conventions** (see `docs/ux/IA_guidelines.md` §3.4):
+
+- Detail toolbar: `btn btn-outline-secondary`, icon `fa-regular fa-copy`, label **Copy Prompt**, `data-testid="copy-prompt-btn"`, tooltip **Copy prompt to clipboard**
+- List row: icon-only copy button in Actions group, `data-testid="copy-prompt-btn-<type>-<pk>"`
+- Hidden store: visually hidden `<textarea data-testid="copy-prompt-text-<type>-<pk>">` — not `data-copy` attributes (large Markdown)
+- Success feedback: brief check icon or toast; no navigation
+- Visible to **all readers** (owner, non-owner, guest on public released) — independent of `can_edit`
+
+**LIST surfaces with Actions column**:
+
+- Activities: workflow-scoped, playbook-scoped, global `/activities/`
+- Skills, Agents, Rules, Artifacts, Workflows, Phases: playbook-scoped + global lists
+- PIPs: `/pips/` list
+- Nested: Playbook → Workflows tab table; Phase detail → activities table
+
+**Access control**:
+
+- Same visibility as entity VIEW (public released → guest OK; private → 404)
+- PIPs require authentication (guest GET `/pips/<pk>/` → redirect/deny)
+
+**Mockups** (DEBUG only): `/mockups/copy-prompt/` — activity detail + list exemplars
+
+**Feature files**: `docs/features/act-17-copy-prompt/` (`copy-prompt-service.feature`, `copy-prompt-view.feature`, `copy-prompt-list.feature`, `copy-prompt-guest.feature`)
+
+---
+
 ## Journey Complete
 
-Maria's journey through Acts 0-15 demonstrates the complete Mimir MVP experience:
+Maria's journey through Acts 0-17 demonstrates the complete Mimir MVP experience:
 
 **Core CRUDLF Entities (Acts 2-8):**
 - ✅ **Playbooks**: Top-level methodologies with versioning and team publishing
@@ -3023,6 +3079,9 @@ Maria's journey through Acts 0-15 demonstrates the complete Mimir MVP experience
 - ✅ **Error Recovery**: Graceful handling of failure scenarios
 
 - ✅ **Content Browser**: Interactive node-based graph explorer (Cytoscape.js, CDN) for visualizing the full entity graph of any playbook
+
+**Cross-cutting UX (Act 17):**
+- ✅ **Copy Prompt**: Server-built AI instructions on entity VIEW headers and list-row Actions — one-click clipboard for IDE/assistant paste
 
 **Key Achievements:**
 - All 7 core entities have complete CRUDLF with LIST+FIND entry points
