@@ -262,7 +262,7 @@ Maria's FOB web GUI (http://localhost:8000) has a consistent layout:
 
 **Top Navigation Bar** (persistent across all screens):
 - **Logo**: "Mimir" (links to Dashboard)
-- **Search**: Global search bar (playbooks, teams, activities)
+- **Search**: Global search bar (playbook contents: playbooks, workflows, phases, activities, artifacts, skills, agents, rules; teams when implemented)
 - **Navigation Menu**:
   - Home (Dashboard)
   - Playbooks
@@ -392,33 +392,76 @@ Clicking "View all notifications" opens dedicated page:
   - Action buttons (context-specific)
   - Dismiss button
 
-#### Screen: FOB Global Search
-Maria types "React" in search bar:
-- Live dropdown suggestions appear:
-  - **Playbooks** (2):
-    - React Frontend Development (Usability)
-    - React Testing Patterns (Archived)
-  - **Activities** (5):
-    - Setup React Project
-    - Create React Components
-    - ...
-  - **Teams** (0)
-- "See all results" link → Full search results page
+#### Screen: FOB Global Search (NAV-06)
+Maria types "React" in the navbar search bar:
+- Live dropdown suggestions appear (top 5 per type, compact):
+  - **Playbooks** (2): React Frontend Development · by Mike Chen
+  - **Workflows** (1): Component Development → React Frontend Development
+  - **Activities** (5): Setup React Project, Create React Components, …
+  - **Skills** (3): React Form Component · GUI_FORM · React+Redux
+  - **Artifacts**, **Agents**, **Rules**, **Phases** — shown only when they match
+  - Each row links to the entity detail page; playbook context shown as subtitle where helpful
+- **"See all results"** link → `/search/?q=React` (full search results page with the same query pre-filled)
 
-#### Screen: FOB Search Results
-Full search page with filters:
-- **Left sidebar filters**:
-  - Type: Playbooks, Activities, Artifacts, Goals, Teams
-  - Status: Active, Disabled, Archived
-  - Source: Local, Owned
-- **Results list** with relevance ranking
-- **Empty state**: "No results found" with suggestions
+**Access scope**: Search includes playbooks Maria can read (owned + public non-draft from others). Entity rows are scoped to those playbooks. Teams are out of scope for NAV-06 until team search is implemented.
+
+#### Screen: FOB Search Results (NAV-06)
+Full search page — refine and browse matches across **all playbook entity types**:
+
+**Filter bar** (single row, no Status or Source filters):
+- **Search for**: Text input (`name="q"`, `data-testid="global-search-query-input"`) — pre-populated from navbar when user submits search or clicks "See all results"; user can edit and re-submit
+- **Type**: Dropdown (`name="type"`) — All types (default) | Playbooks | Workflows | Phases | Activities | Artifacts | Skills | Agents | Rules
+- **[Search]** button — GET `/search/?q=…&type=…` (preserves bookmarkable URLs)
+
+**Results layout** (grouped sections — see wireframe below):
+- Summary line: `Showing results for "React" · N matches` (omit type groups with zero hits when **All types** is selected)
+- One collapsible section per entity type that has matches, ordered:
+  1. Playbooks → 2. Workflows → 3. Phases → 4. Activities → 5. Artifacts → 6. Skills → 7. Agents → 8. Rules
+- Each result row:
+  - **Title** (link to detail view)
+  - **Context breadcrumb**: `{Playbook name}` or `{Playbook} › {Workflow}` as appropriate
+  - **Snippet**: ~20 words from matched field (name, description, guidance, skill content, etc.)
+  - **Type icon + badge** (matches Content Browser colours: Workflow blue, Activity green, Artifact amber, Skill orange, Agent teal, Rule grey, Phase purple, Playbook primary)
+- When **Type** filter selects a single entity, show only that section (full width list)
+- **Empty state** (`data-testid="global-search-empty-state"`): "No results found for …" with hint to broaden query or switch type to All types
+
+**Wireframe — FOB Search Results (All types)**:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Search results                                                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│  Search for  [ React_____________________________________ ]  [Search]    │
+│  Type        [ All types ▼ ]                                             │
+├──────────────────────────────────────────────────────────────────────────┤
+│  Showing results for "React" · 24 matches                                │
+├──────────────────────────────────────────────────────────────────────────┤
+│  ▼ Playbooks (2)                                                         │
+│  │ 📘 React Frontend Development          Mike Chen · v1.2 · Development │
+│  │    …modern React patterns and component architecture…                 │
+│  │ 📘 React Testing Patterns              Community · v1.0 · Released    │
+│  ├────────────────────────────────────────────────────────────────────── │
+│  ▼ Workflows (3)                                                         │
+│  │ 🔷 Component Development    React Frontend Development · 8 activities │
+│  ├────────────────────────────────────────────────────────────────────── │
+│  ▼ Activities (8)                                                        │
+│  │ ✅ Setup React Project       React Frontend Development › Component…  │
+│  ├────────────────────────────────────────────────────────────────────── │
+│  ▼ Skills (6)                                                            │
+│  │ 🟠 React Form Component      GUI_FORM · React+Redux                   │
+│  ├────────────────────────────────────────────────────────────────────── │
+│  ▼ Artifacts (2)  ·  Agents (1)  ·  Rules (1)  ·  Phases (1)           │
+│     (same row pattern; sections with 0 hits hidden in All-types view)    │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Not in scope for this screen**: Status filter (draft/released belongs on playbook list, not global find). Source/Owned/Downloaded filter — FOB has no family sync download model; ownership is implied by author + visibility, not a separate `source` dimension in UI.
 
 ---
 
 ### Act 2: PLAYBOOKS - Complete CRUDLF
 
-**Context**: After onboarding, Maria needs to manage playbooks - the top-level container for methodologies. She can create her own, view downloaded ones, edit them, and delete obsolete ones.
+**Context**: After onboarding, Maria needs to manage playbooks - the top-level container for methodologies. She creates her own, browses others' public playbooks, edits drafts she owns, and deletes obsolete ones.
 
 **Pattern**: Playbook follows the standard CRUDLF pattern with LIST+FIND as the entry point.
 
@@ -445,11 +488,11 @@ Maria clicks "Playbooks" in the main navigation. The playbooks list page appears
 - [Create New Playbook] absent or links to login; `/playbooks/create/` redirects to login
 
 **Example Data**:
-- "React Frontend Development" | Mike Chen | v1.2 | Active | Downloaded
-- "UX Research Methodology" | Maria Rodriguez | v2.1 | Active | Owned
-- "Design System Patterns" | Community | v1.0 | Disabled | Downloaded
+- "React Frontend Development" | Mike Chen | v1.2 | Released | Public
+- "UX Research Methodology" | Maria Rodriguez | v2.1 | Draft | Private
+- "Design System Patterns" | Community | v1.0 | Disabled | Public
 
-Maria sees her existing playbooks and can search/filter to find specific ones.
+Maria sees her playbooks plus other authors' public playbooks and can search/filter to find specific ones.
 
 ---
 
@@ -612,7 +655,7 @@ Maria clicks [View] on "React Frontend Development" from the list. The detail vi
      - Category: Development
      - Tags: react, frontend, component-architecture
      - Created: 3 months ago
-     - Source: Downloaded from Usability team
+     - Visibility: Public · Author: Mike Chen (Usability team)
    - **Workflows Section**:
      - List of workflows in this playbook
      - Each workflow shows: Name, Description, Activity count
@@ -700,9 +743,9 @@ Maria clicks [Edit] on her "Product Discovery Framework" draft playbook (v0.3). 
 - Updated data and new version visible in FOB-PLAYBOOKS-LIST+FIND-1
 
 **Permission Handling**:
-- Downloaded playbooks (not owned): Edit button disabled or opens read-only view
-- Tooltip: "You cannot edit playbooks from other authors. Create a local copy or submit a PIP."
-- [Create Local Copy] button offered as alternative
+- Playbooks authored by others (read-only): Edit button disabled or opens read-only view
+- Tooltip: "You cannot edit playbooks you do not own. Duplicate to your account or submit a PIP on a released playbook you maintain."
+- [Duplicate] button offered as alternative for public playbooks
 
 ---
 
@@ -756,10 +799,10 @@ Maria clicks [Delete] on an old "Test Playbook 123" she no longer needs. A confi
 - Team/family sharing notifications: not implemented in FOB
 
 **Special Cases**:
-- **Cannot Delete Downloaded Playbooks**: Modal shows:
-  - "You cannot delete playbooks from other authors"
-  - "Instead, you can Disable this playbook to hide it from your views"
-  - [Disable Playbook] [Cancel] buttons
+- **Cannot delete others' playbooks**: Modal shows:
+  - "You cannot delete playbooks you do not own"
+  - For owned playbooks: standard delete flow only
+  - [Cancel] button
 - **Delete Draft**: Simpler confirmation, less dramatic warnings
 
 Maria confirms deletion by typing the name and checking the box. The playbook and all its contents are permanently removed.
@@ -2110,9 +2153,9 @@ Whether created via MCP or the FOB UI, the PIP creation form contains:
 
 ```
 Draft ──→ Submitted ──→ Processing (Galdr) ──→ Reviewed ──→ Accepted / Rejected (partial)
-  ↑             │                 │
-  └──────[Withdraw]───────────────┘
-         (reverts to Draft; Galdr processing aborted if mid-flight)
+  ↑             │                 │                 │
+  └──────[Withdraw]───────────────┴─────────────────┘
+         (reverts to Draft; Galdr output cleared; author can fix and resubmit)
 ```
 
 **Galdr Processing** (automated, runs immediately after submission):
@@ -2149,8 +2192,8 @@ Maria navigates to **PIPs** in the top nav. The list page loads and immediately 
 - **Row actions** (dropdown per row):
   - [View] → FOB-PIP-DETAIL
   - [Edit] (Draft only)
-  - [Withdraw] (Submitted and Processing only) — reverts PIP to Draft for editing and resubmission
-  - [Cancel PIP] (Submitted and Processing only) — permanently cancels the PIP
+  - [Withdraw] (Submitted, Processing, and Reviewed) — reverts PIP to Draft; clears Galdr output; author can fix and resubmit
+  - [Cancel PIP] (Submitted, Processing, and Reviewed) — permanently cancels the PIP
   - [Discard] (Draft only) — permanently deletes the draft
 - **Example rows** (with blue dot on PIP-42 since it just moved to Reviewed):
 
@@ -2189,37 +2232,40 @@ Maria opens PIP-42:
   - **Draft**: "Draft — not yet submitted." → [Edit PIP] [Submit for Review] [Discard]
   - **Submitted**: "Submitted — queued for Galdr review." → [Withdraw] [Cancel PIP]
   - **Processing (Galdr)**: "Galdr is reviewing your changes — check back shortly." → [Withdraw] [Cancel PIP]
-  - **Reviewed**: "Reviewed — awaiting Administrator decision." → (read-only)
+  - **Reviewed**: "Reviewed — awaiting Administrator decision." → [Withdraw] [Cancel PIP]
   - **Accepted / Rejected**: outcome banner with per-Change verdicts → (read-only)
 
-**[Withdraw]** and **[Cancel PIP]** are both available on Submitted and Processing PIPs — they have distinct semantics:
-- **[Withdraw]** — reverts PIP to `Draft`; Galdr processing is aborted; all Galdr recommendations are cleared; Maria can edit and resubmit. Confirmation: *"Withdraw PIP-42? It will return to Draft and any in-progress Galdr review will be discarded."*
+**[Withdraw]** and **[Cancel PIP]** are available on Submitted, Processing, and Reviewed PIPs — they have distinct semantics:
+- **[Withdraw]** — reverts PIP to `Draft`; all Galdr recommendations are cleared; Maria can edit and resubmit. Primary use case: Galdr flagged issues — author withdraws, addresses the feedback, resubmits without creating a new PIP. Confirmation: *"Withdraw PIP-42? It will return to Draft and Galdr's assessment will be cleared."*
 - **[Cancel PIP]** — permanently cancels the PIP (no recovery). Confirmation: *"Cancel PIP-42 permanently? This cannot be undone."*
 
 ---
 
 #### Withdrawing & Resubmitting a PIP
 
-**Context**: After submitting PIP-42, Maria realises she forgot to include a second Change — an ALTER on "Component Testing" to reference the new accessibility checklist. She decides to withdraw the PIP before Galdr finishes, add the missing Change, then resubmit.
+**Context**: Galdr has reviewed PIP-42 and flagged Change #1 as `NEEDS_CLARIFICATION` — the new Activity lacks a clear link to the workflow goal. Maria wants to address the feedback without creating a brand-new PIP, so she withdraws PIP-42 back to Draft, refines the Change, and resubmits.
 
 **Via FOB UI**:
-1. Maria opens PIP-42 (status: `Processing (Galdr)`) from **FOB-PIP-LIST** or **FOB-PIP-DETAIL**
-2. She clicks **[Withdraw]** → confirmation modal: *"Withdraw PIP-42? It will return to Draft and any in-progress Galdr review will be discarded."*
-3. She clicks **[Confirm]** → PIP-42 status reverts to `Draft`; all Galdr output is cleared
-4. She clicks **[Edit PIP]** → opens the PIP edit form pre-populated with existing Changes
-5. She adds Change #2 (ALTER Activity "Component Testing"), updates the summary
-6. She clicks **[Submit for Review]** → PIP-42 re-enters the `Submitted → Processing (Galdr)` pipeline
+1. Maria opens PIP-42 (status: `Reviewed`) from **FOB-PIP-LIST** or **FOB-PIP-DETAIL**
+2. She sees Galdr's recommendations and decides to revise her proposal
+3. She clicks **[Withdraw]** → confirmation modal: *"Withdraw PIP-42? It will return to Draft and Galdr's assessment will be cleared."*
+4. She clicks **[Confirm]** → PIP-42 status reverts to `Draft`; all Galdr output is cleared
+5. She clicks **[Edit PIP]** → opens the PIP edit form pre-populated with existing Changes
+6. She updates Change #1 content to address Galdr's clarification note
+7. She clicks **[Submit for Review]** → PIP-42 re-enters the `Submitted → Processing (Galdr)` pipeline
+
+**Also works mid-flight**: If Maria catches an error before Galdr finishes (status `Submitted` or `Processing (Galdr)`), Withdraw is equally available — Galdr processing is aborted and output is discarded.
 
 **Via MCP**:
 ```
-> mimir: Withdraw PIP-42 so I can add another change.
+> mimir: Galdr flagged PIP-42. Withdraw it so I can fix the changes and resubmit.
 ```
-AI calls `cancel_pip(pip_id=42)` (withdraw to Draft) → then `add_pip_change(...)` to add the new Change → then `submit_pip(pip_id=42)` to resubmit.
+AI calls `revert_pip_to_draft(pip_id=42)` → then edits the Change via `add_pip_change` / `remove_pip_change` → then `submit_pip(pip_id=42)` to resubmit.
 
 **Constraints**:
-- Withdraw is only available while status is `Submitted` or `Processing (Galdr)`
-- Once `Reviewed`, `Accepted`, or `Rejected`, the PIP is read-only and cannot be withdrawn
-- A PIP may be withdrawn and resubmitted any number of times before reaching `Reviewed`
+- Withdraw is available while status is `Submitted`, `Processing (Galdr)`, or `Reviewed`
+- Once `Accepted` or `Rejected`, the PIP is finalized and cannot be withdrawn
+- A PIP may be withdrawn and resubmitted any number of times
 - Each resubmission restarts Galdr processing from scratch (prior recommendations are discarded)
 
 ---
