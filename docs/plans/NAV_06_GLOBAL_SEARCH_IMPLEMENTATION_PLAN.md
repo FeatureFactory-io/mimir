@@ -1,5 +1,7 @@
 ## NAV-06: Global Search – Implementation Plan (Executed)
 
+> **Superseded by** [`NAV-06_GLOBAL_SEARCH_V2_IMPLEMENTATION_PLAN.md`](NAV-06_GLOBAL_SEARCH_V2_IMPLEMENTATION_PLAN.md) for accordion UI, 8 entity types, highlighting, and accessible playbook scope. This document records the original v1 MVP delivery.
+
 ### 1. Scope & Goals
 
 - Implement a global search capability accessible from the top navigation bar.
