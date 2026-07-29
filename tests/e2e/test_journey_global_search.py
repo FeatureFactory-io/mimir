@@ -64,7 +64,8 @@ def test_complete_global_search_journey(page, live_server, nav06_sample_data):
     search_input.press('Enter')
     expect(page).to_have_url(f'{live_server.url}/search/?q=Component')
     
-    # Verify results
+    # Verify results page summary and content
+    expect(page.get_by_test_id('global-search-summary')).to_be_visible()
     expect(page.locator('body')).to_contain_text(nav06_sample_data['playbook_name'])
 
 

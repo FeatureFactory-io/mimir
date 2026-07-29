@@ -1,8 +1,22 @@
+import logging
+
 import pytest
 from django.contrib.auth.models import User
 
-from methodology.models import Playbook, Workflow, Activity
-from methodology.services.global_search_service import GlobalSearchService
+from methodology.models import (
+    Activity,
+    Agent,
+    Artifact,
+    Phase,
+    Playbook,
+    Rule,
+    Skill,
+    Workflow,
+)
+from methodology.services.global_search_service import (
+    SEARCH_ENTITY_ORDER,
+    GlobalSearchService,
+)
 
 
 @pytest.mark.django_db
@@ -15,70 +29,168 @@ class TestGlobalSearchService:
             email="maria@example.com",
             password="SecurePass123",
         )
+        self.other = User.objects.create_user(
+            username="other",
+            email="other@example.com",
+            password="SecurePass123",
+        )
         self.service = GlobalSearchService()
 
-    def test_search_returns_playbooks_workflows_activities_for_query(self):
-        """Search should return results across Playbooks, Workflows, Activities for matching query."""
+    def _create_full_fixture(self, author=None, name_prefix="Alpha"):
+        author = author or self.user
         playbook = Playbook.objects.create(
-            name="Component Development Playbook",
-            description="Playbook for building components",
+            name=f"{name_prefix} Development Playbook",
+            description=f"Playbook for {name_prefix} components",
             category="development",
-            author=self.user,
+            author=author,
         )
         workflow = Workflow.objects.create(
             playbook=playbook,
-            name="Component Workflow",
-            description="Workflow for component work",
+            name=f"{name_prefix} Workflow",
+            description=f"Workflow for {name_prefix}",
             order=1,
         )
-        Activity.objects.create(
+        activity = Activity.objects.create(
             workflow=workflow,
-            name="Create Component",
-            guidance="Do component work",
+            name=f"Create {name_prefix}",
+            guidance=f"Do {name_prefix} component work",
             order=1,
         )
+        phase = Phase.objects.create(
+            playbook=playbook,
+            name=f"{name_prefix} Phase",
+            description=f"Phase for {name_prefix}",
+            order=1,
+        )
+        artifact = Artifact.objects.create(
+            playbook=playbook,
+            produced_by=activity,
+            name=f"{name_prefix} Artifact",
+            description=f"Artifact for {name_prefix}",
+        )
+        skill = Skill.objects.create(
+            playbook=playbook,
+            title=f"{name_prefix} Skill",
+            capability_domain=f"{name_prefix}Domain",
+            technology_stack="Django",
+            content=f"Skill content about {name_prefix}",
+        )
+        agent = Agent.objects.create(
+            playbook=playbook,
+            name=f"{name_prefix} Agent",
+            description=f"Agent for {name_prefix}",
+        )
+        rule = Rule.objects.create(
+            playbook=playbook,
+            title=f"{name_prefix} Rule",
+            slug=f"{name_prefix.lower()}-rule",
+            content=f"Rule content about {name_prefix}",
+        )
+        return {
+            "playbook": playbook,
+            "workflow": workflow,
+            "activity": activity,
+            "phase": phase,
+            "artifact": artifact,
+            "skill": skill,
+            "agent": agent,
+            "rule": rule,
+        }
 
-        results = self.service.search(query="Component", user=self.user, filters=None)
+    def test_search_returns_all_entity_types_for_query(self):
+        self._create_full_fixture(name_prefix="Alpha")
 
-        assert "playbooks" in results
-        assert "workflows" in results
-        assert "activities" in results
+        results = self.service.search(query="Alpha", user=self.user, filters=None)
 
-        assert any("Component" in pb.name for pb in results["playbooks"])
-        assert any("Component" in wf.name for wf in results["workflows"])
-        assert any("Component" in act.name for act in results["activities"])
+        for key in SEARCH_ENTITY_ORDER:
+            assert key in results
+            assert results[key], f"Expected matches in {key}"
 
     def test_search_with_no_matches_returns_empty_lists(self):
-        """Search with no matches should return empty lists for all entity types."""
         results = self.service.search(query="NonExistingQuery", user=self.user, filters=None)
 
-        assert results["playbooks"] == []
-        assert results["workflows"] == []
-        assert results["activities"] == []
+        for key in SEARCH_ENTITY_ORDER:
+            assert results[key] == []
 
     def test_search_with_type_filter_limits_entity_lists(self):
-        """Type filter should limit which entity lists are populated in the result."""
-        playbook = Playbook.objects.create(
-            name="Component Development Playbook",
-            description="Playbook for components",
+        self._create_full_fixture(name_prefix="Alpha")
+
+        results = self.service.search(
+            query="Alpha", user=self.user, filters={"type": "playbooks"}
+        )
+
+        assert results["playbooks"]
+        assert results["workflows"] == []
+        assert results["activities"] == []
+        assert results["phases"] == []
+
+    def test_search_includes_public_playbook_not_owned(self):
+        Playbook.objects.create(
+            name="Public Shared Playbook",
+            description="Visible to everyone",
+            category="development",
+            author=self.other,
+            visibility="public",
+            status="released",
+        )
+
+        results = self.service.search(query="Public Shared", user=self.user, filters=None)
+
+        assert len(results["playbooks"]) == 1
+        assert results["playbooks"][0].author_id == self.other.id
+
+    def test_search_excludes_other_authors_draft(self):
+        Playbook.objects.create(
+            name="Secret Draft Playbook",
+            description="Should not appear",
+            category="development",
+            author=self.other,
+            visibility="public",
+            status="draft",
+        )
+
+        results = self.service.search(query="Secret Draft", user=self.user, filters=None)
+
+        assert results["playbooks"] == []
+
+    def test_build_sections_includes_context_and_snippet(self):
+        data = self._create_full_fixture(name_prefix="Alpha")
+        results = self.service.search(query="Alpha", user=self.user, filters=None)
+        sections, total = self.service.build_sections("Alpha", results, type_filter="")
+
+        activity_section = next(s for s in sections if s["key"] == "activities")
+        row = activity_section["items"][0]
+        assert "Development Playbook" in row["context_html"]
+        assert "Workflow" in row["context_html"]
+        assert "Alpha" in row["snippet_html"]
+        assert total >= 8
+
+    def test_build_sections_omits_empty_entity_types(self):
+        Playbook.objects.create(
+            name="Lonely Playbook",
+            description="Only playbook",
             category="development",
             author=self.user,
         )
-        workflow = Workflow.objects.create(
-            playbook=playbook,
-            name="Component Workflow",
-            description="Workflow for components",
-            order=1,
-        )
-        Activity.objects.create(
-            workflow=workflow,
-            name="Create Component",
-            guidance="Do component work",
-            order=1,
-        )
+        results = self.service.search(query="Lonely", user=self.user, filters=None)
+        sections, total = self.service.build_sections("Lonely", results, type_filter="")
 
-        results = self.service.search(query="Component", user=self.user, filters={"type": "playbooks"})
+        assert len(sections) == 1
+        assert sections[0]["key"] == "playbooks"
+        assert total == 1
 
-        assert results["playbooks"], "Playbooks list should not be empty when type=playbooks"
-        assert results["workflows"] == [], "Workflows list should be empty when type=playbooks"
-        assert results["activities"] == [], "Activities list should be empty when type=playbooks"
+    def test_search_empty_query_log_story(self, caplog):
+        with caplog.at_level(logging.INFO, logger="methodology.services.global_search_service"):
+            results = self.service.search(query="", user=self.user, filters=None)
+
+        assert results == {key: [] for key in SEARCH_ENTITY_ORDER}
+        assert any("empty query" in r.getMessage() for r in caplog.records)
+
+    def test_search_happy_path_log_story(self, caplog):
+        self._create_full_fixture(name_prefix="Alpha")
+        with caplog.at_level(logging.INFO, logger="methodology.services.global_search_service"):
+            self.service.search(query="Alpha", user=self.user, filters=None)
+
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("GlobalSearchService.search started" in m for m in messages)
+        assert any("GlobalSearchService.search finished" in m for m in messages)
