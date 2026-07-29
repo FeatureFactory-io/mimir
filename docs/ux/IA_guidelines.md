@@ -210,7 +210,7 @@ Every page follows this structure:
 | **Single-column form** | Create / Edit screens | `col-md-8 col-lg-6`, centred |
 | **Full-width table** | LIST+FIND screens | Card shell + `table-responsive` + `table-hover` (§5.2 LIST+FIND data table) |
 | **Filter row → table** | LIST+FIND screens | Filter controls in a `row` directly above the table card (§5.2) |
-| **8+4 read + metadata rail** | Entity VIEW screens | `col-md-8` primary / `col-md-4` rail (§3.7) |
+| **8+4 read + context rail** | Entity VIEW screens | `col-md-8` content / `col-md-4` rail (§3.7) |
 
 ### 3.3 Navbar CSS
 
@@ -272,9 +272,9 @@ Screens that combine **filters → table** with **checkbox-driven bulk operation
 
 **Canonical reference:** `ui/templates/ui/fragos/list.html` (`fragos-bulk-bar`).
 
-### 3.7 View page — read column + metadata rail (8+4)
+### 3.7 View page — read column + context rail (8+4)
 
-Every **VIEW** screen for a playbook entity dedicates roughly **⅔ of the content width to reading** the primary artifact and **⅓ to supplementary metadata** on the right. This keeps long-form Markdown (guidance, descriptions, rule bodies) readable while scannable facts and cross-links stay in a compact rail.
+Every **VIEW** screen for a playbook entity dedicates roughly **⅔ of the content width to the primary body** and **⅓ to a context rail** on the right. You open the page to **read content**; everything else — metadata, relationships, "used in" lists — lives in the rail so you can glance at context **while** you read without it competing for horizontal space with the body.
 
 #### Layout
 
@@ -282,10 +282,11 @@ Every **VIEW** screen for a playbook entity dedicates roughly **⅔ of the conte
 <hg-page-header>                    ← full width: title, at-a-glance badges, toolbar (§3.4)
 <div class="row">
   <div class="col-md-8">            ← primary read column (~⅔)
-    [primary content card(s)]
+    [content card only]
   </div>
-  <div class="col-md-4">            ← metadata rail (~⅓)
-    [Details / Metadata card(s)]
+  <div class="col-md-4">            ← context rail (~⅓)
+    [Details / Metadata]
+    [Used in / Producer / Consumers / …]
     [related-entity summary cards]
   </div>
 </div>
@@ -293,37 +294,39 @@ Every **VIEW** screen for a playbook entity dedicates roughly **⅔ of the conte
 
 | Zone | Bootstrap | Purpose |
 |---|---|---|
-| **Primary read column** | `col-md-8` | The reason the user opened the page — rendered Markdown body, descriptions, PIP narrative, etc. May also include **structural relationship lists** when those explain the entity's role (e.g. artifact producer / consumer activities). |
-| **Metadata rail** | `col-md-4` | Supplementary, scannable facts: scalar fields (`<dl>`), dates, type badges, compact cards linking to parent workflow / playbook, M2M summaries (skills, rules, agent assignment). |
+| **Primary read column** | `col-md-8` | **Content only** — the Markdown body you came to read (guidance, skill content, rule body, artifact description, PIP narrative, agent description, …). One focused card; no relationship lists, no metadata blocks. |
+| **Context rail** | `col-md-4` | **Everything supplementary:** scalar metadata (`<dl>`, dates, type, status badges), parent context (Workflow, Playbook), M2M links (skills, rules, agent), **and relationship / usage lists** (input / output artifacts, producer / consumer activities, "used in activities", template download). Stack as compact cards; long lists scroll inside the card. |
 | **Page header** | full width above split | Identity + actions only; repeat only the most important at-a-glance badges (ref label, order, status). Deeper fields belong in the rail **Details** card. |
 
-**Responsive:** Below the `md` breakpoint the columns stack — primary content first, rail second — so reading order stays correct on mobile.
+**Responsive:** Below the `md` breakpoint the columns stack — content first, rail second — so reading order stays correct on mobile.
 
 #### What goes where (decision rules)
 
-| Put in **primary column** | Put in **metadata rail** |
+| Put in **primary column** | Put in **context rail** |
 |---|---|
-| Markdown-rendered body (guidance, content, description) | Scalar metadata (order, phase, type, required, dates) |
-| Relationship lists that explain **how this entity fits the workflow** (producer / consumers, "used in activities") | Parent context cards (Workflow, Playbook) with short teaser + **View** link |
-| Downloadable assets tied to the entity (template file) | M2M link lists (skills, rules, agent) when they are reference, not the main read |
-| Empty-state copy for the primary body | Edit / assign shortcuts scoped to a related facet |
+| Rendered Markdown body (the entity's main text) | Scalar metadata (order, phase, type, required, dates) |
+| Empty-state copy when there is no body yet | **Used in** / **Producer** / **Consumer** / dependency lists |
+| | Parent context cards (Workflow, Playbook) with short teaser + **View** link |
+| | M2M summaries (skills, rules, agent assignment) |
+| | Downloadable assets (template file) as a compact card with action button |
+| | Edit / assign shortcuts scoped to a related facet |
 
-When a relationship list is long (e.g. 12 consumer activities), keep it in the **primary column** — it is navigational context, not sidebar metadata.
+**Rule of thumb:** if it is not the sentence-level content the user came to read, it belongs in the rail — including long lists (e.g. 12 consumer activities). The rail is reference while reading, not a second content column.
 
 #### Canonical references (production)
 
-| Entity | Template | Primary column | Metadata rail |
+| Entity | Template | Primary column | Context rail |
 |---|---|---|---|
 | **Activity** | `templates/activities/detail.html` | **Guidance** card (Markdown + Mermaid) | Details, Workflow, Assigned Agent, Required Skills, Rules, Input / Output Artifacts |
-| **Artifact** | `templates/artifacts/detail.html` | Description, Producer Activity, Consumer Activities, Template File | Metadata (type, required, created / updated) |
+| **Artifact** | `templates/artifacts/detail.html` | **Description** (Markdown) only | Metadata, Producer Activity, Consumer Activities, Template File *(target layout — producer / consumers currently in primary column; migrate to rail)* |
 
-**Activity VIEW** is the reference implementation — copy its structure for new entity VIEW screens.
+**Activity VIEW** is the reference implementation for the split. **Artifact VIEW** is a partial adopter: move producer / consumer sections to the rail when aligning to this guideline.
 
 #### Adoption
 
-Apply this pattern to all playbook-entity **VIEW** templates (Skill, Agent, Rule, Workflow, Phase, PIP, Team, …). Surfaces that still use a single full-width column are **migration targets**, not exceptions to the guideline.
+Apply this pattern to all playbook-entity **VIEW** templates (Skill, Agent, Rule, Workflow, Phase, PIP, Team, …). Surfaces that still use a single full-width column, or that mix relationship lists into the primary column, are **migration targets**.
 
-Playbook VIEW uses a variant inside the Overview tab: stats and description follow the same 8+4 split (`templates/playbooks/detail.html`).
+Playbook VIEW uses a variant inside the Overview tab: description in the read column, stats and sidebar cards in the rail (`templates/playbooks/detail.html`).
 
 Tabbed VIEW screens (e.g. Playbook tabs, RoE VIEW — §5.2) keep the **8+4 split inside each tab's content area**, with the tab bar and page header remaining full width above.
 
