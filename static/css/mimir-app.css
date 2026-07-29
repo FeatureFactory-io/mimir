@@ -365,6 +365,33 @@ body.mm-content-browser #browser-root {
   box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.1);
 }
 
+/* Navbar search suggestions — drop down below input, right-aligned */
+#global-search-suggestions-container {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 1050;
+  margin-top: 0.35rem;
+  min-width: 20rem;
+  max-width: min(24rem, calc(100vw - 1rem));
+}
+
+.mm-search-suggestions-dropdown {
+  width: 100%;
+  max-height: min(70vh, calc(100dvh - 5rem));
+  overflow: hidden;
+}
+
+.mm-search-suggestions-dropdown .card-body {
+  max-height: min(70vh, calc(100dvh - 5rem));
+  overflow-y: auto;
+}
+
+.mm-search-suggestion-link:hover,
+.mm-search-suggestion-link:focus {
+  background-color: var(--hg-bg-surface);
+}
+
 .feedback-edge-tab {
   position: fixed;
   right: 0;
