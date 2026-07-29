@@ -12,17 +12,17 @@ Architecture:
     Django dev server (subprocess) ← httpx ← Facade server (subprocess) ← JSON-RPC ← test
 """
 import json
+import logging
 import os
 import select
 import socket
 import subprocess
 import time
 import uuid
-import logging
 from pathlib import Path
 
-import pytest
 import httpx
+import pytest
 
 logger = logging.getLogger(__name__)
 
@@ -263,13 +263,13 @@ class TestFacadeStartup:
         assert facade.process.poll() is None, "Facade process should be running"
 
     def test_facade_lists_63_tools(self, facade):
-        """tools/list must return exactly 71 tools (64 original + 7 team tools)."""
+        """tools/list must return exactly 72 tools (71 previous + revert_pip_to_draft)."""
         response = facade.send("tools/list", {})
         assert "result" in response, f"Unexpected: {response}"
         tools = response["result"].get("tools", [])
         tool_names = sorted(t["name"] for t in tools)
-        assert len(tools) == 71, (
-            f"Expected 71 tools, got {len(tools)}. Tools: {tool_names}"
+        assert len(tools) == 72, (
+            f"Expected 72 tools, got {len(tools)}. Tools: {tool_names}"
         )
         logger.info(f"✓ facade lists {len(tools)} tools")
 
@@ -292,9 +292,10 @@ class TestFacadeStartup:
             "link_artifact_to_activity", "unlink_artifact_from_activity",
             "create_phase", "list_phases", "get_phase", "update_phase", "delete_phase",
             "reorder_phases",
-            # PIPs (8)
+            # PIPs (9)
             "list_pips", "get_pip", "create_pip", "add_pip_change",
             "remove_pip_change", "submit_pip", "cancel_pip", "preview_pip_diff",
+            "revert_pip_to_draft",
             "report_bug",
             # Teams (7)
             "list_teams", "get_team", "create_team",

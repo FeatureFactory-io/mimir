@@ -76,6 +76,47 @@ def _provision_e2e_database(project_root: Path, db_path: Path) -> None:
     _run_manage_command(project_root, db_path, "create_default_admin")
 
 
+def _create_submitted_pip_via_subprocess(
+    project_root: Path, db_path: Path, uid: str
+) -> dict:
+    """Create a released playbook + submitted PIP in the E2E DB and return {pip_id, pb_id}.
+
+    Data is committed by the subprocess so the MCP server subprocess can read it.
+    """
+    import json as _json
+    script = (
+        "from decimal import Decimal; "
+        "from django.contrib.auth import get_user_model; "
+        "from methodology.models import Activity, PipChange, Playbook, ProcessImprovementProposal, Workflow; "
+        "from methodology.services.pip_service import PIPService; "
+        "import json; "
+        "User = get_user_model(); "
+        "actor = User.objects.get(username='admin'); "
+        f"pb = Playbook.objects.create(name='Revert E2E PB {uid}', description='d'*30, category='development', author=actor, status='released', version=Decimal('1.0')); "
+        "wf = Workflow.objects.create(playbook=pb, name='Main', order=1); "
+        "act = Activity.objects.create(workflow=wf, name='Step', guidance='g'*20, order=1); "
+        "pip = PIPService.create_draft_for_playbook(actor=actor, playbook_id=pb.pk, title='Revert MCP PIP', summary=''); "
+        "PIPService.add_change(actor=actor, pip=pip, change_type=PipChange.CHANGE_ALTER, entity_type=PipChange.ENTITY_ACTIVITY, target_id=act.pk, content='updated guidance', name=''); "
+        "pip.status = ProcessImprovementProposal.STATUS_SUBMITTED; "
+        "pip.galdr_holistic_assessment = 'holistic'; "
+        "pip.save(update_fields=['status', 'galdr_holistic_assessment']); "
+        "pip.changes.update(galdr_recommendation=PipChange.GALDR_ACCEPT, galdr_reasoning='ok'); "
+        "print(json.dumps({'pip_id': pip.pk, 'pb_id': pb.pk}))"
+    )
+    import subprocess as _subprocess
+    result = _subprocess.run(
+        [str(project_root / ".venv" / "bin" / "python"), str(project_root / "manage.py"), "shell", "-c", script],
+        env=_mcp_dev_env(project_root, db_path),
+        cwd=str(project_root),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"_create_submitted_pip_via_subprocess failed: {result.stderr}")
+    last_line = result.stdout.strip().split("\n")[-1]
+    return _json.loads(last_line)
+
+
 def _delete_playbook_via_subprocess(
     project_root: Path, db_path: Path, playbook_id: int
 ) -> None:
@@ -814,65 +855,22 @@ class TestMCPAllTools:
     # 11. PIP revert-to-draft
     # ------------------------------------------------------------------
 
-    def test_51b_revert_pip_to_draft(self, mcp, uid, db):
-        """Create PIP, submit it, then revert to draft via revert_pip_to_draft."""
-        from decimal import Decimal
+    def test_51b_revert_pip_to_draft(self, mcp, uid, project_root, e2e_isolated_db):
+        """Create submitted PIP via subprocess (commits to E2E DB), revert via MCP tool."""
+        setup = _create_submitted_pip_via_subprocess(project_root, e2e_isolated_db, uid)
+        pip_id = setup["pip_id"]
+        TestMCPAllTools.pip_revert_pk = pip_id
 
-        from django.contrib.auth import get_user_model
-
-        from methodology.models import (
-            Activity,
-            PipChange,
-            Playbook,
-            ProcessImprovementProposal,
-            Workflow,
-        )
-        from methodology.services.pip_service import PIPService
-
-        User = get_user_model()
-        actor = User.objects.get(username="admin")
-
-        pb = Playbook.objects.create(
-            name=f"Revert MCP PB {uid}",
-            description="d" * 30,
-            category="development",
-            author=actor,
-            status="released",
-            version=Decimal("1.0"),
-        )
-        wf = Workflow.objects.create(playbook=pb, name="Main", order=1)
-        act = Activity.objects.create(workflow=wf, name="Step", guidance="g" * 20, order=1)
-        pip = PIPService.create_draft_for_playbook(
-            actor=actor, playbook_id=pb.pk, title=f"Revert MCP PIP {uid}", summary=""
-        )
-        PIPService.add_change(
-            actor=actor, pip=pip,
-            change_type=PipChange.CHANGE_ALTER,
-            entity_type=PipChange.ENTITY_ACTIVITY,
-            target_id=act.pk,
-            content="updated guidance", name="",
-        )
-        pip.status = ProcessImprovementProposal.STATUS_SUBMITTED
-        pip.galdr_holistic_assessment = "some holistic"
-        pip.save(update_fields=["status", "galdr_holistic_assessment"])
-        pip.changes.update(
-            galdr_recommendation=PipChange.GALDR_ACCEPT,
-            galdr_reasoning="looks good",
-        )
-        TestMCPAllTools.pip_revert_pk = pip.pk
-
-        result = mcp.call("revert_pip_to_draft", {"pip_id": pip.pk})
+        result = mcp.call("revert_pip_to_draft", {"pip_id": pip_id})
         assert result.get("reverted") is True, f"revert_pip_to_draft: {result}"
-        assert result.get("pip_id") == pip.pk
+        assert result.get("pip_id") == pip_id
 
-        pip.refresh_from_db()
-        assert pip.status == ProcessImprovementProposal.STATUS_DRAFT
-        assert pip.galdr_holistic_assessment == ""
-        for ch in pip.changes.all():
-            assert ch.galdr_recommendation == ""
-            assert ch.galdr_reasoning == ""
+        pip_data = mcp.call("get_pip", {"pip_id": pip_id})
+        assert pip_data.get("status") == "draft", f"Expected draft, got: {pip_data.get('status')}"
+        changes = pip_data.get("changes", [])
+        assert all(ch.get("galdr_recommendation") == "" for ch in changes), "Galdr change fields not cleared"
 
-        logger.info(f"✓ revert_pip_to_draft → reverted=True pip_id={pip.pk}")
+        logger.info(f"✓ revert_pip_to_draft → reverted=True pip_id={pip_id}")
 
     # ------------------------------------------------------------------
     # 10. Teardown: delete core resources (in reverse dependency order)

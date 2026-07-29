@@ -42,6 +42,7 @@ _WITHDRAW_ALLOWED = frozenset(
         ProcessImprovementProposal.STATUS_DRAFT,
         ProcessImprovementProposal.STATUS_SUBMITTED,
         ProcessImprovementProposal.STATUS_PROCESSING_GALDR,
+        ProcessImprovementProposal.STATUS_REVIEWED,
     }
 )
 
@@ -49,6 +50,7 @@ _REVERT_ALLOWED = frozenset(
     {
         ProcessImprovementProposal.STATUS_SUBMITTED,
         ProcessImprovementProposal.STATUS_PROCESSING_GALDR,
+        ProcessImprovementProposal.STATUS_REVIEWED,
     }
 )
 

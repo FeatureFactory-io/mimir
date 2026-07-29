@@ -192,10 +192,12 @@ def _pip_detail_context(pip, user):
         PipModel.STATUS_DRAFT,
         PipModel.STATUS_SUBMITTED,
         PipModel.STATUS_PROCESSING_GALDR,
+        PipModel.STATUS_REVIEWED,
     }
     revertable = pip.status in {
         PipModel.STATUS_SUBMITTED,
         PipModel.STATUS_PROCESSING_GALDR,
+        PipModel.STATUS_REVIEWED,
     }
     banner = _pip_detail_status_banner(pip)
     can_submit = pip.status in {

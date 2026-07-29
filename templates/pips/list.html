@@ -186,7 +186,7 @@
                                     {% csrf_token %}
                                 </form>
                                 {% endif %}
-                                {% if pip.status in 'submitted,processing_galdr' and pip.created_by == request.user %}
+                                {% if pip.status in 'submitted,processing_galdr,reviewed' and pip.created_by == request.user %}
                                 <button type="button"
                                         class="btn btn-outline-warning"
                                         data-bs-toggle="tooltip"
@@ -199,7 +199,7 @@
                                     {% csrf_token %}
                                 </form>
                                 {% endif %}
-                                {% if pip.status in 'draft,submitted,processing_galdr' and pip.created_by == request.user %}
+                                {% if pip.status in 'draft,submitted,processing_galdr,reviewed' and pip.created_by == request.user %}
                                 <button type="button"
                                         class="btn btn-outline-danger"
                                         data-bs-toggle="tooltip"
