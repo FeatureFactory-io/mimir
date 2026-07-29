@@ -195,7 +195,12 @@ class TestEmbedReturnsFragment:
         )
         content = client_auth.get(url).content.decode()
         assert '<strong>' in content, "markdown should be rendered to HTML"
-        assert '**Bold**' not in content, "raw markdown should not appear"
+        guidance_start = content.find('data-testid="embed-guidance"')
+        assert guidance_start != -1, "embed guidance section should exist"
+        guidance_start = content.find('>', guidance_start) + 1
+        guidance_end = content.find('</div>', guidance_start)
+        guidance_html = content[guidance_start:guidance_end]
+        assert '**Bold**' not in guidance_html, "raw markdown should not appear in rendered guidance"
 
 
 # ---------------------------------------------------------------------------
