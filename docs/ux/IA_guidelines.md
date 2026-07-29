@@ -336,7 +336,7 @@ Production VIEW templates under `templates/*/detail.html`. **Compliant** = `col-
 | **Rule** | `rules/detail.html` | ✅ Compliant | Content | Details, Playbook, Activities |
 | **Workflow** | `workflows/detail.html` | ✅ Compliant | Description | Details, Playbook, Activities Flow |
 | **Phase** | `phases/detail.html` | ✅ Compliant | Description | Details, Playbook, Activities in Phase |
-| **Playbook** | `playbooks/detail.html` | ✅ Compliant (Overview tab) | Description | Metadata, Quick Stats, Workflows |
+| **Playbook** | `playbooks/detail.html` | ⚠️ Exception (Overview tab) | Description full width; col-8 Quick Stats + Workflows | col-4 Metadata only — **not** strict §3.7; dashboard-style layout retained |
 | **PIP** | `pips/detail.html` | ✅ Compliant | Summary + Changes | Details, Target Playbook |
 | **Team** | `teams/detail.html` | ✅ Compliant | About (description) | Details, member/playbook counts |
 
