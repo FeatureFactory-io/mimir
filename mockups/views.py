@@ -1,5 +1,8 @@
 import logging
+import re
+
 from django.shortcuts import render
+from django.utils.html import escape, mark_safe
 
 logger = logging.getLogger(__name__)
 
@@ -678,64 +681,48 @@ SEARCH_ENTITY_META = [
         "label": "Playbooks",
         "label_singular": "Playbook",
         "icon": "fa-book-sparkles",
-        "icon_class": "text-primary",
-        "badge_class": "bg-primary",
     },
     {
         "key": "workflows",
         "label": "Workflows",
         "label_singular": "Workflow",
         "icon": "fa-diagram-project",
-        "icon_class": "text-info",
-        "badge_class": "bg-info",
     },
     {
         "key": "phases",
         "label": "Phases",
         "label_singular": "Phase",
         "icon": "fa-layer-group",
-        "icon_class": "mm-search-icon-phase",
-        "badge_class": "mm-search-badge-phase",
     },
     {
         "key": "activities",
         "label": "Activities",
         "label_singular": "Activity",
         "icon": "fa-list-check",
-        "icon_class": "text-success",
-        "badge_class": "bg-success",
     },
     {
         "key": "artifacts",
         "label": "Artifacts",
         "label_singular": "Artifact",
         "icon": "fa-file-lines",
-        "icon_class": "text-warning",
-        "badge_class": "bg-warning text-dark",
     },
     {
         "key": "skills",
         "label": "Skills",
         "label_singular": "Skill",
         "icon": "fa-wand-magic-sparkles",
-        "icon_class": "mm-search-icon-skill",
-        "badge_class": "mm-search-badge-skill",
     },
     {
         "key": "agents",
         "label": "Agents",
         "label_singular": "Agent",
         "icon": "fa-robot",
-        "icon_class": "mm-search-icon-agent",
-        "badge_class": "mm-search-badge-agent",
     },
     {
         "key": "rules",
         "label": "Rules",
         "label_singular": "Rule",
         "icon": "fa-gavel",
-        "icon_class": "text-secondary",
-        "badge_class": "bg-secondary",
     },
 ]
 
@@ -884,6 +871,22 @@ _ENTITY_TESTID_SINGULAR = {
 }
 
 
+def _highlight_search_term(text: str, query: str):
+    """Wrap case-insensitive query matches in <mark> for result display."""
+    if not text:
+        return ""
+    escaped = escape(text)
+    needle = (query or "").strip()
+    if not needle:
+        return mark_safe(escaped)
+    pattern = re.compile(re.escape(needle), re.IGNORECASE)
+    highlighted = pattern.sub(
+        r'<mark class="mm-search-highlight">\g<0></mark>',
+        escaped,
+    )
+    return mark_safe(highlighted)
+
+
 def _mock_search_matches(query: str):
     """Return items whose title, context, or snippet match query (case-insensitive)."""
     needle = (query or "").strip().lower()
@@ -901,8 +904,9 @@ def _mock_search_matches(query: str):
                 {
                     "type_label": meta["label_singular"],
                     "icon": meta["icon"],
-                    "icon_class": meta["icon_class"],
-                    "badge_class": meta["badge_class"],
+                    "title_html": _highlight_search_term(item["title"], query),
+                    "context_html": _highlight_search_term(item.get("context", ""), query),
+                    "snippet_html": _highlight_search_term(item.get("snippet", ""), query),
                     "testid": (
                         f"global-search-result-"
                         f"{_ENTITY_TESTID_SINGULAR[item['entity_key']]}-{item['id']}"
@@ -938,7 +942,6 @@ def _mock_search_grouped(query: str, type_filter: str):
                 "items": items,
                 "count": len(items),
                 "icon": meta["icon"],
-                "icon_class": meta["icon_class"],
             }
         )
     return sections, total

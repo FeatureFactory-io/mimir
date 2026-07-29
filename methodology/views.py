@@ -3,7 +3,10 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
-from methodology.services.global_search_service import GlobalSearchService
+from methodology.services.global_search_service import (
+    GlobalSearchService,
+    SEARCH_ENTITY_META,
+)
 logger = logging.getLogger(__name__)
 
 ACTIVITY_FEED_HOURS_LABELS = {
@@ -236,48 +239,46 @@ def global_search(request):
     """
 
     query = request.GET.get("q", "").strip()
-    type_filter = request.GET.get("type") or ""
-    status_filter = request.GET.get("status") or ""
-    source_filter = request.GET.get("source") or ""
+    type_filter = (request.GET.get("type") or "").strip()
+    valid_keys = {m["key"] for m in SEARCH_ENTITY_META}
+    if type_filter and type_filter not in valid_keys:
+        type_filter = ""
 
-    filters = {}
-    if type_filter:
-        filters["type"] = type_filter
-    if status_filter:
-        filters["status"] = status_filter
-    if source_filter:
-        filters["source"] = source_filter
+    filters = {"type": type_filter} if type_filter else {}
 
     logger.info(
-        "Global search requested by %s with query='%s', filters=%s",
+        "Global search requested by %s with query='%s', type=%s",
         request.user.username,
         query,
-        filters,
+        type_filter or "all",
     )
 
     service = GlobalSearchService()
     results = service.search(query=query, user=request.user, filters=filters)
+    sections, total_count = service.build_sections(query, results, type_filter)
 
     logger.info(
-        "Global search completed for %s with query='%s': %d playbooks, %d workflows, %d activities",
+        "Global search completed for %s with query='%s': %d total matches",
         request.user.username,
         query,
-        len(results["playbooks"]),
-        len(results["workflows"]),
-        len(results["activities"]),
+        total_count,
     )
+
+    type_choices = [{"value": "", "label": "All types"}] + [
+        {"value": m["key"], "label": m["label"]} for m in SEARCH_ENTITY_META
+    ]
 
     return render(
         request,
         "search/results.html",
         {
             "query": query,
-            "playbooks": results["playbooks"],
-            "workflows": results["workflows"],
-            "activities": results["activities"],
+            "sections": sections,
+            "total_count": total_count,
             "type_filter": type_filter,
-            "status_filter": status_filter,
-            "source_filter": source_filter,
+            "type_choices": type_choices,
+            "show_no_query_prompt": not query,
+            "show_empty_state": bool(query) and total_count == 0,
         },
     )
 
@@ -308,31 +309,30 @@ def global_search_suggestions(request):
         return render(
             request,
             "search/partials/suggestions.html",
-            {
-                "query": query,
-                "playbooks": [],
-                "workflows": [],
-                "activities": [],
-            },
+            {"query": "", "sections": [], "total_count": 0},
         )
 
-    logger.info("Global search suggestions requested by %s with query='%s'", request.user.username, query)
+    logger.info(
+        "Global search suggestions requested by %s with query='%s'",
+        request.user.username,
+        query,
+    )
 
     service = GlobalSearchService()
     results = service.search(query=query, user=request.user, filters=None)
-
-    # Limit suggestions per type to keep dropdown compact
-    playbooks = list(results["playbooks"])[:5]
-    workflows = list(results["workflows"])[:5]
-    activities = list(results["activities"])[:5]
+    sections, total_count = service.build_sections(query, results, type_filter="")
+    limited_sections = []
+    for section in sections:
+        limited = dict(section)
+        limited["items"] = section["items"][:5]
+        limited["count"] = len(section["items"])
+        limited_sections.append(limited)
 
     logger.info(
-        "Global search suggestions for %s with query='%s': %d playbooks, %d workflows, %d activities (limited)",
+        "Global search suggestions for %s with query='%s': %d total matches (limited per type)",
         request.user.username,
         query,
-        len(playbooks),
-        len(workflows),
-        len(activities),
+        total_count,
     )
 
     return render(
@@ -340,8 +340,7 @@ def global_search_suggestions(request):
         "search/partials/suggestions.html",
         {
             "query": query,
-            "playbooks": playbooks,
-            "workflows": workflows,
-            "activities": activities,
+            "sections": limited_sections,
+            "total_count": total_count,
         },
     )

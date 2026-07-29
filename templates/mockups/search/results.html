@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Search results - Mimir{% endblock %}
+{% block title %}Search results — Mockup{% endblock %}
 
 {% block content %}
 <div class="container-fluid px-4 py-3" data-testid="global-search-results-page">
@@ -23,12 +24,12 @@
     <div class="card border-0 shadow-sm rounded-3 mb-3" data-testid="global-search-filters-form">
         <div class="card-body">
             <form method="get"
-                  action="{% url 'global_search' %}"
+                  action="{% url 'mockup_search_results' %}"
                   id="global-search-filters-form"
                   role="search"
                   aria-label="Search filters">
                 <div class="row g-3 align-items-end">
-                    <div class="col-12 col-md-6">
+                    <div class="col-12 col-md-8">
                         <label for="global-search-query-input" class="form-label hg-label-caps mb-1">Search for</label>
                         <input type="search"
                                class="form-control form-control-sm hg-filter-control bg-body-secondary border-0 rounded-2"
@@ -55,13 +56,6 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-12 col-md-2 d-grid">
-                        <button type="submit"
-                                class="btn btn-sm btn-primary"
-                                data-testid="global-search-submit-button">
-                            Search
-                        </button>
-                    </div>
                 </div>
             </form>
         </div>
@@ -73,7 +67,7 @@
             <i class="fa-solid fa-magnifying-glass fa-2x text-muted mb-3" aria-hidden="true"></i>
             <p class="text-muted mb-2">Enter a search term to find playbooks and related content.</p>
             <p class="small text-muted mb-0">
-                Try searching from the navbar or enter a term above.
+                Try <a href="{% url 'mockup_search_results' %}?q=React">React</a>
             </p>
         </div>
     </div>
@@ -102,7 +96,7 @@
         </div>
         <div class="list-group list-group-flush">
             {% for item in section.items %}
-            {% include "search/partials/result_row.html" with item=item only %}
+            {% include "mockups/search/partials/result_row.html" with item=item only %}
             {% endfor %}
         </div>
     </div>
@@ -135,7 +129,7 @@
                  data-bs-parent="#global-search-sections">
                 <div class="list-group list-group-flush">
                     {% for item in section.items %}
-                    {% include "search/partials/result_row.html" with item=item only %}
+                    {% include "mockups/search/partials/result_row.html" with item=item only %}
                     {% endfor %}
                 </div>
             </div>
@@ -144,24 +138,44 @@
     </div>
     {% endif %}
     {% endif %}
+
+    <div class="alert alert-light border mt-5 small">
+        <strong>Mockup screens (NAV-06):</strong>
+        <a href="{% url 'mockup_search_results' %}?q=React">Results — React (all types)</a> ·
+        <a href="{% url 'mockup_search_results' %}?q=React&amp;type=skills">Skills only</a> ·
+        <a href="{% url 'mockup_search_results' %}?q=zzzznomatch">Empty state</a> ·
+        <a href="{% url 'mockup_search_results' %}">No query prompt</a> ·
+        <a href="{% url 'mockup_search_suggestions' %}?q=React" target="_blank" rel="noopener">Navbar suggestions fragment</a>
+        <span class="text-muted ms-2">(DEBUG only — <code>/mockups/search/</code>)</span>
+    </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    console.log('[mockup:search-results] page loaded', {
+        query: '{{ query|escapejs }}',
+        typeFilter: '{{ type_filter|escapejs }}' || 'all',
+        totalCount: {{ total_count }},
+    });
+
     var form = document.getElementById('global-search-filters-form');
     var queryInput = document.getElementById('global-search-query-input');
     var typeSelect = document.getElementById('global-search-type-filter');
     var debounceTimer = null;
 
-    function submitFilters() {
-        if (form) {
-            form.submit();
-        }
+    function submitFilters(reason) {
+        if (!form) return;
+        console.log('[mockup:search-results] filter apply', {
+            reason: reason,
+            q: queryInput ? queryInput.value : '',
+            type: typeSelect ? typeSelect.value || 'all' : 'all',
+        });
+        form.submit();
     }
 
     if (typeSelect) {
         typeSelect.addEventListener('change', function () {
-            submitFilters();
+            submitFilters('type-change');
         });
     }
 
@@ -169,14 +183,33 @@ document.addEventListener('DOMContentLoaded', function () {
         queryInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                submitFilters();
+                submitFilters('enter');
             }
         });
         queryInput.addEventListener('input', function () {
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(submitFilters, 300);
+            debounceTimer = setTimeout(function () {
+                submitFilters('debounced-input');
+            }, 300);
         });
     }
+
+    document.querySelectorAll('[data-testid^="global-search-result-"][data-testid$="-link"]').forEach(function (el) {
+        el.addEventListener('click', function (e) {
+            e.preventDefault();
+            console.log('[mockup:search-results] result click (mock — no navigation)', el.textContent.trim());
+        });
+    });
+
+    document.querySelectorAll('.mm-search-accordion .mm-search-section-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var label = btn.querySelector('span:not([aria-hidden])')?.textContent?.trim() || '';
+            console.log('[mockup:search-results] section toggle', {
+                section: label,
+                expanded: !btn.classList.contains('collapsed'),
+            });
+        });
+    });
 });
 </script>
 {% endblock %}

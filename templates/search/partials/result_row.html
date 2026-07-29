@@ -1,0 +1,24 @@
+{% comment %}
+Single search result row — grouped sections and single-type lists.
+Expects: item (title, title_html, context_html, snippet_html, type_label, icon, url, testid)
+{% endcomment %}
+<div class="list-group-item p-0 mm-search-result-row" data-testid="{{ item.testid }}">
+    <a href="{{ item.url }}"
+       class="d-block py-3 px-3 text-decoration-none text-reset"
+       data-testid="{{ item.testid }}-link"
+       aria-label="Open {{ item.type_label }}: {{ item.title }}">
+        <div class="d-flex align-items-start mm-search-result-body">
+            <span class="mm-search-result-icon-wrap" aria-hidden="true">
+                <i class="fa-solid {{ item.icon }} mm-search-result-icon"></i>
+            </span>
+            <div class="min-w-0 flex-grow-1">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                    <span class="hg-card-name">{{ item.title_html|safe }}</span>
+                    <span class="badge bg-secondary">{{ item.type_label }}</span>
+                </div>
+                <div class="small text-muted mb-1">{{ item.context_html|safe }}</div>
+                <div class="small text-body-secondary">{{ item.snippet_html|safe }}</div>
+            </div>
+        </div>
+    </a>
+</div>

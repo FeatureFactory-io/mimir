@@ -1,6 +1,5 @@
 {% if query and sections %}
-<div class="card shadow-sm border mm-search-suggestions-dropdown position-absolute mt-2"
-     style="min-width: 320px; z-index: 1050;"
+<div class="card shadow-sm border mm-search-suggestions-dropdown"
      data-testid="global-search-suggestions"
      role="listbox"
      aria-label="Search suggestions for {{ query }}">
@@ -14,11 +13,11 @@
             <ul class="list-unstyled mb-0">
                 {% for item in section.items %}
                 <li>
-                    <a href="{{ item.url }}"
+                    <a href="{% url 'mockup_search_results' %}?q={{ query|urlencode }}"
                        class="d-block px-2 py-1 rounded text-decoration-none mm-search-suggestion-link"
-                       data-testid="{{ item.testid }}-suggestion">
-                        <span class="fw-medium">{{ item.title_html|safe }}</span>
-                        <span class="small text-muted d-block text-truncate">{{ item.context_html|safe }}</span>
+                       data-testid="global-search-suggestion-{{ section.key }}-{{ item.id }}">
+                        <span class="fw-medium">{{ item.title_html }}</span>
+                        <span class="small text-muted d-block text-truncate">{{ item.context_html }}</span>
                     </a>
                 </li>
                 {% endfor %}
@@ -26,7 +25,7 @@
         </div>
         {% endfor %}
         <div class="border-top pt-2 mt-1 px-2">
-            <a href="{% url 'global_search' %}?q={{ query|urlencode }}"
+            <a href="{% url 'mockup_search_results' %}?q={{ query|urlencode }}"
                class="small fw-semibold"
                data-testid="global-search-see-all-results">
                 See all results ({{ total_count }})

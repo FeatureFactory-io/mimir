@@ -13,7 +13,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
 
   # ── Navbar → results page flow ───────────────────────────────────────────
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-01 Navbar search submits to results with query pre-filled
     Given Maria is on any FOB screen with the navbar visible
     When she types "React" in the global search input with data-testid "global-search-input"
@@ -23,7 +22,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
     And she does not see a Status filter on the search results page
     And she does not see a Source filter on the search results page
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-02 See all results link preserves navbar query
     Given Maria has typed "React" in the navbar global search input
     And live suggestions are visible with data-testid "global-search-suggestions"
@@ -33,7 +31,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
 
   # ── Results page filter bar ───────────────────────────────────────────────
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-03 Results page filter bar has Search for and Type only
     Given Maria is on FOB Search Results at "/search/?q=React"
     Then she sees the page root with data-testid "global-search-results-page"
@@ -44,7 +41,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
     And she does not see an element with data-testid "filter-status"
     And she does not see an element with data-testid "filter-source"
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-04 Refine query on the results page
     Given Maria is on FOB Search Results at "/search/?q=React"
     When she clears the Search for field
@@ -53,7 +49,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
     Then she is on "/search/?q=Component"
     And the summary line shows results for "Component"
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-05 Type filter options cover all playbook entity types
     Given Maria is on FOB Search Results at "/search/?q=React"
     When she opens the Type dropdown with data-testid "global-search-type-filter"
@@ -69,7 +64,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
       | agents     | Agents     |
       | rules      | Rules      |
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-06 Type filter narrows results to one flat entity section
     Given Maria is on FOB Search Results at "/search/?q=React"
     When she selects "Skills" from the Type dropdown
@@ -82,7 +76,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
 
   # ── Grouped results (All types) ───────────────────────────────────────────
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-07 All types view shows summary and grouped accordion sections
     Given Maria is on FOB Search Results at "/search/?q=React"
     And matching entities exist across multiple types
@@ -100,14 +93,12 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
       | Agents     | global-search-agents        | global-search-section-toggle-agents    |
       | Rules      | global-search-rules         | global-search-section-toggle-rules     |
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-08 All types view hides sections with zero matches
     Given Maria is on FOB Search Results at "/search/?q=React"
     And no Rules match "React"
     Then she does not see the Rules results section with data-testid "global-search-rules"
     And other sections with matches remain visible
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-09 Each result row shows title context snippet and type badge
     Given Maria is on FOB Search Results at "/search/?q=React"
     And "React Frontend Development" is a matching playbook
@@ -118,27 +109,23 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
     And the row shows a type badge "Playbook"
     And matching occurrences of "React" in title, context, and snippet are wrapped in mark.mm-search-highlight
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-09b Search term highlight is case-insensitive
     Given Maria is on FOB Search Results at "/search/?q=react"
     And a playbook title contains "React Frontend Development"
     Then the title shows mark.mm-search-highlight around "React" despite lowercase query
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-09c Highlight styling uses design token yellow background
     Given Maria is on FOB Search Results at "/search/?q=React"
     And a result row contains a highlighted match
     Then mark.mm-search-highlight elements use background-color var(--hg-yellow)
     And highlighted text inherits the surrounding font colour
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-10 Activity result shows playbook and workflow breadcrumb
     Given Maria is on FOB Search Results at "/search/?q=React"
     And "Setup React Project" is a matching activity
     Then she sees a result row with data-testid "global-search-result-activity-20"
     And the row shows context "React Frontend Development › Component Development"
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-11 Clicking a result navigates to entity detail
     Given Maria is on FOB Search Results at "/search/?q=React"
     When she clicks the result link for "React Frontend Development"
@@ -146,14 +133,12 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
 
   # ── Empty and no-query states ─────────────────────────────────────────────
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-12 Empty state when query has no matches
     Given Maria is on FOB Search Results at "/search/?q=zzzznomatch"
     Then she sees the empty state with data-testid "global-search-empty-state"
     And the empty state message includes "No results found"
     And the empty state suggests broadening the query or switching Type to All types
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-13 No query shows prompt without empty-state error
     Given Maria opens FOB Search Results at "/search/" without a query parameter
     Then she does not see the empty state with data-testid "global-search-empty-state"
@@ -161,7 +146,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
 
   # ── Navbar live suggestions ───────────────────────────────────────────────
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-14 Live suggestions show top hits per entity type
     Given Maria is on any FOB screen with the navbar visible
     When she types "React" in the global search input with data-testid "global-search-input"
@@ -170,14 +154,12 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
     And suggestions may include Playbooks, Workflows, Activities, Skills, Artifacts, Agents, Rules, and Phases
     And each suggestion row links to the entity detail page
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-15 Suggestions omit entity types with no matches
     Given Maria is on any FOB screen with the navbar visible
     When she types "React" in the global search input
     And no Rules match "React"
     Then the suggestions dropdown does not include a Rules section
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-16 Empty query returns no suggestions fragment
     Given Maria is on any FOB screen with the navbar visible
     When she clears the global search input
@@ -185,14 +167,12 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
 
   # ── Access scope ──────────────────────────────────────────────────────────
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-17 Search excludes draft playbooks Maria cannot read
     Given another author has a draft public playbook "Secret Draft"
     And Maria is not the author of "Secret Draft"
     When Maria searches for "Secret Draft"
     Then "Secret Draft" does not appear in her search results
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-18 Anonymous users do not see navbar global search
     Given Bob is not authenticated
     When he views any public FOB page
@@ -200,7 +180,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
 
   # ── Accordion expand / collapse (All types) ───────────────────────────────
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-19 All types view first section expanded others collapsed
     Given Maria is on FOB Search Results at "/search/?q=React"
     And matching entities exist in Playbooks and Workflows sections
@@ -209,7 +188,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
     And the Workflows section toggle has aria-expanded "false"
     And the Workflows collapse panel does not have class "show"
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-20 Maria expands a collapsed section
     Given Maria is on FOB Search Results at "/search/?q=React"
     And the Workflows section is collapsed
@@ -218,7 +196,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
     And the Workflows result rows become visible
     And the Workflows section chevron indicates expanded state
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-21 Expanding one section collapses the previously open section
     Given Maria is on FOB Search Results at "/search/?q=React"
     And the Playbooks section is expanded
@@ -227,7 +204,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
     And the Playbooks section is collapsed
     # Bootstrap accordion data-bs-parent="#global-search-sections" — single open panel
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-22 Maria collapses the open section
     Given Maria is on FOB Search Results at "/search/?q=React"
     And the Playbooks section is expanded
@@ -235,14 +211,12 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
     Then the Playbooks section toggle has aria-expanded "false"
     And the Playbooks result rows are hidden
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-23 Single type filter renders flat list without accordion
     Given Maria is on FOB Search Results at "/search/?q=React&type=skills"
     Then she does not see an accordion with id "global-search-sections"
     And she sees the Skills section as a flat card with data-testid "global-search-skills"
     And the Skills section does not have a collapse toggle
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-24 Section headers show icon label and count badge
     Given Maria is on FOB Search Results at "/search/?q=React"
     And the Playbooks section has 2 matches
@@ -252,7 +226,6 @@ Feature: FOB-GLOBAL-SEARCH Global search and search results (NAV-06)
 
   # ── Search term highlighting in suggestions ───────────────────────────────
 
-  @wip
   Scenario: FOB-GLOBAL-SEARCH-25 Navbar suggestions highlight query in title and context
     Given Maria is on any FOB screen with the navbar visible
     When she types "React" in the global search input with data-testid "global-search-input"
