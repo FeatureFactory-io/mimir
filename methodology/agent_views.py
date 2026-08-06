@@ -132,9 +132,17 @@ def agent_create(request, playbook_pk):
     """
     playbook = get_object_or_404(Playbook, pk=playbook_pk)
 
-    if not playbook.is_owned_by(request.user):
+    if not playbook.can_edit(request.user):
+        reason = (
+            "released_playbook_pip_required"
+            if playbook.is_owned_by(request.user) and playbook.is_released
+            else "not_owner"
+        )
         logger.warning(
-            f"User {request.user.username} attempted to create agent without permission"
+            "agent_create | branch | user=%s playbook=%s reason=%s",
+            request.user.username,
+            playbook_pk,
+            reason,
         )
         messages.error(request, "You don't have permission to add agents to this playbook.")
         return redirect('playbook_detail', pk=playbook_pk)
@@ -240,6 +248,13 @@ def agent_detail(request, pk):
     }
     if request.GET.get('embed') == '1':
         return render(request, 'agents/_embed.html', context)
+    logger.info(
+        "Agent detail rendered user=%s agent=%s playbook_status=%s can_edit=%s",
+        user_label,
+        pk,
+        agent.playbook.status,
+        can_edit,
+    )
     return render(request, 'agents/detail.html', context)
 
 
@@ -271,6 +286,15 @@ def agent_edit(request, pk):
     except Agent.DoesNotExist:
         raise Http404()
     except (PermissionError, ObjectDoesNotExist):
+        messages.error(request, "You don't have permission to edit this agent.")
+        return redirect('agent_detail', pk=pk)
+
+    if not agent.can_edit(request.user):
+        logger.warning(
+            "agent_edit | branch | user=%s agent=%s reason=released_playbook_pip_required",
+            request.user.username,
+            pk,
+        )
         messages.error(request, "You don't have permission to edit this agent.")
         return redirect('agent_detail', pk=pk)
 
@@ -369,6 +393,15 @@ def agent_delete(request, pk):
     except Agent.DoesNotExist:
         raise Http404()
     except (PermissionError, ObjectDoesNotExist):
+        messages.error(request, "You don't have permission to delete this agent.")
+        return redirect('agent_detail', pk=pk)
+
+    if not agent.can_edit(request.user):
+        logger.warning(
+            "agent_delete | branch | user=%s agent=%s reason=released_playbook_pip_required",
+            request.user.username,
+            pk,
+        )
         messages.error(request, "You don't have permission to delete this agent.")
         return redirect('agent_detail', pk=pk)
 

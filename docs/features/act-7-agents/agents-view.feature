@@ -44,6 +44,13 @@ Feature: FOB-AGENTS-VIEW_AGENT-1 View Agent Details
     When she clicks [Delete Agent]
     Then the FOB-AGENTS-DELETE_AGENT-1 modal appears
 
+  Scenario: AGENT-VIEW-09 Owner on released playbook cannot mutate agents via web
+    Given Maria owns a Released playbook with agent "Cautious Developer (drdobbs-v2)"
+    When Maria views the agent detail page
+    Then she does not see [Edit Agent] or [Delete Agent]
+    And a direct GET to agent create for that playbook is redirected with an error
+    And a direct GET to agent edit is redirected with an error
+
   # ============================================================
   # GUEST ACCESS — anonymous read-only agent view (@guest_access)
   # ============================================================
