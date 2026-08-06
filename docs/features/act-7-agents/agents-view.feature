@@ -51,6 +51,12 @@ Feature: FOB-AGENTS-VIEW_AGENT-1 View Agent Details
     And a direct GET to agent create for that playbook is redirected with an error
     And a direct GET to agent edit is redirected with an error
 
+  Scenario: AGENT-VIEW-10 Owner on released playbook sees Submit PIP on agent detail
+    Given Maria owns a Released playbook with agent "Cautious Developer (drdobbs-v2)"
+    When Maria views the agent detail page
+    Then she does not see [Edit Agent]
+    And she sees [Submit PIP] linking to PIP create with playbook context
+
   # ============================================================
   # GUEST ACCESS — anonymous read-only agent view (@guest_access)
   # ============================================================

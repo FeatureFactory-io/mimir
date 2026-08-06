@@ -46,6 +46,12 @@ Feature: FOB-SKILLS-VIEW_SKILL-1 View Skill Details
     When she clicks [Delete Skill]
     Then the FOB-SKILLS-DELETE_SKILL-1 modal appears
 
+  Scenario: FOB-SKILLS-VIEW_SKILL-10 Owner on released playbook sees Submit PIP on skill detail
+    Given Maria owns a Released playbook with skill "React Form Component"
+    When Maria views the skill detail page
+    Then she does not see [Edit Skill]
+    And she sees [Submit PIP] linking to PIP create with playbook context
+
   # ============================================================
   # GUEST ACCESS — anonymous read-only skill view (@guest_access)
   # ============================================================

@@ -36,6 +36,14 @@
                         hx-target="#rule-delete-modal-container" hx-swap="innerHTML">
                     <i class="fa-solid fa-trash"></i>
                 </button>
+            {% elif can_submit_pip %}
+                <a href="{% url 'pip_create' %}?playbook={{ playbook.pk }}"
+                   class="btn btn-primary"
+                   data-testid="rule-submit-pip-btn"
+                   data-bs-toggle="tooltip"
+                   title="Propose changes to this Released playbook">
+                    <i class="fa-solid fa-lightbulb"></i> Submit PIP
+                </a>
             {% endif %}
             {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
             </div>

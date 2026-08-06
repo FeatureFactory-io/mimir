@@ -13,7 +13,7 @@ from methodology.models import Playbook, Rule
 from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.services.rule_service import RuleService
 from methodology.utils.guest_auth import guest_read_or_login_required
-from methodology.utils.playbook_access import playbook_readable_or_404
+from methodology.utils.playbook_access import playbook_can_submit_pip, playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -148,14 +148,17 @@ def rule_detail(request, playbook_pk, rule_pk):
     rule = _get_rule_in_playbook(playbook, rule_pk)
     activities = RuleService.get_activities_for_rule(rule_pk)
     can_edit = playbook.can_edit(request.user) if request.user.is_authenticated else False
+    can_submit_pip = playbook_can_submit_pip(playbook, request.user)
     user_label = (
         request.user.username if request.user.is_authenticated else "anonymous"
     )
     logger.info(
-        'User %s viewing rule %s in playbook %s',
+        'User %s viewing rule %s in playbook %s can_edit=%s can_submit_pip=%s',
         user_label,
         rule_pk,
         playbook_pk,
+        can_edit,
+        can_submit_pip,
     )
 
     context = {
@@ -163,6 +166,7 @@ def rule_detail(request, playbook_pk, rule_pk):
         'rule': rule,
         'activities': activities,
         'can_edit': can_edit,
+        'can_submit_pip': can_submit_pip,
         'is_guest_browse': not request.user.is_authenticated,
         'copy_prompt_text': CopyPromptService.build_rule_prompt(rule),
         'copy_prompt_text_testid': f"copy-prompt-text-rule-{rule.pk}",

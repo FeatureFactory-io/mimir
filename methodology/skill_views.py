@@ -17,7 +17,7 @@ from methodology.models import Playbook, Skill
 from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.services.skill_service import SkillService
 from methodology.utils.guest_auth import guest_read_or_login_required
-from methodology.utils.playbook_access import playbook_readable_or_404
+from methodology.utils.playbook_access import playbook_can_submit_pip, playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -249,13 +249,19 @@ def skill_detail(request, playbook_pk, skill_pk):
     skill = _get_skill_in_playbook(playbook, skill_pk)
     activities = SkillService.get_activities_for_skill(skill_pk)
     can_edit = playbook.can_edit(request.user) if request.user.is_authenticated else False
+    can_submit_pip = playbook_can_submit_pip(playbook, request.user)
     user_label = (
         request.user.username if request.user.is_authenticated else "anonymous"
     )
 
     logger.info(
-        "User %s viewing skill %s '%s' in playbook %s",
-        user_label, skill_pk, skill.title, playbook_pk,
+        "User %s viewing skill %s '%s' in playbook %s can_edit=%s can_submit_pip=%s",
+        user_label,
+        skill_pk,
+        skill.title,
+        playbook_pk,
+        can_edit,
+        can_submit_pip,
     )
 
     context = {
@@ -263,6 +269,7 @@ def skill_detail(request, playbook_pk, skill_pk):
         'skill': skill,
         'activities': activities,
         'can_edit': can_edit,
+        'can_submit_pip': can_submit_pip,
         'is_guest_browse': not request.user.is_authenticated,
         'copy_prompt_text': CopyPromptService.build_skill_prompt(skill),
         'copy_prompt_text_testid': f"copy-prompt-text-skill-{skill.pk}",

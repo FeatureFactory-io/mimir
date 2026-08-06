@@ -41,3 +41,13 @@ def playbook_readable_or_404(request, pk):
         )
         raise Http404()
     return playbook
+
+
+def playbook_can_submit_pip(playbook, user) -> bool:
+    """True when an owned released playbook owner may start a PIP from the UI."""
+    return (
+        user.is_authenticated
+        and playbook.source == "owned"
+        and playbook.author_id == user.id
+        and playbook.is_released
+    )

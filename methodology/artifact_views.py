@@ -16,7 +16,7 @@ from methodology.services.artifact_service import ArtifactService
 from methodology.services.activity_service import ActivityService
 from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.utils.guest_auth import guest_read_or_login_required
-from methodology.utils.playbook_access import playbook_readable_or_404
+from methodology.utils.playbook_access import playbook_can_submit_pip, playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -234,12 +234,7 @@ def artifact_detail(request, pk):
     playbook = artifact.playbook
     consumers = ArtifactService.get_artifact_consumers(artifact)
     can_edit = artifact.can_edit(request.user) if request.user.is_authenticated else False
-    can_submit_pip = (
-        request.user.is_authenticated
-        and playbook.source == "owned"
-        and playbook.author_id == request.user.id
-        and playbook.is_released
-    )
+    can_submit_pip = playbook_can_submit_pip(playbook, request.user)
 
     context = {
         "artifact": artifact,

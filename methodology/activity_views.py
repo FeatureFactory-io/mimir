@@ -21,7 +21,7 @@ from methodology.services.skill_service import SkillService
 from methodology.services.artifact_service import ArtifactService
 from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.utils.guest_auth import guest_read_or_login_required
-from methodology.utils.playbook_access import playbook_readable_or_404
+from methodology.utils.playbook_access import playbook_can_submit_pip, playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -399,12 +399,7 @@ def activity_detail(request, playbook_pk, workflow_pk, activity_pk):
     can_edit = (
         workflow.can_edit(request.user) if request.user.is_authenticated else False
     )
-    can_submit_pip = (
-        request.user.is_authenticated
-        and playbook.source == 'owned'
-        and playbook.author_id == request.user.id
-        and playbook.is_released
-    )
+    can_submit_pip = playbook_can_submit_pip(playbook, request.user)
     context = {
         'playbook': playbook,
         'workflow': workflow,

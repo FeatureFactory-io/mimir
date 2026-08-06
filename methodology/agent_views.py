@@ -18,7 +18,7 @@ from methodology.models import Agent, Playbook
 from methodology.services.agent_service import AgentService
 from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.utils.guest_auth import guest_read_or_login_required
-from methodology.utils.playbook_access import playbook_readable_or_404
+from methodology.utils.playbook_access import playbook_can_submit_pip, playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +231,9 @@ def agent_detail(request, pk):
         raise Http404()
 
     activities = AgentService.get_activities_for_agent(agent.pk)
+    playbook = agent.playbook
     can_edit = agent.can_edit(request.user) if request.user.is_authenticated else False
+    can_submit_pip = playbook_can_submit_pip(playbook, request.user)
     user_label = (
         request.user.username if request.user.is_authenticated else "anonymous"
     )
@@ -239,9 +241,10 @@ def agent_detail(request, pk):
 
     context = {
         'agent': agent,
-        'playbook': agent.playbook,
+        'playbook': playbook,
         'activities': activities,
         'can_edit': can_edit,
+        'can_submit_pip': can_submit_pip,
         'is_guest_browse': not request.user.is_authenticated,
         'copy_prompt_text': CopyPromptService.build_agent_prompt(agent),
         'copy_prompt_text_testid': f"copy-prompt-text-agent-{agent.pk}",
@@ -249,11 +252,12 @@ def agent_detail(request, pk):
     if request.GET.get('embed') == '1':
         return render(request, 'agents/_embed.html', context)
     logger.info(
-        "Agent detail rendered user=%s agent=%s playbook_status=%s can_edit=%s",
+        "Agent detail rendered user=%s agent=%s playbook_status=%s can_edit=%s can_submit_pip=%s",
         user_label,
         pk,
-        agent.playbook.status,
+        playbook.status,
         can_edit,
+        can_submit_pip,
     )
     return render(request, 'agents/detail.html', context)
 

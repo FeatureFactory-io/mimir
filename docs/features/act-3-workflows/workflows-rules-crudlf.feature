@@ -24,3 +24,9 @@ Feature: FOB-WORKFLOWS-RULES-1 Rules CRUDLF (playbook-scoped)
     When Maria creates rule "pytest-first" with content
     Then she sees rule detail with title and slug
     And she sees linked activities count
+
+  Scenario: RULES-04 Owner on released playbook sees Submit PIP on rule detail
+    Given Maria owns a Released playbook with rule "pytest-first"
+    When Maria views the rule detail page
+    Then she does not see [Edit Rule]
+    And she sees [Submit PIP] linking to PIP create with playbook context

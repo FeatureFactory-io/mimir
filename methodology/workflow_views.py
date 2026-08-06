@@ -10,7 +10,7 @@ from methodology.models import Playbook, Workflow
 from methodology.services.workflow_service import WorkflowService
 from methodology.services.activity_service import ActivityService
 from methodology.utils.guest_auth import guest_read_or_login_required
-from methodology.utils.playbook_access import playbook_readable_or_404
+from methodology.utils.playbook_access import playbook_can_submit_pip, playbook_readable_or_404
 
 logger = logging.getLogger(__name__)
 
@@ -155,12 +155,7 @@ def workflow_detail(request, playbook_pk, pk):
             logger.error(f"Failed to generate activity graph for workflow {pk}: {str(e)}")
             # Continue without graph - template will show error or plain list
     
-    can_submit_pip = (
-        request.user.is_authenticated
-        and playbook.source == "owned"
-        and playbook.author_id == request.user.id
-        and playbook.is_released
-    )
+    can_submit_pip = playbook_can_submit_pip(playbook, request.user)
     user_label = (
         request.user.username if request.user.is_authenticated else "anonymous"
     )
