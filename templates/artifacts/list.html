@@ -29,6 +29,7 @@
                 </p>
             </div>
             <div role="toolbar" aria-label="Artifact actions" class="d-flex flex-wrap gap-2 align-items-center">
+                {% if can_edit %}
                 <a href="{% url 'artifact_create' playbook_pk=playbook.pk %}"
                    class="btn btn-primary"
                    data-testid="btn-create-artifact"
@@ -36,6 +37,7 @@
                    title="Create new artifact">
                     <i class="fa-solid fa-plus"></i> Create Artifact
                 </a>
+                {% endif %}
             </div>
         </div>
     </div>

@@ -45,6 +45,12 @@ Feature: FOB-ARTIFACTS-VIEW_ARTIFACT-1 View Artifact Details
     Given Maria is viewing the artifact
     When she clicks [Delete Artifact]
     Then the FOB-ARTIFACTS-DELETE_ARTIFACT-1 modal appears
+
+  Scenario: FOB-ARTIFACTS-VIEW_ARTIFACT-13 Owner views artifact in released playbook read-only with PIP path
+    Given Maria owns a Released playbook with artifact "Bug Report"
+    When Maria views the artifact detail page
+    Then she does not see [Edit Artifact]
+    And she sees [Submit PIP] linking to PIP create with playbook and producer activity context
   # ============================================================
   # ARTIFACT FLOW - See artifacts-flow.feature for complete flow scenarios
   # ============================================================

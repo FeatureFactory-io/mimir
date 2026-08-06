@@ -115,9 +115,17 @@ def artifact_create(request, playbook_pk):
     playbook = get_object_or_404(Playbook, pk=playbook_pk)
 
     # Check edit permission
-    if not playbook.is_owned_by(request.user):
+    if not playbook.can_edit(request.user):
+        reason = (
+            "released_playbook_pip_required"
+            if playbook.is_owned_by(request.user) and playbook.is_released
+            else "not_owner"
+        )
         logger.warning(
-            f"User {request.user.username} attempted to create artifact without permission"
+            "artifact_create | branch | user=%s playbook=%s reason=%s",
+            request.user.username,
+            playbook_pk,
+            reason,
         )
         messages.error(
             request, "You don't have permission to add artifacts to this playbook."
@@ -206,6 +214,7 @@ def artifact_detail(request, pk):
         - producer: Activity instance (artifact.produced_by)
         - consumers: QuerySet of ArtifactInput instances
         - can_edit: Boolean indicating if user can edit
+        - can_submit_pip: Boolean (released owned playbook — user may propose a PIP)
 
     :param request: Django request object
     :param pk: Artifact primary key
@@ -222,27 +231,37 @@ def artifact_detail(request, pk):
     except Exception:
         raise Http404()
 
-    # Get consumers
+    playbook = artifact.playbook
     consumers = ArtifactService.get_artifact_consumers(artifact)
-    can_edit = (
-        artifact.playbook.is_owned_by(request.user)
-        if request.user.is_authenticated
-        else False
+    can_edit = artifact.can_edit(request.user) if request.user.is_authenticated else False
+    can_submit_pip = (
+        request.user.is_authenticated
+        and playbook.source == "owned"
+        and playbook.author_id == request.user.id
+        and playbook.is_released
     )
 
     context = {
         "artifact": artifact,
-        "playbook": artifact.playbook,
+        "playbook": playbook,
         "producer": artifact.produced_by,
         "consumers": consumers,
         "can_edit": can_edit,
+        "can_submit_pip": can_submit_pip,
         "is_guest_browse": not request.user.is_authenticated,
         "copy_prompt_text": CopyPromptService.build_artifact_prompt(artifact),
         "copy_prompt_text_testid": f"copy-prompt-text-artifact-{artifact.pk}",
     }
     if request.GET.get('embed') == '1':
         return render(request, 'artifacts/_embed.html', context)
-    logger.info("Artifact detail rendered for user %s", user_label)
+    logger.info(
+        "Artifact detail rendered user=%s artifact=%s playbook_status=%s can_edit=%s can_submit_pip=%s",
+        user_label,
+        pk,
+        playbook.status,
+        can_edit,
+        can_submit_pip,
+    )
     return render(request, "artifacts/detail.html", context)
 
 
@@ -276,6 +295,15 @@ def artifact_edit(request, pk):
     try:
         artifact = ArtifactService.get_artifact_for_user(pk, request.user, write=True)
     except Exception:
+        messages.error(request, "You don't have permission to edit this artifact.")
+        return redirect("artifact_detail", pk=pk)
+
+    if not artifact.can_edit(request.user):
+        logger.warning(
+            "artifact_edit | branch | user=%s artifact=%s reason=released_playbook_pip_required",
+            request.user.username,
+            pk,
+        )
         messages.error(request, "You don't have permission to edit this artifact.")
         return redirect("artifact_detail", pk=pk)
 
@@ -470,6 +498,8 @@ def _build_list_context(playbook, user, artifacts, filters, total_count):
     """Build template context for artifact list."""
     activities = ActivityService.list_activities_for_playbook(playbook.pk, user)
 
+    can_edit = playbook.can_edit(user) if user.is_authenticated else False
+
     return {
         "playbook": playbook,
         "artifacts": artifacts,
@@ -481,6 +511,7 @@ def _build_list_context(playbook, user, artifacts, filters, total_count):
         "total_count": total_count,
         "filtered_count": artifacts.count(),
         "artifact_types": Artifact.ARTIFACT_TYPES,
+        "can_edit": can_edit,
     }
 
 
@@ -510,6 +541,15 @@ def artifact_delete(request, pk):
 
     artifact = _get_artifact_with_permission_check(request, pk)
     if not artifact:
+        return redirect("artifact_detail", pk=pk)
+
+    if not artifact.can_edit(request.user):
+        logger.warning(
+            "artifact_delete | branch | user=%s artifact=%s reason=released_playbook_pip_required",
+            request.user.username,
+            pk,
+        )
+        messages.error(request, "You don't have permission to delete this artifact.")
         return redirect("artifact_detail", pk=pk)
 
     if request.method == "POST":

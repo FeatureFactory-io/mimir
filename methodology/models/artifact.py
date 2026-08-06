@@ -140,6 +140,18 @@ class Artifact(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
+    def can_edit(self, user):
+        """
+        Check if user can directly edit this artifact.
+
+        Released playbooks require PIP workflow; draft playbooks allow direct edit
+        by owner.
+
+        :param user: User attempting to edit
+        :returns: True if user may edit directly (not via PIP)
+        """
+        return self.playbook.can_edit(user)
+
     def get_absolute_url(self):
         """
         Get URL for artifact detail page.

@@ -73,6 +73,7 @@
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
                                 {% include "partials/copy_prompt/row_button.html" with entity_type="artifact" entity_pk=artifact.pk entity_name=artifact.name copy_prompt_text=artifact.copy_prompt_text %}
+                                {% if can_edit %}
                                 <a href="{% url 'artifact_edit' pk=artifact.pk %}"
                                    class="btn btn-outline-secondary"
                                    data-bs-toggle="tooltip"
@@ -88,6 +89,7 @@
                                         hx-swap="innerHTML">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

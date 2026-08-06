@@ -40,6 +40,14 @@
                    data-testid="edit-btn">
                     <i class="fa-solid fa-edit"></i> Edit
                 </a>
+            {% elif can_submit_pip %}
+                <a href="{% url 'pip_create' %}?playbook={{ playbook.pk }}&workflow={{ producer.workflow.pk }}&activity={{ producer.pk }}"
+                   class="btn btn-primary"
+                   data-testid="artifact-submit-pip-btn"
+                   data-bs-toggle="tooltip"
+                   title="Propose changes to this Released playbook (context: producer activity)">
+                    <i class="fa-solid fa-lightbulb"></i> Submit PIP
+                </a>
             {% endif %}
             {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
             </div>
