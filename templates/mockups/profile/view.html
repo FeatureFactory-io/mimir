@@ -178,6 +178,67 @@
             </div>
         </div>
 
+        <!-- ── Karma & contributions (Act 18) ─────────────────────────────── -->
+        {% if show_karma_card %}
+        <div class="col-12">
+            <div class="card shadow-sm" data-testid="profile-karma-card">
+                <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-medal text-warning me-1" aria-hidden="true"></i> Karma &amp; contributions</span>
+                    <span class="badge bg-light text-dark border">{{ karma_primary_category }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <div class="col-md-3 text-center text-md-start">
+                            <div class="text-muted small text-uppercase fw-semibold mb-1">Total Karma</div>
+                            <div class="display-5 fw-bold" data-testid="profile-karma-total">{{ karma_total_display }}</div>
+                        </div>
+                        <div class="col-md-9">
+                            <div class="text-muted small text-uppercase fw-semibold mb-2">Contribution summary</div>
+                            <div id="profile-summary-collapsed"
+                                 class="small text-body-secondary"
+                                 data-testid="profile-contribution-summary-preview">
+                                {{ contribution_summary|truncatewords:42 }}
+                            </div>
+                            <div id="profile-summary-full"
+                                 class="small d-none"
+                                 data-testid="profile-contribution-summary">
+                                {{ contribution_summary }}
+                            </div>
+                            <button type="button"
+                                    class="btn btn-link btn-sm px-0 mt-1"
+                                    id="profile-summary-toggle"
+                                    data-testid="profile-contribution-summary-toggle"
+                                    aria-expanded="false">
+                                Show more
+                            </button>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Source</th>
+                                    <th class="text-end">Points</th>
+                                    <th class="text-muted">Detail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in karma_breakdown %}
+                                <tr>
+                                    <td>{{ row.source }}</td>
+                                    <td class="text-end fw-semibold">+{{ row.points }}</td>
+                                    <td class="text-muted small">{{ row.detail }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- ── My PIPs ───────────────────────────────────────────────────── -->
         <div class="col-12">
             <div class="card shadow-sm">
@@ -403,6 +464,20 @@
                 if (successDiv) { successDiv.classList.remove('d-none'); }
                 console.log('[mockup] verification email "sent" (simulated)');
             }, 1200);
+        });
+    }
+
+    /* ── contribution summary toggle ── */
+    var summaryToggle = document.getElementById('profile-summary-toggle');
+    if (summaryToggle) {
+        var preview = document.getElementById('profile-summary-collapsed');
+        var full = document.getElementById('profile-summary-full');
+        summaryToggle.addEventListener('click', function () {
+            var expanded = full.classList.toggle('d-none') === false;
+            preview.classList.toggle('d-none', expanded);
+            summaryToggle.textContent = expanded ? 'Show less' : 'Show more';
+            summaryToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            console.log('[mockup:profile] contribution summary toggled, expanded=' + expanded);
         });
     }
 
