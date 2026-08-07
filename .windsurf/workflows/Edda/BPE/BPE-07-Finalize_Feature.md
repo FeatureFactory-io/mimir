@@ -11,6 +11,11 @@ Finalize Feature
 
 ## Guidance
 
+## Prerequisites
+
+- All nodes in this feature's `feature_execution_graph` show `<!-- NODE_PASS -->` (including the terminal `BPE-06` DoD node).
+- When running under PIN/MIN: scenario issue closed with all nodes green; may run mid-iteration per feature.
+
 ## Purpose
 Finalize feature with testing, validation, and deployment preparation.
 

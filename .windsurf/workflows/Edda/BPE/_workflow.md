@@ -1,11 +1,11 @@
 # Build Feature
 
-**Playbook**: Edda v55.0 (Released)
+**Playbook**: Edda v66.0 (Released)
 **Workflow ID**: 15
-**Description**: Complete workflow for planning, implementing, and testing new pages/features. Covers backend (models, services, views), frontend (templates, HTMX), feature acceptance tests (Django test client), journey certification tests (Playwright), Definition of Done check, and feature finalization.
+**Description**: Plan and graph-enforced feature delivery. BPE-01 compiles a per-feature `feature_execution_graph`; BPE-02–06 are node-type specs executed by an orchestrator (MIN or solo) with fresh subagents and pytest gates per node; BPE-07 finalizes each feature; BPE-08/09 handle change requests and bugs.
 **Phase Organization**: Uses phases
-**Total Activities**: 8
-**Export Date**: 2026-07-27 10:52 UTC
+**Total Activities**: 9
+**Export Date**: 2026-08-06 12:46 UTC
 
 ## Activities
 
