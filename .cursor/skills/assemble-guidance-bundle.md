@@ -80,6 +80,8 @@ When `tests[]` or `log_story_rows[]` are set:
 - Log-story tests in the **same slice** as behavior when `log_story_rows` present
 - Use skill *Pytest Log Story Assertions* (`assert_log_story`)
 
+When node has `mockup_source` (BPE-03): follow Step 1b in BPE-03 — rewire mockup to `production_template`; keep mockup routes.
+
 ### 8. Scenario guardrails (PIN / issue)
 
 When available from issue or manifest:

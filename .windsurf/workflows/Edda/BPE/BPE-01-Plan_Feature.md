@@ -56,6 +56,37 @@ d) **Detect MCP / Agent surface:**
      `llm/executor.py | <line> | ToolExecutor — wire service callables here`
      Skip a row if that surface is not in scope.
 
+e) **Mockup inventory and graduation plan** (when the feature has UI screens):
+
+Canonical mockup locations (ESM-06):
+
+- `templates/mockups/{entity}/` — HTML prototype templates
+- `mockups/urls.py`, `mockups/views.py` — DEBUG-only routes at `/mockups/...` (404 when `DEBUG=False`)
+
+```bash
+# Entity slug from feature spec / screen ID (e.g. pips, teams, search)
+ls templates/mockups/{entity}/ 2>/dev/null
+rg "mockup_{entity}" mockups/urls.py 2>/dev/null || true
+```
+
+For **each screen** in scope (list, create, detail, …), decide graduate strategy and record in **Section H** (Step 6):
+
+| Screen | Mockup source | Production target | Strategy |
+|--------|---------------|-------------------|----------|
+| list | `templates/mockups/{entity}/list.html` | `templates/methodology/{entity}/list.html` | rewire |
+
+**Strategies:**
+
+- **rewire** — mockup exists: BPE-03 **ports** markup/structure/testids to production templates and real views; **do not delete** mockup files or `/mockups/...` routes (keep as design reference per existing plan convention)
+- **greenfield** — no mockup: build from feature file + `docs/ux/IA_guidelines.md`
+- **partial** — mockup covers part of the screen: rewire what exists, extend in production
+
+When strategy is **rewire** or **partial**, add mockup template path(s) to the Context Map (Step 4c). Each **BPE-03** graph node (Step 6G) must list `mockup_source` and `production_template` when applicable.
+
+If the feature has **no UI** (API-only, MCP-only): Section H = `Not applicable — no frontend screens.`
+
+If UI is in scope but **no mockups exist**, ask: create per ESM-06 first, or proceed **greenfield**?
+
 ### Step 5: Clarification Questions
 Ask clarification questions scenario-by-scenario. If >5 questions total, create `FEAT_X.Y.Z_Clarifications.md` for batch answers.
 
@@ -85,6 +116,17 @@ Do not cite dropped rule `add-logging`.
 | `create_foo` | `FooService.create` | Yes | No | server-side user_id |
 ```
 Rules: artifact 57 §3.2 (tool schema), §3.3 (auth injection — never accept user_id from args), §3.4 (write-tool policy)
+
+**Mandatory Section H — Mockup Graduation Plan** (from Step 4e; use `Not applicable — no frontend screens` when no UI):
+
+```
+## Mockup Graduation Plan
+| Screen | Mockup source | Production target | Strategy | BPE-03 node id |
+|--------|---------------|-------------------|----------|----------------|
+| list | templates/mockups/{entity}/list.html | templates/methodology/{entity}/list.html | rewire | N2-frontend-list |
+```
+
+Strategy values: `rewire | greenfield | partial`. When `rewire`/`partial`, production templates must match mockup UX unless feature file explicitly diverges (note divergence in Do-Not-Do or clarifications).
 
 **Implementation Steps:**
 
@@ -123,6 +165,7 @@ After Sections A–F are complete:
 
 1. Switch to **Plan mode**. Present a Mermaid dependency graph of execution nodes (typical order: backend slices → frontend → AT → E2E → DoD). Prefer **4–8 nodes** per feature.
 2. For each node, assign `bpe: BPE-0N` using [BPE-02](BPE-02-Implement_Backend.md)…[BPE-06](BPE-06-Check_Definition_of_Done.md) as templates: slice `footprint`, `tests`, `log_story_rows`, and **pytest/`make` gates** only (no custom gate scripts). See artifact **Feature Execution Graph** (`artifacts/feature-execution-graph-schema.md`).
+   - **BPE-03 nodes:** when Section H strategy is `rewire` or `partial`, set optional fields `mockup_source`, `production_template`, `graduate_strategy: rewire` on the node (schema documents these).
 3. User approves the graph in Plan mode.
 4. **Compile** the approved graph to YAML with root key `feature_execution_graph`, wrapped in `<!-- FEATURE_EXECUTION_GRAPH -->` … `<!-- /FEATURE_EXECUTION_GRAPH -->`.
 5. **Standalone feature** (no PIN): also write `docs/plans/{FEAT}-feature-execution-graph.yaml`.
@@ -132,7 +175,7 @@ After Sections A–F are complete:
 
 ### Steps 7–10: Rule Confirmation, No Time Estimates, Submit for Approval, GitHub Issue
 
-Issue body must contain all mandatory sections inline: **A–F**, **`FEATURE_EXECUTION_GRAPH`**, and **Lessons Learned**. Each section must be self-sufficient for a cold-start implementor. When used under PIN, note that `checkpoint.log_story_command` must pass alongside the behavior checkpoint; terminal scenario checkpoint should match the **BPE-06** node's `gate.command`.
+Issue body must contain all mandatory sections inline: **A–H** (H may be N/A), **`FEATURE_EXECUTION_GRAPH`**, and **Lessons Learned**. Each section must be self-sufficient for a cold-start implementor. When used under PIN, note that `checkpoint.log_story_command` must pass alongside the behavior checkpoint; terminal scenario checkpoint should match the **BPE-06** node's `gate.command`.
 
 ### Step 7: Write Lessons Learned
 
@@ -176,7 +219,7 @@ Activity-specific (not a substitute for the rules above):
 ## Success Criteria
 - Feature specification exists and is clear
 - Codebase assessment complete with context map (3–5 file:line_range references)
-- Plan contains all six mandatory sections: Context Map, Do-Not-Do, SAO Sections, Tests to Create, Log Story Script, MCP Tools to Expose
+- Plan contains all mandatory sections: Context Map, Do-Not-Do, SAO Sections, Tests to Create, Log Story Script, MCP Tools to Expose, Mockup Graduation Plan (Section H or N/A)
 - **`feature_execution_graph` compiled** (Step 6G): every node has `gate.command`, BPE-06 terminal node, deps enforce layer order
 - All tests explicitly listed with what they prove, including `*_log_story_*` when Section E has rows
 - All log decision points listed with Beat + required context fields
@@ -308,7 +351,7 @@ Activity-specific (not a substitute for the rules above):
 - **User Journey** (Document) - Required
 - **Screen Flow / Dialogue Map** (Diagram) - Required
 - **Feature Files** (Document) - Required
-- **HTML Mockups** (Code) - Optional
+- **HTML Mockups** (Code) - Optional — inventory in Step 4e; graduation in Section H
 - **System Architecture Overview Template** (Document) - Required
 
 ## Notes

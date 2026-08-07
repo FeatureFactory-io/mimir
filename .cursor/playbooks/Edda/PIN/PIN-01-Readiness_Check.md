@@ -54,12 +54,18 @@ test -f CLAUDE.md && echo "PASS" || echo "FAIL"
 If missing: **STOP** — "No `CLAUDE.md` found. Run the DSP (Deploy Software Process) workflow to configure the AI IDE."
 
 ## Mockup Check (advisory, after all gates pass)
+
+Canonical paths (ESM-06): `templates/mockups/{entity}/`, `mockups/urls.py`.
+
 ```bash
-ls docs/ux/mockups/act-{N}/ 2>/dev/null && echo "Mockups found" || echo "No mockups"
+# Derive {entity} from target act / feature specs (e.g. pips, teams)
+ls templates/mockups/{entity}/ 2>/dev/null && echo "Mockups found" || echo "No mockups"
+rg "mockup_{entity}" mockups/urls.py 2>/dev/null || true
 ```
-If no mockups: ask — "No mockups found for {target}. Create them per ESM-04 before planning? (yes/no)"
-- Yes → run ESM-04, then return to PIN-01 after mockups are created
-- No → proceed with feature specs only
+
+If no mockups and feature has UI screens: ask — "No mockups under `templates/mockups/{entity}/`. Create them per ESM-06 before planning, or proceed greenfield? (create / greenfield)"
+- create → run ESM-06, then return to PIN-01
+- greenfield → proceed; BPE-01 Section H will document greenfield strategy
 
 ## Output
 When all gates pass:

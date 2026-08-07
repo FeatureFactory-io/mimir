@@ -76,7 +76,11 @@ feature_execution_graph:
       bpe: BPE-03
       depends_on: [N1-backend-service]
       footprint:
-        - templates/foo/form.html
+        - templates/methodology/foo/form.html
+        - methodology/views/foo_views.py
+      mockup_source: templates/mockups/foo/create.html   # optional; BPE-03 only
+      production_template: templates/methodology/foo/form.html
+      graduate_strategy: rewire   # rewire | greenfield | partial
       gate:
         command: "pytest tests/integration/test_foo_views.py -x"
       guidance_bundle:
@@ -139,6 +143,9 @@ feature_execution_graph:
 | `guidance_bundle.activity` | yes | Path to BPE activity file under playbook root |
 | `guidance_bundle.rules` | yes | Rule slugs; worker must read each by slug |
 | `guidance_bundle.skills` | recommended | Skill titles from playbook |
+| `mockup_source` | BPE-03 when Section H rewire/partial | Path under `templates/mockups/` |
+| `production_template` | BPE-03 when mockup_source set | Target production template path |
+| `graduate_strategy` | BPE-03 when UI in scope | `rewire`, `greenfield`, or `partial` |
 
 ## Rules
 

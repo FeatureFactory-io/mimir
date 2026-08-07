@@ -95,6 +95,20 @@ Standalone store: `docs/plans/{FEAT}-feature-execution-graph.yaml`
 
 ---
 
+## Mockup Graduation Plan (Mandatory Section H)
+
+*From BPE-01 Step 4e. Use `Not applicable — no frontend screens` when the feature has no UI.*
+
+| Screen | Mockup source | Production target | Strategy | BPE-03 node id |
+|--------|---------------|-------------------|----------|----------------|
+| list | `templates/mockups/{entity}/list.html` | `templates/methodology/{entity}/list.html` | rewire | N2-frontend-list |
+
+**Strategies:** `rewire` (port mockup → production, keep mockup routes) | `greenfield` | `partial`
+
+BPE-03 nodes carry `mockup_source`, `production_template`, `graduate_strategy` when strategy is not greenfield.
+
+---
+
 ## Current State Assessment
 
 ### What Exists (Reusable)

@@ -89,7 +89,8 @@ Grep of `logs/app.log` is an **audit aid**, not the DoD gate. Caplog (or `log_st
 - [ ] BDD scenarios exist for features
 - [ ] Feature files are well-structured
 - [ ] Scenarios cover edge cases and error conditions
-- [ ] Review GUI - do scenarios match behavior, fields, URLs, design rules? Report inconsistencies to user
+- [ ] Review GUI — do scenarios match behavior, fields, URLs, design rules? Report inconsistencies to user
+- [ ] When Section H used **rewire**/**partial**: production UI matches mockup source(s) and IA guidelines (mockup routes may remain as DEBUG reference)
 
 ### TODO Management
 - [ ] TODO comments exist for incomplete implementations

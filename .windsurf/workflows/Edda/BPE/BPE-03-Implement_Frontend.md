@@ -18,6 +18,7 @@ This activity is a **node type spec** (`bpe: BPE-03`). BPE-01 assigns graph node
 - **STOP**: Do not implement nodes tagged `BPE-02`, `BPE-04`…`BPE-06` in this invocation.
 - **Gate**: Node complete when `gate.command` exits 0 (typically view/template pytest for this footprint); post `<!-- NODE_PASS -->`.
 - **testids**: Every interactive element in this node's footprint must have `data-testid`; gaps not covered by gate are verified in the BPE-06 node.
+- **Mockup graduation**: When the graph node declares `mockup_source` + `graduate_strategy: rewire|partial`, **port** from mockup — do not redesign from scratch. Keep mockup templates and `/mockups/...` routes intact.
 - Prerequisites below apply **within the node**; upstream backend nodes must show `NODE_PASS` before this node starts.
 
 ## Purpose
@@ -27,11 +28,22 @@ Implement frontend templates and interactions following your framework's pattern
 - Upstream `BPE-02` graph node(s) show `NODE_PASS`
 - Routing defined for this node's footprint
 - Review UX/design guidelines to identify sections applicable to the page/component
+- When node specifies `mockup_source`: read that template and Section H (Mockup Graduation Plan) from the implementation plan / issue before editing production templates
 
 ## Steps
 
 ### 1. Review Routing and Template Structure
 Check routing patterns - does anything need to be added or changed? Plan template/component hierarchy (base templates, partials, pages/components). Identify dynamic interactions needed.
+
+### 1b. Graduate mockup to production GUI (when `mockup_source` is set)
+
+1. Open `mockup_source` (e.g. `templates/mockups/{entity}/list.html`) and target `production_template` from the graph node.
+2. **Rewire, don't redesign:** copy structure, Bootstrap/HTMX patterns, `data-testid` names, and ARIA from mockup; replace mock static data with view context and real URLs.
+3. Wire production view + URL; mockup view in `mockups/views.py` stays unchanged.
+4. Compare side-by-side in browser: `/mockups/{entity}/...` (DEBUG) vs production route — layout and interactives should match unless feature file documents intentional divergence.
+5. Do **not** delete mockup templates or remove entries from `mockups/urls.py`.
+
+If `graduate_strategy: greenfield` (no mockup): skip 1b; build from IA guidelines and feature file.
 
 ### 2. Implement Templates/Components
 **A. Page Templates/Components**: Full pages (inherit from base or layout)
