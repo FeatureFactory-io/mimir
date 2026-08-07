@@ -75,6 +75,33 @@ system_dependencies:
 rollback_point: "git stash"
 <!-- /SCENARIO -->
 
+<!-- FEATURE_EXECUTION_GRAPH -->
+feature_execution_graph:
+  nodes:
+    - id: N1-backend-service
+      title: "Backend — service slice"
+      bpe: BPE-02
+      depends_on: []
+      footprint: [path/to/service.py, tests/unit/test_service.py]
+      gate:
+        command: "pytest tests/unit/test_service.py -x"
+      guidance_bundle:
+        activity: BPE/BPE-02-Implement_Backend.md
+        rules: [do-skeletons-first, do-test-first]
+        skills: [Django Backend Implementation Patterns]
+    - id: N5-definition-of-done
+      title: "Definition of Done"
+      bpe: BPE-06
+      depends_on: [N4-e2e-journey]
+      footprint: []
+      gate:
+        command: "pytest tests/integration/test_feature.py -x"
+      guidance_bundle:
+        activity: BPE/BPE-06-Check_Definition_of_Done.md
+        rules: [do-test-first]
+        skills: []
+<!-- /FEATURE_EXECUTION_GRAPH -->
+
 ## Context Map
 | File | Lines | Note |
 |------|-------|------|
@@ -90,7 +117,13 @@ rollback_point: "git stash"
 {BPE-01 plan content — full text}
 
 ## Acceptance Criteria
-- [ ] `pytest tests/integration/test_feature.py -x` passes
+
+### Graph nodes
+- [ ] N1-backend-service — gate: `pytest tests/unit/test_service.py -x`
+- [ ] N5-definition-of-done — gate: `pytest tests/integration/test_feature.py -x`
+
+### Scenario rollup
+- [ ] Terminal checkpoint passes
 - [ ] No regressions: `pytest tests/ -x --ignore=tests/e2e` passes
 - [ ] Changes committed with Angular convention message
 EOF
@@ -123,6 +156,26 @@ if match:
 EOF
 ```
 
+## Pattern 2c — Parse FEATURE_EXECUTION_GRAPH from Issue Body
+
+```bash
+ISSUE_BODY=$(gh issue view {issue_number} --json body --jq '.body')
+
+python3 - <<EOF
+import re, yaml
+
+body = """$ISSUE_BODY"""
+match = re.search(r'<!-- FEATURE_EXECUTION_GRAPH -->(.+?)<!-- /FEATURE_EXECUTION_GRAPH -->', body, re.DOTALL)
+if match:
+    doc = yaml.safe_load(match.group(1))
+    graph = doc.get('feature_execution_graph', doc)
+    for node in graph.get('nodes', []):
+        print(node['id'], node['bpe'], '->', node.get('depends_on', []), '|', node['gate']['command'])
+else:
+    print('No FEATURE_EXECUTION_GRAPH block found')
+EOF
+```
+
 ## Pattern 3 — Label State Transitions
 
 ```bash
@@ -144,6 +197,16 @@ gh issue comment {N} --body "<!-- CHECKPOINT_PASS -->
 Checkpoint passed at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 Command: {command}
 <!-- /CHECKPOINT_PASS -->"
+```
+
+## Pattern 4b — Node Pass Comment
+
+```bash
+gh issue comment {N} --body "<!-- NODE_PASS -->
+node: {node_id}
+gate: {gate_command} — exit 0
+commits: {commit_sha}
+<!-- /NODE_PASS -->"
 ```
 
 ## Pattern 5 — Absorbed Drift Comment
@@ -212,6 +275,8 @@ EOF
 ## Quality Gates
 
 - [ ] Every scenario issue has `<!-- SCENARIO -->` block parseable as YAML
+- [ ] Every scenario issue has `<!-- FEATURE_EXECUTION_GRAPH -->` with at least one `BPE-02` and one `BPE-06` node
+- [ ] Each graph node has `gate.command`; node footprints ⊆ scenario footprint
 - [ ] `skeleton_commit` field present and is a valid git hash
 - [ ] `sao_sections[]` and `do_not_do[]` fields present and non-empty
 - [ ] `system_dependencies[]` field present (empty list `[]` is valid)
