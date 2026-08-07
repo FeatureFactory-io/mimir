@@ -8,6 +8,9 @@ Senior developer at a tech community. Maintains shared playbooks for common deve
 **Maria Rodriguez** - UX Consultant  
 Runs an independent UX consulting practice. Needs to organize her personal workflows, collaborate with her team, and leverage community methodologies.
 
+**Elena Svensson** — Competency Center Head  
+Leads an internal methodology guild. Wants to **find experts** in Design vs Development, review their Karma and contribution summaries, and reach out when building an RFP team or guild invite list. Motivation: retain organizational knowledge — “know your experts.”
+
 ---
 
 ---
@@ -119,6 +122,8 @@ Mike is satisfied with the playbook and clicks **[Release]** on the playbook det
 
 **Result**: The playbook is now a stable v1.0 reference visible to all authenticated users and to anonymous guests (when Public). Future changes require PIPs reviewed by Galdr and approved by an Administrator.
 
+- Mike earns **+5000 Karma** (one-time per playbook on first transition to Released v1.0); toast: *“You earned 5,000 Karma for releasing React Frontend Development.”* Points attributed to the playbook’s category (Product, Development, Research, Design, or Other).
+
 ---
 
 ### Act 0.5: Guest evaluation (pre-registration)
@@ -127,13 +132,14 @@ Mike is satisfied with the playbook and clicks **[Release]** on the playbook det
 
 #### Screen: FOB Landing Page (`/`)
 Bob opens the FOB root URL in an incognito session:
-- **Full primary navbar**: Home → Playbooks → Workflows → Phases → Activities → Artifacts → Agents → Skills → Rules → Teams → PIPs
+- **Full primary navbar**: Home → Playbooks → Workflows → Phases → Activities → Artifacts → Agents → Skills → Rules → Teams → PIPs → **Experts**
 - Right side: **[Register]** and **[Login]** only (no global search, notifications bell, or user menu)
 - Hero section with product value proposition
 - Primary CTA: **[Explore public playbooks]** (`data-testid="landing-cta-explore-playbooks"`) → `/playbooks/`
 - Hero primary action (guest): **[Register]** (`data-testid="landing-cta-register"`) with user-plus icon → `/auth/user/register/`
 - Hero primary action (authenticated): **[Connect MCP]** (`data-testid="landing-cta-connect-mcp"`, primary button, plug icon) → `#mcp-config`
 - Auth-only nav targets (Home, Teams, PIPs) redirect to login when clicked
+- **Experts** (`/experts/`) is **read-only** for guests — same leaderboard as authenticated users, no profile Karma card until login
 
 #### Screen: Guest Playbooks List (`/playbooks/`)
 Bob clicks **[Explore public playbooks]** and lands on the public browse grid:
@@ -268,14 +274,15 @@ Maria's FOB web GUI (http://localhost:8000) has a consistent layout:
   - Playbooks
   - Workflows, Phases, Activities, Artifacts, Agents, Skills, Rules
   - PIPs (with **status-change count pill** — see below)
+  - **Experts** → **FOB-EXPERTS-LIST+FIND-1** (`/experts/`)
 - **Notifications**: Bell icon with badge count (unread notifications) — *when implemented*
 - **User Menu**: Click **your username** in the top-right to open a dropdown:
-  - **[View Profile]** → **FOB-PROFILE-1** (`/auth/user/profile/`) — name, email, API token (show / copy / **regenerate** with password), PIPs you created, playbooks you own, teams you belong to
+  - **[View Profile]** → **FOB-PROFILE-VIEW-1** (`/auth/user/profile/`) — name, email, API token (show / copy / **regenerate** with password), **Karma & contributions**, PIPs you created, playbooks you own, teams you belong to
   - **[Log Out]**
 
-Staff users may also use dashboard shortcuts (e.g. Django admin) where applicable; primary account + token management for everyone is **FOB-PROFILE-1**.
+Staff users may also use dashboard shortcuts (e.g. Django admin) where applicable; primary account + token management for everyone is **FOB-PROFILE-VIEW-1**.
 
-#### Screen: FOB-PROFILE-1 (My Profile)
+#### Screen: FOB-PROFILE-VIEW-1 (My Profile)
 
 Maria opens **View Profile** from the username menu.
 
@@ -286,6 +293,15 @@ Maria opens **View Profile** from the username menu.
     - ⚠️ **Not verified** (orange badge) — email unconfirmed; a **[Re-send verification email]** button appears inline. An unverified email means the account cannot log in — this badge should only be visible if a staff admin is viewing the profile on behalf of the user, or immediately after an email change before the session terminates.
   - **[Edit]** button in the card header → `FOB-PROFILE-EDIT-1`.
 - **API token (MCP / REST)**: DRF `Token` used as `Authorization: Token <key>`; [Show] / [Copy]; **Regenerate token** requires **current password** and invalidates the previous key immediately.
+- **Karma & contributions** card (`data-testid="profile-karma-card"`):
+  - **Total Karma** (large number, `data-testid="profile-karma-total"`)
+  - **Primary category** badge (e.g. “Development”) — category where Maria has earned the most Karma
+  - **Contribution summary** — Galdr-generated paragraph (up to 12–14 sentences), refreshed when Maria submits a PIP; `data-testid="profile-contribution-summary"`; if over ~4 lines in UI, collapse with **[Show more]** / **[Show less]**
+  - **Breakdown table** (numeric Karma sources):
+    - Released playbooks (+5000 each, first Release v1.0 only)
+    - PIP contributions (+500 major / +100 minor per accepted Change)
+    - Consumption by others (+5 each — Copy to ADE, MCP `get_*`, `export_workflow_to_local`)
+    - Learning (+5 each — same consumption paths as consumer)
 - **My PIPs**: PIPs where Maria is the submitter (`created_by`), with links to each PIP.
 - **My playbooks**: Playbooks Maria authors (`author`), with links to each playbook.
 - **My Teams**: Teams Maria belongs to (as admin or member), showing role badge, member count, and a [View] link to each team detail page. Teams where she is admin show a crown icon. Hidden teams are included.
@@ -1156,6 +1172,8 @@ mcp.export_workflow_to_local(
   "message": "Workflow exported successfully. Edit files locally and use import_workflow_from_local to apply changes."
 }
 ```
+
+**Karma** (authenticated MCP only): On successful export, Maria earns **+5** learning Karma and Mike (playbook author) earns **+5** author Karma — one accrual per export call, not per file. Exporting your own workflow earns nothing. `import_workflow_from_local` and other import/write tools earn no Karma.
 
 **GUI Integration**:
 - Available from FOB-WORKFLOWS-VIEW_WORKFLOW-1
@@ -2170,8 +2188,9 @@ Draft ──→ Submitted ──→ Processing (Galdr) ──→ Reviewed ──
    - Checks for upstream/downstream Activity impact
    - Writes a recommendation: `ACCEPT` / `REJECT` / `NEEDS_CLARIFICATION`
    - Attaches 1–3 sentence reasoning
-3. PIP status → `Reviewed`
-4. FOB notifies Administrators: "PIP-42 is ready for review"
+3. **Contributor profile refresh** — Galdr reads the PIP submitter’s history (released playbooks authored, prior PIPs, Karma by category, public contributions) and writes/refreshes **`contribution_summary`**: up to one paragraph (**12–14 sentences max**) covering playbook names, PIP themes, category strengths, and how others use their work. Stored on the submitter’s profile; surfaced on **FOB-PROFILE-VIEW-1**, **FOB-EXPERT-VIEW-1**, and truncated on the Experts leaderboard **Expertise hint**. Re-runs on every PIP submission (including after Withdraw → resubmit); does **not** wait for Admin acceptance.
+4. PIP status → `Reviewed`
+5. FOB notifies Administrators: "PIP-42 is ready for review"
 
 ---
 
@@ -2300,6 +2319,12 @@ Changes:
 - Rejected Changes are discarded
 - PIP status → `Accepted` (or `Partially Accepted` if mixed, or `Rejected`)
 - Email sent to Maria (see Email Notification below)
+
+**Karma on acceptance** (after Mike’s Admin decision):
+- Per **accepted** Change: Maria earns **+500** for ADD Activity / Skill / Artifact; **+100** for ALTER, Link, DROP, or other minor Change
+- Partial acceptance → points only for accepted Changes; rejected Changes earn nothing
+- No Karma for Draft, Submitted-only, or fully Rejected PIPs
+- Points attributed to the target playbook’s category
 
 ---
 
@@ -2771,6 +2796,21 @@ Maria: `> mimir: Open playbook in browser`
 
 ---
 
+#### Karma-eligible MCP consumption
+
+When an **authenticated** user consumes playbook content via MCP, Karma accrues as follows (see Act 18 for full rules):
+
+| MCP tool | Karma |
+|----------|-------|
+| `get_playbook`, `get_workflow`, `get_activity`, `get_skill`, `get_agent`, `get_rule`, `get_artifact`, `get_phase`, `get_pip` | Consumer +5; playbook author +5 |
+| `export_workflow_to_local` | Consumer +5; playbook author +5 (one accrual per successful export call) |
+| `list_playbooks`, `list_workflows`, `list_activities`, … | No Karma |
+| `import_workflow_from_local`, `apply_upload_protocol`, other write/import tools | No Karma |
+
+**No self-Karma** — fetching or exporting your own playbook content earns neither consumer nor author points. Same rules as Copy to ADE (Act 17).
+
+---
+
 **Act 12 Summary**: Maria uses Mimir MCP for AI-assisted methodology execution:
 - ✅ Activate playbooks in FOB
 - ✅ Query playbook context via AI (Windsurf/MCP)
@@ -2798,7 +2838,7 @@ Maria: `> mimir: Open playbook in browser`
 
 **Context**: Maria needs to configure her FOB and account settings.
 
-**MVP (implemented today)** — **FOB-PROFILE-1** (`/auth/user/profile/`): profile fields, **MCP/REST API token** (show, copy, regenerate with password), my PIPs, my playbooks. Reach it from the **username** dropdown in the top navigation bar.
+**MVP (implemented today)** — **FOB-PROFILE-VIEW-1** (`/auth/user/profile/`): profile fields, **MCP/REST API token** (show, copy, regenerate with password), my PIPs, my playbooks. **Target:** Karma & contributions card (Act 18). Reach it from the **username** dropdown in the top navigation bar.
 
 **Target (full FOB Settings)** — **FOB-SETTINGS-1** below: multi-section settings UI (storage, MCP snippet builder, notifications, etc.).
 
@@ -3055,15 +3095,130 @@ Entity-specific bodies: Activity → full `guidance`; Skill → `content` + meta
 - Same visibility as entity VIEW (public released → guest OK; private → 404)
 - PIPs require authentication (guest GET `/pips/<pk>/` → redirect/deny)
 
+**Karma side-effect** (see Act 18):
+
+- **Authenticated user:** on successful Copy to ADE (clipboard write), consumer **+5** and playbook author **+5**
+- **Guest (anonymous):** Copy to ADE still works — Act 17 guest access unchanged; **no Karma** to guest or author (silent no-op)
+- **No self-Karma** when copying your own content
+- No Karma on list-row copy for out-of-scope collections (unchanged)
+- User-facing label remains **Copy Prompt**; tooltip **Copy prompt to use in your ADE** — “Copy to ADE” in Karma narrative
+
 **Mockups** (DEBUG only): `/mockups/copy-prompt/` — activity detail + list exemplars
 
 **Feature files**: `docs/features/act-17-copy-prompt/` (`copy-prompt-service.feature`, `copy-prompt-view.feature`, `copy-prompt-list.feature`, `copy-prompt-guest.feature`)
 
 ---
 
+### Act 18: Experts & Karma — Community Reputation
+
+**Context**: Elena (Competency Center Head) and Maria want to discover who the community trusts in each methodology category, see proof of contribution (Karma), read Galdr-written expertise summaries, and reach out to the right people.
+
+**Pattern**: Experts follows the LIST+FIND entry pattern (category tabs filter the leaderboard).
+
+#### Key Concepts
+
+- **Karma** — points you earn by contributing playbooks others use and by learning from the community. Not a moral score; a measure of methodology impact.
+- **Contribution summary** — Galdr-generated narrative of a user’s expertise (up to 12–14 sentences), refreshed on each PIP submission
+- **Primary category** — the playbook category where a user has earned the **most Karma** (tie-break: most released playbooks in that category, then alphabetical); determines which Experts tab lists them
+- **Expert** — any user with Karma > 0 (no manual badge)
+- **Copy to ADE** — user-facing name for **Copy Prompt** (Act 17)
+
+#### Karma rules
+
+| Event | Recipient | Points | Category attribution |
+|-------|-----------|--------|----------------------|
+| First **Release v1.0** on a playbook | Playbook author | **5000** | Playbook’s category |
+| Another user **consumes** content (Copy to ADE, MCP `get_*`, or `export_workflow_to_local`; consumer must be **authenticated**) | Playbook author | **5** | Playbook’s category |
+| PIP **Accepted** — ADD Activity / Skill / Artifact | PIP submitter | **500** | Target playbook’s category |
+| PIP **Accepted** — ALTER, Link, DROP, other minor | PIP submitter | **100** | Target playbook’s category |
+| User **consumes** via Copy to ADE, MCP `get_*` (entity, not list), or `export_workflow_to_local` | Consumer (**authenticated**) | **5** | Playbook’s category (learning credit) |
+
+**Out of scope for earning:**
+
+- `list_*` MCP calls and LIST+FIND page views
+- Playbook / Phase / Workflow collection Copy Prompt (Act 17)
+- Copying, MCP-fetching, or `export_workflow_to_local` on **your own** content — no Karma to consumer or author
+- **Guest Copy to ADE:** anonymous users may use Copy Prompt on public released entities; clipboard works; **no Karma** to anyone
+- **Guest Experts:** leaderboard read-only; profile Karma card and all other accrual require login
+
+**Ranking:** Users appear on **one** category tab (their **primary category**), ranked by **total Karma across all categories**. Each tab shows the **top 5** experts whose primary category matches the tab.
+
+**Contribution summary — display by screen:**
+
+| Surface | What users see |
+|---------|----------------|
+| **Stored value** | Full Galdr paragraph, 12–14 sentences max |
+| **FOB-EXPERT-VIEW-1** | Full paragraph (`data-testid="expert-contribution-summary"`) |
+| **FOB-PROFILE-VIEW-1** | Full paragraph; **[Show more]** / **[Show less]** if long |
+| **Leaderboard Expertise hint** | Truncated teaser — first 1–2 sentences or ~160 characters + ellipsis |
+| **No summary yet** | Numeric fallback (e.g. “3 released · 12 PIP changes accepted”) until first PIP submission triggers Galdr |
+
+---
+
+#### Screen: FOB-EXPERTS-LIST+FIND-1 (`/experts/`)
+
+Elena clicks **Experts** in the main navigation. The experts leaderboard appears (entry point for expert discovery):
+
+**Layout**:
+
+- **Header**: “Experts” + subtitle “Top contributors by methodology category”
+- **Category tabs** (pill nav, HTMX swap): Product | Development | Research | Design | Other
+- **Leaderboard table** (`data-testid="experts-leaderboard"`):
+  - **Top 5** users whose **primary category** matches the active tab
+  - Columns: Rank | Avatar/initials | Display name | **Total Karma** | Primary category badge | **Expertise hint** (truncated `contribution_summary` or numeric fallback)
+  - Row actions:
+    - **[View profile]** → **FOB-EXPERT-VIEW-1** at `/experts/<username>/`
+    - **[Reach out]**:
+      - **Authenticated:** `mailto:` when expert email is visible (Teams link — future)
+      - **Guest:** button visible but **disabled**; tooltip: **“You need to be logged in to reach out to the expert”** (`data-testid="experts-reach-out-guest-tooltip"`)
+- **Empty state** per tab: “No experts in {Category} yet — release a playbook to be the first”
+- **Guest view**: same leaderboard read-only; guest banner with **[Register]** CTA
+
+**Example rows** (Development tab):
+
+| # | Expert | Karma | Hint |
+|---|--------|-------|------|
+| 1 | Mike Chen | 12,450 | 2 released playbooks · specializes in React testing patterns… |
+| 2 | Maria Rodriguez | 8,200 | Accessibility-focused contributor to Design and Development… |
+
+---
+
+#### Screen: FOB-EXPERT-VIEW-1 (`/experts/<username>/`)
+
+Public expert detail linked from the leaderboard:
+
+- Name, primary category badge, **total Karma** (`data-testid="expert-karma-total"`)
+- **Contribution summary** — Galdr’s full paragraph (`data-testid="expert-contribution-summary"`)
+- **Karma breakdown** — numeric table (same rows as FOB-PROFILE-VIEW-1)
+- **Released public playbooks** authored (read-only cards)
+- **[Reach out]** — same auth rules as leaderboard (guest → disabled + tooltip)
+- Does **not** expose API token, private PIPs, or private playbooks
+
+---
+
+#### Actions & Results
+
+- Elena opens **Experts**, selects **Design**, sees Maria ranked #2 with a Galdr teaser, clicks **View profile**, reads the full contribution summary, clicks **Reach out** (logged in) → mailto opens
+- Bob (guest) copies an Activity via **Copy to ADE** on a public playbook → prompt on clipboard; Mike earns **no** author Karma, Bob earns **no** consumer Karma
+- Bob (guest) hovers **[Reach out]** on Mike’s row → tooltip: “You need to be logged in to reach out to the expert”
+- Maria submits a PIP → Galdr reviews Changes **and** refreshes her `contribution_summary` while the PIP is Processing
+- Mike releases v1.0 → +5000 Karma → appears on the Development tab when primary category is recalculated
+- Maria’s PIP accepted → +500 Karma on the ADD Change; contribution summary was already refreshed at submit time
+
+**Follow-on artifacts** (BDD and implementation — not in this journey slice):
+
+- `docs/features/act-18-experts/experts-list.feature` — FOB-EXPERTS-LIST+FIND-1
+- `docs/features/act-18-experts/experts-profile.feature` — Karma on FOB-PROFILE-VIEW-1
+- `docs/features/act-18-experts/karma-accrual.feature` — Release, PIP accept, Copy Prompt (auth vs guest), MCP, `export_workflow_to_local`
+- `docs/features/act-18-experts/galdr-contribution-summary.feature` — Galdr summary on PIP submit
+- `docs/features/act-18-experts/experts-reach-out.feature` — Guest tooltip on [Reach out]
+- `docs/plans/EXPERTS-KARMA_IMPLEMENTATION_PLAN.md` — BPE-01 backend/frontend slice
+
+---
+
 ## Journey Complete
 
-Maria's journey through Acts 0-17 demonstrates the complete Mimir MVP experience:
+Maria's journey through Acts 0-18 demonstrates the complete Mimir MVP experience:
 
 **Core CRUDLF Entities (Acts 2-8):**
 - ✅ **Playbooks**: Top-level methodologies with versioning and team publishing
@@ -3084,8 +3239,12 @@ Maria's journey through Acts 0-17 demonstrates the complete Mimir MVP experience
 
 - ✅ **Content Browser**: Interactive node-based graph explorer (Cytoscape.js, CDN) for visualizing the full entity graph of any playbook
 
-**Cross-cutting UX (Act 17):**
-- ✅ **Copy Prompt**: Server-built AI instructions on entity VIEW headers and list-row Actions — one-click clipboard for IDE/assistant paste
+**Community reputation (Act 18):**
+- ✅ **Experts & Karma**: Category leaderboard, Galdr contribution summaries, profile Karma card
+
+**Cross-cutting UX (Acts 17–18):**
+- ✅ **Copy Prompt / Copy to ADE**: Server-built AI instructions on entity VIEW headers and list-row Actions — one-click clipboard for IDE/assistant paste; Karma on authenticated copy
+- ✅ **Experts & Karma**: Category leaderboard, Galdr contribution summaries, profile Karma card — community reputation ties contribution to discoverability
 
 **Key Achievements:**
 - All 7 core entities have complete CRUDLF with LIST+FIND entry points
@@ -3093,8 +3252,9 @@ Maria's journey through Acts 0-17 demonstrates the complete Mimir MVP experience
 - Phase explicitly marked as OPTIONAL throughout
 - "Artifact" terminology (not "Deliverable")
 - Detailed screen specifications ready for BDD feature files
-- Structured PIP workflow with Galdr AI pre-screening + Admin decision + email notification
+- Structured PIP workflow with Galdr AI pre-screening + Admin decision + email notification + contributor summary refresh
 - FastMCP as API wrapper (no direct DB access from MCP layer)
+- Karma accrual on Release, PIP acceptance, Copy to ADE, MCP reads, and `export_workflow_to_local`
 - Error recovery paths for all scenarios
 
-Maria now has a complete, production-ready methodology management system with team collaboration, Galdr-assisted PIP review, and AI integration via FastMCP.
+Maria now has a complete, production-ready methodology management system with team collaboration, Galdr-assisted PIP review, expert discovery, and AI integration via FastMCP.
