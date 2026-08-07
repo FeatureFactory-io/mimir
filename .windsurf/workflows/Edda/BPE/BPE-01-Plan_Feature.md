@@ -111,14 +111,44 @@ Rules: artifact 57 §3.2 (tool schema), §3.3 (auth injection — never accept u
    - T3 (subprocess JSON-RPC): proves entrypoint cleanliness (no stdout noise)
    - Full recipes: artifact 57 §7
 
-4. **Observability:** emit INFO at decision points matching the Log Story Script (who/what/when/why, never raw secrets). Prove with caplog tests — ban deferred “informative logging pass” slices.
+4. **Observability:** emit INFO at decision points matching the Log Story Script (who/what/when/why, never raw secrets). Prove with caplog tests — ban deferred "informative logging pass" slices.
 
 5. **Commit Strategy:** Angular convention after every principal step. Behavior + log-story green in the same commit when Section E is populated.
 
+Each narrative implementation step above maps to one or more **`feature_execution_graph` nodes** tagged with `bpe: BPE-02`…`BPE-06` in Step 6G — the graph is the executable plan; Sections A–F remain the human-readable contract.
+
+### Step 6G — Build Feature Execution Graph (Plan mode)
+
+After Sections A–F are complete:
+
+1. Switch to **Plan mode**. Present a Mermaid dependency graph of execution nodes (typical order: backend slices → frontend → AT → E2E → DoD). Prefer **4–8 nodes** per feature.
+2. For each node, assign `bpe: BPE-0N` using [BPE-02](BPE-02-Implement_Backend.md)…[BPE-06](BPE-06-Check_Definition_of_Done.md) as templates: slice `footprint`, `tests`, `log_story_rows`, and **pytest/`make` gates** only (no custom gate scripts). See artifact **Feature Execution Graph** (`artifacts/feature-execution-graph-schema.md`).
+3. User approves the graph in Plan mode.
+4. **Compile** the approved graph to YAML with root key `feature_execution_graph`, wrapped in `<!-- FEATURE_EXECUTION_GRAPH -->` … `<!-- /FEATURE_EXECUTION_GRAPH -->`.
+5. **Standalone feature** (no PIN): also write `docs/plans/{FEAT}-feature-execution-graph.yaml`.
+6. **Under PIN-03**: embed the graph at `scenarios.{SN}.feature_execution_graph` in the iteration execution manifest; skip BPE-01 Steps 9–10 (issue creation happens in PIN-04).
+
+**Solo orchestration (no MIN):** parent agent walks ready nodes, launches a **fresh subagent per node** with skill *Assemble Guidance Bundle*, collects `NODE_PASS` comments, runs BPE-07 when all nodes green.
+
 ### Steps 7–10: Rule Confirmation, No Time Estimates, Submit for Approval, GitHub Issue
 
-Issue body must contain all six mandatory sections inline (A–F, not linked). Each section must be self-sufficient for a cold-start implementor. When used under PIN, note that `checkpoint.log_story_command` must pass alongside the behavior checkpoint.
+Issue body must contain all mandatory sections inline: **A–F**, **`FEATURE_EXECUTION_GRAPH`**, and **Lessons Learned**. Each section must be self-sufficient for a cold-start implementor. When used under PIN, note that `checkpoint.log_story_command` must pass alongside the behavior checkpoint; terminal scenario checkpoint should match the **BPE-06** node's `gate.command`.
 
+### Step 7: Write Lessons Learned
+
+Before creating the GitHub issue, add a `## Lessons Learned` section to the issue body.
+
+**The question is open-ended:** *Completing this story — what difficulties did you encounter? How could the task definition, tools, and artifacts you received have been improved to make accomplishing this task easier, without creating extra duplicates or contradictions elsewhere?*
+
+This is not a finite list of categories. Write freely. If something matters, write it down. Areas that often surface signal (use them if they apply, ignore if they don't):
+- Missing or unclear artifacts (mockups, SAO sections, feature files, skills)
+- Activity steps that contradicted each other, the feature spec, or `user_journey.md`
+- Technical decisions made during planning not yet in `docs/architecture/SAO.md`
+- Deviations from the written BDD scenarios (scope narrowed, step reworded, constraint added)
+
+If nothing to note: `## Lessons Learned — None.`
+
+One honest sentence beats four empty bullet points. The reader is MIN-05 closing the iteration and PIN-02 opening the next one.
 
 ## Rules
 
@@ -141,16 +171,19 @@ Required:
 Activity-specific (not a substitute for the rules above):
 - Mandatory Section E is a **Log Story Script** (Where / Beat / Trigger / Must include); Section D must name matching `*_log_story_*` tests when Section E is non-empty.
 - Logging ships in the same green slice as behavior — ban deferred logging passes.
+- Step 6G **Feature Execution Graph** is mandatory; every node has `gate.command`; at least one `BPE-02` and one terminal `BPE-06` node.
 
 ## Success Criteria
 - Feature specification exists and is clear
 - Codebase assessment complete with context map (3–5 file:line_range references)
 - Plan contains all six mandatory sections: Context Map, Do-Not-Do, SAO Sections, Tests to Create, Log Story Script, MCP Tools to Expose
+- **`feature_execution_graph` compiled** (Step 6G): every node has `gate.command`, BPE-06 terminal node, deps enforce layer order
 - All tests explicitly listed with what they prove, including `*_log_story_*` when Section E has rows
 - All log decision points listed with Beat + required context fields
 - If MCP tools added: Tests to Create table contains T1+T2 rows per new tool (T3 if stdio)
-- Plan reviewed and approved by user
-- GitHub issue created/updated with all mandatory sections inline
+- Plan reviewed and approved by user (including Plan mode graph approval)
+- GitHub issue created/updated with Sections A–F, `FEATURE_EXECUTION_GRAPH`, and Lessons Learned inline
+- `## Lessons Learned` section present in the issue body
 
 ## Agent
 
@@ -268,6 +301,7 @@ Activity-specific (not a substitute for the rules above):
 ## Artifacts Produced
 
 - **Implementation Plan Template** (Template) - Required
+- **Feature Execution Graph** (Schema) - Required — see `artifacts/feature-execution-graph-schema.md`
 
 ## Artifacts Consumed
 

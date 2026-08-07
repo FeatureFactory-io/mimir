@@ -67,6 +67,34 @@ DoD: both commands pass.
 
 ---
 
+## Feature Execution Graph (Mandatory Section G)
+
+*Compiled in BPE-01 Step 6G (Plan mode). Schema: `artifacts/feature-execution-graph-schema.md`. Orchestrator executes one fresh subagent per node; worker exits on gate PASS.*
+
+```yaml
+<!-- FEATURE_EXECUTION_GRAPH -->
+feature_execution_graph:
+  nodes:
+    - id: N1-backend-service
+      title: "{Backend slice title}"
+      bpe: BPE-02
+      depends_on: []
+      footprint: ["{path/to/service.py}", "{path/to/test.py}"]
+      gate:
+        command: "pytest {test_path} -x"
+        log_story_command: "pytest {test_path} -k log_story -x"  # when Section E populated
+      guidance_bundle:
+        activity: BPE/BPE-02-Implement_Backend.md
+        rules: [do-skeletons-first, do-test-first, do-assert-log-story]
+        skills: [Django Backend Implementation Patterns, Pytest Log Story Assertions]
+    # N2 frontend (BPE-03) → N3 AT (BPE-04) → N4 E2E (BPE-05) → N5 DoD (BPE-06)
+<!-- /FEATURE_EXECUTION_GRAPH -->
+```
+
+Standalone store: `docs/plans/{FEAT}-feature-execution-graph.yaml`
+
+---
+
 ## Current State Assessment
 
 ### What Exists (Reusable)
@@ -126,8 +154,8 @@ DoD: both commands pass.
   git checkout -b feature/{feature-slug}
   ```
 
-- [ ] **0.2** Read workflow files
-  - Read BPE-02 / BPE-03 activity guidance
+- [ ] **0.2** Review compiled **Feature Execution Graph** (Section G)
+  - Orchestrator loads BPE activity types per node via skill *Assemble Guidance Bundle*
   - Read skill *Pytest Log Story Assertions* when Section E is populated
 
 ---
