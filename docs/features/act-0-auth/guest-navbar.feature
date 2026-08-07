@@ -47,3 +47,10 @@ Feature: FOB-GUEST-NAV Anonymous Full Primary Navbar
     When Bob GET "/pips/"
     Then he is redirected to the FOB login page
     And the redirect URL includes "?next=/pips/"
+
+
+  Scenario: GUEST-NAV-06 Guest Experts link is read-only
+    When Bob GET "/experts/"
+    Then he sees data-testid="experts-leaderboard"
+    And he sees data-testid="guest-auth-banner"
+    And he is not redirected to the login page

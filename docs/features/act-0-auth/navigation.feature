@@ -98,3 +98,9 @@ Feature: FOB-DASHBOARD-1 Dashboard and Navigation
     When she views the "Recently Contributed" section
     Then she sees "3 in last 24h" with data-testid "recently-used-window-count"
     And she does not see "83 recent" or a total-accessible-activities count in the section header
+
+  Scenario: FOB-DASHBOARD-14 Navigate to Experts leaderboard
+    Given Maria is on the dashboard
+    When she clicks "Experts" in main navigation
+    Then she is redirected to FOB-EXPERTS-LIST+FIND-1 at /experts/
+    And data-testid="experts-leaderboard" is present
