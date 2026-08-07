@@ -45,7 +45,9 @@ Order: Group A → Group B → Group C … Within each group, READY scenarios be
 ```
 
 ### Step 4: Switch to Plan Mode and Present Queue
-Switch to **Plan mode**. Present the execution queue as a Mermaid dependency diagram:
+Switch to **Plan mode**. Present **two-level** diagrams:
+
+**Outer** — scenario dependencies (iteration graph):
 
 ```mermaid
 flowchart LR
@@ -53,7 +55,15 @@ flowchart LR
   S3["S3: {title}"]
 ```
 
-Label parallel scenarios clearly. Note any BLOCKED scenarios and their unmet dependencies.
+**Inner** — for each READY scenario, `feature_execution_graph` node deps:
+
+```mermaid
+flowchart LR
+  N1["N1 backend BPE-02"] --> N2["N2 frontend BPE-03"]
+  N2 --> N3["N3 DoD BPE-06"]
+```
+
+Label parallel scenarios clearly. Note BLOCKED scenarios and unmet scenario-level dependencies.
 
 ### Step 5: Output Execution Plan
 ```
@@ -61,14 +71,18 @@ Label parallel scenarios clearly. Note any BLOCKED scenarios and their unmet dep
 Groups: {N} | Scenarios: {N} ready, {N} blocked
 
 Group A (parallel):
-  [READY] S1 #{issue} — {title}
-  [READY] S3 #{issue} — {title}
+  [READY] S1 #{issue} — {title} — nodes: N1→N2→…→N5
+  [READY] S3 #{issue} — {title} — nodes: …
 
 Group B (after A):
   [BLOCKED] S2 #{issue} — {title} — waiting for S1
 
+READY nodes (next to execute across ready scenarios):
+  S1/N1-backend-service [BPE-02]
+  S3/N1-backend-service [BPE-02]  (parallel scenarios OK; respect conflict_map)
+
 Conflicts: {file} shared by {S_N, S_M} — serialized in groups
-Next: MIN-04 Execute
+Next: MIN-04 Execute (one fresh subagent per ready node)
 ======================
 ```
 
@@ -76,7 +90,8 @@ Next: MIN-04 Execute
 - `parallel_groups` and `conflict_map` parsed from manifest (not recomputed)
 - Each scenario dependency state checked via `gh issue view` (one at a time)
 - Execution queue ordered correctly: group order + dependency order within groups
-- Mermaid diagram presented in Plan mode
+- Mermaid diagrams presented in Plan mode (scenario + inner graph for READY scenarios)
+- READY **nodes** listed for MIN-04, not scenarios alone
 - Ready to proceed to MIN-04
 
 > The conflict map and parallel groups were established by PIN-02 from actual skeleton commits.

@@ -39,6 +39,14 @@ The iteration cannot be closed if:
 
 WARNING-level findings are documented as issues for the next iteration but do not block close.
 
+### 4. Graph execution verification
+
+Before TAF or iteration close, confirm for every closed scenario issue in this milestone:
+
+- Every `feature_execution_graph` node has a `<!-- NODE_PASS -->` comment on the issue
+- Scenario closed only after all nodes passed and terminal checkpoint ran
+- **BPE-07 Finalize Feature** ran for each distinct feature (or list deferred features in MIN-05 close comment)
+
 ---
 
 ## Lessons Learned Aggregation

@@ -49,6 +49,7 @@ ls -t docs/plans/iterations/ITER-*.yaml 2>/dev/null | head -1
 - `context_map[]` (file + lines + note)
 - `do_not_do[]`
 - `checkpoint.command`
+- `feature_execution_graph` — `nodes[]` with `id`, `bpe`, `depends_on`, `footprint`, `gate` (from BPE-01 Step 6G)
 - `dependencies[]`
 - `feature_file_paths[]` — paths to the `.feature` files for this scenario (used by MIN-06 to build the demo path)
 - `system_dependencies[]` — infrastructure capabilities required (e.g. `notification_service`, `email_backend`); empty list = none
@@ -69,7 +70,7 @@ Orient:   {filename or "first iteration — no history"}
           velocity_trend: {value or "unknown"}
 Manifest: ITER-{slug}.yaml — {N} scenarios
 Scenarios:
-  S{N} [{group}] {title} — #{issue} — {N} footprint files
+  S{N} [{group}] {title} — #{issue} — {N} footprint files — {M} graph nodes
   ...
 System deps declared: {list or "none"}
 Spot-check: {N}/{N} context_map refs confirmed
@@ -80,7 +81,7 @@ Next: MIN-03 Sequence from Manifest
 ## Success Criteria
 - Orient summary loaded OR first-iteration defaults applied (never a hard stop here)
 - Execution manifest loaded (hard stop if missing — return to PIN)
-- `feature_file_paths[]` and `system_dependencies[]` extracted per scenario
+- `feature_file_paths[]`, `system_dependencies[]`, and `feature_execution_graph` extracted per scenario
 - Context map spot-check complete
 - Ready to proceed to MIN-03
 

@@ -15,10 +15,10 @@ Execute
 **Sequencing (authoritative):** Predecessor = Sequence from Manifest (Activity 180 / MIN-03).
 
 ## Purpose
-Implement all issues from the execution queue. Assume **dr-dobbs** agent identity. Dispatch subagents in parallel for independent groups; execute sequentially within conflicting groups.
+Implement all issues from the execution queue via **graph node orchestration**. Assume **dr-dobbs** agent identity for worker invocations. Parent MIN-04 session is the **orchestrator** (scheduler only); each graph node runs in a **new** subagent with skill *Assemble Guidance Bundle*. Dispatch parallel **nodes** across non-conflicting scenarios where MIN-03 allows.
 
 ## Identity
-Assume the **dr-dobbs** agent identity for all implementation work in this activity. dr-dobbs is a precise, test-driven implementer: fills skeletons without redesigning them, never touches files outside the declared footprint, and surfaces uncertainty rather than guessing.
+Assume the **dr-dobbs** agent identity for worker subagents. dr-dobbs implements **one `feature_execution_graph` node** per invocation: fills skeleton within node footprint, runs node gate, posts `NODE_PASS`, stops. The orchestrator assigns the next ready node — workers do not chain BPE-02→05 in one session.
 
 ## Steps
 
@@ -45,21 +45,18 @@ await_human_decision: true\
 > Do not proceed with affected scenarios until human decides.
 
 ### Step 2: Dispatch Parallel Groups
-For each parallel group from MIN-03's execution queue:
-- Multiple READY scenarios in the group → dispatch one subagent per scenario using the `Task` tool concurrently
-- Single scenario in the group → execute inline
+For each parallel group from MIN-03's execution queue, process **READY scenarios**. Within each scenario, compute **ready nodes** (all `depends_on` have `NODE_PASS`). Dispatch one subagent per ready node when conflict_map allows concurrent work.
 
 Subagent task template:
 ```
-Assume dr-dobbs identity. Implement GitHub issue #{N}: {title}.
+Assume dr-dobbs identity. Implement ONLY node {node_id} for GitHub issue #{N}: {title}.
 Get the issue: gh issue view {N} --json number,title,body,labels
-Follow BPE-02 → BPE-05 to fill the skeleton.
-Run the behavior checkpoint from the issue SCENARIO / manifest.
-If log_story_command (or log_tests) is present, run it too — both must PASS in the same commit.
-Do not list other issues — get this one only.
+Assemble prompt per skill Assemble Guidance Bundle (node from FEATURE_EXECUTION_GRAPH).
+Run node gate.command (+ gate.log_story_command when declared). Post NODE_PASS on exit 0.
+Do not implement other nodes. Do not resume a prior subagent. Do not list other issues.
 ```
 
-### Step 3: Per-Issue Execution Loop
+### Step 3: Per-Issue Node Orchestration Loop
 For each issue (dispatched or inline):
 
 **a) Get the issue — one at a time, never list-all:**
@@ -67,35 +64,44 @@ For each issue (dispatched or inline):
 gh issue view {N} --json number,title,body,labels
 ```
 
-**b) Claim it:**
+Parse `<!-- FEATURE_EXECUTION_GRAPH -->` from body (fallback: `iteration_execution_manifest.scenarios.{SN}.feature_execution_graph`).
+
+**b) Claim scenario on first node** (if not already in progress):
 ```bash
 gh issue edit {N} --add-label "status-in-progress" --remove-label "status-queued"
 gh issue comment {N} --body "<!-- EXECUTION_START -->\nStarted: {timestamp}\n<!-- /EXECUTION_START -->"
 ```
 
-**c) Fill the skeleton** following BPE-02 → BPE-05:
-- **BPE-02**: Implement backend (replace `raise NotImplementedError()` with logic), including Log Story Script emission and caplog tests in the same slice
-  - If the scenario introduced **new Django models**: run migrations immediately after the model is defined:
-    ```bash
-    python manage.py makemigrations
-    python manage.py migrate
-    ```
-  - Verify migrations apply cleanly before continuing.
-- **BPE-03**: Implement frontend (if applicable)
-- **BPE-04**: Feature acceptance tests
-- **BPE-05**: Journey certification tests (if applicable)
+**c) Node loop** until all nodes show `NODE_PASS`:
+
+For each **ready node** (deps satisfied, not yet passed):
+
+1. Launch **new** Task subagent (`no resume`) with assembled guidance bundle
+2. Worker implements **only** this node's `footprint[]` per its `bpe` activity spec
+3. If node introduces **new Django models**: worker runs `makemigrations && migrate` before gate
+4. Worker runs `gate.command` (+ `gate.log_story_command` when declared)
+5. On PASS: worker posts:
+```html
+<!-- NODE_PASS -->
+node: {node_id}
+gate: {command} — exit 0
+commits: {sha}
+<!-- /NODE_PASS -->
+```
+6. Mark node done on issue Acceptance Criteria checklist
+7. On FAIL: drift/retry/escalate **per node** (not whole scenario)
 
 Do NOT:
 - Change method signatures
-- Create files outside `codebase_footprint[]`
+- Touch files outside **node** `footprint[]` (subset of scenario footprint)
 - Add unplanned public methods
 - Quietly redesign the skeleton
-- Close on behavior-only green when `log_story_command` is declared
+- Close scenario on behavior-only green when `log_story_command` is declared
+- Let one subagent implement multiple nodes or BPE-02→05 inline
 
-**d) Run checkpoint:**
+**d) Scenario terminal checkpoint** (after all nodes `NODE_PASS`):
 ```bash
 {checkpoint.command}
-# When declared in the manifest / SCENARIO block:
 {checkpoint.log_story_command}
 pytest tests/ -x --ignore=tests/e2e 2>&1 | tail -5
 ```
@@ -107,10 +113,10 @@ Checkpoint PASS means **both** behavior and log_story commands pass when `log_st
 git add -A
 git commit -m "feat({scope}): {title}
 
-Implements {scenario_id} from ITER-{slug}
+Implements {scenario_id} node {node_id} from ITER-{slug}
 Checkpoint: {command} — PASSED
 Log story: {log_story_command} — PASSED"
-gh issue close {N} --comment "<!-- CHECKPOINT_PASS -->\nPassed: {timestamp}\n<!-- /CHECKPOINT_PASS -->"
+gh issue close {N} --comment "<!-- CHECKPOINT_PASS -->\nAll nodes NODE_PASS\nPassed: {timestamp}\n<!-- /CHECKPOINT_PASS -->"
 gh issue edit {N} --remove-label "status-in-progress" --add-label "status-done"
 ```
 
@@ -157,12 +163,15 @@ Required:
 
 Activity-specific (not a substitute for the rules above):
 - When `checkpoint.log_story_command` is declared, Checkpoint PASS requires **both** behavior and log-story commands in the same commit.
+- Every graph node must post `NODE_PASS` before scenario terminal checkpoint runs.
 
 ## Success Criteria
 - System dependencies checked before any implementation begins
-- Migrations run immediately after any new model is defined
-- All issues implemented, checkpointed (behavior + log_story when declared), committed, closed with `status-done`
-- Parallel groups dispatched concurrently where possible
+- Migrations run immediately after any new model is defined (within the node that introduces it)
+- All graph nodes implemented via fresh subagents; each node gated and `NODE_PASS` recorded
+- All issues checkpointed (behavior + log_story when declared), committed, closed with `status-done`
+- **BPE-07** invoked per feature when its scenarios complete (or deferred list in MIN-05 comment)
+- Parallel nodes/scenarios dispatched concurrently where conflict_map allows
 - Each issue fetched one at a time (`gh issue view`, never list-all)
 - Escalations surfaced immediately; no autonomous action while awaiting human
 - Ready to proceed to MIN-05
@@ -182,9 +191,10 @@ Execution agent for MIN-04 (Execute). Activated as a Cursor `dr-dobbs` subagent 
 
 When assuming dr-dobbs identity:
 - Read the issue once (`gh issue view {N}`) — do not list other issues
+- Implement **one graph node only** — prompt from *Assemble Guidance Bundle*
 - Fill `raise NotImplementedError()` stubs with logic — do not change signatures
 - Run `makemigrations && migrate` immediately after any new model definition
-- Run the checkpoint command from the `<!-- SCENARIO -->` YAML block
+- Run node `gate.command` (+ `gate.log_story_command` when declared); post `NODE_PASS`
 - Surface uncertainty before guessing: if the skeleton design looks wrong, say so and escalate
 
 ## Authority Model
@@ -204,10 +214,11 @@ When assuming dr-dobbs identity:
 
 ### dr-dobbs cannot do:
 - Change a method signature or return type
-- Create files outside `codebase_footprint[]`
+- Create files outside **node** `footprint[]`
 - Merge to main or create a release
 - Modify the milestone or manifest
-- Claim more than one scenario at a time
+- Claim more than one node or scenario at a time
+- Pick up the next graph node without orchestrator assignment
 
 ## Productive Friction Principle
 
@@ -218,18 +229,18 @@ dr-dobbs surfaces uncertainty rather than hiding it. If a skeleton contract look
 To invoke as a Cursor subagent (from MIN-04):
 ```
 Task tool: subagent_type="dr-dobbs"
-Prompt: Assume dr-dobbs identity. Implement GitHub issue #{N}: {title}.
+Prompt: Assume dr-dobbs identity. Implement ONLY node {node_id} for issue #{N}.
 Get the issue: gh issue view {N} --json number,title,body,labels
-Follow BPE-02 → BPE-05 to fill the skeleton.
-Run checkpoint from SCENARIO block. Do not list other issues.
+Assemble bundle per skill Assemble Guidance Bundle. Run node gate; post NODE_PASS. Do not list other issues.
 ```
 
 ## Skill
 
+**Title**: Assemble Guidance Bundle
+
 **Title**: Pytest Log Story Assertions
 
 ## Rules
-
 - **Assert Log Story** (`assert-log-story`)
 - **Informative Logging** (`do-informative-logging`)
 

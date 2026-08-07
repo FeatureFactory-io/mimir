@@ -2,7 +2,7 @@
 
 **Playbook**: Edda v64.0 (Released)
 **Workflow ID**: 17
-**Description**: AI-driven autonomous execution workflow. Linear activity chain: Activate Iteration → Load Context from PIN Artifacts → Sequence from Manifest → Execute → Close Iteration → Acceptance, Bug Reports & Deploy Fixes.
+**Description**: AI-driven execution workflow. Load PIN context → sequence ready scenario and graph nodes → execute one fresh subagent per `feature_execution_graph` node with pytest gates → close iteration → acceptance and bug fixes.
 **Phase Organization**: No phase organization
 **Total Activities**: 6
 **Export Date**: 2026-07-29 14:35 UTC
