@@ -11,6 +11,15 @@ Implement Backend
 
 ## Guidance
 
+## Node type role (graph-enforced execution)
+
+This activity is a **node type spec** (`bpe: BPE-02`). BPE-01 assigns one or more graph nodes with this tag. MIN-04 (or a solo orchestrator) injects this file + rules + skills into a **fresh subagent per node** via skill *Assemble Guidance Bundle*.
+
+- **STOP**: Do not implement nodes tagged `BPE-03`…`BPE-06` in this invocation.
+- **Gate**: Node complete when `gate.command` (and `gate.log_story_command` if declared) exits 0; post `<!-- NODE_PASS -->`.
+- **Slice**: One node may cover a service or view footprint; red → green behavior and log-story in the **same** node/commit.
+- Layer order is enforced by `depends_on` on the graph — not by reading the next BPE activity doc.
+
 ## Purpose
 Implement backend services, models, and views following test-first development and small increments approach.
 

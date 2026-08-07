@@ -90,6 +90,14 @@ Read these before starting this activity. They are produced earlier in the playb
 - **Implementation Plan Template** (Template, Required) — produced by Plan Feature (#96).
 - **Definition of Done Checklist Template** (Template, Required) — produced by Check Definition of Done (#101).
 
+## Defects Found During Finalization
+
+When testing or validation reveals a defect (failing test that exposes a real bug, user-reported issue during demo, or ERROR in `logs/app.log` tied to broken behavior):
+
+1. File a **Bug Report** via `report_bug` MCP tool or Feedback UI (see Bug Report artifact for body structure)
+2. Invoke **Fix Bug** (BPE-09) — do not patch ad hoc without the test-first workflow
+3. Do not declare the feature complete until BPE-09 success criteria are met (100% regression green)
+
 ## Agent
 
 **Name**: Dr. Dobbs v2

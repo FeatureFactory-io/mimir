@@ -11,6 +11,14 @@ Implement Feature Acceptance Tests
 
 ## Guidance
 
+## Node type role (graph-enforced execution)
+
+This activity is a **node type spec** (`bpe: BPE-04`). BPE-01 assigns graph nodes with this tag. MIN-04 (or a solo orchestrator) injects this file + rules + skills into a **fresh subagent per node**.
+
+- **STOP**: Do not implement other BPE node types in this invocation.
+- **Gate**: Node complete when `make test-at` (scoped to this feature's `.feature` paths) exits 0; post `<!-- NODE_PASS -->`.
+- Remove `@wip` from scenarios in scope when implementation is ready.
+
 APPEND TO GUIDANCE:
 
 ---

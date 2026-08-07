@@ -11,6 +11,14 @@ Check Definition of Done
 
 ## Guidance
 
+## Node type role (graph-enforced execution)
+
+This activity is a **terminal node type spec** (`bpe: BPE-06`). BPE-01 assigns one DoD node per feature graph. MIN-04 (or a solo orchestrator) injects this file after all upstream nodes show `NODE_PASS`.
+
+- **STOP**: Do not implement `BPE-02`…`BPE-05` work in this invocation — verify and certify only.
+- **Gate**: Node complete when scenario rollup `gate.command` exits 0 (typically full unit/integration pytest) **and** checklist items below that gates cannot automate are satisfied; post `<!-- NODE_PASS -->`.
+- Caplog / `log_story_command` remains the observability gate — not grep of `logs/app.log`.
+
 ## Purpose
 Validate that feature/story implementation complies with all project rules and standards by examining current state and outputs.
 
@@ -152,6 +160,14 @@ Read these before starting this activity. They are produced earlier in the playb
 
 - **Feature Files** (Document, Required) — produced by Write Feature Files (#39).
 - **Implementation Plan Template** (Template, Required) — produced by Plan Feature (#96).
+
+## Defects Found During DoD
+
+When DoD review reveals a **defect** (behavior does not match feature files or acceptance criteria) — not a deferred cleanup item:
+
+1. File a **Bug Report** via `report_bug` MCP tool or Feedback UI (see Bug Report artifact for body structure)
+2. Invoke **Fix Bug** (BPE-09) with the Bug Report as input
+3. Do not mark the story done until blockers are resolved and BPE-09 success criteria are met
 
 ## Agent
 

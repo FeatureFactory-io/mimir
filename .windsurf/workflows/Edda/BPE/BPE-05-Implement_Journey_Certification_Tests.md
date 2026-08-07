@@ -11,6 +11,13 @@ Implement Journey Certification Tests
 
 ## Guidance
 
+## Node type role (graph-enforced execution)
+
+This activity is a **node type spec** (`bpe: BPE-05`). BPE-01 assigns graph nodes with this tag. MIN-04 (or a solo orchestrator) injects this file + rules + skills into a **fresh subagent per node**.
+
+- **STOP**: Do not implement other BPE node types in this invocation.
+- **Gate**: Node complete when `make test-e2e` (scoped to this journey's files) exits 0; post `<!-- NODE_PASS -->`.
+
 APPEND TO GUIDANCE:
 
 ---

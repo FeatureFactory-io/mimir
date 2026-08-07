@@ -11,12 +11,21 @@ Implement Frontend
 
 ## Guidance
 
+## Node type role (graph-enforced execution)
+
+This activity is a **node type spec** (`bpe: BPE-03`). BPE-01 assigns graph nodes with this tag. MIN-04 (or a solo orchestrator) injects this file + rules + skills into a **fresh subagent per node**.
+
+- **STOP**: Do not implement nodes tagged `BPE-02`, `BPE-04`…`BPE-06` in this invocation.
+- **Gate**: Node complete when `gate.command` exits 0 (typically view/template pytest for this footprint); post `<!-- NODE_PASS -->`.
+- **testids**: Every interactive element in this node's footprint must have `data-testid`; gaps not covered by gate are verified in the BPE-06 node.
+- Prerequisites below apply **within the node**; upstream backend nodes must show `NODE_PASS` before this node starts.
+
 ## Purpose
 Implement frontend templates and interactions following your framework's patterns with appropriate rendering approach.
 
 ## Prerequisites
-- Backend implementation completed with passing tests
-- Routing defined
+- Upstream `BPE-02` graph node(s) show `NODE_PASS`
+- Routing defined for this node's footprint
 - Review UX/design guidelines to identify sections applicable to the page/component
 
 ## Steps
