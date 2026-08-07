@@ -55,4 +55,10 @@ urlpatterns = [
         views.copy_prompt_activity_detail_error,
         name="mockup_copy_prompt_activity_detail_error",
     ),
+    # ── Experts & Karma (Act 18 mockup) ─────────────────────────────────────
+    path("experts/", views.experts_index, name="mockup_experts_index"),
+    path("experts/list/", views.experts_list, name="mockup_experts_list"),
+    path("experts/list/empty/", views.experts_list_empty, name="mockup_experts_list_empty"),
+    path("experts/list/guest/", views.experts_list_guest, name="mockup_experts_list_guest"),
+    path("experts/<slug:slug>/", views.experts_detail, name="mockup_experts_detail"),
 ]

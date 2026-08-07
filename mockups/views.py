@@ -335,6 +335,23 @@ MOCK_PROFILE = {
         {"pk": 2, "name": "UX Research", "version": "2.1", "status_display": "Released", "status_css": "bg-success"},
         {"pk": 5, "name": "Agile Sprint Retrospectives", "version": "0.3", "status_display": "Draft", "status_css": "bg-secondary"},
     ],
+    "karma_total": 8200,
+    "karma_total_display": "8,200",
+    "karma_primary_category": "Design",
+    "contribution_summary": (
+        "Maria Rodriguez has contributed accepted PIPs that add accessibility audit activities "
+        "to React and Design playbooks. She released Product Discovery Framework at v1.0 and "
+        "actively learns from community playbooks via Copy Prompt and MCP. Her submissions "
+        "emphasize WCAG 2.1 AA guidance, component testing checklists, and cross-playbook "
+        "accessibility patterns that guild leads reference when staffing design-heavy RFP teams. "
+        "Galdr refreshed this summary after her most recent PIP entered Processing."
+    ),
+    "karma_breakdown": [
+        {"source": "Released playbooks", "points": 5000, "detail": "1 × 5,000"},
+        {"source": "PIP contributions", "points": 600, "detail": "1 major + 1 minor"},
+        {"source": "Consumption by others", "points": 1200, "detail": "240 copies × 5"},
+        {"source": "Learning", "points": 400, "detail": "80 entities × 5"},
+    ],
 }
 
 
@@ -454,6 +471,7 @@ def profile_view(request):
         ctx["email_verified"] = False
         logger.info("Mockup: profile_view forcing unverified state via ?unverified=1")
     ctx["teams"] = [t for t in MOCK_TEAMS if t["maria_role"]]
+    ctx["show_karma_card"] = request.GET.get("karma", "1") != "0"
     return render(request, "mockups/profile/view.html", ctx)
 
 
@@ -1216,3 +1234,231 @@ def copy_prompt_activity_list_empty(request):
         "show_empty_state": True,
     }
     return render(request, "mockups/copy-prompt/activity_list.html", context)
+
+
+# ---------------------------------------------------------------------------
+# Experts & Karma — mock data (Act 18)
+# ---------------------------------------------------------------------------
+
+EXPERT_CATEGORIES = ["Product", "Development", "Research", "Design", "Other"]
+
+_CATEGORY_SLUG = {
+    "Product": "product",
+    "Development": "development",
+    "Research": "research",
+    "Design": "design",
+    "Other": "other",
+}
+
+MIKE_CONTRIBUTION_SUMMARY = (
+    "Mike Chen has authored two released playbooks in the Development category, "
+    "including React Frontend Development and Testing Patterns Guide, both widely "
+    "copied into AI-assisted development sessions. He released React Frontend Development "
+    "at v1.0 after structuring workflows for setup, component development, and testing. "
+    "Community members frequently export his Frontend Development workflow to local "
+    "markdown for IDE editing. Mike's playbooks emphasize React testing patterns, "
+    "accessibility-aware component guidance, and CI-friendly activity sequences. "
+    "He has received steady consumption Karma from Copy Prompt and MCP get_activity calls. "
+    "Although Mike has not submitted PIPs himself, his work is referenced in guild "
+    "discussions on frontend standards. Elena often shortlists him when staffing "
+    "RFP teams that need a strong Development methodology anchor. His primary category "
+    "is Development based on Karma earned from released playbooks and downstream use."
+)
+
+MOCK_KARMA_BREAKDOWN_MIKE = [
+    {"source": "Released playbooks", "points": 10000, "detail": "2 × 5,000"},
+    {"source": "PIP contributions", "points": 0, "detail": "—"},
+    {"source": "Consumption by others", "points": 2350, "detail": "470 copies × 5"},
+    {"source": "Learning", "points": 100, "detail": "20 entities × 5"},
+]
+
+MOCK_KARMA_BREAKDOWN_MARIA = [
+    {"source": "Released playbooks", "points": 5000, "detail": "1 × 5,000"},
+    {"source": "PIP contributions", "points": 600, "detail": "1 major + 1 minor"},
+    {"source": "Consumption by others", "points": 1200, "detail": "240 copies × 5"},
+    {"source": "Learning", "points": 400, "detail": "80 entities × 5"},
+]
+
+MOCK_EXPERTS = {
+    "mchen": {
+        "slug": "mchen",
+        "username": "mchen",
+        "display_name": "Mike Chen",
+        "email": "mchen@example.com",
+        "total_karma": 12450,
+        "total_karma_display": "12,450",
+        "primary_category": "Development",
+        "initials": "MC",
+        "expertise_hint": "2 released playbooks · specializes in React testing patterns…",
+        "contribution_summary": MIKE_CONTRIBUTION_SUMMARY,
+        "karma_breakdown": MOCK_KARMA_BREAKDOWN_MIKE,
+        "playbooks": [
+            {"name": "React Frontend Development", "version": "1.0", "status": "Released"},
+            {"name": "Testing Patterns Guide", "version": "1.0", "status": "Released"},
+        ],
+    },
+    "mrodriguez": {
+        "slug": "mrodriguez",
+        "username": "mrodriguez",
+        "display_name": "Maria Rodriguez",
+        "email": "maria@example.com",
+        "total_karma": 8200,
+        "total_karma_display": "8,200",
+        "primary_category": "Design",
+        "initials": "MR",
+        "expertise_hint": "Accessibility-focused contributor to Design and Development…",
+        "contribution_summary": (
+            "Maria Rodriguez has contributed accepted PIPs that add accessibility audit "
+            "activities to React and Design playbooks. She released Product Discovery "
+            "Framework at v1.0 and actively learns from community playbooks via Copy Prompt. "
+            "Her PIP submissions triggered Galdr to refresh a contribution summary "
+            "highlighting WCAG-oriented guidance and cross-playbook accessibility themes."
+        ),
+        "karma_breakdown": MOCK_KARMA_BREAKDOWN_MARIA,
+        "playbooks": [
+            {"name": "Product Discovery Framework", "version": "1.0", "status": "Released"},
+        ],
+    },
+    "jlee": {
+        "slug": "jlee",
+        "username": "jlee",
+        "display_name": "Jordan Lee",
+        "email": "jlee@example.com",
+        "total_karma": 6100,
+        "total_karma_display": "6,100",
+        "primary_category": "Development",
+        "initials": "JL",
+        "expertise_hint": "1 released playbook · PIP contributor on component patterns…",
+        "contribution_summary": "Jordan Lee maintains one released Development playbook focused on component architecture.",
+        "karma_breakdown": MOCK_KARMA_BREAKDOWN_MIKE,
+        "playbooks": [
+            {"name": "Component Architecture Patterns", "version": "1.0", "status": "Released"},
+        ],
+    },
+    "apatel": {
+        "slug": "apatel",
+        "username": "apatel",
+        "display_name": "Alex Patel",
+        "email": "apatel@example.com",
+        "total_karma": 5400,
+        "total_karma_display": "5,400",
+        "primary_category": "Product",
+        "initials": "AP",
+        "expertise_hint": "Product discovery frameworks and roadmap activities…",
+        "contribution_summary": "Alex Patel authors Product-category playbooks for discovery and roadmap planning.",
+        "karma_breakdown": MOCK_KARMA_BREAKDOWN_MARIA,
+        "playbooks": [
+            {"name": "Product Discovery Playbook", "version": "1.0", "status": "Released"},
+        ],
+    },
+    "skim": {
+        "slug": "skim",
+        "username": "skim",
+        "display_name": "Sam Kim",
+        "email": "skim@example.com",
+        "total_karma": 4800,
+        "total_karma_display": "4,800",
+        "primary_category": "Research",
+        "initials": "SK",
+        "expertise_hint": "UX research methodology author with strong interview guides…",
+        "contribution_summary": "Sam Kim publishes Research playbooks for interview and synthesis workflows.",
+        "karma_breakdown": MOCK_KARMA_BREAKDOWN_MARIA,
+        "playbooks": [
+            {"name": "UX Research Methodology", "version": "1.0", "status": "Released"},
+        ],
+    },
+}
+
+
+def _experts_for_category(category: str) -> list:
+    """Return up to 5 experts whose primary category matches, sorted by Karma desc."""
+    matches = [e for e in MOCK_EXPERTS.values() if e["primary_category"] == category]
+    matches.sort(key=lambda e: e["total_karma"], reverse=True)
+    ranked = []
+    for i, expert in enumerate(matches[:5], start=1):
+        row = dict(expert)
+        row["rank"] = i
+        ranked.append(row)
+    return ranked
+
+
+def _experts_list_context(request, *, category: str, is_guest: bool = False, force_empty: bool = False):
+    experts = [] if force_empty else _experts_for_category(category)
+    category_slug = _CATEGORY_SLUG.get(category, "development")
+    return {
+        "categories": EXPERT_CATEGORIES,
+        "active_category": category,
+        "active_category_slug": category_slug,
+        "experts": experts,
+        "expert_count": len(experts),
+        "is_guest": is_guest,
+        "force_empty": force_empty,
+    }
+
+
+def experts_index(request):
+    """Act 18 mockup hub — links to all Experts & Karma prototype screens."""
+    logger.info(
+        "Mockup: experts_index | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    return render(request, "mockups/experts/index.html", {})
+
+
+def experts_list(request):
+    """FOB-EXPERTS-LIST+FIND-1: Experts leaderboard — loaded Development tab by default."""
+    category = request.GET.get("category", "development").replace("-", " ").title()
+    if category not in EXPERT_CATEGORIES:
+        category = "Development"
+    logger.info(
+        "Mockup: experts_list | category=%s | user=%s",
+        category,
+        getattr(request.user, "username", "anonymous"),
+    )
+    ctx = _experts_list_context(request, category=category, is_guest=False)
+    return render(request, "mockups/experts/list.html", ctx)
+
+
+def experts_list_empty(request):
+    """FOB-EXPERTS-LIST+FIND-1: Empty category tab (Other)."""
+    logger.info(
+        "Mockup: experts_list_empty | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    ctx = _experts_list_context(
+        request, category="Other", is_guest=False, force_empty=True
+    )
+    return render(request, "mockups/experts/list.html", ctx)
+
+
+def experts_list_guest(request):
+    """FOB-EXPERTS-LIST+FIND-1: Guest view with disabled Reach out."""
+    category = request.GET.get("category", "development").replace("-", " ").title()
+    if category not in EXPERT_CATEGORIES:
+        category = "Development"
+    logger.info(
+        "Mockup: experts_list_guest | category=%s | user=%s",
+        category,
+        getattr(request.user, "username", "anonymous"),
+    )
+    ctx = _experts_list_context(request, category=category, is_guest=True)
+    return render(request, "mockups/experts/list.html", ctx)
+
+
+def experts_detail(request, slug):
+    """FOB-EXPERT-VIEW-1: Public expert profile."""
+    expert = MOCK_EXPERTS.get(slug)
+    if not expert:
+        expert = MOCK_EXPERTS["mchen"]
+    is_guest = request.GET.get("guest") == "1"
+    logger.info(
+        "Mockup: experts_detail | slug=%s | guest=%s | user=%s",
+        slug,
+        is_guest,
+        getattr(request.user, "username", "anonymous"),
+    )
+    return render(
+        request,
+        "mockups/experts/detail.html",
+        {"expert": expert, "is_guest": is_guest},
+    )

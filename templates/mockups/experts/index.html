@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Experts & Karma — Mockup{% endblock %}
+
+{% block content %}
+<div class="container mt-4" data-testid="experts-index-page">
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Experts & Karma (mockup)</li>
+        </ol>
+    </nav>
+
+    <section class="hg-page-header rounded-2 mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <h1 class="hg-page-title mb-1">
+                    <i class="fa-solid fa-medal text-warning me-2" aria-hidden="true"></i>
+                    Experts &amp; Karma
+                </h1>
+                <p class="text-muted small mb-0">Act 18 — leaderboard, expert profile, profile Karma card</p>
+            </div>
+            <span class="badge bg-warning text-dark">Mockup</span>
+        </div>
+    </section>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
+                <div class="card-body">
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-ranking-star text-primary me-2" aria-hidden="true"></i>
+                        Leaderboard (loaded)
+                    </h2>
+                    <p class="text-muted small">FOB-EXPERTS-LIST+FIND-1 — Development tab, top 5 experts.</p>
+                    <a href="{% url 'mockup_experts_list' %}?category=development"
+                       class="btn btn-primary btn-sm"
+                       data-testid="mockup-link-experts-list">
+                        Open list mockup
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
+                <div class="card-body">
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-inbox text-secondary me-2" aria-hidden="true"></i>
+                        Empty category tab
+                    </h2>
+                    <p class="text-muted small">Other category with no experts yet.</p>
+                    <a href="{% url 'mockup_experts_list_empty' %}"
+                       class="btn btn-outline-secondary btn-sm"
+                       data-testid="mockup-link-experts-empty">
+                        Open empty mockup
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
+                <div class="card-body">
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-user-lock text-info me-2" aria-hidden="true"></i>
+                        Guest leaderboard
+                    </h2>
+                    <p class="text-muted small">Read-only list, disabled Reach out + tooltip.</p>
+                    <a href="{% url 'mockup_experts_list_guest' %}"
+                       class="btn btn-outline-info btn-sm"
+                       data-testid="mockup-link-experts-guest">
+                        Open guest mockup
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
+                <div class="card-body">
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-user-tie text-success me-2" aria-hidden="true"></i>
+                        Expert detail
+                    </h2>
+                    <p class="text-muted small">FOB-EXPERT-VIEW-1 — Mike Chen, full Galdr summary.</p>
+                    <a href="{% url 'mockup_experts_detail' slug='mchen' %}"
+                       class="btn btn-success btn-sm"
+                       data-testid="mockup-link-expert-detail">
+                        Open Mike Chen
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm rounded-3 h-100">
+                <div class="card-body">
+                    <h2 class="h6 card-title">
+                        <i class="fa-solid fa-id-card text-primary me-2" aria-hidden="true"></i>
+                        Profile with Karma
+                    </h2>
+                    <p class="text-muted small">FOB-PROFILE-VIEW-1 — Karma &amp; contributions card.</p>
+                    <a href="{% url 'mockup_profile' %}?karma=1"
+                       class="btn btn-primary btn-sm"
+                       data-testid="mockup-link-profile-karma">
+                        Open profile mockup
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-light border mt-4 small">
+        <strong>Mockup screens:</strong>
+        <a href="{% url 'mockup_experts_list' %}">List</a> ·
+        <a href="{% url 'mockup_experts_list_empty' %}">Empty</a> ·
+        <a href="{% url 'mockup_experts_list_guest' %}">Guest</a> ·
+        <a href="{% url 'mockup_experts_detail' slug='mchen' %}">Detail</a> ·
+        <a href="{% url 'mockup_profile' %}">Profile</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    console.log('[mockup:experts-index] page loaded');
+});
+</script>
+{% endblock %}
