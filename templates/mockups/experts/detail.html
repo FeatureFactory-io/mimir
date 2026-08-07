@@ -4,10 +4,10 @@
 {% block title %}{{ expert.display_name }} — Expert — Mockup{% endblock %}
 
 {% block content %}
-<div class="container mt-4" data-testid="experts-detail-page">
+<div data-testid="experts-detail-page">
 
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
             <li class="breadcrumb-item"><a href="{% url 'mockup_experts_index' %}">Experts mockup</a></li>
             <li class="breadcrumb-item"><a href="{% url 'mockup_experts_list' %}?category={{ expert.primary_category|lower }}">Experts</a></li>
@@ -15,43 +15,65 @@
         </ol>
     </nav>
 
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-        <div class="d-flex align-items-center gap-3">
-            <span class="rounded-circle bg-primary-subtle text-primary d-inline-flex align-items-center justify-content-center fw-bold"
-                  style="width:3.5rem;height:3.5rem;font-size:1.1rem;"
-                  aria-hidden="true">
-                {{ expert.initials }}
-            </span>
-            <div>
-                <h2 class="mb-1">{{ expert.display_name }}</h2>
-                <p class="text-muted mb-0">@{{ expert.username }}</p>
+    <div class="hg-page-header mb-3" data-testid="experts-detail-header">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="flex-grow-1 min-w-0 d-flex align-items-center gap-3">
+                <span class="rounded-circle bg-primary-subtle text-primary d-inline-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                      style="width:3rem;height:3rem;font-size:1rem;"
+                      aria-hidden="true">
+                    {{ expert.initials }}
+                </span>
+                <div class="min-w-0">
+                    <h1 class="hg-page-title d-flex align-items-center gap-2 mb-1">
+                        <i class="fa-solid fa-medal hg-page-title-icon text-primary" aria-hidden="true"></i>
+                        <span>{{ expert.display_name }}</span>
+                    </h1>
+                    <p class="text-muted small mb-0">
+                        @{{ expert.username }}
+                        ·
+                        <span class="badge bg-light text-dark border" data-testid="expert-primary-category">{{ expert.primary_category }}</span>
+                    </p>
+                </div>
             </div>
-        </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="badge bg-light text-dark border">{{ expert.primary_category }}</span>
-            <span class="badge bg-warning text-dark">Mockup — FOB-EXPERT-VIEW-1</span>
+            <div role="toolbar" aria-label="Expert actions" class="d-flex flex-wrap gap-2 align-items-center flex-shrink-0">
+                {% if is_guest %}
+                <button type="button"
+                        class="btn btn-primary"
+                        disabled
+                        data-testid="experts-reach-out-guest-tooltip"
+                        data-bs-toggle="tooltip"
+                        title="You need to be logged in to reach out to the expert">
+                    <i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>
+                    Reach out
+                </button>
+                {% else %}
+                <a href="mailto:{{ expert.email }}"
+                   class="btn btn-primary"
+                   data-testid="experts-reach-out-detail"
+                   data-bs-toggle="tooltip"
+                   title="Email {{ expert.display_name }}">
+                    <i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>
+                    Reach out
+                </a>
+                {% endif %}
+                <a href="{% url 'mockup_experts_list' %}?category={{ expert.primary_category|lower }}"
+                   class="btn btn-outline-secondary">
+                    <i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>
+                    Back to leaderboard
+                </a>
+                <span class="badge bg-warning text-dark">Mockup — FOB-EXPERT-VIEW-1</span>
+            </div>
         </div>
     </div>
 
-    <div class="row g-4">
-        <div class="col-lg-8">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header fw-semibold">
-                    <i class="fa-solid fa-medal text-warning me-1" aria-hidden="true"></i>
-                    Karma
-                </div>
-                <div class="card-body">
-                    <p class="display-6 fw-bold mb-0" data-testid="expert-karma-total">
-                        {{ expert.total_karma_display }}
-                    </p>
-                    <p class="text-muted small mb-0">Total Karma across all categories</p>
-                </div>
-            </div>
-
-            <div class="card shadow-sm mb-4">
-                <div class="card-header fw-semibold">
-                    <i class="fa-solid fa-file-lines me-1" aria-hidden="true"></i>
-                    Contribution summary
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm rounded-3 mb-4">
+                <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0">
+                    <h2 class="h6 mb-0 fw-semibold">
+                        <i class="fa-solid fa-file-lines me-1" aria-hidden="true"></i>
+                        Contribution summary
+                    </h2>
                 </div>
                 <div class="card-body">
                     <p class="mb-0" data-testid="expert-contribution-summary">
@@ -59,17 +81,40 @@
                     </p>
                 </div>
             </div>
+        </div>
 
-            <div class="card shadow-sm">
-                <div class="card-header fw-semibold">Karma breakdown</div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-3 mb-4">
+                <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0">
+                    <h2 class="h6 mb-0 fw-semibold">
+                        <i class="fa-solid fa-info-circle me-1" aria-hidden="true"></i>
+                        Details
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Total Karma</dt>
+                        <dd class="col-sm-7 fw-bold" data-testid="expert-karma-total">{{ expert.total_karma_display }}</dd>
+                        <dt class="col-sm-5">Primary category</dt>
+                        <dd class="col-sm-7">{{ expert.primary_category }}</dd>
+                        <dt class="col-sm-5">Username</dt>
+                        <dd class="col-sm-7">@{{ expert.username }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm rounded-3 mb-4">
+                <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0">
+                    <h2 class="h6 mb-0 fw-semibold">Karma breakdown</h2>
+                </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm mb-0" data-testid="expert-karma-breakdown">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3">Source</th>
-                                    <th class="text-end">Points</th>
-                                    <th class="pe-3 text-muted">Detail</th>
+                                    <th class="ps-3" scope="col">Source</th>
+                                    <th class="text-end" scope="col">Points</th>
+                                    <th class="pe-3 text-muted" scope="col">Detail</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -85,51 +130,21 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-lg-4">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header fw-semibold">Actions</div>
-                <div class="card-body d-grid gap-2">
-                    {% if is_guest %}
-                    <button type="button"
-                            class="btn btn-primary"
-                            disabled
-                            data-testid="experts-reach-out-guest-tooltip"
-                            data-bs-toggle="tooltip"
-                            title="You need to be logged in to reach out to the expert">
-                        Reach out
-                    </button>
-                    {% else %}
-                    <a href="mailto:{{ expert.email }}"
-                       class="btn btn-primary"
-                       data-testid="experts-reach-out-detail"
-                       data-bs-toggle="tooltip"
-                       title="Email {{ expert.display_name }}">
-                        <i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>
-                        Reach out
-                    </a>
-                    {% endif %}
-                    <a href="{% url 'mockup_experts_list' %}?category={{ expert.primary_category|lower }}"
-                       class="btn btn-outline-secondary">
-                        Back to leaderboard
-                    </a>
-                </div>
-            </div>
-
-            <div class="card shadow-sm">
-                <div class="card-header fw-semibold">
-                    Released public playbooks
+            <div class="card border-0 shadow-sm rounded-3">
+                <div class="card-header bg-transparent border-bottom-0 pt-3 pb-0">
+                    <h2 class="h6 mb-0 fw-semibold">Released public playbooks</h2>
                 </div>
                 <div class="card-body">
                     {% for pb in expert.playbooks %}
-                    <div class="border rounded p-3 mb-2 {% if not forloop.last %}mb-2{% else %}mb-0{% endif %}"
+                    <div class="border rounded p-3 {% if not forloop.last %}mb-2{% endif %}"
                          data-testid="expert-playbook-card-{{ forloop.counter }}">
                         <div class="fw-semibold">{{ pb.name }}</div>
                         <div class="text-muted small">v{{ pb.version }} · {{ pb.status }}</div>
                         <a href="{% url 'playbook_list' %}"
                            class="btn btn-sm btn-outline-secondary mt-2"
                            data-testid="expert-playbook-view-{{ forloop.counter }}">
+                            <i class="fa-solid fa-eye me-1" aria-hidden="true"></i>
                             View
                         </a>
                     </div>

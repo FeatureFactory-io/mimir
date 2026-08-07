@@ -4,10 +4,10 @@
 {% block title %}Experts — Mockup{% endblock %}
 
 {% block content %}
-<div class="container mt-4" data-testid="experts-list-page">
+<div data-testid="experts-list-page">
 
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
             <li class="breadcrumb-item"><a href="{% url 'mockup_experts_index' %}">Experts mockup</a></li>
             <li class="breadcrumb-item active" aria-current="page">Leaderboard</li>
@@ -26,19 +26,28 @@
     </div>
     {% endif %}
 
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-        <div>
-            <h2 class="mb-1">
-                <i class="fa-solid fa-medal text-warning me-2" aria-hidden="true"></i>
-                Experts
-            </h2>
-            <p class="text-muted mb-0">Top contributors by methodology category</p>
+    <div class="hg-page-header mb-3" data-testid="experts-list-header">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="flex-grow-1 min-w-0">
+                <h1 class="hg-page-title d-flex align-items-center gap-2 mb-1">
+                    <i class="fa-solid fa-medal hg-page-title-icon text-primary" aria-hidden="true"></i>
+                    <span>Experts</span>
+                </h1>
+                <p class="text-muted small mb-0">
+                    {% if expert_count %}
+                    <span data-testid="experts-count-badge">{{ expert_count }} expert{{ expert_count|pluralize }}</span>
+                    · Top contributors by methodology category
+                    {% else %}
+                    Top contributors by methodology category
+                    {% endif %}
+                </p>
+            </div>
+            <span class="badge bg-warning text-dark flex-shrink-0">Mockup — FOB-EXPERTS-LIST+FIND-1</span>
         </div>
-        <span class="badge bg-warning text-dark">Mockup — FOB-EXPERTS-LIST+FIND-1</span>
     </div>
 
     <!-- Category tabs -->
-    <ul class="nav nav-pills mb-4 flex-wrap gap-1"
+    <ul class="nav nav-pills mb-3 flex-wrap gap-1"
         data-testid="experts-category-tabs"
         role="tablist"
         aria-label="Expert categories">
@@ -75,88 +84,120 @@
         {% endfor %}
     </ul>
 
-    {% if experts %}
-    <div class="table-responsive">
-        <table class="table table-hover align-middle"
-               data-testid="experts-leaderboard">
-            <thead class="table-light">
-                <tr>
-                    <th scope="col" style="width:4%">#</th>
-                    <th scope="col" style="width:8%"></th>
-                    <th scope="col">Expert</th>
-                    <th scope="col" style="width:12%">Karma</th>
-                    <th scope="col" style="width:12%">Category</th>
-                    <th scope="col">Expertise</th>
-                    <th scope="col" style="width:16%" class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for expert in experts %}
-                <tr data-testid="experts-row-{{ expert.slug }}">
-                    <td class="fw-semibold text-muted">{{ expert.rank }}</td>
-                    <td>
-                        <span class="rounded-circle bg-primary-subtle text-primary d-inline-flex align-items-center justify-content-center fw-semibold"
-                              style="width:2.25rem;height:2.25rem;font-size:0.75rem;"
-                              aria-hidden="true">
-                            {{ expert.initials }}
-                        </span>
-                    </td>
-                    <td>
-                        <strong>{{ expert.display_name }}</strong>
-                        <div class="text-muted small">@{{ expert.username }}</div>
-                    </td>
-                    <td>
-                        <span class="fw-semibold">{{ expert.total_karma_display }}</span>
-                    </td>
-                    <td>
-                        <span class="badge bg-light text-dark border">{{ expert.primary_category }}</span>
-                    </td>
-                    <td class="small text-muted">{{ expert.expertise_hint }}</td>
-                    <td class="text-end">
-                        <div class="btn-group btn-group-sm" role="group" aria-label="Expert actions">
-                            <a href="{% url 'mockup_experts_detail' slug=expert.slug %}{% if is_guest %}?guest=1{% endif %}"
-                               class="btn btn-outline-secondary"
-                               data-testid="experts-view-profile-{{ expert.slug }}"
-                               data-bs-toggle="tooltip"
-                               title="View public expert profile">
-                                View profile
-                            </a>
-                            {% if is_guest %}
-                            <button type="button"
-                                    class="btn btn-outline-primary"
-                                    disabled
-                                    data-testid="experts-reach-out-guest-tooltip"
-                                    data-bs-toggle="tooltip"
-                                    data-bs-placement="top"
-                                    title="You need to be logged in to reach out to the expert"
-                                    aria-label="Reach out (login required)">
-                                Reach out
-                            </button>
-                            {% else %}
-                            <a href="mailto:{{ expert.email }}"
-                               class="btn btn-outline-primary"
-                               data-testid="experts-reach-out-{{ expert.slug }}"
-                               data-bs-toggle="tooltip"
-                               title="Email {{ expert.display_name }}">
-                                Reach out
-                            </a>
-                            {% endif %}
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-body p-0">
+            {% if not experts %}
+            <div class="text-center py-5 text-muted" data-testid="experts-empty-state">
+                <i class="fa-solid fa-medal fa-2x mb-3 d-block" style="color: var(--hg-border, #dee2e6);" aria-hidden="true"></i>
+                <p class="mb-1 fw-medium">No experts in {{ active_category }} yet — release a playbook to be the first</p>
+                <p class="small mb-3">Release a playbook at v1.0 to earn Karma and appear on the leaderboard.</p>
+                <a href="{% url 'playbook_list' %}" class="btn btn-primary btn-sm" data-testid="empty-state-cta">
+                    <i class="fa-solid fa-book-sparkles me-1" aria-hidden="true"></i>
+                    Browse playbooks
+                </a>
+            </div>
+            {% endif %}
+            <div class="table-responsive{% if not experts %} d-none{% endif %}" data-testid="experts-table-wrap">
+                <table class="table table-hover align-middle mb-0"
+                       data-testid="experts-leaderboard">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" style="width:4%">#</th>
+                            <th scope="col" style="width:8%"><span class="visually-hidden">Avatar</span></th>
+                            <th scope="col">Expert</th>
+                            <th scope="col" style="width:12%">Karma</th>
+                            <th scope="col" style="width:12%">Category</th>
+                            <th scope="col">Expertise</th>
+                            <th class="text-end ps-3" scope="col" style="width:3.25rem;">
+                                <span class="visually-hidden">Row actions</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for expert in experts %}
+                        <tr data-testid="experts-row-{{ expert.slug }}">
+                            <td class="fw-semibold text-muted">{{ expert.rank }}</td>
+                            <td>
+                                <span class="rounded-circle bg-primary-subtle text-primary d-inline-flex align-items-center justify-content-center fw-semibold"
+                                      style="width:2.25rem;height:2.25rem;font-size:0.75rem;"
+                                      aria-hidden="true">
+                                    {{ expert.initials }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{% url 'mockup_experts_detail' slug=expert.slug %}{% if is_guest %}?guest=1{% endif %}"
+                                   class="hg-list-name-link fw-semibold d-inline-block"
+                                   data-testid="experts-row-name-{{ expert.slug }}">
+                                    {{ expert.display_name }}
+                                </a>
+                                <div class="text-muted small">@{{ expert.username }}</div>
+                            </td>
+                            <td>
+                                <span class="fw-semibold">{{ expert.total_karma_display }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border">{{ expert.primary_category }}</span>
+                            </td>
+                            <td class="small text-muted">{{ expert.expertise_hint }}</td>
+                            <td class="text-end ps-3 align-middle">
+                                <div class="dropdown d-inline-block">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary border-0 px-2"
+                                            id="experts-row-menu-{{ expert.slug }}"
+                                            data-bs-toggle="dropdown"
+                                            data-bs-popper-config='{"strategy":"fixed"}'
+                                            aria-expanded="false"
+                                            aria-haspopup="true"
+                                            aria-label="Actions for {{ expert.display_name }}"
+                                            data-testid="experts-row-actions-{{ expert.slug }}">
+                                        <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm"
+                                        aria-labelledby="experts-row-menu-{{ expert.slug }}">
+                                        <li>
+                                            <a class="dropdown-item"
+                                               href="{% url 'mockup_experts_detail' slug=expert.slug %}{% if is_guest %}?guest=1{% endif %}"
+                                               data-testid="experts-view-profile-{{ expert.slug }}">
+                                                <i class="fa-solid fa-user me-2" aria-hidden="true"></i>
+                                                View profile
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            {% if is_guest %}
+                                            <button type="button"
+                                                    class="dropdown-item"
+                                                    disabled
+                                                    data-testid="experts-reach-out-guest-tooltip"
+                                                    data-bs-toggle="tooltip"
+                                                    data-bs-placement="left"
+                                                    title="You need to be logged in to reach out to the expert"
+                                                    aria-label="Reach out (login required)">
+                                                <i class="fa-solid fa-envelope me-2" aria-hidden="true"></i>
+                                                Reach out
+                                            </button>
+                                            {% else %}
+                                            <a class="dropdown-item experts-reach-out-link"
+                                               href="mailto:{{ expert.email }}"
+                                               data-testid="experts-reach-out-{{ expert.slug }}"
+                                               data-expert-slug="{{ expert.slug }}"
+                                               data-bs-toggle="tooltip"
+                                               title="Email {{ expert.display_name }}">
+                                                <i class="fa-solid fa-envelope me-2" aria-hidden="true"></i>
+                                                Reach out
+                                            </a>
+                                            {% endif %}
+                                        </li>
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-    {% else %}
-    <div class="text-center py-5 border rounded bg-light"
-         data-testid="experts-empty-state">
-        <i class="fa-solid fa-medal fa-2x text-muted mb-3" aria-hidden="true"></i>
-        <p class="text-muted mb-0">
-            No experts in {{ active_category }} yet — release a playbook to be the first
-        </p>
-    </div>
-    {% endif %}
 
     <div class="alert alert-light border mt-4 small">
         <strong>Mockup screens:</strong>
@@ -175,7 +216,13 @@ document.addEventListener('DOMContentLoaded', function () {
     console.log('[mockup:experts-list] page loaded, category={{ active_category_slug|escapejs }}, guest={{ is_guest|yesno:"true,false" }}');
     document.querySelectorAll('[data-testid^="experts-tab-"]').forEach(function (tab) {
         tab.addEventListener('click', function () {
-            console.log('[mockup:experts-list] category tab: ' + tab.getAttribute('data-testid'));
+            var slug = tab.getAttribute('data-testid').replace('experts-tab-', '');
+            console.log('[experts] category tab: ' + slug);
+        });
+    });
+    document.querySelectorAll('.experts-reach-out-link').forEach(function (link) {
+        link.addEventListener('click', function () {
+            console.log('[experts] reach out: ' + link.getAttribute('data-expert-slug'));
         });
     });
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {

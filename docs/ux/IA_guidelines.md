@@ -373,7 +373,7 @@ Shared rail utilities: `.mm-view-rail-scroll` / `.mm-view-rail-scroll-x` in `sta
 
 ### 4.1 Primary Nav Items
 
-**Production navbar order** (`templates/base.html`): Home → Playbooks → Workflows → Phases → Activities → Artifacts → Agents → Skills → Rules → Teams → PIPs.
+**Production navbar order** (`templates/base.html`): Home → Playbooks → Workflows → Phases → Activities → Artifacts → Agents → Skills → Rules → Teams → PIPs → **Experts**.
 
 | Nav item | Route | Icon (`data-testid`) |
 |---|---|---|
@@ -388,10 +388,11 @@ Shared rail utilities: `.mm-view-rail-scroll` / `.mm-view-rail-scroll-x` in `sta
 | Rules | `/rules/` | `fa-scale-balanced` — `nav-rules` |
 | Teams | `/teams/` | `fa-users` — `nav-teams` |
 | PIPs | `/pips/` | `fa-lightbulb` — `nav-pips` |
+| Experts | `/experts/` | `fa-medal` — `nav-experts` |
 
 **Content Browser** is **not** in the navbar. Open it from **Playbook VIEW** via the Content Browser button (`data-testid="playbook-content-browser"`) → `/browser/<playbook_pk>/`. Nav highlight for browser URLs maps to **Playbooks** (`methodology.context_processors.primary_nav_section`).
 
-**Anonymous sessions** (landing, browse routes, Content Browser, login/register pages): full primary navbar (Home → PIPs, same order as authenticated). Right side: **Register** + **Login** only. Auth-only nav targets (Home `/dashboard/`, Teams, PIPs) redirect to login; browse targets serve guest-readable content where implemented.
+**Anonymous sessions** (landing, browse routes, Content Browser, login/register pages): full primary navbar (Home → Experts, same order as authenticated). Right side: **Register** + **Login** only. Auth-only nav targets (Home `/dashboard/`, Teams, PIPs) redirect to login; browse targets serve guest-readable content where implemented (**Experts** leaderboard is read-only for guests).
 
 **Guest banner** (`data-testid="guest-auth-banner"`) on list and browse surfaces prompts sign-in to create or edit.
 
