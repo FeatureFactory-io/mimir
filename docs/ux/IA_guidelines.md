@@ -420,6 +420,7 @@ Set `aria-current="page"` on the active nav link and add `.active` class. Active
 | Surface | Pattern | CSS / template |
 |---|---|---|
 | **Playbook book-card grid** | LIST uses book-style cards (not LIST+FIND table) | `.playbook-book-*` in `static/css/mimir-app.css`; `templates/playbooks/_playbook_list_card.html` |
+| **Experts leaderboard cards** | LIST+FIND uses stacked expert cards (not LIST+FIND table) | `templates/mockups/experts/_expert_card.html` (production: `templates/experts/_expert_card.html`) |
 | **Content Browser** | Full-viewport canvas; playbook-scoped URL only | `body.mm-content-browser`, `.mm-browser-*` in `mimir-app.css`; `templates/browser/browser_graph.html` |
 | **PIP status badges** | Reviewed = purple | `.pip-status-reviewed` in `mimir-app.css` |
 | **Playbook create wizard** | Multi-step forms with primary card headers | `templates/playbooks/create_wizard_*.html` |

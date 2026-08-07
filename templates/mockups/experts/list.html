@@ -84,119 +84,24 @@
         {% endfor %}
     </ul>
 
-    <div class="card border-0 shadow-sm rounded-3">
-        <div class="card-body p-0">
-            {% if not experts %}
-            <div class="text-center py-5 text-muted" data-testid="experts-empty-state">
-                <i class="fa-solid fa-medal fa-2x mb-3 d-block" style="color: var(--hg-border, #dee2e6);" aria-hidden="true"></i>
-                <p class="mb-1 fw-medium">No experts in {{ active_category }} yet — release a playbook to be the first</p>
-                <p class="small mb-3">Release a playbook at v1.0 to earn Karma and appear on the leaderboard.</p>
-                <a href="{% url 'playbook_list' %}" class="btn btn-primary btn-sm" data-testid="empty-state-cta">
-                    <i class="fa-solid fa-book-sparkles me-1" aria-hidden="true"></i>
-                    Browse playbooks
-                </a>
-            </div>
-            {% endif %}
-            <div class="table-responsive{% if not experts %} d-none{% endif %}" data-testid="experts-table-wrap">
-                <table class="table table-hover align-middle mb-0"
-                       data-testid="experts-leaderboard">
-                    <thead class="table-light">
-                        <tr>
-                            <th scope="col" style="width:4%">#</th>
-                            <th scope="col" style="width:8%"><span class="visually-hidden">Avatar</span></th>
-                            <th scope="col">Expert</th>
-                            <th scope="col" style="width:12%">Karma</th>
-                            <th scope="col" style="width:12%">Category</th>
-                            <th scope="col">Expertise</th>
-                            <th class="text-end ps-3" scope="col" style="width:3.25rem;">
-                                <span class="visually-hidden">Row actions</span>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for expert in experts %}
-                        <tr data-testid="experts-row-{{ expert.slug }}">
-                            <td class="fw-semibold text-muted">{{ expert.rank }}</td>
-                            <td>
-                                <span class="rounded-circle bg-primary-subtle text-primary d-inline-flex align-items-center justify-content-center fw-semibold"
-                                      style="width:2.25rem;height:2.25rem;font-size:0.75rem;"
-                                      aria-hidden="true">
-                                    {{ expert.initials }}
-                                </span>
-                            </td>
-                            <td>
-                                <a href="{% url 'mockup_experts_detail' slug=expert.slug %}{% if is_guest %}?guest=1{% endif %}"
-                                   class="hg-list-name-link fw-semibold d-inline-block"
-                                   data-testid="experts-row-name-{{ expert.slug }}">
-                                    {{ expert.display_name }}
-                                </a>
-                                <div class="text-muted small">@{{ expert.username }}</div>
-                            </td>
-                            <td>
-                                <span class="fw-semibold">{{ expert.total_karma_display }}</span>
-                            </td>
-                            <td>
-                                <span class="badge bg-light text-dark border">{{ expert.primary_category }}</span>
-                            </td>
-                            <td class="small text-muted">{{ expert.expertise_hint }}</td>
-                            <td class="text-end ps-3 align-middle">
-                                <div class="dropdown d-inline-block">
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-secondary border-0 px-2"
-                                            id="experts-row-menu-{{ expert.slug }}"
-                                            data-bs-toggle="dropdown"
-                                            data-bs-popper-config='{"strategy":"fixed"}'
-                                            aria-expanded="false"
-                                            aria-haspopup="true"
-                                            aria-label="Actions for {{ expert.display_name }}"
-                                            data-testid="experts-row-actions-{{ expert.slug }}">
-                                        <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm"
-                                        aria-labelledby="experts-row-menu-{{ expert.slug }}">
-                                        <li>
-                                            <a class="dropdown-item"
-                                               href="{% url 'mockup_experts_detail' slug=expert.slug %}{% if is_guest %}?guest=1{% endif %}"
-                                               data-testid="experts-view-profile-{{ expert.slug }}">
-                                                <i class="fa-solid fa-user me-2" aria-hidden="true"></i>
-                                                View profile
-                                            </a>
-                                        </li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            {% if is_guest %}
-                                            <button type="button"
-                                                    class="dropdown-item"
-                                                    disabled
-                                                    data-testid="experts-reach-out-guest-tooltip"
-                                                    data-bs-toggle="tooltip"
-                                                    data-bs-placement="left"
-                                                    title="You need to be logged in to reach out to the expert"
-                                                    aria-label="Reach out (login required)">
-                                                <i class="fa-solid fa-envelope me-2" aria-hidden="true"></i>
-                                                Reach out
-                                            </button>
-                                            {% else %}
-                                            <a class="dropdown-item experts-reach-out-link"
-                                               href="mailto:{{ expert.email }}"
-                                               data-testid="experts-reach-out-{{ expert.slug }}"
-                                               data-expert-slug="{{ expert.slug }}"
-                                               data-bs-toggle="tooltip"
-                                               title="Email {{ expert.display_name }}">
-                                                <i class="fa-solid fa-envelope me-2" aria-hidden="true"></i>
-                                                Reach out
-                                            </a>
-                                            {% endif %}
-                                        </li>
-                                    </ul>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    {% if not experts %}
+    <div class="card border-0 shadow-sm rounded-3 text-center py-5 mb-3" data-testid="experts-empty-state">
+        <div class="card-body">
+            <i class="fa-solid fa-medal fa-2x mb-3 d-block text-muted" aria-hidden="true"></i>
+            <p class="mb-1 fw-medium text-muted">No experts in {{ active_category }} yet — release a playbook to be the first</p>
+            <p class="small text-muted mb-3">Release a playbook at v1.0 to earn Karma and appear on the leaderboard.</p>
+            <a href="{% url 'playbook_list' %}" class="btn btn-primary btn-sm" data-testid="empty-state-cta">
+                <i class="fa-solid fa-book-sparkles me-1" aria-hidden="true"></i>
+                Browse playbooks
+            </a>
         </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-3" data-testid="experts-leaderboard">
+        {% for expert in experts %}
+            {% include "mockups/experts/_expert_card.html" %}
+        {% endfor %}
     </div>
 
     <div class="alert alert-light border mt-4 small">

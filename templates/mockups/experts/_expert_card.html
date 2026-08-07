@@ -1,0 +1,80 @@
+{# Expert leaderboard card — Act 18 mockup #}
+<div class="col-12">
+    <div class="card border-0 shadow-sm rounded-3 h-100"
+         data-testid="experts-card-{{ expert.slug }}">
+        <div class="card-body">
+            <div class="d-flex flex-wrap align-items-start gap-3">
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    <span class="badge rounded-pill bg-primary-subtle text-primary fw-semibold px-3 py-2"
+                          data-testid="experts-card-rank-{{ expert.slug }}"
+                          aria-label="Rank {{ expert.rank }}">
+                        #{{ expert.rank }}
+                    </span>
+                    <span class="rounded-circle bg-primary-subtle text-primary d-inline-flex align-items-center justify-content-center fw-semibold flex-shrink-0"
+                          style="width:2.75rem;height:2.75rem;font-size:0.85rem;"
+                          aria-hidden="true">
+                        {{ expert.initials }}
+                    </span>
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
+                        <div>
+                            <a href="{% url 'mockup_experts_detail' slug=expert.slug %}{% if is_guest %}?guest=1{% endif %}"
+                               class="hg-list-name-link fw-semibold d-inline-block h5 mb-0"
+                               data-testid="experts-card-name-{{ expert.slug }}">
+                                {{ expert.display_name }}
+                            </a>
+                            <div class="text-muted small">@{{ expert.username }}</div>
+                        </div>
+                        <div class="text-md-end flex-shrink-0">
+                            <div class="fw-bold fs-5 mb-0" data-testid="experts-card-karma-{{ expert.slug }}">
+                                {{ expert.total_karma_display }}
+                            </div>
+                            <div class="text-muted small">Karma</div>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <span class="badge bg-light text-dark border">{{ expert.primary_category }}</span>
+                    </div>
+                    <p class="text-muted small mb-0" data-testid="experts-card-hint-{{ expert.slug }}">
+                        {{ expert.expertise_hint }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer bg-transparent border-top-0 pt-0 pb-3 px-3">
+            <div class="d-flex flex-wrap justify-content-end gap-2">
+                <a href="{% url 'mockup_experts_detail' slug=expert.slug %}{% if is_guest %}?guest=1{% endif %}"
+                   class="btn btn-outline-secondary btn-sm"
+                   data-testid="experts-view-profile-{{ expert.slug }}"
+                   data-bs-toggle="tooltip"
+                   title="View public expert profile">
+                    <i class="fa-solid fa-user me-1" aria-hidden="true"></i>
+                    View profile
+                </a>
+                {% if is_guest %}
+                <button type="button"
+                        class="btn btn-outline-primary btn-sm"
+                        disabled
+                        data-testid="experts-reach-out-guest-tooltip"
+                        data-bs-toggle="tooltip"
+                        title="You need to be logged in to reach out to the expert"
+                        aria-label="Reach out (login required)">
+                    <i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>
+                    Reach out
+                </button>
+                {% else %}
+                <a href="mailto:{{ expert.email }}"
+                   class="btn btn-primary btn-sm experts-reach-out-link"
+                   data-testid="experts-reach-out-{{ expert.slug }}"
+                   data-expert-slug="{{ expert.slug }}"
+                   data-bs-toggle="tooltip"
+                   title="Email {{ expert.display_name }}">
+                    <i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>
+                    Reach out
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

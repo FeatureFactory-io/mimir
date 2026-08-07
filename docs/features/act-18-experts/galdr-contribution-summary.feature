@@ -30,5 +30,5 @@ Feature: FOB-GALDR-CONTRIBUTION-SUMMARY-1 Galdr Refreshes Expert Contribution Su
   Scenario: GALDR-SUMMARY-04 Expert without PIP submission shows numeric fallback hint
     Given Mike has total Karma 12450 but has never submitted a PIP
     When Elena is on /experts/?category=development
-    Then the row for "Mike Chen" shows numeric expertise hint like "2 released · 47 copies"
-    And data-testid="expert-contribution-summary" is absent on the leaderboard row
+    Then the card for "Mike Chen" shows numeric expertise hint like "2 released · 47 copies"
+    And data-testid="expert-contribution-summary" is absent on the leaderboard card

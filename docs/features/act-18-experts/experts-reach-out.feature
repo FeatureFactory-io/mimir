@@ -11,14 +11,14 @@ Feature: FOB-EXPERTS-REACH-OUT-1 Reach Out to an Expert
   Scenario: EXPERTS-REACH-01 Authenticated user reach out opens mailto link
     Given Elena is authenticated in FOB
     And Elena is on /experts/?category=development
-    When she clicks [Reach out] on the row for "Mike Chen"
+    When she clicks [Reach out] on the card for "Mike Chen"
     Then the reach out control links to mailto:mchen@example.com
     And the browser console logs "[experts] reach out: mchen"
 
   Scenario: EXPERTS-REACH-02 Guest reach out is disabled with login tooltip
     Given Bob is not logged in
     When Bob GET "/experts/?category=development"
-    Then [Reach out] on the row for "Mike Chen" is disabled
+    Then [Reach out] on the card for "Mike Chen" is disabled
     And hovering [Reach out] shows tooltip "You need to be logged in to reach out to the expert"
     And data-testid="experts-reach-out-guest-tooltip" is present on the control
 

@@ -3113,7 +3113,7 @@ Entity-specific bodies: Activity → full `guidance`; Skill → `content` + meta
 
 **Context**: Elena (Competency Center Head) and Maria want to discover who the community trusts in each methodology category, see proof of contribution (Karma), read Galdr-written expertise summaries, and reach out to the right people.
 
-**Pattern**: Experts follows the LIST+FIND entry pattern (category tabs filter the leaderboard).
+**Pattern**: Experts follows the LIST+FIND entry pattern (category tabs filter the leaderboard). The leaderboard uses a **stacked card grid** (not a data table) — same card shell as Playbooks and Teams browse.
 
 #### Key Concepts
 
@@ -3163,10 +3163,10 @@ Elena clicks **Experts** in the main navigation. The experts leaderboard appears
 
 - **Header**: “Experts” + subtitle “Top contributors by methodology category”
 - **Category tabs** (pill nav, HTMX swap): Product | Development | Research | Design | Other
-- **Leaderboard table** (`data-testid="experts-leaderboard"`):
+- **Leaderboard card grid** (`data-testid="experts-leaderboard"`):
   - **Top 5** users whose **primary category** matches the active tab
-  - Columns: Rank | Avatar/initials | Display name | **Total Karma** | Primary category badge | **Expertise hint** (truncated `contribution_summary` or numeric fallback)
-  - Row actions:
+  - Each card (`data-testid="experts-card-<username>"`): Rank badge | Avatar/initials | Display name (link) | **Total Karma** | Primary category badge | **Expertise hint** (truncated `contribution_summary` or numeric fallback)
+  - Card footer actions:
     - **[View profile]** → **FOB-EXPERT-VIEW-1** at `/experts/<username>/`
     - **[Reach out]**:
       - **Authenticated:** `mailto:` when expert email is visible (Teams link — future)
@@ -3174,12 +3174,12 @@ Elena clicks **Experts** in the main navigation. The experts leaderboard appears
 - **Empty state** per tab: “No experts in {Category} yet — release a playbook to be the first”
 - **Guest view**: same leaderboard read-only; guest banner with **[Register]** CTA
 
-**Example rows** (Development tab):
+**Example cards** (Development tab):
 
 | # | Expert | Karma | Hint |
 |---|--------|-------|------|
 | 1 | Mike Chen | 12,450 | 2 released playbooks · specializes in React testing patterns… |
-| 2 | Maria Rodriguez | 8,200 | Accessibility-focused contributor to Design and Development… |
+| 2 | Jordan Lee | 6,100 | 1 released playbook · PIP contributor on component patterns… |
 
 ---
 
