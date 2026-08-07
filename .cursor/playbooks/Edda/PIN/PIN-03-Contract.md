@@ -70,11 +70,13 @@ Follow BPE/BPE-01 completely. Output must include:
 
 **c) Applicable SAO.md Sections** — list by heading name.
 
-**d) Checkpoint Command** — pytest command that proves behavior done.
+**d) Checkpoint Command** — pytest command that proves behavior done (typically matches terminal **BPE-06** node `gate.command`).
 
 **e) Log Story Script** — from BPE-01 Section E (Where / Beat / Trigger / Must include).
 
 **f) Log-story tests + command** — when Section E is non-empty: `log_tests[]` names/paths and `checkpoint.log_story_command`.
+
+**g) Feature Execution Graph** — from BPE-01 Step 6G: full `feature_execution_graph.nodes[]` per schema `artifacts/feature-execution-graph-schema.md`.
 
 **Important:** When running BPE-01 inside PIN-03, **skip BPE-01 Step 9 (Submit for Approval) and BPE-01 Step 10 (GitHub/Issue Management)**. The implementation plan is captured in the manifest; GitHub/GitLab issues are created in PIN-04. Running those steps here would produce duplicates.
 
@@ -182,12 +184,17 @@ scenarios:
     context_map: [...]
     do_not_do: [...]
     sao_sections: [...]
+    feature_execution_graph:
+      nodes: [...]   # from BPE-01 Step 6G; see feature-execution-graph-schema.md
 ```
 
 Rules:
 - If `log_tests` is non-empty, `checkpoint.log_story_command` is **required**
 - Omit `log_story_script` / `log_tests` / `log_story_command` only when BPE-01 Section E is empty (document why)
-- PIN-04 consumers may embed both commands in the issue SCENARIO block
+- `checkpoint.command` should match the terminal **BPE-06** node's `gate.command` when a DoD node exists
+- Every scenario must have non-empty `feature_execution_graph.nodes` with at least one `BPE-02` and one `BPE-06` node
+- Node `footprint[]` entries must be subsets of `codebase_footprint[]`
+- PIN-04 consumers embed `feature_execution_graph` in the issue body as `<!-- FEATURE_EXECUTION_GRAPH -->`
 
 
 ## Rules
@@ -214,6 +221,7 @@ Activity-specific (not a substitute for the rules above):
 - All system_dependencies resolved (stubbed, prerequisite scenario, or deferred) before proceeding
 - Stub files named to match their dependency identifier so MIN-04's codebase check succeeds
 - Execution manifest YAML written to `docs/plans/iterations/`
+- Every scenario includes `feature_execution_graph.nodes[]` (BPE-01 Step 6G)
 - Conflict map derived from actual skeleton commits
 - All checkpoint commands verified (NotImplementedError or 0 items), including `log_story_command` when declared
 

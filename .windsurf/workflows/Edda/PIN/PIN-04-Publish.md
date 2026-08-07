@@ -81,11 +81,12 @@ For each scenario in manifest order:
 
 Issue body must include inline:
 - `<!-- SCENARIO -->` YAML block
+- `<!-- FEATURE_EXECUTION_GRAPH -->` YAML block (full graph for this scenario)
 - Context Map table
 - Do Not Do list
 - SAO.md Sections
 - Implementation Plan (full text from BPE-01)
-- Acceptance Criteria checklist
+- Acceptance Criteria checklist — **one checkbox per graph node** plus scenario rollup checkpoint
 
 Labels: `status-queued, parallel-group-{X}`
 Dependency issues reference each other in body.
@@ -113,7 +114,7 @@ glab issue list --milestone "{milestone_title}" --label "status-queued"
 
 ## Success Criteria
 - Milestone created with full `<!-- MANIFEST -->` YAML block
-- One Issue per scenario with inline `<!-- SCENARIO -->` YAML + context map + do-not-do + implementation plan
+- One Issue per scenario with inline `<!-- SCENARIO -->` + `<!-- FEATURE_EXECUTION_GRAPH -->` + context map + do-not-do + implementation plan
 - All issues labelled `status-queued` + `parallel-group-{X}`
 - Local manifest updated with issue numbers and committed
 

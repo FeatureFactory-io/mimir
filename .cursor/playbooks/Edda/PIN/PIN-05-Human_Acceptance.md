@@ -27,7 +27,7 @@ Verify CLAUDE.md iteration protocol is current, obtain explicit human approval, 
 Read the `## Iteration Protocol`, `## Drift Handling`, `## Session Resume Protocol`, and `## Authority Model` sections of CLAUDE.md. Verify they match `doctrine_version` in the manifest.
 
 Required sections:
-- **Iteration Protocol** — references `<!-- MANIFEST -->` block, `status-queued`, BPE-02 → BPE-05
+- **Iteration Protocol** — references `<!-- MANIFEST -->` block, `status-queued`, **fresh subagent per `feature_execution_graph` node** with pytest gates (not honor-system BPE-02 → BPE-05 walkthrough)
 - **Drift Handling** — matches manifest `drift_thresholds` (absorbed: checkpoint_fail retry once; escalated: footprint_violation, method_explosion, sao_violation, checkpoint_fail_after_retry)
 - **Session Resume Protocol** — find `status-in-progress` → re-run checkpoint → PASS: close and continue / FAIL: retry
 - **Authority Model** — can-decide / must-escalate / cannot-do bounds for the iteration runner (dr-dobbs for MIN-04 execution)
@@ -47,8 +47,11 @@ Scenarios: {N} | Groups: {A,B,...}
 {for each scenario:}
   S{N} [{group}] {title}
     Checkpoint: {command}
+    Graph nodes: {N} (BPE-02…06)
     Footprint:  {N} files
     Depends on: {deps or "none"}
+
+Sample: review one scenario's `feature_execution_graph` in Plan mode (node deps + gates)
 
 Conflict map:
   {file} → [{S_N}, {S_M}] (serialized)
