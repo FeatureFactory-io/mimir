@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from playwright.sync_api import Page
 
+from accounts.models import mark_email_verified
 from methodology.models import (
     Activity,
     PipChange,
@@ -23,14 +24,17 @@ def pip_e2e_user(db):
     u = User.objects.create_user(
         username="pip_e2e", password="pipE2Epw!", email="e2e@example.test"
     )
+    mark_email_verified(u)
     return u
 
 
 @pytest.fixture
 def pip_withdraw_user(db):
-    return User.objects.create_user(
+    u = User.objects.create_user(
         username="pip_withdraw_e2e", password="wdE2Epw!", email="wd_e2e@example.test"
     )
+    mark_email_verified(u)
+    return u
 
 
 @pytest.fixture
@@ -141,12 +145,13 @@ def test_pip_withdraw_button_visible_for_submitted_e2e(
 
 @pytest.mark.e2e
 @pytest.mark.django_db(transaction=True)
-def test_pip_withdraw_not_shown_for_reviewed_e2e(
+def test_pip_revert_and_withdraw_visible_for_reviewed_e2e(
     page: Page, live_server_url: str, pip_withdraw_user, reviewed_pip_for_e2e
 ):
-    """Reviewed PIP detail does not show the Withdraw-to-Draft button."""
+    """Reviewed PIP detail shows Return to Draft and Cancel PIP (#162)."""
     _login_user(page, live_server_url, "pip_withdraw_e2e", "wdE2Epw!")
     page.goto(f"{live_server_url}{reverse('pip_detail', kwargs={'pk': reviewed_pip_for_e2e.pk})}")
     page.wait_for_load_state("networkidle")
 
-    assert not page.locator('[data-testid="pip-detail-revert-open"]').is_visible()
+    assert page.locator('[data-testid="pip-detail-revert-open"]').is_visible()
+    assert page.locator('[data-testid="pip-detail-withdraw-open"]').is_visible()
