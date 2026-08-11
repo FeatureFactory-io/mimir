@@ -4,6 +4,7 @@ from decimal import Decimal
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 from methodology.models import Activity, PipChange, Playbook, Workflow
 from methodology.services.galdr_validator import GaldrStructuralValidator
@@ -111,3 +112,86 @@ def test_validator_rejects_unresolved_link_ref(author, draft_pip, released_playb
     report = GaldrStructuralValidator.validate_pip_structure(draft_pip)
     assert not report.ok
     assert report.errors
+
+
+@pytest.mark.django_db
+def test_validator_rejects_internal_ref_slug_in_alter_content(
+    author, draft_pip, released_playbook
+):
+    act = Activity.objects.filter(workflow__playbook=released_playbook).first()
+    PipChange.objects.create(
+        pip=draft_pip,
+        change_type=PipChange.CHANGE_ADD,
+        entity_type=PipChange.ENTITY_ARTIFACT,
+        order=1,
+        name="Recon Doc",
+        content="artifact body",
+        internal_ref="#art-recon",
+        produced_by_activity_ref=str(act.pk),
+    )
+    PipChange.objects.create(
+        pip=draft_pip,
+        change_type=PipChange.CHANGE_ALTER,
+        entity_type=PipChange.ENTITY_ACTIVITY,
+        order=2,
+        target_id=act.pk,
+        content="See #art-recon for the reconciliation output.",
+        name="",
+    )
+    report = GaldrStructuralValidator.validate_pip_structure(draft_pip)
+    assert not report.ok
+    assert any("#art-recon" in e for e in report.errors)
+
+
+@pytest.mark.django_db
+def test_add_change_rejects_internal_ref_in_alter_content(
+    author, draft_pip, released_playbook
+):
+    act = Activity.objects.filter(workflow__playbook=released_playbook).first()
+    PIPService.add_change(
+        actor=author,
+        pip=draft_pip,
+        change_type=PipChange.CHANGE_ADD,
+        entity_type=PipChange.ENTITY_ARTIFACT,
+        name="Handoff",
+        content="artifact body",
+        internal_ref="#art-handoff",
+        produced_by_activity_ref=str(act.pk),
+    )
+    with pytest.raises(ValidationError, match="#art-handoff"):
+        PIPService.add_change(
+            actor=author,
+            pip=draft_pip,
+            change_type=PipChange.CHANGE_ALTER,
+            entity_type=PipChange.ENTITY_ACTIVITY,
+            target_id=act.pk,
+            content="Deliverable: #art-handoff",
+            name="",
+        )
+
+
+@pytest.mark.django_db
+def test_submit_pip_rejects_internal_ref_in_guidance(
+    author, draft_pip, released_playbook
+):
+    act = Activity.objects.filter(workflow__playbook=released_playbook).first()
+    PIPService.add_change(
+        actor=author,
+        pip=draft_pip,
+        change_type=PipChange.CHANGE_ADD,
+        entity_type=PipChange.ENTITY_SKILL,
+        name="Lint Skill",
+        content="skill body",
+        internal_ref="#sk-lint",
+    )
+    PipChange.objects.create(
+        pip=draft_pip,
+        change_type=PipChange.CHANGE_ALTER,
+        entity_type=PipChange.ENTITY_ACTIVITY,
+        order=2,
+        target_id=act.pk,
+        content="Apply patterns from #sk-lint in guidance.",
+        name="",
+    )
+    with pytest.raises(ValidationError, match="#sk-lint"):
+        PIPService.submit_for_review(actor=author, pip=draft_pip)

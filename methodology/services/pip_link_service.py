@@ -25,6 +25,7 @@ from methodology.models import (
 logger = logging.getLogger(__name__)
 
 _INTERNAL_REF_RE = re.compile(r"^#[A-Za-z0-9_-]+$")
+_INTERNAL_REF_TOKEN_RE = re.compile(r"#[A-Za-z0-9_-]+")
 
 _RELATIONSHIP_ENDPOINTS: dict[str, tuple[str, str]] = {
     PipChange.REL_SKILL_ACTIVITY: (PipChange.ENTITY_SKILL, PipChange.ENTITY_ACTIVITY),
@@ -57,6 +58,57 @@ def validate_internal_ref_label(raw: str) -> str:
     if not _INTERNAL_REF_RE.match(val):
         raise ValidationError("internal_ref must match #letters-digits-underscore.")
     return val
+
+
+def collect_pip_internal_refs(changes) -> set[str]:
+    """Return normalized internal_ref labels declared on ADD rows in a PIP."""
+    refs: set[str] = set()
+    for change in changes:
+        if change.change_type != PipChange.CHANGE_ADD or not change.internal_ref:
+            continue
+        refs.add(normalize_internal_ref(change.internal_ref))
+    return refs
+
+
+def find_leaked_internal_refs(content: str, known_refs: set[str]) -> set[str]:
+    """
+    Find ``#slug`` tokens in prose that match same-PIP ADD internal_ref labels.
+
+    :param content: Guidance or rationale text.
+    :param known_refs: Normalized internal_ref labels from ADD rows.
+    :return: Subset of ``known_refs`` appearing in ``content``.
+    """
+    if not content or not known_refs:
+        return set()
+    tokens = {normalize_internal_ref(t) for t in _INTERNAL_REF_TOKEN_RE.findall(content)}
+    return tokens & known_refs
+
+
+def validate_no_internal_ref_leakage_in_content(
+    *,
+    content: str,
+    known_refs: set[str],
+    change_label: str = "change",
+) -> None:
+    """
+    Reject guidance prose that embeds PIP-only internal_ref slugs.
+
+    :raises ValidationError: When ``content`` contains a known internal_ref token.
+    """
+    leaked = find_leaked_internal_refs(content, known_refs)
+    if not leaked:
+        return
+    slug = sorted(leaked)[0]
+    logger.warning(
+        "internal_ref leakage in %s content slug=%s known_refs=%s",
+        change_label,
+        slug,
+        len(known_refs),
+    )
+    raise ValidationError(
+        f"{change_label} content must not include internal_ref slug '{slug}' — "
+        "use the entity display name in guidance; internal_ref is for LINK/ref fields only."
+    )
 
 
 def relationship_endpoint_types(relationship_type: str) -> tuple[str, str]:

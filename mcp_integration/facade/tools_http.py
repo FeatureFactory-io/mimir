@@ -1283,6 +1283,8 @@ def add_pip_change(
               ADD Activity: parent_workflow_id OR parent_workflow_ref (pk or #slug).
               ADD Artifact: produced_by_activity_ref required.
               Optionally set internal_ref="#slug" for later LINK/ref rows in this PIP.
+              Never embed internal_ref slugs (#slug) in ADD/ALTER guidance content — use
+              entity display names; slugs are PIP-only plumbing for ref fields.
     - ALTER : entity_type + target_id + at least one of name/content required.
               Activity: optional phase_ref (pk or #slug).
     - DROP  : entity_type + target_id + rationale in content.

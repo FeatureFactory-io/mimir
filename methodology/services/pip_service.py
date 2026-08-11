@@ -28,9 +28,11 @@ from methodology.models import (
     Workflow,
 )
 from methodology.services.pip_link_service import (
+    collect_pip_internal_refs,
     link_change_summary_label,
     validate_internal_ref_label,
     validate_link_change_for_persist,
+    validate_no_internal_ref_leakage_in_content,
     validate_pending_or_live_ref,
 )
 from methodology.services.playbook_service import PlaybookService
@@ -279,6 +281,15 @@ def _persist_pip_change(
         if not tgt:
             raise ValidationError("DROP requires target_id.")
         display_name = nm or _entity_target_label(pb, et, tgt)
+
+    if ct in {PipChange.CHANGE_ADD, PipChange.CHANGE_ALTER} and body:
+        existing = list(PipChange.objects.filter(pip=pip).order_by("order", "pk"))
+        known_refs = collect_pip_internal_refs(existing)
+        validate_no_internal_ref_leakage_in_content(
+            content=body,
+            known_refs=known_refs,
+            change_label=f"{ct} {et or 'change'}",
+        )
 
     ref_label = ""
     if ct == PipChange.CHANGE_ADD and internal_ref.strip():
@@ -715,6 +726,13 @@ class PIPService:
         _pip_allow_submit_for_review(pip, actor)
         if not PipChange.objects.filter(pip=pip).exists():
             raise ValidationError("Add at least one Change before submitting.")
+
+        from methodology.services.galdr_validator import GaldrStructuralValidator
+
+        structural = GaldrStructuralValidator.validate_pip_structure(pip)
+        if not structural.ok:
+            raise ValidationError("; ".join(structural.errors))
+
         pk_holder = pip.pk
 
         def _enqueue() -> None:

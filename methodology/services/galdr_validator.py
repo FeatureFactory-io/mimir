@@ -10,7 +10,11 @@ from django.db import transaction
 
 from methodology.models import PipChange, ProcessImprovementProposal
 from methodology.services.pip_apply_changes_service import PipApplyChangesService
-from methodology.services.pip_link_service import normalize_internal_ref
+from methodology.services.pip_link_service import (
+    collect_pip_internal_refs,
+    find_leaked_internal_refs,
+    normalize_internal_ref,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +55,8 @@ class GaldrStructuralValidator:
 
         cls._check_duplicate_internal_refs(changes, report)
         if report.ok:
+            cls._check_internal_ref_leakage_in_content(changes, report)
+        if report.ok:
             cls._dry_run_apply(pip, changes, report)
         logger.info(
             "GaldrStructuralValidator pip id=%s ok=%s errors=%s warnings=%s",
@@ -74,6 +80,34 @@ class GaldrStructuralValidator:
             if key in seen:
                 report.errors.append(f"Duplicate internal_ref '{key}'.")
             seen.add(key)
+
+    @staticmethod
+    def _check_internal_ref_leakage_in_content(
+        changes: list[PipChange],
+        report: StructuralReport,
+    ) -> None:
+        known_refs = collect_pip_internal_refs(changes)
+        if not known_refs:
+            return
+        for change in changes:
+            if change.change_type not in {
+                PipChange.CHANGE_ADD,
+                PipChange.CHANGE_ALTER,
+            }:
+                continue
+            leaked = find_leaked_internal_refs(change.content or "", known_refs)
+            if not leaked:
+                continue
+            slug = sorted(leaked)[0]
+            report.errors.append(
+                f"Change [{change.pk}] {change.change_type} content must not include "
+                f"internal_ref slug '{slug}' — use the entity display name in guidance."
+            )
+            logger.warning(
+                "GaldrStructuralValidator internal_ref leakage change_id=%s slug=%s",
+                change.pk,
+                slug,
+            )
 
     @staticmethod
     def _dry_run_apply(
