@@ -1390,7 +1390,11 @@ def submit_pip(pip_id: int) -> dict:
 
 def cancel_pip(pip_id: int) -> dict:
     """
-    Withdraw / cancel a PIP owned by the current user.
+    Withdraw a PIP owned by the current user (terminal ``withdrawn`` status).
+
+    Allowed from: draft, submitted, processing_galdr, reviewed.
+    Use to abandon a PIP. To fix Galdr feedback and resubmit the same pip_id,
+    use ``revert_pip_to_draft`` instead.
 
     :param pip_id: PIP ID. Example: 1
     :return: Dict with cancelled=True and pip_id
@@ -1402,7 +1406,11 @@ def cancel_pip(pip_id: int) -> dict:
 
 def revert_pip_to_draft(pip_id: int) -> dict:
     """
-    Revert a Submitted or Processing PIP back to Draft, clearing Galdr assessments.
+    Revert a PIP to draft for editing and resubmission (clears Galdr fields).
+
+    Allowed from: submitted, processing_galdr, reviewed.
+    After Galdr REJECT: get_pip → revert_pip_to_draft → edit changes → submit_pip
+    on the same pip_id. Use cancel_pip only to abandon.
 
     :param pip_id: PIP ID. Example: 1
     :return: Dict with reverted=True and pip_id

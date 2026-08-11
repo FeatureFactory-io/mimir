@@ -19,6 +19,8 @@ from methodology.models import (
     Workflow,
 )
 from methodology.services.pip_service import PIPService
+from mcp_integration.context import set_current_user
+from mcp_integration.tools import cancel_pip, revert_pip_to_draft
 from tests.support.log_story import assert_log_story
 
 User = get_user_model()
@@ -377,3 +379,37 @@ def test_submit_directly_from_reviewed_raises(alice, submitted_pip):
 
     with pytest.raises(ValidationError, match="Submit is only allowed from Draft"):
         PIPService.submit_for_review(actor=alice, pip=submitted_pip)
+
+
+# ---------------------------------------------------------------------------
+# MCP tool integration (#162)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_mcp_cancel_pip_from_reviewed_status(alice, submitted_pip):
+    """MCP cancel_pip withdraws a reviewed PIP (regression for #162)."""
+    set_current_user(alice)
+    submitted_pip.status = ProcessImprovementProposal.STATUS_REVIEWED
+    submitted_pip.save(update_fields=["status"])
+
+    result = await cancel_pip(submitted_pip.pk)
+
+    assert result == {"cancelled": True, "pip_id": submitted_pip.pk}
+    submitted_pip.refresh_from_db()
+    assert submitted_pip.status == ProcessImprovementProposal.STATUS_WITHDRAWN
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_mcp_revert_pip_to_draft_from_reviewed_status(alice, submitted_pip):
+    """MCP revert_pip_to_draft opens the Galdr fix-and-resubmit loop from reviewed."""
+    set_current_user(alice)
+    submitted_pip.status = ProcessImprovementProposal.STATUS_REVIEWED
+    submitted_pip.save(update_fields=["status"])
+
+    result = await revert_pip_to_draft(submitted_pip.pk)
+
+    assert result == {"reverted": True, "pip_id": submitted_pip.pk}
+    submitted_pip.refresh_from_db()
+    assert submitted_pip.status == ProcessImprovementProposal.STATUS_DRAFT

@@ -3068,7 +3068,12 @@ async def submit_pip(pip_id: int) -> dict:
 
 
 async def cancel_pip(pip_id: int) -> dict:
-    """Withdraw / delete an in-flight PIP owned by caller."""
+    """Withdraw a PIP owned by the caller (terminal ``withdrawn`` status).
+
+    Allowed from: ``draft``, ``submitted``, ``processing_galdr``, ``reviewed``.
+    Use to abandon a PIP entirely. To fix Galdr feedback and resubmit the same
+    pip_id, use ``revert_pip_to_draft`` instead.
+    """
 
     user = await sync_to_async(get_current_user)()
 
@@ -3086,7 +3091,13 @@ async def cancel_pip(pip_id: int) -> dict:
 
 
 async def revert_pip_to_draft(pip_id: int) -> dict:
-    """Revert a Submitted or Processing PIP back to Draft, clearing Galdr assessments."""
+    """Revert a PIP to ``draft`` for editing and resubmission (clears Galdr fields).
+
+    Allowed from: ``submitted``, ``processing_galdr``, ``reviewed``.
+    Workflow after Galdr REJECT feedback: ``get_pip`` (read reasoning) →
+    ``revert_pip_to_draft`` → ``add_pip_change`` / ``remove_pip_change`` →
+    ``submit_pip`` on the same pip_id. Use ``cancel_pip`` only to abandon.
+    """
 
     user = await sync_to_async(get_current_user)()
 
