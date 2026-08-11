@@ -33,9 +33,9 @@ def build_playbook_context_summary(playbook) -> str:
     Build compact text summarising playbook structure for Galdr prompts.
 
     :param playbook: :class:`~methodology.models.Playbook` instance.
-    :return: Multi-line textual outline of workflows and activities.
+    :return: Multi-line textual outline of workflows, activities, and artifacts.
     """
-    from methodology.models import Workflow
+    from methodology.models import Artifact, Workflow
 
     lines = [
         f"Playbook: {playbook.name} v{playbook.version} (status={playbook.status})",
@@ -44,17 +44,22 @@ def build_playbook_context_summary(playbook) -> str:
         lines.append(f"  Workflow [{wf.pk}] {wf.name} (#{wf.order})")
         for act in wf.activities.order_by("order", "pk"):
             lines.append(f"    Activity [{act.pk}] {act.name} (#{act.order})")
+
+    lines.append("")
+    lines.append("--- Artifacts ---")
+    for art in Artifact.objects.filter(playbook=playbook).order_by("pk"):
+        lines.append(f"  Artifact [{art.pk}] {art.name} ({art.type})")
     return "\n".join(lines)
 
 
 def build_extended_playbook_summary(playbook) -> str:
     """
-    Build a richer playbook outline including skills, agents, rules, and links.
+    Build a richer playbook outline including skills, agents, rules, artifacts, and links.
 
     :param playbook: :class:`~methodology.models.Playbook` instance.
     :return: Multi-line textual outline for Galdr target-state context.
     """
-    from methodology.models import Activity, Agent, Rule, Skill, Workflow
+    from methodology.models import Activity, Agent, Artifact, Rule, Skill, Workflow
 
     lines = [build_playbook_context_summary(playbook), "", "--- Skills ---"]
     for sk in Skill.objects.filter(playbook=playbook).order_by("pk"):
@@ -79,6 +84,18 @@ def build_extended_playbook_summary(playbook) -> str:
     ):
         for sk in act.skills.all():
             lines.append(f"  Skill [{sk.pk}] → Activity [{act.pk}] {act.name}")
+
+    lines.append("")
+    lines.append("--- Artifact → Activity links ---")
+    for act in (
+        Activity.objects.filter(workflow__playbook=playbook)
+        .prefetch_related("input_artifacts__artifact")
+        .order_by("workflow__order", "order", "pk")
+    ):
+        for ai in act.input_artifacts.all():
+            lines.append(
+                f"  Artifact [{ai.artifact.pk}] → Activity [{act.pk}] {act.name}"
+            )
 
     lines.append("")
     lines.append("--- Workflows (detail) ---")
