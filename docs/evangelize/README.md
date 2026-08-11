@@ -19,7 +19,7 @@ Community growth strategy for Mimir: persona-targeted live code-alongs, repurpos
 | [strategy.md](./strategy.md) | Two-channel model (webinars + video), funnel, pricing waves, risks |
 | [webinar-format.md](./webinar-format.md) | 30-minute run-of-show, pre-work, tooling, success criteria |
 | [content-pipeline.md](./content-pipeline.md) | Webinar → long YouTube → short clips → LinkedIn & communities |
-| [content-calendar.md](./content-calendar.md) | Pilot roster, episode templates, 12-week launch sequence |
+| [content-calendar.md](./content-calendar.md) | Arc-batch scheduling, episode roster, 12-week launch sequence |
 
 ## Principles
 
@@ -28,3 +28,4 @@ Community growth strategy for Mimir: persona-targeted live code-alongs, repurpos
 3. **Show, don't pitch** — live MCP + Cursor; no slide decks unless setup fails.
 4. **Same CTA everywhere** — Register → Connect MCP → Run one use-case command → Follow / join list.
 5. **Building in the open** — FeatureFactory / Edda is the demo product; Mimir is the platform.
+6. **Arc batches, not persona exhaustion** — group 2–3 episodes into cross-role stories (encode → use → scale), then rotate; max two consecutive episodes on one persona.
