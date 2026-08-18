@@ -2126,6 +2126,7 @@ Complete reference for all environment variables consumed by Mimir, grouped by e
 | `MCP_PORT` | No | `8001` | Port for MCP SSE facade |
 | `ANTHROPIC_API_KEY` | **Yes** (Galdr) | `sk-ant-api03-…` | Required for Galdr AI PIP review. Without it Galdr is disabled (`GALDR_USE_ANTHROPIC=False`). |
 | `GALDR_MODEL` | No | `claude-sonnet-4-5` | Any Anthropic model slug |
+| `GALDR_USE_TARGET_STATE` | No | `false` (local); `true` on EB via CDK | When `true`, Galdr uses holistic target-state assessment instead of per-change prompts |
 | `GITHUB_TOKEN` | No | `ghp_…` | GitHub PAT with **Issues: write** on `GITHUB_BUG_REPO`. **If absent**, `BUG_REPORT_DRY_RUN` is auto-set to `True` so the Feedback widget works without filing real issues. |
 | `GITHUB_BUG_REPO` | No | `FeatureFactory-io/mimir` | Target repo for bug reports |
 | `BUG_REPORT_DRY_RUN` | No | auto | `1`/`true` to force dry-run even when token is present |
@@ -2172,6 +2173,7 @@ Routine **application** deploys do not run CDK; **infrastructure** recreate uses
 |----------|----------|---------|-------|
 | `ANTHROPIC_API_KEY` | **Yes** (Galdr) | `sk-ant-api03-…` | Required for Galdr PIP review. Without it, Galdr is disabled. |
 | `GALDR_MODEL` | No | `claude-sonnet-4-5` | Any Anthropic model slug |
+| `GALDR_USE_TARGET_STATE` | No | `false` (local); `true` on EB via CDK | When `true`, Galdr uses holistic target-state assessment instead of per-change prompts |
 
 #### Bug Reports (Feedback Widget → GitHub Issues)
 

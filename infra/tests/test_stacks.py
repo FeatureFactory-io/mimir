@@ -229,6 +229,20 @@ class TestMimirApp:
             },
         )
 
+    def test_galdr_use_target_state_enabled(self, template):
+        template.has_resource_properties(
+            "AWS::ElasticBeanstalk::Environment",
+            {
+                "OptionSettings": assertions.Match.array_with([
+                    assertions.Match.object_like({
+                        "Namespace": "aws:elasticbeanstalk:application:environment",
+                        "OptionName": "GALDR_USE_TARGET_STATE",
+                        "Value": "true",
+                    })
+                ])
+            },
+        )
+
     def test_cloudwatch_log_group_created(self, template):
         template.has_resource_properties(
             "AWS::Logs::LogGroup",

@@ -11,6 +11,7 @@
 #   DJANGO_SECRET_KEY, DATABASE_URL, DJANGO_ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS
 #   ANTHROPIC_API_KEY   — Galdr AI engine (secret, set manually in EB env)
 #   GALDR_MODEL         — set by CDK (default: claude-sonnet-4-5)
+#   GALDR_USE_TARGET_STATE — set by CDK (default: true); holistic Galdr v2 snapshot
 #   GITHUB_TOKEN        — optional but recommended: PAT with Issues:write on GITHUB_BUG_REPO
 #   GITHUB_BUG_REPO     — optional; default FeatureFactory-io/mimir when resolved on host
 #   MIMIR_GIT_REVISION  — set automatically by CI to release tag or branch-sha

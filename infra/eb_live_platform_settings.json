@@ -317,6 +317,11 @@
     },
     {
       "namespace": "aws:elasticbeanstalk:application:environment",
+      "option_name": "GALDR_USE_TARGET_STATE",
+      "value": "true"
+    },
+    {
+      "namespace": "aws:elasticbeanstalk:application:environment",
       "option_name": "GITHUB_BUG_REPO",
       "value": "FeatureFactory-io/mimir"
     },
@@ -1001,6 +1006,11 @@
       "namespace": "aws:elasticbeanstalk:application:environment",
       "option_name": "GALDR_MODEL",
       "value": "claude-sonnet-4-5"
+    },
+    {
+      "namespace": "aws:elasticbeanstalk:application:environment",
+      "option_name": "GALDR_USE_TARGET_STATE",
+      "value": "true"
     },
     {
       "namespace": "aws:elasticbeanstalk:application:environment",
