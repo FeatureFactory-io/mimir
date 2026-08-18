@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
+
 SYSTEM_PROMPT = """You are Galdr, an AI reviewer for playbook improvement proposals.
 Assess whether each proposed change is consistent with the playbook's goals,
 free of conflicts with existing entities, and structurally sound.
@@ -28,52 +30,30 @@ Respond ONLY with a JSON object — no prose, no markdown fences:
 """
 
 
-def build_playbook_context_summary(playbook) -> str:
-    """
-    Build compact text summarising playbook structure for Galdr prompts.
+def _ordered_activities(playbook):
+    from methodology.models import Activity
 
-    :param playbook: :class:`~methodology.models.Playbook` instance.
-    :return: Multi-line textual outline of workflows, activities, and artifacts.
-    """
-    from methodology.models import Artifact, Workflow
+    return (
+        Activity.objects.filter(workflow__playbook=playbook)
+        .select_related("agent", "workflow")
+        .order_by("workflow__order", "order", "pk")
+    )
 
-    lines = [
-        f"Playbook: {playbook.name} v{playbook.version} (status={playbook.status})",
-    ]
-    for wf in Workflow.objects.filter(playbook=playbook).order_by("order", "pk"):
-        lines.append(f"  Workflow [{wf.pk}] {wf.name} (#{wf.order})")
-        for act in wf.activities.order_by("order", "pk"):
-            lines.append(f"    Activity [{act.pk}] {act.name} (#{act.order})")
 
+def _append_catalog_section(
+    lines: list[str],
+    header: str,
+    rows: Iterable,
+    formatter: Callable,
+) -> None:
     lines.append("")
-    lines.append("--- Artifacts ---")
-    for art in Artifact.objects.filter(playbook=playbook).order_by("pk"):
-        lines.append(f"  Artifact [{art.pk}] {art.name} ({art.type})")
-    return "\n".join(lines)
+    lines.append(header)
+    for row in rows:
+        lines.append(formatter(row))
 
 
-def build_extended_playbook_summary(playbook) -> str:
-    """
-    Build a richer playbook outline including skills, agents, rules, artifacts, and links.
-
-    :param playbook: :class:`~methodology.models.Playbook` instance.
-    :return: Multi-line textual outline for Galdr target-state context.
-    """
-    from methodology.models import Activity, Agent, Artifact, Rule, Skill, Workflow
-
-    lines = [build_playbook_context_summary(playbook), "", "--- Skills ---"]
-    for sk in Skill.objects.filter(playbook=playbook).order_by("pk"):
-        lines.append(f"  Skill [{sk.pk}] {sk.title}")
-
-    lines.append("")
-    lines.append("--- Agents ---")
-    for ag in Agent.objects.filter(playbook=playbook).order_by("pk"):
-        lines.append(f"  Agent [{ag.pk}] {ag.name}")
-
-    lines.append("")
-    lines.append("--- Rules ---")
-    for ru in Rule.objects.filter(playbook=playbook).order_by("pk"):
-        lines.append(f"  Rule [{ru.pk}] {ru.title}")
+def _append_skill_activity_links(lines: list[str], playbook) -> None:
+    from methodology.models import Activity
 
     lines.append("")
     lines.append("--- Skill → Activity links ---")
@@ -84,6 +64,34 @@ def build_extended_playbook_summary(playbook) -> str:
     ):
         for sk in act.skills.all():
             lines.append(f"  Skill [{sk.pk}] → Activity [{act.pk}] {act.name}")
+
+
+def _append_rule_activity_links(lines: list[str], playbook) -> None:
+    from methodology.models import Activity
+
+    lines.append("")
+    lines.append("--- Rule → Activity links ---")
+    for act in (
+        Activity.objects.filter(workflow__playbook=playbook)
+        .prefetch_related("rules")
+        .order_by("workflow__order", "order", "pk")
+    ):
+        for ru in act.rules.all():
+            lines.append(f"  Rule [{ru.pk}] → Activity [{act.pk}] {act.name}")
+
+
+def _append_agent_activity_links(lines: list[str], playbook) -> None:
+    lines.append("")
+    lines.append("--- Agent → Activity links ---")
+    for act in _ordered_activities(playbook):
+        if act.agent_id:
+            lines.append(
+                f"  Agent [{act.agent.pk}] → Activity [{act.pk}] {act.name}"
+            )
+
+
+def _append_artifact_activity_links(lines: list[str], playbook) -> None:
+    from methodology.models import Activity
 
     lines.append("")
     lines.append("--- Artifact → Activity links ---")
@@ -97,8 +105,79 @@ def build_extended_playbook_summary(playbook) -> str:
                 f"  Artifact [{ai.artifact.pk}] → Activity [{act.pk}] {act.name}"
             )
 
-    lines.append("")
-    lines.append("--- Workflows (detail) ---")
+
+def _append_entity_catalogs_and_links(lines: list[str], playbook) -> None:
+    from methodology.models import Agent, Artifact, Phase, Rule, Skill
+
+    _append_catalog_section(
+        lines,
+        "--- Phases ---",
+        Phase.objects.filter(playbook=playbook).order_by("pk"),
+        lambda ph: f"  Phase [{ph.pk}] {ph.name} (#{ph.order})",
+    )
+    _append_catalog_section(
+        lines,
+        "--- Artifacts ---",
+        Artifact.objects.filter(playbook=playbook).order_by("pk"),
+        lambda art: f"  Artifact [{art.pk}] {art.name} ({art.type})",
+    )
+    _append_catalog_section(
+        lines,
+        "--- Skills ---",
+        Skill.objects.filter(playbook=playbook).order_by("pk"),
+        lambda sk: f"  Skill [{sk.pk}] {sk.title}",
+    )
+    _append_catalog_section(
+        lines,
+        "--- Agents ---",
+        Agent.objects.filter(playbook=playbook).order_by("pk"),
+        lambda ag: f"  Agent [{ag.pk}] {ag.name}",
+    )
+    _append_catalog_section(
+        lines,
+        "--- Rules ---",
+        Rule.objects.filter(playbook=playbook).order_by("pk"),
+        lambda ru: f"  Rule [{ru.pk}] {ru.title}",
+    )
+    _append_skill_activity_links(lines, playbook)
+    _append_rule_activity_links(lines, playbook)
+    _append_agent_activity_links(lines, playbook)
+    _append_artifact_activity_links(lines, playbook)
+
+
+def build_playbook_context_summary(playbook) -> str:
+    """
+    Build compact text summarising playbook structure for Galdr prompts.
+
+    :param playbook: :class:`~methodology.models.Playbook` instance.
+    :return: Multi-line textual outline of workflows, entities, and links.
+    """
+    from methodology.models import Workflow
+
+    lines = [
+        f"Playbook: {playbook.name} v{playbook.version} (status={playbook.status})",
+    ]
+    for wf in Workflow.objects.filter(playbook=playbook).order_by("order", "pk"):
+        lines.append(f"  Workflow [{wf.pk}] {wf.name} (#{wf.order})")
+        for act in wf.activities.order_by("order", "pk"):
+            lines.append(f"    Activity [{act.pk}] {act.name} (#{act.order})")
+
+    _append_entity_catalogs_and_links(lines, playbook)
+    return "\n".join(lines)
+
+
+def build_extended_playbook_summary(playbook) -> str:
+    """
+    Build a richer playbook outline including workflow detail.
+
+    Entity catalogs and links come from :func:`build_playbook_context_summary`.
+
+    :param playbook: :class:`~methodology.models.Playbook` instance.
+    :return: Multi-line textual outline for Galdr target-state context.
+    """
+    from methodology.models import Workflow
+
+    lines = [build_playbook_context_summary(playbook), "", "--- Workflows (detail) ---"]
     for wf in Workflow.objects.filter(playbook=playbook).order_by("order", "pk"):
         lines.append(f"  Workflow [{wf.pk}] {wf.name}: {wf.description[:120]}")
     return "\n".join(lines)
@@ -114,6 +193,8 @@ def _format_change_list(changes) -> str:
         body_lines = [header, f"  name: {change.name or '(empty)'}"]
         if change.target_id:
             body_lines.append(f"  target_id: {change.target_id}")
+        if change.target_name_snapshot:
+            body_lines.append(f"  target_name_snapshot: {change.target_name_snapshot}")
         if change.content:
             body_lines.append(f"  content: {change.content[:500]}")
         if change.internal_ref:
@@ -183,6 +264,8 @@ def build_change_prompt(change, context_summary: str) -> str:
         f"append_to_playbook_end: {change.append_to_playbook_end}",
         f"content / rationale:\n{change.content or '(empty)'}",
     ]
+    if change.target_name_snapshot:
+        lines.append(f"target_name_snapshot: {change.target_name_snapshot}")
     if change.parent_workflow_id:
         lines.append(f"parent_workflow_id: {change.parent_workflow_id}")
     if change.change_type in {PipChange.CHANGE_LINK, PipChange.CHANGE_UNLINK}:

@@ -5,7 +5,17 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth import get_user_model
 
-from methodology.models import Activity, Artifact, PipChange, Playbook, Skill, Workflow
+from methodology.models import (
+    Activity,
+    Agent,
+    Artifact,
+    Phase,
+    PipChange,
+    Playbook,
+    Rule,
+    Skill,
+    Workflow,
+)
 from methodology.services.galdr_prompts import (
     build_extended_playbook_summary,
     build_playbook_context_summary,
@@ -159,3 +169,103 @@ def test_build_target_state_summary_reflects_artifact_add_and_link(
         ).count()
         == 0
     )
+
+
+@pytest.mark.django_db
+def test_build_playbook_context_summary_includes_skills_rules_agents(
+    author, released_playbook
+):
+    Skill.objects.create(
+        playbook=released_playbook,
+        title="Behave Runner",
+        capability_domain="BDD",
+        technology_stack="Django",
+    )
+    Rule.objects.create(
+        playbook=released_playbook,
+        title="Test Fixture Rule",
+        slug="do-test-fixture-data-management",
+    )
+    Agent.objects.create(
+        playbook=released_playbook,
+        name="BDD Agent",
+        description="Runs behave tests",
+    )
+
+    summary = build_playbook_context_summary(released_playbook)
+
+    assert "--- Skills ---" in summary
+    assert "Behave Runner" in summary
+    assert "--- Rules ---" in summary
+    assert "Test Fixture Rule" in summary
+    assert "--- Agents ---" in summary
+    assert "BDD Agent" in summary
+
+
+@pytest.mark.django_db
+def test_build_playbook_context_summary_includes_phases(author, released_playbook):
+    Phase.objects.create(
+        playbook=released_playbook,
+        name="Construction",
+        description="Build phase",
+        order=1,
+    )
+
+    summary = build_playbook_context_summary(released_playbook)
+
+    assert "--- Phases ---" in summary
+    assert "Construction" in summary
+
+
+@pytest.mark.django_db
+def test_build_playbook_context_summary_includes_skill_and_rule_links(
+    author, released_playbook
+):
+    act = Activity.objects.filter(workflow__playbook=released_playbook).first()
+    skill = Skill.objects.create(
+        playbook=released_playbook,
+        title="Lint Skill",
+        capability_domain="QUALITY",
+        technology_stack="Ruff",
+    )
+    rule = Rule.objects.create(
+        playbook=released_playbook,
+        title="Commit Rule",
+        slug="do-follow-commit-convention",
+    )
+    agent = Agent.objects.create(
+        playbook=released_playbook,
+        name="Reviewer",
+        description="Reviews changes",
+    )
+    act.skills.add(skill)
+    act.rules.add(rule)
+    act.agent = agent
+    act.save(update_fields=["agent"])
+
+    summary = build_playbook_context_summary(released_playbook)
+
+    assert "Skill → Activity links" in summary
+    assert f"Skill [{skill.pk}] → Activity [{act.pk}]" in summary
+    assert "Rule → Activity links" in summary
+    assert f"Rule [{rule.pk}] → Activity [{act.pk}]" in summary
+    assert "Agent → Activity links" in summary
+    assert f"Agent [{agent.pk}] → Activity [{act.pk}]" in summary
+
+
+@pytest.mark.django_db
+def test_build_extended_playbook_summary_includes_workflow_detail_only_once(
+    author, released_playbook
+):
+    Skill.objects.create(
+        playbook=released_playbook,
+        title="Dup Check Skill",
+        capability_domain="X",
+        technology_stack="Y",
+    )
+
+    summary = build_extended_playbook_summary(released_playbook)
+
+    assert summary.count("--- Skills ---") == 1
+    assert "--- Workflows (detail) ---" in summary
+    assert "Dup Check Skill" in summary
