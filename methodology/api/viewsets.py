@@ -336,18 +336,31 @@ class PlaybookViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @action(detail=True, methods=["post"], url_path="export-local")
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="export-local",
+        permission_classes=[IsAuthenticated],
+    )
     def export_local(self, request, pk=None):
         """
         Generate full playbook export bundle for local IDE sync.
+
+        Read-only — allowed on released playbooks too (same as workflow export).
 
         Maps to: export_playbook_to_local MCP tool (HTTP facade writes files).
         """
         from django.core.exceptions import ObjectDoesNotExist
 
-        logger.info("API: export_playbook_to_local called playbook_id=%s", pk)
-        self.get_object()
+        logger.info("PlaybookViewSet.export_local | entry | playbook_id=%s", pk)
+        playbook = self.get_object()
         folder_name = request.data.get("folder_name")
+        logger.info(
+            "PlaybookViewSet.export_local | processing | playbook_id=%s status=%s folder=%s",
+            pk,
+            playbook.status,
+            folder_name,
+        )
 
         from methodology.services.playbook_export_service import PlaybookExportService
 

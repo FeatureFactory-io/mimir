@@ -353,3 +353,12 @@ Feature: FOB-WORKFLOWS-EXPORT_IMPORT-1 MCP Workflow Synchronization
     Then MCP returns error "ValueError: Activity 'Create Mockup' references unknown predecessor 'activity-99'"
     And no playbook is created
     And no partial entities remain in the database
+
+  # LOCAL PLAYBOOK TREE EXPORT (markdown, not JSON) — #172
+  Scenario: FOB-WORKFLOWS-EXPORT_IMPORT-29 Export playbook to local is allowed on released playbooks
+    Given Maria owns released playbook "Edda" at version 70.0
+    When AI calls mcp.export_playbook_to_local(playbook_id=<Edda>, target_directory=".cursor/playbooks", folder_name="edda")
+    Then POST /api/playbooks/{id}/export-local/ returns 200 with a file bundle
+    And the response does not contain "Cannot modify released playbook"
+    And the bundle includes playbook.md and workflow folders
+
