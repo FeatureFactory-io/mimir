@@ -51,3 +51,15 @@ class TestLandingHeroCta:
         assert 'href="#mcp-config"' in connect_cta
         assert 'data-testid="landing-mcp-connect"' in body
         assert 'id="mcp-config"' in body
+
+    def test_landing_mcp_section_includes_devin_tab_and_config_path(self, client):
+        """LANDING-CTA-03: Devin tab, icon, and ~/.config/devin/mcp_config.json."""
+        response = client.get("/")
+
+        assert response.status_code == 200
+        body = response.content.decode()
+        assert 'data-testid="tab-devin"' in body
+        assert "Devin" in body
+        assert 'data-testid="pane-devin"' in body
+        assert "~/.config/devin/mcp_config.json" in body
+        assert "images/devin.svg" in body

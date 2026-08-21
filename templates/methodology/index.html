@@ -86,6 +86,11 @@
           </button>
         </li>
         <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-devin" data-testid="tab-devin" data-bs-toggle="tab" data-bs-target="#pane-devin" type="button" role="tab">
+            <img src="{% static 'images/devin.svg' %}" height="16" alt="" class="me-1" style="vertical-align: text-top;"> Devin
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
           <button class="nav-link" id="tab-source" data-bs-toggle="tab" data-bs-target="#pane-source" type="button" role="tab">
             <img src="{% static 'images/github.svg' %}" height="16" alt="" class="me-1" style="vertical-align: text-top;"> Get Source Code
           </button>
@@ -133,6 +138,26 @@
         </div>
         <div class="tab-pane fade" id="pane-cursor" role="tabpanel">
           <p class="text-muted small mb-2">File: <code>~/.cursor/mcp.json</code></p>
+          <pre class="bg-dark text-light rounded p-3 small"><code>{
+  "mcpServers": {
+    "mimir": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "-e", "MIMIR_DEV_ROOT=/Users/you/GitHub",
+        "-v", "/Users/you/GitHub:/Users/you/GitHub",
+        "-e", "MIMIR_SERVER_URL=https://mimir.featurefactory.io",
+        "-e", "MIMIR_TOKEN=&lt;your-token&gt;",
+        "-e", "MCP_TRANSPORT=stdio",
+        "featurefactory/mimir-mcp:latest"
+      ]
+    }
+  }
+}</code></pre>
+        </div>
+        <div class="tab-pane fade" id="pane-devin" role="tabpanel" data-testid="pane-devin">
+          <p class="text-muted small mb-2">File: <code>~/.config/devin/mcp_config.json</code></p>
+          <p class="text-muted small mb-2">Windows: <code>%APPDATA%\devin\mcp_config.json</code>. Project-level: <code>.devin/mcp_config.json</code> (or gitignored <code>.devin/mcp_config.local.json</code> for tokens).</p>
           <pre class="bg-dark text-light rounded p-3 small"><code>{
   "mcpServers": {
     "mimir": {

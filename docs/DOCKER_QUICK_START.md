@@ -133,6 +133,29 @@ The MCP facade (`featurefactory/mimir-mcp:latest`) is a public Docker Hub image 
 }
 ```
 
+### Devin — `~/.config/devin/mcp_config.json`
+
+Windows: `%APPDATA%\devin\mcp_config.json`. Project-level (commit or gitignore tokens): `.devin/mcp_config.json` / `.devin/mcp_config.local.json`.
+
+```json
+{
+  "mcpServers": {
+    "mimir": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "-e", "MIMIR_DEV_ROOT=/Users/you/GitHub",
+        "-v", "/Users/you/GitHub:/Users/you/GitHub",
+        "-e", "MIMIR_SERVER_URL=https://mimir.featurefactory.io",
+        "-e", "MIMIR_TOKEN=<your-token>",
+        "-e", "MCP_TRANSPORT=stdio",
+        "featurefactory/mimir-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
 Replace `<your-token>` with your token from Step 2.
 Replace `/Users/you/GitHub` with the folder where your repositories live (use the same path in `MIMIR_DEV_ROOT` and the `-v` mount).
 For a local FOB, change `MIMIR_SERVER_URL` to `http://localhost:8000` (or `http://host.docker.internal:8000` from Docker Desktop on macOS/Windows).

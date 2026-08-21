@@ -99,7 +99,7 @@ curl -s -X POST http://localhost:8000/api/auth/token/ \
 
 The MCP facade is published as a **public Docker Hub image** (`featurefactory/mimir-mcp`) — no registry login needed.
 
-**Windsurf** (`~/.codeium/windsurf/mcp_config.json`), **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`), **Cursor** (`~/.cursor/mcp.json`):
+**Windsurf** (`~/.codeium/windsurf/mcp_config.json`), **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`), **Cursor** (`~/.cursor/mcp.json`), **Devin** (`~/.config/devin/mcp_config.json`):
 
 ```json
 {
@@ -253,6 +253,7 @@ pytest tests/
 - **Windsurf**: `~/.codeium/windsurf/mcp_config.json`
 - **Claude Desktop**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Cursor**: `~/.cursor/mcp.json`
+- **Devin**: `~/.config/devin/mcp_config.json` (Windows: `%APPDATA%\devin\mcp_config.json`; project: `.devin/mcp_config.json`)
 
 See the Quick Start section above for the config snippet.
 
@@ -280,7 +281,7 @@ Once logged in, you can:
 
 Register at [mimir.featurefactory.io](https://mimir.featurefactory.io/auth/register/) to get your token, then add to your IDE config:
 
-**Windsurf** (`~/.codeium/windsurf/mcp_config.json`) · **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`) · **Cursor** (`~/.cursor/mcp.json`):
+**Windsurf** (`~/.codeium/windsurf/mcp_config.json`) · **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`) · **Cursor** (`~/.cursor/mcp.json`) · **Devin** (`~/.config/devin/mcp_config.json`):
 
 ```json
 {
@@ -350,7 +351,8 @@ All tools support async operations and validate user permissions automatically.
    Add Mimir to your IDE's MCP configuration (see section 2 above):
    - **Windsurf:** `~/.codeium/windsurf/mcp_config.json`
    - **Claude Desktop:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Cursor:** Workspace settings or `.cursorrules`
+   - **Cursor:** `~/.cursor/mcp.json`
+   - **Devin:** `~/.config/devin/mcp_config.json`
    
    Restart your IDE after configuration.
 
