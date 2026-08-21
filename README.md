@@ -99,7 +99,7 @@ curl -s -X POST http://localhost:8000/api/auth/token/ \
 
 The MCP facade is published as a **public Docker Hub image** (`featurefactory/mimir-mcp`) — no registry login needed.
 
-**Windsurf** (`~/.codeium/windsurf/mcp_config.json`), **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`), **Cursor** (`~/.cursor/mcp.json`), **Devin** (`~/.config/devin/mcp_config.json`):
+**Devin** (`~/.config/devin/mcp_config.json`), **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`), **Cursor** (`~/.cursor/mcp.json`):
 
 ```json
 {
@@ -148,7 +148,7 @@ Maintainers publishing from CI configure GitHub Actions secrets **`DOCKERHUB_USE
 - **Graphviz** (system `dot` binary — required for workflow activity diagrams; the `graphviz` pip package alone is not enough)
   - macOS: `brew install graphviz`
   - Debian/Ubuntu: `sudo apt-get install graphviz`
-- IDE with MCP support (Claude Desktop, Cursor, Windsurf, etc.)
+- IDE with MCP support (Claude Desktop, Cursor, Devin, etc.)
 - Access credentials for HOMEBASE (optional, for syncing)
 - **Playwright browsers** (optional — only for E2E tests): after `pip install`, run `playwright install`
 
@@ -250,10 +250,9 @@ pytest tests/
 
 ### MCP Configuration Files
 
-- **Windsurf**: `~/.codeium/windsurf/mcp_config.json`
+- **Devin**: `~/.config/devin/mcp_config.json` (Windows: `%APPDATA%\devin\mcp_config.json`; project: `.devin/mcp_config.json`)
 - **Claude Desktop**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Cursor**: `~/.cursor/mcp.json`
-- **Devin**: `~/.config/devin/mcp_config.json` (Windows: `%APPDATA%\devin\mcp_config.json`; project: `.devin/mcp_config.json`)
 
 See the Quick Start section above for the config snippet.
 
@@ -281,7 +280,7 @@ Once logged in, you can:
 
 Register at [mimir.featurefactory.io](https://mimir.featurefactory.io/auth/register/) to get your token, then add to your IDE config:
 
-**Windsurf** (`~/.codeium/windsurf/mcp_config.json`) · **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`) · **Cursor** (`~/.cursor/mcp.json`) · **Devin** (`~/.config/devin/mcp_config.json`):
+**Devin** (`~/.config/devin/mcp_config.json`) · **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`) · **Cursor** (`~/.cursor/mcp.json`):
 
 ```json
 {
@@ -349,10 +348,9 @@ All tools support async operations and validate user permissions automatically.
 1. **Configure your IDE** (one-time setup)
    
    Add Mimir to your IDE's MCP configuration (see section 2 above):
-   - **Windsurf:** `~/.codeium/windsurf/mcp_config.json`
+   - **Devin:** `~/.config/devin/mcp_config.json`
    - **Claude Desktop:** `~/Library/Application Support/Claude/claude_desktop_config.json`
    - **Cursor:** `~/.cursor/mcp.json`
-   - **Devin:** `~/.config/devin/mcp_config.json`
    
    Restart your IDE after configuration.
 
@@ -402,7 +400,7 @@ All tools support async operations and validate user permissions automatically.
    Send `{"jsonrpc":"2.0","method":"tools/list","id":1}` — you should get a list of 53 tools.
 
 3. **Check IDE logs:**
-   - **Windsurf**: View logs in MCP settings panel
+   - **Devin**: View logs in MCP settings panel
    - **Claude Desktop**: Check `~/Library/Logs/Claude/`
    - **Cursor**: Check IDE console for MCP connection errors
 
@@ -476,7 +474,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ### IDE-Specific Rules
 
 Mimir maintains project rules in two formats to support different AI-powered IDEs:
-- **`.windsurf/rules/*.md`** - For Windsurf IDE
+- **`.windsurf/rules/*.md`** - For Devin / Windsurf-compatible IDE rules
 - **`.cursor/rules/*.mdc`** - For Cursor IDE
 
 Both rule sets contain identical content with different formatting. **If you use Cursor and modify rules**, ask your IDE to maintain sync between both formats to keep them consistent.

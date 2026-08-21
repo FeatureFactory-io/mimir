@@ -52,14 +52,20 @@ class TestLandingHeroCta:
         assert 'data-testid="landing-mcp-connect"' in body
         assert 'id="mcp-config"' in body
 
-    def test_landing_mcp_section_includes_devin_tab_and_config_path(self, client):
-        """LANDING-CTA-03: Devin tab, icon, and ~/.config/devin/mcp_config.json."""
+    def test_landing_mcp_section_replaces_windsurf_with_devin(self, client):
+        """LANDING-CTA-03: Devin is the default MCP tab; Windsurf is gone."""
         response = client.get("/")
 
         assert response.status_code == 200
         body = response.content.decode()
         assert 'data-testid="tab-devin"' in body
-        assert "Devin" in body
+        assert 'class="nav-link active" id="tab-devin"' in body
+        assert 'class="tab-pane fade show active" id="pane-devin"' in body
         assert 'data-testid="pane-devin"' in body
         assert "~/.config/devin/mcp_config.json" in body
         assert "images/devin.svg" in body
+        assert "tab-windsurf" not in body
+        assert "pane-windsurf" not in body
+        assert "images/windsurf.svg" not in body
+        assert "~/.codeium/windsurf" not in body
+        assert "Windsurf" not in body

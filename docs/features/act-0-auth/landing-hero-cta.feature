@@ -26,8 +26,9 @@ Feature: FOB-LANDING-CTA Landing Hero Primary Action
     Then the page scroll target is the MCP configuration section with data-testid "landing-mcp-connect"
 
 
-  Scenario: LANDING-CTA-03 MCP connect section lists Devin config path
+  Scenario: LANDING-CTA-03 MCP connect section lists Devin instead of Windsurf
     Given Bob is on the FOB landing page at "/"
-    Then he sees a Devin tab with data-testid "tab-devin"
+    Then he sees a Devin tab with data-testid "tab-devin" as the default active tab
     And the Devin pane with data-testid "pane-devin" names file "~/.config/devin/mcp_config.json"
     And the Devin tab shows the Devin icon from static/images/devin.svg
+    And he does not see a Windsurf tab, pane, icon, or ~/.codeium/windsurf config path

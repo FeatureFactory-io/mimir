@@ -70,7 +70,9 @@ The MCP facade (`featurefactory/mimir-mcp:latest`) is a public Docker Hub image 
 
 > **Note:** Older guides referenced `public.ecr.aws/h1b6q4p0/mimir-mcp-facade`; use Docker Hub (`featurefactory/mimir-mcp`) instead.
 
-### Windsurf — `~/.codeium/windsurf/mcp_config.json`
+### Devin — `~/.config/devin/mcp_config.json`
+
+Windows: `%APPDATA%\devin\mcp_config.json`. Project-level (commit or gitignore tokens): `.devin/mcp_config.json` / `.devin/mcp_config.local.json`.
 
 ```json
 {
@@ -113,29 +115,6 @@ The MCP facade (`featurefactory/mimir-mcp:latest`) is a public Docker Hub image 
 ```
 
 ### Cursor — `~/.cursor/mcp.json`
-
-```json
-{
-  "mcpServers": {
-    "mimir": {
-      "command": "docker",
-      "args": [
-        "run", "--rm", "-i",
-        "-e", "MIMIR_DEV_ROOT=/Users/you/GitHub",
-        "-v", "/Users/you/GitHub:/Users/you/GitHub",
-        "-e", "MIMIR_SERVER_URL=https://mimir.featurefactory.io",
-        "-e", "MIMIR_TOKEN=<your-token>",
-        "-e", "MCP_TRANSPORT=stdio",
-        "featurefactory/mimir-mcp:latest"
-      ]
-    }
-  }
-}
-```
-
-### Devin — `~/.config/devin/mcp_config.json`
-
-Windows: `%APPDATA%\devin\mcp_config.json`. Project-level (commit or gitignore tokens): `.devin/mcp_config.json` / `.devin/mcp_config.local.json`.
 
 ```json
 {
