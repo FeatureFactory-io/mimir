@@ -1,0 +1,107 @@
+feature_execution_graph:
+  feature_ref: EXPORT-ADE-RULES
+  nodes:
+    - id: N1-ade-formatter
+      title: "Backend — ADE rule formatters + bundle fields"
+      bpe: BPE-02
+      depends_on: []
+      footprint:
+        - methodology/services/rule_export_formatters.py
+        - methodology/services/playbook_export_service.py
+        - methodology/services/workflow_export_service.py
+        - tests/unit/test_playbook_export_service.py
+        - tests/unit/test_rule_export_formatters.py
+      tests:
+        - test_format_rule_for_ade_cursor_force_apply
+        - test_build_inline_rules_markdown
+        - test_sync_ade_rules_cursor_only
+        - test_canonical_tree_preserves_stored_always_apply
+        - test_playbook_export_ade_log_story_happy
+        - test_playbook_export_ade_log_story_reject
+      log_story_rows:
+        - PlaybookExportService.export_playbook_to_local:entry
+        - PlaybookExportService._format_ade_rule_files:processing
+        - PlaybookExportService._sync_ade_root_rules:processing
+        - PlaybookExportService.export_playbook_to_local:exit
+        - PlaybookExportService.export_playbook_to_local:error
+      gate:
+        command: "pytest tests/unit/test_playbook_export_service.py tests/unit/test_rule_export_formatters.py -x"
+        log_story_command: "pytest tests/unit/test_playbook_export_service.py -k log_story -x"
+      guidance_bundle:
+        activity: BPE/BPE-02-Implement_Backend.md
+        rules:
+          - do-skeletons-first
+          - do-test-first
+          - do-assert-log-story
+          - do-write-concise-methods
+        skills:
+          - Pytest Log Story Assertions
+
+    - id: N2-mcp-api
+      title: "Backend — MCP + export-local API + HTTP facade"
+      bpe: BPE-02
+      depends_on: [N1-ade-formatter]
+      footprint:
+        - mcp_integration/tools.py
+        - mcp_integration/facade/tools_http.py
+        - methodology/api/viewsets.py
+        - tests/integration/test_playbook_export_local_api.py
+        - tests/integration/test_mcp_export_playbook_ade.py
+      tests:
+        - test_mcp_export_playbook_to_local_ade_t1
+        - test_mcp_export_playbook_to_local_ade_t2
+        - test_export_local_api_ade_params
+      gate:
+        command: "pytest tests/integration/test_playbook_export_local_api.py tests/integration/test_mcp_export_playbook_ade.py -x"
+      guidance_bundle:
+        activity: BPE/BPE-02-Implement_Backend.md
+        rules:
+          - do-test-first
+          - do-not-mock-in-integration-tests
+        skills:
+          - Pytest Log Story Assertions
+
+    - id: N3-acceptance
+      title: "Feature acceptance — Gherkin EXPORT_IMPORT-30..34"
+      bpe: BPE-04
+      depends_on: [N2-mcp-api]
+      footprint:
+        - docs/features/act-3-workflows/workflows-export-import.feature
+        - tests/integration/test_mcp_export_playbook_ade.py
+      gate:
+        command: "pytest tests/integration/test_mcp_export_playbook_ade.py tests/unit/test_playbook_export_service.py -x"
+      guidance_bundle:
+        activity: BPE/BPE-04-Implement_Feature_Acceptance_Tests.md
+        rules:
+          - do-not-mock-in-integration-tests
+        skills:
+          - Behave-Django BDD Runner
+
+    - id: N4-edda-pip-draft
+      title: "Draft Edda PIP — DSP-04/05/artifact 20 (no apply)"
+      bpe: BPE-02
+      depends_on: [N2-mcp-api]
+      footprint:
+        - docs/plans/EXPORT-ADE-RULES_CHANGE_RECONCILIATION.md
+      gate:
+        command: "test -f docs/plans/EXPORT-ADE-RULES_CHANGE_RECONCILIATION.md"
+      guidance_bundle:
+        activity: BPE/BPE-02-Implement_Backend.md
+        rules:
+          - do-plan-before-doing
+        skills: []
+
+    - id: N5-definition-of-done
+      title: "Definition of Done — EXPORT-ADE-RULES"
+      bpe: BPE-06
+      depends_on: [N3-acceptance, N4-edda-pip-draft]
+      footprint:
+        - docs/plans/EXPORT-ADE-RULES_IMPLEMENTATION_PLAN.md
+        - docs/architecture/SAO.md
+      gate:
+        command: "pytest tests/unit/test_playbook_export_service.py tests/integration/test_playbook_export_local_api.py tests/integration/test_mcp_export_playbook_ade.py -x"
+      guidance_bundle:
+        activity: BPE/BPE-06-Check_Definition_of_Done.md
+        rules:
+          - do-test-first
+          - do-assert-log-story
