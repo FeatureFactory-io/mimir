@@ -17,7 +17,6 @@ from mcp_integration.facade.workspace_mount import (
     ensure_import_supported_on_server,
     ensure_readable_workspace_path,
     ensure_writable_workspace_path,
-    resolve_dev_root_from_export_target,
 )
 
 logger = logging.getLogger(__name__)
@@ -508,7 +507,9 @@ def export_playbook_to_local(
 
     ade_rule_files = data.get("ade_rule_files") or []
     if sync_root_rules and ade_rule_files:
-        dev_root = resolve_dev_root_from_export_target(resolved_target)
+        from methodology.services.playbook_export_service import PlaybookExportService
+
+        dev_root = PlaybookExportService._resolve_dev_root(resolved_target)
         for entry in ade_rule_files:
             dest = dev_root / entry["path"]
             dest.parent.mkdir(parents=True, exist_ok=True)
