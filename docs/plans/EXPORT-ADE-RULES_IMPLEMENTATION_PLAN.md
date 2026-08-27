@@ -10,7 +10,7 @@
 
 ## Problem Statement
 
-Playbook rules export to the playbook tree with stored `alwaysApply`, but ADEs (Cursor, Devin) only inject rules from `.cursor/rules/` and `.windsurf/rules/`. Most Edda rules are `always_apply=false`, so even optional `sync_root_rules` skips them. DSP-05 never calls export with force-apply. Agents skip mandatory process rules.
+Playbook rules export to the playbook tree with stored `alwaysApply`, but ADEs (Cursor, Devin) only inject rules from `.cursor/rules/` and `.windsurf/rules/`. Most Edda rules are still `always_apply=false` in released data, so even optional `sync_root_rules` skips them. **Approved data fix:** set Edda process rules to `always_apply=true` (PIP / seed) so export and ADE sync match team intent — always-on craft standards. DSP-05 still needs ADE-aware placement (`ade_target`); `force_apply` becomes optional once data is corrected.
 
 ---
 
@@ -31,8 +31,7 @@ Playbook rules export to the playbook tree with stored `alwaysApply`, but ADEs (
 
 ## Section B — Do-Not-Do List
 
-- Do NOT add `apply_mode` to Rule model ([#175](https://github.com/FeatureFactory-io/mimir/issues/175)).
-- Do NOT mass-update Edda `Rule.always_apply` rows.
+- Do NOT add `apply_mode` to Rule model ([#175](https://github.com/FeatureFactory-io/mimir/issues/175)) — use boolean `always_apply` + export placement for this CR.
 - Do NOT change JSON `export_playbook` / `import_playbook`.
 - Do NOT overwrite entire `CLAUDE.md` / copilot-instructions — inline section only (DSP-05 PIP).
 - Do NOT copy apply-on rules to **both** `.cursor` and `.windsurf` when `ade_target` is set — single ADE only.
@@ -143,10 +142,11 @@ No new MCP tool. T1 + T2 required; T3 if stdio subprocess tested elsewhere.
 1. Verify Gherkin scenarios 30–34 mappable to integration tests (may remain partially documented until green).
 2. Run full export test module.
 
-### Slice 4 — Edda PIP draft (BPE-02, human gate)
+### Slice 4 — Edda data + PIP draft (BPE-02, human gate)
 
-1. `create_pip` on playbook 3 with ALTERs from reconciliation doc (DSP-04, DSP-05, artifact 20).
-2. **Do not submit/apply** until human review.
+1. **Data:** PIP ALTER (or seed `mimir.db`) — set `always_apply=true` on all Edda/FeatureFactory playbook rules currently `false` (~25 rows). Rationale: process rules are team-wide craft standards; Mimir activity-linking remains for *which* rules attach to activities, not “off in ADE”.
+2. `create_pip` on playbook 3 with ALTERs from reconciliation doc (DSP-04, DSP-05, artifact 20) **plus** rule flag updates.
+3. **Do not submit/apply** until human review.
 
 ### Slice 5 — DoD (BPE-06)
 
@@ -171,4 +171,4 @@ See [EXPORT-ADE-RULES-feature-execution-graph.yaml](./EXPORT-ADE-RULES-feature-e
 - #176 was filed as a bug but is a **process + export contract** gap; BPE-08 reclassification avoided Autofix noise.
 - Edda source of truth is released playbook v71 — FOB repo copies under `.cursor/playbooks/Edda/` are export artifacts, not authoritative for PIP ALTERs.
 - Prior #165 `sync_root_rules` dual-wrote both IDEs; Plan B requires explicit `ade_target` to prevent wrong-IDE pollution.
-- Deferring #175 keeps this CR shippable: `force_apply` on ADE copy is sufficient for the Yggdrasil failure mode.
+- Deferring #175 keeps this CR shippable without a schema migration; **`always_apply=true` on Edda rules** aligns stored data with “always-on standards” so export/`sync_root_rules` work without relying solely on `force_apply`.
