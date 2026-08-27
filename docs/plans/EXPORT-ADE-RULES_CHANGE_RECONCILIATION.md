@@ -29,7 +29,7 @@ Two coordinated slices — **minimal FOB export changes** + **Edda PIP** (DSP-04
 
 | Slice | Owner | Change |
 |-------|-------|--------|
-| Edda rule data | PIP on playbook 3 (+ seed `mimir.db`) | Set `always_apply=true` on all process rules currently `false` (~25). Team decision: craft rules are always-on in ADE; activity M2M still scopes *activity* attachment. |
+| Edda rule data | FOB playbook 3 (draft → MCP → re-release) | Set `always_apply=true` on all process rules currently `false` (~25 on prod). Team decision: craft rules are always-on in ADE; activity M2M still scopes *activity* attachment. **No local `mimir.db` changes.** |
 | FOB export | `export_playbook_to_local` + MCP/API passthrough | Add `ade_target` + optional `force_apply`; format for chosen ADE; with `sync_root_rules=true`, write apply-on copies to ADE load paths. Canonical tree keeps stored `always_apply` (now `true` for Edda). |
 | Edda process | PIP on released playbook | ALTER DSP-04 (record `ade_target`), DSP-05 (call export; verify / splice Claude-Copilot), artifact 20 (truthful apply-on wording). |
 
@@ -127,7 +127,7 @@ Update deliverables: include ADE rule sync verification.
 
 ## Explicit goals (added)
 
-- Mass-update Edda `Rule.always_apply` → `true` where currently `false` (PIP + seed), so ADE export/`sync_root_rules` inject process rules without export-only overrides alone
+- Mass-update Edda `Rule.always_apply` → `true` on **hosted FOB** via MCP `update_rule` while draft (~25 rules); re-release after review — not via local seed
 
 ---
 

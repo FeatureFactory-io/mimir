@@ -10,7 +10,7 @@
 
 ## Problem Statement
 
-Playbook rules export to the playbook tree with stored `alwaysApply`, but ADEs (Cursor, Devin) only inject rules from `.cursor/rules/` and `.windsurf/rules/`. Most Edda rules are still `always_apply=false` in released data, so even optional `sync_root_rules` skips them. **Approved data fix:** set Edda process rules to `always_apply=true` (PIP / seed) so export and ADE sync match team intent — always-on craft standards. DSP-05 still needs ADE-aware placement (`ade_target`); `force_apply` becomes optional once data is corrected.
+Playbook rules export to the playbook tree with stored `alwaysApply`, but ADEs (Cursor, Devin) only inject rules from `.cursor/rules/` and `.windsurf/rules/`. On **hosted FOB** (prod Edda v71), most process rules are still `always_apply=false`, so even optional `sync_root_rules` skips them. **Approved data fix:** on FOB only — set Edda rules to `always_apply=true` via MCP while playbook is **draft** (no local `mimir.db` changes). DSP-05 still needs ADE-aware placement (`ade_target`); `force_apply` becomes optional once FOB data is corrected.
 
 ---
 
@@ -142,11 +142,16 @@ No new MCP tool. T1 + T2 required; T3 if stdio subprocess tested elsewhere.
 1. Verify Gherkin scenarios 30–34 mappable to integration tests (may remain partially documented until green).
 2. Run full export test module.
 
-### Slice 4 — Edda data + PIP draft (BPE-02, human gate)
+### Slice 4 — Edda on FOB (BPE-02, human gate)
 
-1. **Data:** PIP ALTER (or seed `mimir.db`) — set `always_apply=true` on all Edda/FeatureFactory playbook rules currently `false` (~25 rows). Rationale: process rules are team-wide craft standards; Mimir activity-linking remains for *which* rules attach to activities, not “off in ADE”.
-2. `create_pip` on playbook 3 with ALTERs from reconciliation doc (DSP-04, DSP-05, artifact 20) **plus** rule flag updates.
-3. **Do not submit/apply** until human review.
+**Source of truth:** hosted FOB only (`https://mimir.featurefactory.io` — playbook 3 Edda). Local `mimir.db` is out of scope for this slice.
+
+1. **Prerequisite:** Human sets Edda to **draft** on FOB (released playbooks are MCP read-only for rule updates).
+2. **Rule data (MCP):** For each rule with `always_apply=false` (~25 on prod today), call `update_rule(rule_id=…, always_apply=true)`. Rationale: process rules are team-wide craft standards; activity M2M still scopes *which* rules attach to activities, not “off in ADE”.
+3. **Process text (PIP or MCP activity updates):** ALTER DSP-04, DSP-05, artifact 20 per reconciliation doc — `create_pip` on playbook 3 **or** direct `update_activity` while draft.
+4. Human review → re-release Edda on FOB.
+
+**Prod rules currently `always_apply=false` (2026-08-27 MCP snapshot):** 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32.
 
 ### Slice 5 — DoD (BPE-06)
 
@@ -169,6 +174,6 @@ See [EXPORT-ADE-RULES-feature-execution-graph.yaml](./EXPORT-ADE-RULES-feature-e
 ## Lessons Learned
 
 - #176 was filed as a bug but is a **process + export contract** gap; BPE-08 reclassification avoided Autofix noise.
-- Edda source of truth is released playbook v71 — FOB repo copies under `.cursor/playbooks/Edda/` are export artifacts, not authoritative for PIP ALTERs.
+- Edda source of truth is **hosted FOB** (released v71) — repo copies under `.cursor/playbooks/Edda/` and local `mimir.db` are not authoritative for rule flags or PIP ALTERs.
 - Prior #165 `sync_root_rules` dual-wrote both IDEs; Plan B requires explicit `ade_target` to prevent wrong-IDE pollution.
 - #175 closed without `apply_mode` schema; **`always_apply=true` on Edda rules** + `ade_target` export placement resolves the injection gap without a model migration.
