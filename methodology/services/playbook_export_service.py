@@ -12,6 +12,12 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from methodology.models import Agent, Artifact, Playbook, Rule, Skill, Workflow
 from methodology.services.playbook_service import PlaybookService
+from methodology.services.rule_export_formatters import (
+    build_ade_rule_files,
+    build_inline_rules_markdown,
+    normalize_ade_targets,
+    validate_ade_export_params,
+)
 from methodology.services.workflow_export_service import WorkflowExportService
 
 logger = logging.getLogger(__name__)
@@ -27,6 +33,9 @@ class PlaybookExportService:
         folder_name: Optional[str] = None,
         additional_targets: Optional[list[str]] = None,
         sync_root_rules: bool = False,
+        ade_targets: Optional[list[str]] = None,
+        force_apply: bool = False,
+        ade_target: Optional[str] = None,
         user=None,
     ) -> dict:
         """
@@ -36,20 +45,44 @@ class PlaybookExportService:
         :param target_directory: Base directory (e.g. ``.cursor/playbooks``)
         :param folder_name: Playbook folder name (defaults to slugified playbook name)
         :param additional_targets: Optional extra roots receiving a copy of the tree
-        :param sync_root_rules: Copy always-apply rules to IDE root rule folders
+        :param sync_root_rules: Copy apply-on rules to ADE load paths from ``ade_targets``
+        :param ade_targets: ADE keys (cursor, devin, claude, copilot); ≥1 when sync/force
+        :param force_apply: Apply-on frontmatter for ADE copies even when DB flag is false
+        :param ade_target: Singular alias normalized into ``ade_targets``
         :param user: Authenticated user for read permission checks
         :return: Summary dict with counts and file paths
         """
+        try:
+            normalized_targets = validate_ade_export_params(
+                ade_targets=ade_targets,
+                sync_root_rules=sync_root_rules,
+                force_apply=force_apply,
+                ade_target=ade_target,
+            )
+        except ValueError as exc:
+            logger.error(
+                "PlaybookExportService.export_playbook_to_local | error | "
+                "ade_targets required | %s",
+                exc,
+            )
+            raise
+        ade_targets_str = ",".join(normalized_targets) if normalized_targets else ""
         logger.info(
-            "Playbook export entry playbook_id=%s target=%s folder=%s sync_root_rules=%s",
+            "PlaybookExportService.export_playbook_to_local | entry | "
+            "playbook_id=%s target=%s folder=%s sync_root_rules=%s "
+            "ade_targets=%s force_apply=%s",
             playbook_id,
             target_directory,
             folder_name,
             sync_root_rules,
+            ade_targets_str,
+            force_apply,
         )
         bundle = PlaybookExportService.generate_playbook_export_bundle(
             playbook_id=playbook_id,
             folder_name=folder_name,
+            ade_targets=normalized_targets,
+            force_apply=force_apply,
             user=user,
         )
         targets = [target_directory] + list(additional_targets or [])
@@ -72,8 +105,14 @@ class PlaybookExportService:
             )
 
         if sync_root_rules:
-            PlaybookExportService._sync_root_rules(bundle, Path(target_directory))
+            PlaybookExportService._sync_ade_root_rules(
+                bundle,
+                Path(target_directory),
+                force_apply=force_apply,
+            )
 
+        inline_md = bundle.get("inline_rules_markdown") or ""
+        ade_files = bundle.get("ade_rule_files") or []
         result = {
             "status": "exported",
             "playbook_id": bundle["playbook_id"],
@@ -86,14 +125,19 @@ class PlaybookExportService:
             "agents": bundle["counts"]["agents"],
             "artifacts": bundle["counts"]["artifacts"],
             "files_created": all_files,
+            "ade_rule_files": ade_files,
+            "inline_rules_markdown": inline_md,
             "message": "Playbook exported successfully.",
         }
         logger.info(
-            "Playbook export exit playbook_id=%s workflows=%s rules=%s files=%s",
+            "PlaybookExportService.export_playbook_to_local | exit | "
+            "playbook_id=%s workflows=%s rules=%s files=%s ade_files=%s inline=%s",
             playbook_id,
             result["workflows"],
             result["rules"],
             len(all_files),
+            len(ade_files),
+            bool(inline_md),
         )
         return result
 
@@ -101,9 +145,23 @@ class PlaybookExportService:
     def generate_playbook_export_bundle(
         playbook_id: int,
         folder_name: Optional[str] = None,
+        ade_targets: Optional[list[str]] = None,
+        force_apply: bool = False,
+        ade_target: Optional[str] = None,
         user=None,
     ) -> dict:
         """Build export payload without filesystem writes (for API / facade)."""
+        if force_apply:
+            normalized_targets = validate_ade_export_params(
+                ade_targets=ade_targets,
+                sync_root_rules=False,
+                force_apply=True,
+                ade_target=ade_target,
+            )
+        else:
+            normalized_targets = normalize_ade_targets(
+                ade_targets, ade_target=ade_target
+            )
         playbook = PlaybookExportService._load_playbook(playbook_id, user)
         if not folder_name:
             folder_name = WorkflowExportService._slugify(playbook.name)
@@ -169,6 +227,28 @@ class PlaybookExportService:
             for artifact in artifacts
         ]
 
+        ade_rule_files = build_ade_rule_files(
+            rules, normalized_targets, force_apply=force_apply
+        )
+        for entry in ade_rule_files:
+            logger.info(
+                "PlaybookExportService._format_ade_rule_files | processing | "
+                "slug=%s ade_targets=%s",
+                entry["slug"],
+                entry["ade_target"],
+            )
+
+        inline_rules_markdown = ""
+        if any(t in normalized_targets for t in ("claude", "copilot")):
+            inline_rules_markdown = build_inline_rules_markdown(
+                rules, force_apply=force_apply
+            )
+            logger.info(
+                "PlaybookExportService._build_inline_rules_markdown | processing | "
+                "rule_count=%s",
+                len(rules),
+            )
+
         return {
             "playbook_id": playbook.pk,
             "playbook_name": playbook.name,
@@ -179,6 +259,8 @@ class PlaybookExportService:
             "skill_files": skill_files,
             "artifact_files": artifact_files,
             "workflows": workflow_bundles,
+            "ade_rule_files": ade_rule_files,
+            "inline_rules_markdown": inline_rules_markdown,
             "counts": {
                 "workflows": len(workflows),
                 "activities": activity_count,
@@ -230,17 +312,30 @@ class PlaybookExportService:
         return written
 
     @staticmethod
-    def _sync_root_rules(bundle: dict, target_directory: Path) -> None:
-        dev_root = target_directory.resolve().parent
-        for ide_rules in (dev_root / ".cursor" / "rules", dev_root / ".windsurf" / "rules"):
-            ide_rules.mkdir(parents=True, exist_ok=True)
-            for rule in bundle["rule_files"]:
-                if "alwaysApply: true" not in rule["content"]:
-                    continue
-                ext = ".mdc" if ide_rules.name == "rules" and ".cursor" in str(ide_rules) else ".md"
-                name = rule["filename"].replace(".mdc", ext)
-                (ide_rules / name).write_text(rule["content"], encoding="utf-8")
-                logger.info("Synced root rule %s to %s", name, ide_rules)
+    def _resolve_dev_root(target_directory: Path) -> Path:
+        """Project dev root from a ``.cursor/playbooks`` (or similar) export target."""
+        resolved = target_directory.resolve()
+        if resolved.name == "playbooks" and resolved.parent.name == ".cursor":
+            return resolved.parent.parent
+        return resolved.parent
+
+    @staticmethod
+    def _sync_ade_root_rules(
+        bundle: dict, target_directory: Path, *, force_apply: bool = False
+    ) -> None:
+        dev_root = PlaybookExportService._resolve_dev_root(target_directory)
+        for entry in bundle.get("ade_rule_files") or []:
+            rel = entry["path"]
+            dest = dev_root / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(entry["content"], encoding="utf-8")
+            logger.info(
+                "PlaybookExportService._sync_ade_root_rules | processing | "
+                "path=%s slug=%s force_apply=%s",
+                rel,
+                entry.get("slug"),
+                force_apply,
+            )
 
     @staticmethod
     def _generate_playbook_md(playbook, workflows, activity_count: int) -> str:
