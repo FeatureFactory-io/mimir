@@ -223,6 +223,41 @@ def test_playbook_export_additional_target_rejected_outside_dev_root(
     assert not (outside / "Edda").exists()
 
 
+def test_playbook_export_sync_ade_rules_without_django_import(
+    configured_client,
+    tmp_path,
+    monkeypatch,
+):
+    """ADE root sync must not import methodology (Docker facade has no Django)."""
+    monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: False)
+    bundle = _playbook_export_bundle()
+    bundle["ade_rule_files"] = [
+        {
+            "slug": "pytest",
+            "ade_target": "cursor",
+            "path": ".cursor/rules/pytest.mdc",
+            "filename": "pytest.mdc",
+            "content": "---\nalwaysApply: true\n---\nUse pytest\n",
+        }
+    ]
+    _mock_playbook_export_client(monkeypatch, bundle)
+
+    export_dir = tmp_path / ".cursor" / "playbooks"
+    result = tools.export_playbook_to_local(
+        playbook_id=3,
+        target_directory=str(export_dir),
+        folder_name="Edda",
+        ade_targets=["cursor"],
+        sync_root_rules=True,
+        force_apply=True,
+    )
+
+    ade_rule = tmp_path / ".cursor" / "rules" / "pytest.mdc"
+    assert result["status"] == "exported"
+    assert ade_rule.exists()
+    assert "alwaysApply: true" in ade_rule.read_text(encoding="utf-8")
+
+
 def test_playbook_export_additional_target_writes_when_not_in_docker(
     configured_client,
     tmp_path,

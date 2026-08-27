@@ -214,6 +214,18 @@ def _validate_docker_workspace(path: str, *, purpose: str) -> Path:
     return resolved
 
 
+def resolve_dev_root_from_export_target(export_target: Path) -> Path:
+    """
+    Project dev root from a ``.cursor/playbooks`` (or similar) export target.
+
+    Mirrors ``PlaybookExportService._resolve_dev_root`` without Django imports.
+    """
+    resolved = export_target.resolve()
+    if resolved.name == "playbooks" and resolved.parent.name == ".cursor":
+        return resolved.parent.parent
+    return resolved.parent
+
+
 def ensure_writable_workspace_path(path: str, *, purpose: str = "export") -> Path:
     """
     Validate that a path can be written from the Docker facade.
