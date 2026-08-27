@@ -4,7 +4,7 @@
 **Trigger:** [GitHub #176](https://github.com/FeatureFactory-io/mimir/issues/176) — enhancement / change request (not a product bug)  
 **BPE activity:** BPE-08 Process Change Request  
 **Approved:** 2026-08-27 (user execution of BPE-08 plan)  
-**Related:** [#175](https://github.com/FeatureFactory-io/mimir/issues/175) (`apply_mode` schema — **out of scope** for this CR)
+**Related:** [#175](https://github.com/FeatureFactory-io/mimir/issues/175) closed — `apply_mode` enum **not planned**; Plan B (this CR) is the approved alternate
 
 ---
 
@@ -120,7 +120,7 @@ Update deliverables: include ADE rule sync verification.
 
 ## Explicit non-goals
 
-- [#175](https://github.com/FeatureFactory-io/mimir/issues/175) `apply_mode` enum on Rule model
+- [#175](https://github.com/FeatureFactory-io/mimir/issues/175) `apply_mode` enum on Rule model (closed **not planned** — see issue resolution comment)
 - JSON `export_playbook` behavior changes
 - Product code in BPE-08 (this document + spec edits only)
 - Edda PIP create/submit/apply in BPE-08 (deferred to BPE-01 → BPE-02 implementation phase)

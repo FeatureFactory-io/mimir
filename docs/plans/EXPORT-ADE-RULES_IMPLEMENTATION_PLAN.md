@@ -4,7 +4,7 @@
 **GitHub Issue:** [#176](https://github.com/FeatureFactory-io/mimir/issues/176) (enhancement)  
 **Reconciliation:** [EXPORT-ADE-RULES_CHANGE_RECONCILIATION.md](./EXPORT-ADE-RULES_CHANGE_RECONCILIATION.md)  
 **Spec:** `docs/features/act-3-workflows/workflows-export-import.feature` (FOB-WORKFLOWS-EXPORT_IMPORT-30..34)  
-**Related:** [#165](https://github.com/FeatureFactory-io/mimir/issues/165) playbook export; [#175](https://github.com/FeatureFactory-io/mimir/issues/175) deferred
+**Related:** [#165](https://github.com/FeatureFactory-io/mimir/issues/165) playbook export; [#175](https://github.com/FeatureFactory-io/mimir/issues/175) closed — alternate implementation (no `apply_mode`)
 
 ---
 
@@ -31,7 +31,7 @@ Playbook rules export to the playbook tree with stored `alwaysApply`, but ADEs (
 
 ## Section B — Do-Not-Do List
 
-- Do NOT add `apply_mode` to Rule model ([#175](https://github.com/FeatureFactory-io/mimir/issues/175)) — use boolean `always_apply` + export placement for this CR.
+- Do NOT add `apply_mode` to Rule model — [#175](https://github.com/FeatureFactory-io/mimir/issues/175) closed with alternate implementation: boolean `always_apply` + Edda data fix + export placement ([#176](https://github.com/FeatureFactory-io/mimir/issues/176)).
 - Do NOT change JSON `export_playbook` / `import_playbook`.
 - Do NOT overwrite entire `CLAUDE.md` / copilot-instructions — inline section only (DSP-05 PIP).
 - Do NOT copy apply-on rules to **both** `.cursor` and `.windsurf` when `ade_target` is set — single ADE only.
@@ -171,4 +171,4 @@ See [EXPORT-ADE-RULES-feature-execution-graph.yaml](./EXPORT-ADE-RULES-feature-e
 - #176 was filed as a bug but is a **process + export contract** gap; BPE-08 reclassification avoided Autofix noise.
 - Edda source of truth is released playbook v71 — FOB repo copies under `.cursor/playbooks/Edda/` are export artifacts, not authoritative for PIP ALTERs.
 - Prior #165 `sync_root_rules` dual-wrote both IDEs; Plan B requires explicit `ade_target` to prevent wrong-IDE pollution.
-- Deferring #175 keeps this CR shippable without a schema migration; **`always_apply=true` on Edda rules** aligns stored data with “always-on standards” so export/`sync_root_rules` work without relying solely on `force_apply`.
+- #175 closed without `apply_mode` schema; **`always_apply=true` on Edda rules** + `ade_target` export placement resolves the injection gap without a model migration.
