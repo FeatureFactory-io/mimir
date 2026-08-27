@@ -362,3 +362,38 @@ Feature: FOB-WORKFLOWS-EXPORT_IMPORT-1 MCP Workflow Synchronization
     And the response does not contain "Cannot modify released playbook"
     And the bundle includes playbook.md and workflow folders
 
+  # ADE-AWARE RULE SYNC (Plan B) — #176 / EXPORT-ADE-RULES
+  Scenario: FOB-WORKFLOWS-EXPORT_IMPORT-30 Force-apply sync writes Cursor rules with alwaysApply true
+    Given Maria owns released playbook "Edda" with rule "do-test-first" where always_apply is false
+    When AI calls mcp.export_playbook_to_local with:
+      | playbook_id       | <Edda>              |
+      | target_directory  | .cursor/playbooks   |
+      | folder_name       | edda                |
+      | ade_target        | cursor              |
+      | sync_root_rules   | true                |
+      | force_apply       | true                |
+    Then file ".cursor/rules/do-test-first.mdc" exists under the project dev root
+    And that file contains YAML front matter "alwaysApply: true"
+    And canonical export tree "edda/rules/do-test-first.mdc" contains "alwaysApply: false"
+
+  Scenario: FOB-WORKFLOWS-EXPORT_IMPORT-31 Devin ade_target writes windsurf rules only
+    Given Maria owns released playbook "Edda" with at least one playbook rule
+    When AI calls mcp.export_playbook_to_local with ade_target=devin, sync_root_rules=true, and force_apply=true
+    Then apply-on rule files appear under ".windsurf/rules/" as "*.md"
+    And no new apply-on rule files are written under ".cursor/rules/"
+
+  Scenario: FOB-WORKFLOWS-EXPORT_IMPORT-32 Claude or Copilot target returns inline rules markdown
+    Given Maria owns released playbook "Edda" with at least one playbook rule
+    When AI calls mcp.export_playbook_to_local with ade_target=claude and force_apply=true
+    Then the export response includes field "inline_rules_markdown" with non-empty content
+    And no apply-on rule files are written under ".cursor/rules/" or ".windsurf/rules/"
+
+  Scenario: FOB-WORKFLOWS-EXPORT_IMPORT-33 Canonical playbook tree preserves stored always_apply
+    Given Maria owns playbook with rule "do-test-first" where always_apply is false
+    When AI exports the playbook tree to ".cursor/playbooks/edda/" without force_apply on the canonical path
+    Then "edda/rules/do-test-first.mdc" contains "alwaysApply: false"
+
+  Scenario: FOB-WORKFLOWS-EXPORT_IMPORT-34 sync_root_rules or force_apply requires ade_target
+    When AI calls mcp.export_playbook_to_local with sync_root_rules=true and force_apply=true but ade_target is omitted
+    Then MCP returns a validation error explaining ade_target is required
+

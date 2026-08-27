@@ -75,7 +75,7 @@ Work item management is handled by external 3rd-party MCP servers (GitHub MCP, J
 
 ### Domain Model
 
-**Core Entities**: Playbook, Workflow, Phase (optional), Activity, Artifact, Agent, Skill, **Rule** (playbook-scoped IDE rules; M2M with Activities; exported to `rules/*.mdc`)
+**Core Entities**: Playbook, Workflow, Phase (optional), Activity, Artifact, Agent, Skill, **Rule** (playbook-scoped IDE rules; M2M with Activities; exported to `{playbook_export_root}/rules/*.mdc` with stored `always_apply` in YAML front matter; optional ADE-root apply-on copies via `export_playbook_to_local(ade_target=…, sync_root_rules=true, force_apply=true)` to `.cursor/rules/` or `.windsurf/rules/` — see EXPORT-ADE-RULES reconciliation)
 
 **Phase is OPTIONAL**: Workflows MAY contain Phases for grouping Activities, but a Workflow can organize Activities without Phase grouping.
 
