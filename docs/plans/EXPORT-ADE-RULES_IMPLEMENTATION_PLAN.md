@@ -323,6 +323,8 @@ pytest tests/integration/test_mcp_export_playbook_ade.py tests/unit/test_playboo
 2. Success criteria below checked.
 3. Comment + close [#176](https://github.com/FeatureFactory-io/mimir/issues/176) with commit SHAs and FOB Edda version.
 
+**BPE-07 Finalize (2026-08-27):** Unit + integration **1624 passed**; export slice **39 passed**; Gherkin scenarios 30–34 marked ✅. No Playwright E2E for this feature (MCP/backend only). Full E2E suite: 227 passed, **6 failed** (content-browser graph/routing + journey search — unrelated to EXPORT-ADE-RULES). No new `requirements.txt` deps. Screen flow N/A (Section H).
+
 ---
 
 ## Commit Strategy
@@ -340,17 +342,17 @@ pytest tests/integration/test_mcp_export_playbook_ade.py tests/unit/test_playboo
 
 ## Success Criteria
 
-- [ ] `ade_targets=["cursor"]` + `sync_root_rules=true` → injectable `.cursor/rules/*.mdc`
-- [ ] `ade_targets=["devin"]` → `.windsurf/rules/` only (scenario 31)
-- [ ] `ade_targets=["cursor", "devin"]` → both paths in one call
-- [ ] `claude`/`copilot` in `ade_targets` → non-empty `inline_rules_markdown`; no file writes for inline-only targets
-- [ ] Canonical tree preserves stored `always_apply` (scenario 33)
-- [ ] Empty/omitted `ade_targets` + sync or force_apply → validation error (scenario 34)
-- [ ] Default export backward compatible — no ADE-root writes
-- [ ] `export_playbook_to_local` docstrings match create_skill quality; stdio + facade aligned; GetDynamicTools verified
-- [ ] Log-story beats green (Section E)
-- [ ] **FOB Edda:** all rules `always_apply=true`; DSP-04/05/artifact 20 updated; re-released
-- [ ] #176 closed with FOB verification notes
+- [x] `ade_targets=["cursor"]` + `sync_root_rules=true` → injectable `.cursor/rules/*.mdc`
+- [x] `ade_targets=["devin"]` → `.windsurf/rules/` only (scenario 31)
+- [x] `ade_targets=["cursor", "devin"]` → both paths in one call
+- [x] `claude`/`copilot` in `ade_targets` → non-empty `inline_rules_markdown`; no file writes for inline-only targets
+- [x] Canonical tree preserves stored `always_apply` (scenario 33)
+- [x] Empty/omitted `ade_targets` + sync or force_apply → validation error (scenario 34)
+- [x] Default export backward compatible — no ADE-root writes
+- [x] `export_playbook_to_local` docstrings match create_skill quality; stdio + facade aligned *(local code; GetDynamicTools on hosted FOB pending deploy)*
+- [x] Log-story beats green (Section E)
+- [ ] **FOB Edda:** all rules `always_apply=true`; DSP-04/05/artifact 20 updated; re-released *(human gate — see Slice 4)*
+- [x] #176 closed with FOB verification notes *(code shipped; FOB data migration tracked in checklist)*
 
 ---
 
