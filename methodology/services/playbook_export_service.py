@@ -148,14 +148,15 @@ class PlaybookExportService:
         ade_targets: Optional[list[str]] = None,
         force_apply: bool = False,
         ade_target: Optional[str] = None,
+        sync_root_rules: bool = False,
         user=None,
     ) -> dict:
         """Build export payload without filesystem writes (for API / facade)."""
-        if force_apply:
+        if sync_root_rules or force_apply:
             normalized_targets = validate_ade_export_params(
                 ade_targets=ade_targets,
-                sync_root_rules=False,
-                force_apply=True,
+                sync_root_rules=sync_root_rules,
+                force_apply=force_apply,
                 ade_target=ade_target,
             )
         else:

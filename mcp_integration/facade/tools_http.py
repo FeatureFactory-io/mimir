@@ -412,26 +412,60 @@ def export_playbook_to_local(
     folder_name: str = None,
     additional_targets: list[str] | None = None,
     sync_root_rules: bool = False,
+    ade_targets: list[str] | None = None,
+    force_apply: bool = False,
+    ade_target: str | None = None,
 ) -> dict:
     """
-    Export full playbook tree to local AI workspace markdown files.
+    Export full playbook tree and optional ADE apply-on rule copies for IDE agents.
 
-    :param playbook_id: Playbook ID. Example: 3
-    :param target_directory: Base directory. Example: ".cursor/playbooks"
-    :param folder_name: Playbook folder name. Example: "Edda"
-    :param additional_targets: Optional extra export roots
-    :param sync_root_rules: Copy always-apply rules to IDE root folders
-    :return: Export summary dict
+    Writes the canonical playbook markdown tree under ``target_directory``. When
+    ``sync_root_rules`` is true, also writes apply-on rule files to ADE load paths
+    implied by ``ade_targets`` (for example ``.cursor/rules/`` for Cursor).
+
+    :param playbook_id: Playbook ID. Example: 3 (Edda / FeatureFactory)
+    :param target_directory: Canonical export root. Example: ".cursor/playbooks"
+    :param folder_name: Playbook folder name under target. Example: "Edda"
+    :param additional_targets: Extra roots that receive a copy of the canonical tree only.
+        Example: [".windsurf/workflows"]
+    :param sync_root_rules: When true, write apply-on copies to paths from ``ade_targets``.
+        Requires a non-empty ``ade_targets`` list.
+    :param ade_targets: ADE keys: cursor, devin, claude, copilot. At least one required
+        when ``sync_root_rules`` or ``force_apply`` is true. Multiple allowed.
+        Examples: ["cursor"], ["cursor", "devin"], ["claude"]
+    :param force_apply: ADE copies use apply-on frontmatter even when DB ``always_apply``
+        is false. Canonical tree under ``target_directory`` keeps stored flags.
+    :param ade_target: Singular alias merged into ``ade_targets``. Example: "cursor"
+    :return: Export summary with counts, ``files_created``, ``ade_rule_files``, and
+        ``inline_rules_markdown`` (non-empty for claude/copilot targets)
+    :raises ValueError: Playbook not accessible or ``ade_targets`` missing when required
+
+    Example:
+        export_playbook_to_local(
+            playbook_id=3,
+            target_directory=".cursor/playbooks",
+            folder_name="Edda",
+            ade_targets=["cursor", "devin"],
+            sync_root_rules=True,
+        )
     """
     logger.info(
-        'HTTP Tool: export_playbook_to_local playbook=%s target=%s folder=%s',
+        'HTTP Tool: export_playbook_to_local playbook=%s target=%s folder=%s ade_targets=%s',
         playbook_id,
         target_directory,
         folder_name,
+        ade_targets,
     )
-    payload = {}
+    payload: dict = {
+        "force_apply": force_apply,
+        "sync_root_rules": sync_root_rules,
+    }
     if folder_name:
         payload["folder_name"] = folder_name
+    if ade_targets is not None:
+        payload["ade_targets"] = ade_targets
+    if ade_target:
+        payload["ade_target"] = ade_target
     r = get_client().post(f"/api/playbooks/{playbook_id}/export-local/", json=payload)
     data = check_response(r, "export_playbook_to_local")
 
@@ -471,20 +505,19 @@ def export_playbook_to_local(
         extra_paths.append(str(extra_root))
         logger.info("HTTP Tool: mirrored playbook export to %s", extra_root)
 
-    if sync_root_rules:
-        dev_root = resolved_target.resolve().parent
-        for rule in data.get("rule_files", []):
-            if "alwaysApply: true" not in rule.get("content", ""):
-                continue
-            for ide_rules, ext in (
-                (dev_root / ".cursor" / "rules", ".mdc"),
-                (dev_root / ".windsurf" / "rules", ".md"),
-            ):
-                ide_rules.mkdir(parents=True, exist_ok=True)
-                name = rule["filename"].replace(".mdc", ext)
-                (ide_rules / name).write_text(rule["content"], encoding="utf-8")
+    ade_rule_files = data.get("ade_rule_files") or []
+    if sync_root_rules and ade_rule_files:
+        from methodology.services.playbook_export_service import PlaybookExportService
+
+        dev_root = PlaybookExportService._resolve_dev_root(resolved_target)
+        for entry in ade_rule_files:
+            dest = dev_root / entry["path"]
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(entry["content"], encoding="utf-8")
+            logger.info("HTTP Tool: synced ADE rule %s", dest)
 
     counts = data.get("counts", {})
+    inline_md = data.get("inline_rules_markdown") or ""
     return {
         "status": "exported",
         "playbook_id": data["playbook_id"],
@@ -497,6 +530,8 @@ def export_playbook_to_local(
         "agents": counts.get("agents", 0),
         "artifacts": counts.get("artifacts", 0),
         "files_created": files_written,
+        "ade_rule_files": ade_rule_files,
+        "inline_rules_markdown": inline_md,
         "message": "Playbook exported successfully.",
     }
 

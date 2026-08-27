@@ -355,11 +355,19 @@ class PlaybookViewSet(viewsets.ModelViewSet):
         logger.info("PlaybookViewSet.export_local | entry | playbook_id=%s", pk)
         playbook = self.get_object()
         folder_name = request.data.get("folder_name")
+        ade_targets = request.data.get("ade_targets")
+        ade_target = request.data.get("ade_target")
+        force_apply = bool(request.data.get("force_apply", False))
+        sync_root_rules = bool(request.data.get("sync_root_rules", False))
         logger.info(
-            "PlaybookViewSet.export_local | processing | playbook_id=%s status=%s folder=%s",
+            "PlaybookViewSet.export_local | processing | playbook_id=%s status=%s "
+            "folder=%s ade_targets=%s force_apply=%s sync_root_rules=%s",
             pk,
             playbook.status,
             folder_name,
+            ade_targets,
+            force_apply,
+            sync_root_rules,
         )
 
         from methodology.services.playbook_export_service import PlaybookExportService
@@ -368,6 +376,10 @@ class PlaybookViewSet(viewsets.ModelViewSet):
             bundle = PlaybookExportService.generate_playbook_export_bundle(
                 playbook_id=int(pk),
                 folder_name=folder_name,
+                ade_targets=ade_targets,
+                force_apply=force_apply,
+                ade_target=ade_target,
+                sync_root_rules=sync_root_rules,
                 user=request.user,
             )
         except ObjectDoesNotExist:
@@ -377,6 +389,8 @@ class PlaybookViewSet(viewsets.ModelViewSet):
             )
         except PermissionError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(bundle)
 

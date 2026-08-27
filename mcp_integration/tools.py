@@ -1167,21 +1167,48 @@ async def export_playbook_to_local(
     folder_name: str = None,
     additional_targets: list[str] | None = None,
     sync_root_rules: bool = False,
+    ade_targets: list[str] | None = None,
+    force_apply: bool = False,
+    ade_target: str | None = None,
 ) -> dict:
     """
-    Export full playbook to local AI workspace as markdown tree.
+    Export full playbook tree and optional ADE apply-on rule copies for IDE agents.
 
-    :param playbook_id: Playbook ID. Example: 3
-    :param target_directory: Base directory. Example: ".cursor/playbooks"
-    :param folder_name: Playbook folder name. Example: "Edda"
-    :param additional_targets: Extra roots to mirror the tree into
-    :param sync_root_rules: Copy always-apply rules to IDE root rule folders
-    :return: Export summary with entity counts and file paths
+    Writes the canonical playbook markdown tree under ``target_directory``. When
+    ``sync_root_rules`` is true, also writes apply-on rule files to ADE load paths
+    implied by ``ade_targets`` (for example ``.cursor/rules/`` for Cursor).
+
+    :param playbook_id: Playbook ID. Example: 3 (Edda / FeatureFactory)
+    :param target_directory: Canonical export root. Example: ".cursor/playbooks"
+    :param folder_name: Playbook folder name under target. Example: "Edda"
+    :param additional_targets: Extra roots that receive a copy of the canonical tree only.
+        Example: [".windsurf/workflows"]
+    :param sync_root_rules: When true, write apply-on copies to paths from ``ade_targets``.
+        Requires a non-empty ``ade_targets`` list.
+    :param ade_targets: ADE keys: cursor, devin, claude, copilot. At least one required
+        when ``sync_root_rules`` or ``force_apply`` is true. Multiple allowed.
+        Examples: ["cursor"], ["cursor", "devin"], ["claude"]
+    :param force_apply: ADE copies use apply-on frontmatter even when DB ``always_apply``
+        is false. Canonical tree under ``target_directory`` keeps stored flags.
+    :param ade_target: Singular alias merged into ``ade_targets``. Example: "cursor"
+    :return: Export summary with counts, ``files_created``, ``ade_rule_files``, and
+        ``inline_rules_markdown`` (non-empty for claude/copilot targets)
+    :raises ValueError: Playbook not accessible or ``ade_targets`` missing when required
+
+    Example:
+        >>> await export_playbook_to_local(
+        ...     playbook_id=3,
+        ...     target_directory=".cursor/playbooks",
+        ...     folder_name="Edda",
+        ...     ade_targets=["cursor", "devin"],
+        ...     sync_root_rules=True,
+        ... )
     """
     logger.info(
-        'MCP Tool: export_playbook_to_local playbook_id=%s target=%s',
+        'MCP Tool: export_playbook_to_local playbook_id=%s target=%s ade_targets=%s',
         playbook_id,
         target_directory,
+        ade_targets,
     )
 
     user = await sync_to_async(get_current_user)()
@@ -1195,16 +1222,22 @@ async def export_playbook_to_local(
             folder_name=folder_name,
             additional_targets=additional_targets,
             sync_root_rules=sync_root_rules,
+            ade_targets=ade_targets,
+            force_apply=force_apply,
+            ade_target=ade_target,
             user=user,
         )
     except PermissionError as exc:
         raise ValueError(f'Playbook {playbook_id} not accessible') from exc
+    except ValueError:
+        raise
 
     logger.info(
-        'MCP Tool: Exported playbook %s workflows=%s rules=%s',
+        'MCP Tool: Exported playbook %s workflows=%s rules=%s ade_files=%s',
         playbook_id,
         result.get('workflows'),
         result.get('rules'),
+        len(result.get('ade_rule_files') or []),
     )
     return result
 
