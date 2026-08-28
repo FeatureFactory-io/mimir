@@ -12,76 +12,112 @@ Activate Iteration
 ## Guidance
 
 ## Purpose
-Activate the iteration from a single human trigger. Find the requested milestone, verify it is ready, and confirm a clean execution slate.
+Activate the iteration from a single human trigger. Confirm the correct PIN manifest exists for the requested milestone, validate PIN readiness (no contradictory or non-executable scenarios), assert every issue is open and queued, and declare a clean execution slate.
 
-**Trigger:** user says "Work on milestone `<name or #N>`"
+**Trigger:** user says "Work on Milestone #N" or "Work on Milestone <name>"
 
-## Step 0: Verify PIN Artifacts Exist (do this FIRST)
-Before touching GitHub, confirm PIN completed its work:
+## Step 0 — Locate Milestone-Bound Manifest (do this FIRST)
+
+Find the manifest using the `milestone_number` or `milestone_title` fields written by the Publish activity in Plan Iteration. Do NOT use "newest file" or `ls -t | head -1`.
+
 ```bash
-ls docs/plans/iterations/ITER-*.yaml 2>/dev/null | head -1
+# When user provides a milestone number (#N):
+grep -l "milestone_number: {N}" docs/plans/iterations/ITER-*.yaml 2>/dev/null
+
+# When user provides a milestone name or fragment:
+grep -rl "milestone_title:.*{title_fragment}" docs/plans/iterations/ITER-*.yaml 2>/dev/null
 ```
-If no file found:
-> **STOP.** No execution manifest found. The Plan Iteration (PIN) workflow must be run first to produce the manifest, skeletons, and milestone. Tell the user: "Run PIN on this feature first, then invoke MIN."
 
-If found: proceed.
+If no matching manifest:
+> **STOP.** No manifest bound to this milestone. Tell user: "Run Plan Iteration for milestone '{name}' first, then invoke Manage Iteration."
 
-## Step 1: Find the Milestone
+If `milestone_number: null` (or field absent) in the matched file: the Publish activity did not complete its manifest update. Tell user: "Plan Iteration Publish step did not write the milestone number back to the manifest. Re-run Publish Step 5, then invoke Manage Iteration."
+
+If multiple matches: confirm with user which manifest to use.
+
+Record the selected manifest path. All subsequent steps use this file only.
+
+## Step 1 — Find and Lock the Milestone
 ```bash
 gh milestone list --json number,title,state | jq '.[] | select(.state == "open")'
 ```
-Match the user's input (name substring or #N) to one open milestone. If no match or multiple matches: stop and ask the user to clarify.
+Match to exactly one open milestone. Store `{milestone_number}` and `{milestone_title}`. Multiple matches or no match → stop and ask user to clarify.
 
-## Step 2: Confirm Issues and Sprint-Size Guard
-Get each issue one at a time — do not list all:
+Cross-check: confirm the manifest's `milestone_number` matches `{milestone_number}` AND `milestone_title` matches `{milestone_title}`. Any mismatch → stop and report.
+
+## Step 2 — PIN Readiness Validation
+
+Before touching any issue, validate that the manifest scenarios are executable:
+
+```bash
+cat {selected_manifest} | grep -A1 'feature_file_paths' | grep '\.feature'
+```
+
+For each `feature_file_paths[]` entry, verify:
+- [ ] The `.feature` file exists on disk
+- [ ] Each `Scenario:` title is unique within that file
+- [ ] URLs referenced in steps are consistent (flag alternating paths as a spec conflict)
+- [ ] No scenario step is irreducibly vague — flag and ask user before proceeding
+
+If any conflict or ambiguity is found:
+> **STOP.** List each conflict with file + line reference. Tell user: "Plan Iteration produced contradictory or non-executable scenarios. Reconcile these before Manage Iteration can run."
+
+Do not proceed past this step with unresolved spec conflicts.
+
+## Step 3 — Confirm Issues + Sprint-Size Guard
+Fetch each issue one at a time:
 ```bash
 gh issue view {github_issue} --json number,title,labels,state
 ```
-Confirm each is open with `status-queued`. Report any discrepancy before proceeding.
+Confirm each is `open` with `status-queued`. Report discrepancies.
 
-**Sprint-size guard:** check total open issues on the milestone:
+Sprint-size guard:
 ```bash
 gh api repos/{owner}/{repo}/milestones/{N} --jq '.open_issues'
 ```
-If `open_issues > 15`: warn before proceeding:
-> "This milestone has {N} open issues. Sprints above ~10 issues carry high drift risk. Consider splitting before running MIN. Proceed? (yes / no)"
+If `open_issues > 15`: warn and require explicit user confirmation before continuing.
 
-Do not proceed until explicit user confirmation.
-
-## Step 3: Verify Clean Slate
+## Step 4 — Assert Clean Slate
 ```bash
 gh issue list --milestone {N} --label "status-in-progress" --json number,title
 ```
-If any issue has `status-in-progress`: do not re-activate. Resume from MIN-04 for that scenario — re-run its checkpoint first:
-- PASS → close issue (`status-done`), continue queue
-- FAIL → treat as first checkpoint_fail, apply one retry before escalating
+If any `status-in-progress` exists: prior session interrupted. Re-run its last `gate.command`. PASS → close issue, continue. FAIL → one retry → escalate.
 
-Only proceed if no `status-in-progress` issue exists.
-
-## Step 4: Output Confirmation
+## Step 5 — Verify Iteration Branch
+```bash
+git branch -a | grep "iteration/{milestone-slug}"
 ```
-=== MIN ACTIVATION ===
-Manifest: ITER-{slug}.yaml ✓
+If absent:
+> **STOP.** Tell user: "Plan Iteration Contract step did not create an iteration branch. Re-run Contract Step 1 or create the branch manually before invoking Manage Iteration."
+
+Check out the iteration branch:
+```bash
+git checkout iteration/{milestone-slug}
+```
+
+## Step 6 — Output Activation Summary
+```
+=== ACTIVATION ===
+Manifest:  {selected_manifest} (milestone_number: {N}, milestone_title: {title})
 Milestone: #{N} | {goal}
+Branch:    iteration/{slug}
 Issues:    {N} open, all status-queued
 Size:      {ok | WARNING: {N} issues — user confirmed}
-Slate:     clean — no in-progress work
-Next:      MIN-02 Load Context
-======================
+Spec:      {N} feature files checked, {conflicts} conflicts, {vague} vague steps
+Slate:     clean
+Next:      Load Context from PIN Artifacts
+==================
 ```
 
 ## Success Criteria
-- PIN manifest confirmed present before any GitHub call
-- Milestone found and uniquely identified
-- All issues confirmed open with `status-queued` (fetched one by one)
-- Sprint-size warning shown if > 15 issues; user confirmed to proceed
-- No dangling `status-in-progress` issue from prior session
-- Ready to proceed to MIN-02
-
-## Inputs
-- **Execution Manifest** (`docs/plans/iterations/ITER-*.yaml`) — produced by PIN-02
-- **GitHub Milestone** — produced by PIN-03
-- **GitHub Issues** — produced by PIN-03
+- Manifest located by `milestone_number` or `milestone_title` field (not by file order)
+- `milestone_number` is a concrete integer in the matched manifest (not null or absent)
+- Manifest `milestone_number` + `milestone_title` cross-checked against the live milestone
+- PIN readiness validation passed (no unresolved spec conflicts or vague steps)
+- Iteration branch confirmed and checked out
+- All issues confirmed open with `status-queued` (fetched individually)
+- Sprint-size warning shown if > 15 issues; user confirmed
+- No dangling `status-in-progress`, or resume path taken
 
 ## Agent
 

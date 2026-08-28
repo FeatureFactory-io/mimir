@@ -15,7 +15,7 @@ Publish
 Create the Milestone and Issues from the execution manifest, on GitHub or GitLab. Ask user before creating. The Milestone becomes MIN's operational ground truth — it must contain the full YAML manifest inline.
 
 ## Prerequisites
-- Execution manifest YAML from PIN-03 (`ITER-*.yaml`)
+- Execution manifest YAML from PIN-03 (`ITER-*.yaml`) with `milestone_number: null` placeholder
 - All skeleton commits on iteration branch
 - GitHub CLI (`gh`) or GitLab CLI (`glab`) authenticated
 
@@ -51,25 +51,31 @@ Ask: "Platform detected: **{github|gitlab}**. Create milestone and issues from t
 
 **GitHub:**
 ```bash
-gh api repos/{owner}/{repo}/milestones   --method POST   --field title="ITER-YYYYMMDD | {iteration_goal}"   --field description="$(cat <<EOF
-<!-- MANIFEST -->
-$(cat ITER-*.yaml)
+MILESTONE_NUMBER=$(gh api repos/{owner}/{repo}/milestones \
+  --method POST \
+  --field title="ITER-YYYYMMDD | {iteration_goal}" \
+  --field description="<!-- MANIFEST -->
+$(cat {manifest_path})
 <!-- /MANIFEST -->
 
 ## Iteration Goal
 {iteration_goal}
 
 ## Scenarios
-{list}
-EOF)"
-# Record returned milestone number
+{list}" \
+  --jq '.number')
+echo "Milestone: #$MILESTONE_NUMBER"
 ```
 
 **GitLab:**
 ```bash
 PROJECT=$(glab api projects/:fullpath --jq '.id')
-glab api "projects/$PROJECT/milestones"   --method POST   --field title="ITER-YYYYMMDD | {iteration_goal}"   --field description="<!-- MANIFEST -->$(cat ITER-*.yaml)<!-- /MANIFEST -->"
-# Record returned milestone id
+MILESTONE_NUMBER=$(glab api "projects/$PROJECT/milestones" \
+  --method POST \
+  --field title="ITER-YYYYMMDD | {iteration_goal}" \
+  --field description="<!-- MANIFEST -->$(cat {manifest_path})<!-- /MANIFEST -->" \
+  --jq '.iid')
+echo "Milestone: #$MILESTONE_NUMBER"
 ```
 
 ## Step 4 — Create Issues (one per scenario)
@@ -86,24 +92,42 @@ Issue body must include inline:
 - Do Not Do list
 - SAO.md Sections
 - Implementation Plan (full text from BPE-01)
-- Acceptance Criteria checklist — **one checkbox per graph node** plus scenario rollup checkpoint
+- Acceptance Criteria checklist — one checkbox per graph node plus scenario rollup checkpoint
 
 Labels: `status-queued, parallel-group-{X}`
 Dependency issues reference each other in body.
 
-## Step 5 — Update Manifest with Issue Numbers
-Add `github_issue` or `gitlab_issue` field per scenario. Commit:
+## Step 5 — Update Manifest with Milestone Number and Issue Numbers
+
+After the milestone is created (Step 3) and all issues are created (Step 4), update the manifest:
+
+```bash
+# Write milestone_number into the iteration block
+python3 -c "
+import re
+content = open('{manifest_path}').read()
+content = re.sub(r'milestone_number: null', 'milestone_number: {milestone_number}', content, count=1)
+open('{manifest_path}', 'w').write(content)
+"
+
+# Also add github_issue or gitlab_issue per scenario (as before)
+# Edit the manifest YAML to add the issue number under each scenario key
+```
+
+Commit both updates together:
 ```bash
 git add docs/plans/iterations/
-git commit -m "chore(pin): add issue numbers to manifest ITER-YYYYMMDD"
+git commit -m "chore(pin): add milestone #{milestone_number} and issue numbers to manifest ITER-YYYYMMDD"
 ```
+
+**Verification:** `milestone_number` in the manifest must now be an integer, not `null`. MIN-01 uses this field to locate the correct manifest. Do not proceed to PIN-05 if it is still `null`.
 
 ## Step 6 — Verify
 
 **GitHub:**
 ```bash
-gh milestone view {N}
-gh issue list --milestone {N}
+gh milestone view {milestone_number}
+gh issue list --milestone {milestone_number}
 ```
 
 **GitLab:**
@@ -116,11 +140,12 @@ glab issue list --milestone "{milestone_title}" --label "status-queued"
 - Milestone created with full `<!-- MANIFEST -->` YAML block
 - One Issue per scenario with inline `<!-- SCENARIO -->` + `<!-- FEATURE_EXECUTION_GRAPH -->` + context map + do-not-do + implementation plan
 - All issues labelled `status-queued` + `parallel-group-{X}`
-- Local manifest updated with issue numbers and committed
+- `milestone_number` written back to manifest (not null)
+- Local manifest updated with milestone number + issue numbers and committed
 
 ## Skills
-- *GitHub Issue Operations* (gh CLI) — see skill for all patterns
-- *GitLab Issue Operations* (glab CLI) — see skill for all patterns
+- *GitHub Issue Operations* (gh CLI)
+- *GitLab Issue Operations* (glab CLI)
 
 ## Agent
 

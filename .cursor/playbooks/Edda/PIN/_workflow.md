@@ -1,11 +1,11 @@
 # Plan Iteration
 
-**Playbook**: Edda v64.0 (Released)
+**Playbook**: Edda v73.0 (Released)
 **Workflow ID**: 16
-**Description**: Prepare for the AI-driven sprint run — feature specs, SAO.md, skeletons, per-scenario `feature_execution_graph` (BPE-01), iteration execution manifest (`ITER-*.yaml`), and GitHub/GitLab milestone with issues. Human acceptance gate before MIN.
+**Description**: Dark-factory sprint planning. Use PIN when ESM, DTA, DSP, and BSP are complete and you want to deliver a full act as a milestone rather than building feature-by-feature with BPE. PIN-01 enforces the four Inception + Elaboration gates. PIN-03 runs BPE-01 per scenario to produce skeletons and a manifest. Human GO at PIN-05, then MIN executes. For building a single feature interactively, use BPE instead.
 **Phase Organization**: Uses phases
 **Total Activities**: 5
-**Export Date**: 2026-07-29 14:35 UTC
+**Export Date**: 2026-08-28 15:19 UTC
 
 ## Activities
 

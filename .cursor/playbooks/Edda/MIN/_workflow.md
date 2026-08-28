@@ -1,11 +1,11 @@
 # Manage Iteration
 
-**Playbook**: Edda v64.0 (Released)
+**Playbook**: Edda v73.0 (Released)
 **Workflow ID**: 17
-**Description**: AI-driven execution workflow. Load PIN context → sequence ready scenario and graph nodes → execute one fresh subagent per `feature_execution_graph` node with pytest gates → close iteration → acceptance and bug fixes.
+**Description**: Feature-driven, team-lead-driven sprint execution. Advanced-model TL orchestrates the full build→integrate→test→fix→close cycle, one issue at a time. TL dispatches cheap-fast dr-dobbs workers (one per graph node), verifies each feature’s DoD gate (already run as a BPE-06 node), then hands to Saga (UAT Agent) for project-agnostic acceptance testing scoped to the iteration manifest. A test-first fix loop (BPE-09) resolves UAT blockers before a PR is opened for human review and the iteration is rel
 **Phase Organization**: No phase organization
-**Total Activities**: 6
-**Export Date**: 2026-07-29 14:35 UTC
+**Total Activities**: 7
+**Export Date**: 2026-08-28 15:19 UTC
 
 ## Activities
 

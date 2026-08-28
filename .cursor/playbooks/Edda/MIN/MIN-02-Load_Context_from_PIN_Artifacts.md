@@ -4,7 +4,6 @@
 **Order**: 2
 **Phase**: None
 **Dependencies**: Predecessor: Activity 178 (Activate Iteration)
-Successor: Activity 180 (Sequence from Manifest)
 
 ## Description
 
@@ -12,85 +11,88 @@ Load Context from PIN Artifacts
 
 ## Guidance
 
-**Sequencing (authoritative):** Predecessor = Activate Iteration (Activity 178 / MIN-01).
-
 ## Purpose
-Restore the distilled context that PIN already built. Do NOT re-read SAO.md, user_journey.md, mockups, or BDD specs from scratch — PIN-02 and PIN-03 already did that work.
+Restore the distilled context that Plan Iteration already built, then derive and present the full execution queue. Pure pre-flight — no implementation, no GitHub mutations. This activity absorbs the sequencing responsibilities of the dropped 'Sequence from Manifest' activity: loading context and building the execution queue share the same actor (TL), the same input (the iteration manifest), and the same exit condition (execution queue ready to dispatch).
 
-## Steps
+Do NOT re-read SAO.md, BDD specs, or mockups from scratch.
 
-### Step 1: Load Orient Summary (from PIN-02)
+## Part A — Load Context
+
+### Step 1: Load the Milestone-Bound Manifest
+
+Use the manifest path identified and locked in Activate Iteration. Do not re-select. Do not use `ls -t | head -1`.
+
+```bash
+cat {manifest_path_from_activate_iteration}   # already on disk; read it directly
+```
+
+Extract per scenario: `id`, `title`, `github_issue`, `parallel_group`, `codebase_footprint[]`, `context_map[]`, `do_not_do[]`, `checkpoint.command`, `checkpoint.log_story_command`, `feature_execution_graph` (nodes: `id`, `bpe`, `depends_on`, `footprint[]`, `gate`), `dependencies[]`, `feature_file_paths[]`, `system_dependencies[]`.
+
+Verify that each scenario's `github_issue` is on the current milestone (cross-check with Activate Iteration's confirmed issue list). Any issue not in the milestone list → flag before proceeding.
+
+### Step 2: Load Orient Summary
 ```bash
 ls -t docs/plans/iterations/pin-orient-*.md 2>/dev/null | head -1
 ```
+If none: first-iteration defaults (`velocity_trend: unknown`, `scope_risks: none`). Continue.
+If found: read it. Extract velocity trend, scope risks, watch-fors.
 
-**If no file found (first iteration of this feature):**
-> No orient summary exists — this is the first iteration for this feature. Apply first-iteration defaults:
-> - `velocity_trend`: unknown
-> - `scope_risks`: none computed
-> - `watch_fors`: none — no prior drift patterns
->
-> Continue to Step 2. Do not stop.
-
-**If file found:** read it. Extract: velocity trend, scope risks, watch-fors.
-
-### Step 2: Load Execution Manifest (from PIN-03)
+### Step 3: Spot-Check Context Map
+For 1-3 `context_map` entries per scenario:
 ```bash
-ls -t docs/plans/iterations/ITER-*.yaml 2>/dev/null | head -1
+wc -l {file}   # confirm file exists and has sufficient lines
 ```
+Missing file → flag as potential sao_violation.
 
-**If no file found:**
-> **STOP.** No execution manifest found. PIN-03 (Contract) must be run before MIN can proceed. Return to PIN.
+### Step 4: Check System Dependencies
+For each `system_dependencies[]` item, verify it exists in the codebase. If absent: **STOP** and escalate before any implementation.
 
-**If found:** load the most recent manifest matching this milestone. Extract per scenario:
-- `id`, `title`, `github_issue`, `parallel_group`
-- `codebase_footprint[]`
-- `sao_sections[]`
-- `context_map[]` (file + lines + note)
-- `do_not_do[]`
-- `checkpoint.command`
-- `feature_execution_graph` — `nodes[]` with `id`, `bpe`, `depends_on`, `footprint`, `gate` (from BPE-01 Step 6G)
-- `dependencies[]`
-- `feature_file_paths[]` — paths to the `.feature` files for this scenario (used by MIN-06 to build the demo path)
-- `system_dependencies[]` — infrastructure capabilities required (e.g. `notification_service`, `email_backend`); empty list = none
+## Part B — Sequence
 
-### Step 3: Spot-Check Context Map References
-For each scenario, verify 1–3 `context_map` entries still exist:
+### Step 5: Parse Parallel Groups + Conflict Map
+From the manifest: extract `parallel_groups` and `conflict_map`. Do not recompute — Plan Iteration Contract derived these from actual skeleton commits.
+
+### Step 6: Check Dependency State Per Scenario
+For each scenario, fetch each `dependencies[]` issue individually:
 ```bash
-wc -l {file}  # confirm file exists and has enough lines
+gh issue view {N} --json number,state,labels
 ```
-If a file is missing or significantly shorter than expected: flag as potential `sao_violation` before executing that scenario.
+Mark each **READY** (no deps, or all deps closed with status-done) or **BLOCKED**.
 
-> For new features, context_map entries point to reference patterns in existing code, not the new feature's own files. The spot-check is still valid — those reference files must exist.
+### Step 7: Build Execution Queue
+Order: Group A → Group B → Group C. Within each group: READY before BLOCKED.
 
-### Step 4: Output Loaded Summary
+### Step 8: Output Execution Plan (Plan Mode)
+Switch to Plan Mode. Present:
+
+**Outer** — scenario dependency graph (Mermaid flowchart)
+
+**Inner** — for each READY scenario, feature_execution_graph node dependencies
+
 ```
 === CONTEXT LOADED ===
-Orient:   {filename or "first iteration — no history"}
-          velocity_trend: {value or "unknown"}
-Manifest: ITER-{slug}.yaml — {N} scenarios
-Scenarios:
-  S{N} [{group}] {title} — #{issue} — {N} footprint files — {M} graph nodes
-  ...
-System deps declared: {list or "none"}
+Manifest:  {path} — bound to milestone #{milestone_number}
+Orient:    {filename or "first iteration"} | velocity_trend: {value}
+Scenarios: {N} total
+System deps: {list or "none"}
 Spot-check: {N}/{N} context_map refs confirmed
-Next: MIN-03 Sequence from Manifest
-======================
+
+=== EXECUTION QUEUE ===
+Groups: {N} | Ready: {N} | Blocked: {N}
+{queue with nodes per scenario}
+First ready nodes: {list}
+Conflicts: {file shared by SN, SM — serialized}
+Next: Execute (TL Dispatches Workers)
+=======================
 ```
 
 ## Success Criteria
-- Orient summary loaded OR first-iteration defaults applied (never a hard stop here)
-- Execution manifest loaded (hard stop if missing — return to PIN)
-- `feature_file_paths[]`, `system_dependencies[]`, and `feature_execution_graph` extracted per scenario
-- Context map spot-check complete
-- Ready to proceed to MIN-03
-
-## Inputs
-- **Orient Summary** (`docs/plans/iterations/pin-orient-{date}.md`) — produced by PIN-02 (optional; missing on first iteration is normal)
-- **Execution Manifest** (`docs/plans/iterations/ITER-*.yaml`) — produced by PIN-03 (required)
-
-> PIN-02 read the BDD specs and wrote the orient summary. PIN-03 read SAO.md and built the context maps, do-not-do lists, and skeletons.
-> MIN-02 consumes those artifacts; it does not rebuild them.
+- Manifest loaded from the path locked in Activate Iteration (not re-selected)
+- Every scenario's `github_issue` confirmed on the milestone
+- All per-scenario fields extracted
+- System dependencies verified; escalation if absent
+- Parallel groups + conflict map parsed (not recomputed)
+- Execution queue ordered; Mermaid diagrams presented
 
 ## Agent
 

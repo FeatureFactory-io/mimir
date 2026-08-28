@@ -53,32 +53,37 @@ test -f CLAUDE.md && echo "PASS" || echo "FAIL"
 ```
 If missing: **STOP** — "No `CLAUDE.md` found. Run the DSP (Deploy Software Process) workflow to configure the AI IDE."
 
-## Mockup Check (advisory, after all gates pass)
-
-Canonical paths (ESM-06): `templates/mockups/{entity}/`, `mockups/urls.py`.
-
+### Gate 6 — Agent proof harness (optional; when SAO §17 applies)
+When `docs/architecture/SAO.md` §17 documents in-app LLM agents (not "Not applicable"):
 ```bash
-# Derive {entity} from target act / feature specs (e.g. pips, teams)
-ls templates/mockups/{entity}/ 2>/dev/null && echo "Mockups found" || echo "No mockups"
-rg "mockup_{entity}" mockups/urls.py 2>/dev/null || true
+test -f tests/support/agent_story.py && echo "PASS" || echo "FAIL: TFK-02 must bootstrap tests/support/agent_story.py before agent-feature BPE"
 ```
+If SAO §17 is N/A: **SKIP** — record `agent_harness: n/a`.
 
-If no mockups and feature has UI screens: ask — "No mockups under `templates/mockups/{entity}/`. Create them per ESM-06 before planning, or proceed greenfield? (create / greenfield)"
-- create → run ESM-06, then return to PIN-01
-- greenfield → proceed; BPE-01 Section H will document greenfield strategy
+If SAO §17 applies and the file is missing: **STOP** — "Agent proof helper missing. Run TFK-02 (Bootstrap Test Harness) to create `tests/support/agent_story.py` and ScriptedLLM fixtures before planning agent features."
+
+## Mockup Check (advisory, after all gates pass)
+```bash
+ls docs/ux/mockups/act-{N}/ 2>/dev/null && echo "Mockups found" || echo "No mockups"
+```
+If no mockups: ask — "No mockups found for {target}. Create them per ESM-04 before planning? (yes/no)"
+- Yes → run ESM-04, then return to PIN-01 after mockups are created
+- No → proceed with feature specs only
 
 ## Output
 When all gates pass:
 - `target_act`: extracted act identifier (e.g. "act-11")
 - `feature_files[]`: list of `.feature` files in `docs/features/act-{N}/`
 - `has_mockups`: boolean
+- `agent_harness`: `ready` | `n/a` (from Gate 6)
 
 Proceed to PIN-02 Orient & Validate Scope.
 
 ## Success Criteria
-- All 5 gates pass
+- All required gates pass (Gates 1–5; Gate 6 pass or skipped when SAO §17 N/A)
 - User has confirmed mockup status
 - `target_act` and `feature_files[]` identified
+- `agent_harness` recorded when SAO §17 applies
 
 ## Agent
 
