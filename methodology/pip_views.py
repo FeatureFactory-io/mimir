@@ -663,12 +663,12 @@ def pip_admin_review(request, pk: int):
                     change.save(update_fields=["admin_decision", "admin_note"])
 
             try:
-                PIPAdminService.finalize_pip(pip, request.user)
+                finalized_pip = PIPAdminService.finalize_pip(pip, request.user)
                 status_label = (
                     "accepted"
-                    if pip.status == PipModel.STATUS_ACCEPTED
+                    if finalized_pip.status == PipModel.STATUS_ACCEPTED
                     else "partially accepted"
-                    if pip.status == PipModel.STATUS_ACCEPTED_PARTIAL
+                    if finalized_pip.status == PipModel.STATUS_ACCEPTED_PARTIAL
                     else "rejected"
                 )
                 messages.success(request, f"PIP {status_label} — changes applied.")

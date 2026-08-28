@@ -3,6 +3,7 @@
 from decimal import Decimal
 
 import pytest
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from django.test import Client
@@ -212,6 +213,12 @@ def test_admin_07_all_accept_bumps_version(bob_staff, reviewed_pip_all_accept, p
     pb.refresh_from_db()
     assert reviewed_pip_all_accept.status == ProcessImprovementProposal.STATUS_ACCEPTED
     assert pb.version == Decimal("2.0")
+    success_messages = [
+        str(message)
+        for message in response.wsgi_request._messages
+        if message.level == messages.SUCCESS
+    ]
+    assert success_messages == ["PIP accepted — changes applied."]
 
 
 @pytest.mark.django_db
