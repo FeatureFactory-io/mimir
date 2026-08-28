@@ -54,6 +54,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
           pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest-cov pytest-html
