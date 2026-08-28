@@ -85,6 +85,22 @@ test-unit: export DJANGO_SETTINGS_MODULE := mimir.settings.test
 test-unit: ## Run unit tests only
 	$(PYTEST) tests/unit/
 
+.PHONY: test-factory
+test-factory: export DJANGO_SETTINGS_MODULE := mimir.settings.test
+test-factory: ## Run dark-factory contract tests + shell syntax checks
+	@bash -n scripts/factory.sh scripts/preflight.sh scripts/claim.sh scripts/done.sh \
+	         scripts/reject.sh scripts/status.sh scripts/bb-append.sh \
+	         scripts/verify-result.sh scripts/integrate.sh scripts/release.sh \
+	         scripts/archive.sh scripts/rescue-result.sh scripts/factory-git.sh \
+	         scripts/lib/factory-common.sh scripts/lib/factory-git-inner.sh
+	@bash tests/unit/test_promote_revision_guard.sh
+	$(PYTEST) tests/unit/test_factory_preflight.py \
+	          tests/unit/test_verify_result.py \
+	          tests/unit/test_integrate_guards.py \
+	          tests/unit/test_release_guards.py \
+	          tests/unit/test_factory_status.py \
+	          tests/unit/test_factory_claim_deps.py -v
+
 .PHONY: test-integration
 test-integration: export DJANGO_SETTINGS_MODULE := mimir.settings.test
 test-integration: ## Run integration tests only

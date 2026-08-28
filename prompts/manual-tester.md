@@ -26,7 +26,7 @@ playwright open https://<staging-url>/path/
 
 **HTTP / API endpoints:** `curl -sv` for raw response inspection; `python3 -c "import urllib.request; ..."` if curl unavailable.
 
-**Other tools:** only those declared in the task's `tools:` frontmatter. Do not install additional dependencies.
+**Other tools:** only those declared in the task's `expected_capabilities` frontmatter when possible. Do not install additional dependencies without noting them in the result.
 
 ## Modus operandi
 

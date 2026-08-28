@@ -25,7 +25,7 @@ files_in_scope:
 ---
 ```
 
-- **`depends_on`:** omit key, use `[]`, one-line `[ T-041, T-042 ]`, or YAML list. Every listed id must have **`factory/tasks/done/<id>.md`** before `scripts/claim.sh` succeeds.
+- **`depends_on`:** omit key, use `[]`, one-line `[ T-041, T-042 ]`, or YAML list. Every listed id must have **`factory/tasks/done/<id>.md`** with **terminal status** (`integrated`, `validated`, or `monitoring`; manual-tester `passed` also counts) before `scripts/claim.sh` succeeds.
 - **`branch`:** worker pushes this branch and opens a PR to **`main`** via `gh pr create`.
 
 Body sections (minimum):
@@ -50,9 +50,11 @@ If a **remediation overlay** exists (`pending/T-042.remediation.md`), `claim.sh`
 ## While working
 
 - Work only in **`files_in_scope`** unless justified under **`out_of_scope_changes:`** in `# Result`.
-- Follow declared **`tools`** only.
+- Follow declared **`expected_capabilities`** as guidance; the factory does not enforce tool allowlists.
 
 ## Finish (`done/`)
+
+Workers run with full Cursor tool access (`--yolo`). **Scope is enforced post-run** via `git diff` against `files_in_scope` — not command allowlists.
 
 Prefer:
 
@@ -60,12 +62,14 @@ Prefer:
 ./scripts/done.sh T-042
 ```
 
-Edit **`# Result`** in `factory/tasks/claimed/T-042.md` **relative to your workspace root** before calling `done.sh`. Your workspace is the git worktree (`.worktrees/<role>/`), so the path inside your workspace is `factory/tasks/claimed/T-042.md`. Do not write to `done/` directly — `done.sh` moves the file.
+Edit **`# Result`** in `factory/tasks/claimed/T-042.md` **relative to your workspace root** before calling `done.sh`. Your workspace is the git worktree (`.worktrees/<role>/`), so the path inside your workspace is `factory/tasks/claimed/T-042.md`. The factory loop syncs the `# Result` block from the worktree copy to the management-branch copy before `verify-result.sh` runs.
+
+### Code task result
 
 ```markdown
 # Result
 
-status: passed          # passed | failed | blocked
+status: passed          # passed | failed
 branch: factory/T-042-slug
 mr: 456
 commit_sha: abc1234
@@ -73,6 +77,25 @@ commit_sha: abc1234
 Brief notes for LE review.
 out_of_scope_changes: []   # or list with justification
 ```
+
+### Manual task result
+
+```markdown
+# Result
+
+status: passed
+branch: none
+mr: 0
+commit_sha: none
+
+## Evidence
+
+| Scenario | Status | Evidence |
+|----------|--------|----------|
+| … | PASS | factory/logs/manual-T-042.png |
+```
+
+LE validates with `scripts/integrate.sh validate T-042` (no PR merge).
 
 Atomicity: when writing the done file from scratch, write to **`factory/tasks/done/.T-042.md.tmp`** then **`mv`** to **`factory/tasks/done/T-042.md`** (same pattern inside `claimed/`).
 

@@ -63,6 +63,12 @@ jobs:
 
       - name: Run tests with coverage
         run: |
+          bash -n scripts/factory.sh scripts/preflight.sh scripts/claim.sh scripts/done.sh \
+                   scripts/reject.sh scripts/status.sh scripts/bb-append.sh \
+                   scripts/verify-result.sh scripts/integrate.sh scripts/release.sh \
+                   scripts/archive.sh scripts/rescue-result.sh scripts/factory-git.sh \
+                   scripts/lib/factory-common.sh scripts/lib/factory-git-inner.sh
+          bash tests/unit/test_promote_revision_guard.sh
           pytest tests/ -v \
             --ignore=tests/e2e \
             --ignore=tests/integration/test_mcp_server_acceptance.py \

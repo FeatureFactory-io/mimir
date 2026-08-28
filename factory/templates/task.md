@@ -2,10 +2,10 @@
 id: T-NNN
 role: feature-builder   # step-def-writer | feature-builder | release-engineer | manual-tester
 attempt: 1
-depends_on: []          # task ids that must be in done/ before claim.sh succeeds
+depends_on: []          # ids must be in done/ with terminal status before claim
 github_issue: 0         # GitHub issue number this task closes (0 if none)
 branch: factory/T-NNN-short-slug
-tools:
+expected_capabilities:  # advisory — workers run with full tool access (--yolo)
   - git
   - gh
   - .venv/bin/pytest
@@ -60,8 +60,10 @@ branch:
 mr:
 commit_sha:
 
-<!-- Fill all four fields before calling scripts/done.sh.
-     Leaving any field blank routes this task to factory/tasks/blocked/.
-     status: passed | failed | blocked
-     mr: GitHub PR number (integer, not URL)
-     commit_sha: short SHA of the HEAD commit on the branch -->
+<!-- Result kinds:
+     code task   — status: passed|failed; branch + mr + commit_sha required
+     manual task — status: passed|failed; branch: none; mr: 0; commit_sha: none; ## Evidence required
+     monitoring  — status: monitoring; mr: 0 (release-engineer pipeline watch)
+
+     Scope enforcement is post-run via git diff vs files_in_scope — not tool allowlists.
+     Leaving required fields blank routes this task to factory/tasks/blocked/. -->
