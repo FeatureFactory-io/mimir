@@ -37,8 +37,8 @@ if command -v flock >/dev/null 2>&1; then
   printf '  ok  flock (%s)\n' "$(command -v flock)"
 elif [[ -x "$(brew --prefix util-linux 2>/dev/null)/bin/flock" ]]; then
   flock_path="$(brew --prefix util-linux)/bin/flock"
-  printf '  ok  flock (%s — add util-linux to PATH for shell use)\n' "$flock_path"
-  warn+=("flock not on PATH (bb-append.sh resolves via brew --prefix util-linux)")
+  printf '  ok  flock (%s)\n' "$flock_path"
+  printf '  note add util-linux to PATH for interactive shell use: export PATH="$(brew --prefix util-linux)/bin:$PATH"\n'
 else
   missing+=("flock (util-linux)")
   printf '  MISSING  flock — run make provision or install util-linux\n'
