@@ -1,29 +1,31 @@
 #!/usr/bin/env bash
-# preflight.sh — Phase 0 dry gate for dark-factory (tools, git clean, milestone, issues).
+# preflight.sh — Phase 0 dry gate for dark-factory.
 #
-# Usage: scripts/preflight.sh [--allow-dirty] [--allow-missing-featurefile-ref] <milestone-title>
+# Usage: scripts/preflight.sh [options] <milestone-title>
 #
-# Milestone must match GitHub milestone title for `gh issue list --milestone`.
-# By default, each issue title/description must mention at least one path like
-# docs/features/.../*.feature. Pass --allow-missing-featurefile-ref to warn-only
-# when some issues omit that (e.g. pure infra/tech tasks); default stays strict.
+# Options:
+#   --allow-dirty
+#   --allow-missing-featurefile-ref
+#   --skip-staging-check
 
 set -euo pipefail
 
 ALLOW_DIRTY=false
 ALLOW_MISSING_FEATUREFILE_REF=false
+SKIP_STAGING_CHECK=false
 ARGS=()
 for arg in "$@"; do
   case "$arg" in
     --allow-dirty) ALLOW_DIRTY=true ;;
     --allow-missing-featurefile-ref) ALLOW_MISSING_FEATUREFILE_REF=true ;;
+    --skip-staging-check) SKIP_STAGING_CHECK=true ;;
     *) ARGS+=("$arg") ;;
   esac
 done
 
-MILESTONE="${ARGS[0]:?usage: $0 [--allow-dirty] <milestone-title>}"
+MILESTONE="${ARGS[0]:?usage: $0 [--allow-dirty] [--skip-staging-check] <milestone-title>}"
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="${FACTORY_REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$REPO_ROOT"
 
 require_cmd() {
@@ -33,14 +35,18 @@ require_cmd() {
   }
 }
 
-for c in git gh fswatch tmux rg python3; do require_cmd "$c"; done
+for c in git gh fswatch tmux rg python3 jq; do require_cmd "$c"; done
 
 if ! command -v cursor-agent >/dev/null 2>&1 && ! command -v cursor >/dev/null 2>&1; then
   echo "error: need cursor-agent or cursor on PATH" >&2
   exit 1
 fi
 
-command -v jq >/dev/null 2>&1 || echo "warn: jq not on PATH (optional)" >&2
+if ! gh auth status >/dev/null 2>&1; then
+  echo "error: gh not authenticated — run: gh auth login" >&2
+  exit 1
+fi
+
 command -v watch >/dev/null 2>&1 || echo "warn: watch not on PATH (factory.sh falls back to sleep loop)" >&2
 
 if [[ "$ALLOW_DIRTY" != true ]] && [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
@@ -48,58 +54,63 @@ if [[ "$ALLOW_DIRTY" != true ]] && [[ -n "$(git status --porcelain 2>/dev/null)"
   exit 1
 fi
 
-MOCKS_FOUND=false
-if [[ -d templates/mockups ]] && [[ -n "$(find templates/mockups -name '*.html' 2>/dev/null | head -1)" ]]; then
-  MOCKS_FOUND=true
-fi
-if [[ "$MOCKS_FOUND" != true ]] && [[ -d docs/ux ]] && [[ -n "$(find docs/ux -name '*.drawio' 2>/dev/null | head -1)" ]]; then
-  MOCKS_FOUND=true
-fi
-if [[ "$MOCKS_FOUND" != true ]]; then
-  echo "warn: no mockups under templates/mockups/ or docs/ux/"
+# Resolve milestone via gh api (open milestone required)
+REPO_SLUG="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+MILESTONE_JSON="$(gh api "repos/${REPO_SLUG}/milestones" --paginate -q \
+  "[.[] | select(.state==\"open\" and .title==\"${MILESTONE}\")] | .[0]")"
+
+if [[ "$MILESTONE_JSON" == "null" || -z "$MILESTONE_JSON" ]]; then
+  echo "error: no open milestone titled '${MILESTONE}'" >&2
+  exit 1
 fi
 
-ISSUES_JSON="$(gh issue list --milestone "$MILESTONE" --state all --json number,title,body --limit 500)" || {
-  echo "error: gh issue list failed — check milestone title and auth (gh auth login)" >&2
+MILESTONE_NUMBER="$(printf '%s' "$MILESTONE_JSON" | jq -r '.number')"
+OPEN_ISSUES="$(printf '%s' "$MILESTONE_JSON" | jq -r '.open_issues')"
+echo "milestone: #${MILESTONE_NUMBER} (${MILESTONE}) open_issues=${OPEN_ISSUES}"
+
+ISSUES_JSON="$(gh issue list --milestone "$MILESTONE" --state open --json number,title,body --limit 500)" || {
+  echo "error: gh issue list failed" >&2
   exit 1
 }
 
-if [[ "$ALLOW_MISSING_FEATUREFILE_REF" == true ]]; then
-  export PREFLIGHT_ALLOW_MISSING_FEATUREFILE_REF=1
-else
-  unset PREFLIGHT_ALLOW_MISSING_FEATUREFILE_REF
+ISSUE_COUNT="$(printf '%s' "$ISSUES_JSON" | jq 'length')"
+if (( ISSUE_COUNT == 0 )); then
+  echo "error: milestone has no open issues" >&2
+  exit 1
 fi
 
-printf '%s' "$ISSUES_JSON" | python3 -c '
-import json, os, re, sys
+if [[ "$ALLOW_MISSING_FEATUREFILE_REF" == true ]]; then
+  export PREFLIGHT_ALLOW_MISSING_FEATUREFILE_REF=1
+fi
 
-allow_missing = os.environ.get("PREFLIGHT_ALLOW_MISSING_FEATUREFILE_REF") == "1"
+printf '%s' "$ISSUES_JSON" | python3 "${REPO_ROOT}/scripts/validate-feature-refs.py" \
+  --repo-root "$REPO_ROOT" || {
+  if [[ "$ALLOW_MISSING_FEATUREFILE_REF" != true ]]; then
+    exit 1
+  fi
+  echo "warn: feature validation failed but waived by --allow-missing-featurefile-ref" >&2
+}
 
-try:
-    issues = json.load(sys.stdin)
-except json.JSONDecodeError as e:
-    print("error: gh did not return valid JSON", e, file=sys.stderr)
-    sys.exit(1)
-if not isinstance(issues, list) or len(issues) == 0:
-    print("error: no issues in milestone (title mismatch or empty milestone)", file=sys.stderr)
-    sys.exit(1)
-pat = re.compile(r"docs/features/[^\s\)]+\.feature")
-missing = []
-for i in issues:
-    title = i.get("title") or ""
-    desc = i.get("body") or ""
-    body = title + "\n" + desc
-    if not pat.search(body):
-        missing.append(str(i.get("number", "?")))
-if missing:
-    msg = "issues missing docs/features/.../*.feature in title or body: " + ", ".join(missing)
-    if allow_missing:
-        print("warn:", msg, "(allowed by --allow-missing-featurefile-ref)", file=sys.stderr)
-    else:
-        print("error:", msg, file=sys.stderr)
-        sys.exit(1)
-    print("preflight ok:", len(issues), "issue(s);", len(missing), "without feature path (waived)")
-else:
-    print("preflight ok:", len(issues), "issue(s); feature paths referenced")
-'
 unset PREFLIGHT_ALLOW_MISSING_FEATUREFILE_REF 2>/dev/null || true
+
+# Optional staging reachability (STAGING_URL or make eb-status idle CNAME)
+if [[ "$SKIP_STAGING_CHECK" != true ]]; then
+  STAGING_URL="${STAGING_URL:-}"
+  if [[ -z "$STAGING_URL" ]] && command -v make >/dev/null 2>&1; then
+    STAGING_URL="$(make -s eb-status 2>/dev/null | rg -m1 'mimir-idle' | awk '{print $NF}' || true)"
+    if [[ -n "$STAGING_URL" && "$STAGING_URL" != http* ]]; then
+      STAGING_URL="http://${STAGING_URL}"
+    fi
+  fi
+  if [[ -n "$STAGING_URL" ]]; then
+    if curl -sf --max-time 10 "${STAGING_URL}/" >/dev/null 2>&1; then
+      echo "staging: reachable (${STAGING_URL})"
+    else
+      echo "warn: staging URL not reachable: ${STAGING_URL} (pass --skip-staging-check to waive)" >&2
+    fi
+  else
+    echo "note: no STAGING_URL configured — skipping reachability check"
+  fi
+fi
+
+echo "preflight ok: milestone #${MILESTONE_NUMBER}, ${ISSUE_COUNT} open issue(s)"

@@ -43,7 +43,7 @@ fi
 
 # Per-role model defaults. Override with env vars when cost/quality tradeoffs
 # differ for a specific sprint.
-LE_MODEL="${FACTORY_LE_MODEL:-claude-opus-4-7-thinking-xhigh}"
+LE_MODEL="${FACTORY_LE_MODEL:-composer-2.5-fast}"
 
 role_model_default() {
   case "$1" in
@@ -197,9 +197,7 @@ _process_pending() {
           # done.sh --blocked already appends to blackboard; _task_outcome stays "blocked"
         fi
       fi
-      (cd "$REPO_ROOT" && git pull --rebase 2>/dev/null || true; \
-        git diff --name-only --diff-filter=U 2>/dev/null | xargs -r git checkout --theirs -- 2>/dev/null || true; \
-        git add factory/tasks/ factory/blackboard.md && git commit -m "factory: \${_task_outcome} \$id" && git push) 2>&1 | tee -a "$REPO_ROOT/factory/logs/${role}.log" || true
+      (cd "$REPO_ROOT" && "$REPO_ROOT/scripts/factory-git.sh" "factory: \${_task_outcome} \$id" factory/tasks/ factory/blackboard.md) 2>&1 | tee -a "$REPO_ROOT/factory/logs/${role}.log" || true
       if [[ "$role" == "release-engineer" && "\$_task_outcome" == "done" ]]; then
         for _i in \$(seq 1 40); do
           sleep 60
@@ -223,9 +221,9 @@ _process_pending() {
 # Initial scan — process any tasks already sitting in pending/ before fswatch starts.
 # fswatch -1 is edge-triggered and misses pre-existing files on restart.
 _process_pending
-# Event loop — wake on filesystem events and re-scan
+# Event loop — wake on pending/ or done/ (dependency unblocks) and re-scan
 while :; do
-  fswatch -1 "$REPO_ROOT/factory/tasks/pending" >/dev/null 2>&1 || true
+  fswatch -1 "$REPO_ROOT/factory/tasks/pending" "$REPO_ROOT/factory/tasks/done" >/dev/null 2>&1 || true
   _process_pending
 done
 EOF
@@ -270,9 +268,7 @@ $(ls -t REPO_ROOT_PLACEHOLDER/factory/tasks/done/ REPO_ROOT_PLACEHOLDER/factory/
     2>&1 | tee -a "REPO_ROOT_PLACEHOLDER/factory/logs/le.jsonl" \
          | jq -r 'select(.type=="text") | .text' 2>/dev/null \
          | tee -a "REPO_ROOT_PLACEHOLDER/factory/logs/le.log"
-  (cd "REPO_ROOT_PLACEHOLDER" && git pull --rebase 2>/dev/null || true; \
-    git diff --name-only --diff-filter=U 2>/dev/null | xargs -r git checkout --theirs -- 2>/dev/null || true; \
-    git add factory/ && git commit -m "factory: LE pass ($reason)" && git push) 2>/dev/null || true
+  (cd "REPO_ROOT_PLACEHOLDER" && REPO_ROOT_PLACEHOLDER/scripts/factory-git.sh "factory: LE pass ($reason)" factory/) 2>/dev/null || true
 }
 
 # Startup scan — ingest new issues, review any existing done/ tasks

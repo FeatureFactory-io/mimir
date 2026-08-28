@@ -46,6 +46,22 @@ fi
 
 if command -v cursor-agent >/dev/null 2>&1; then
   printf '  ok  cursor-agent (%s)\n' "$(command -v cursor-agent)"
+  if (( STRICT == 1 )); then
+    if cursor-agent --list-models >/dev/null 2>&1; then
+      printf '  ok  cursor-agent --list-models\n'
+      for role_var in FACTORY_LE_MODEL FACTORY_MODEL_FEATURE_BUILDER; do
+        model="${!role_var:-}"
+        [[ -z "$model" ]] && continue
+        if ! cursor-agent --list-models 2>/dev/null | rg -qF "$model"; then
+          warn+=("${role_var}=${model} not in cursor-agent --list-models")
+          printf '  WARN  %s=%s not listed by cursor-agent --list-models\n' "$role_var" "$model"
+        fi
+      done
+    else
+      warn+=("cursor-agent --list-models unavailable — skip model validation")
+      printf '  WARN  cursor-agent --list-models unavailable\n'
+    fi
+  fi
 elif command -v cursor >/dev/null 2>&1; then
   printf '  ok  cursor (%s — factory.sh accepts cursor CLI)\n' "$(command -v cursor)"
 else

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# rescue-result.sh — auto-fill an empty # Result block from git state.
+# rescue-result.sh — auto-fill an empty # Result block from git state (code tasks only).
 #
 # Usage: scripts/rescue-result.sh <task-id>
 #
-# Requires: git, gh, rg, jq
+# Never overwrites valid manual-validation sentinels (branch none, mr 0).
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/factory-common.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/factory-common.sh"
+REPO_ROOT="$(_factory_repo_root)"
 cd "$REPO_ROOT"
 
 TASK_ID="${1:?usage: $0 <task-id>}"
@@ -23,12 +25,22 @@ else
   exit 1
 fi
 
+ROLE="$(factory_task_field "$TARGET" role)"
+if [[ "$ROLE" == "manual-tester" ]]; then
+  echo "rescue-result: skipping manual-tester task ${TASK_ID}"
+  exit 0
+fi
+
 if rg -q '^# Result' "$TARGET" 2>/dev/null; then
-  result_section="$(awk '/^# Result/{found=1; next} found{print}' "$TARGET")"
-  _status="$(printf '%s\n' "$result_section" | rg -m1 '^status:[[:space:]]*' 2>/dev/null | sed 's/^status:[[:space:]]*//' | tr -d '"' || true)"
-  _branch="$(printf '%s\n' "$result_section" | rg -m1 '^branch:[[:space:]]*' 2>/dev/null | sed 's/^branch:[[:space:]]*//' | tr -d '"' || true)"
-  _mr="$(printf '%s\n' "$result_section" | rg -m1 '^mr:[[:space:]]*' 2>/dev/null | sed 's/^mr:[[:space:]]*//' | tr -d '"' || true)"
-  _sha="$(printf '%s\n' "$result_section" | rg -m1 '^commit_sha:[[:space:]]*' 2>/dev/null | sed 's/^commit_sha:[[:space:]]*//' | tr -d '"' || true)"
+  kind="$(factory_result_kind "$TARGET")"
+  if [[ "$kind" == "manual" ]]; then
+    echo "rescue-result: ${TASK_ID} has manual validation result — skipping"
+    exit 0
+  fi
+  _status="$(factory_result_field "$TARGET" status)"
+  _branch="$(factory_result_field "$TARGET" branch)"
+  _mr="$(factory_result_field "$TARGET" mr)"
+  _sha="$(factory_result_field "$TARGET" commit_sha)"
   if [[ -n "$_status" && -n "$_branch" && -n "$_mr" && -n "$_sha" ]]; then
     echo "rescue-result: ${TASK_ID} already has complete # Result block — skipping"
     exit 0
@@ -38,10 +50,8 @@ if rg -q '^# Result' "$TARGET" 2>/dev/null; then
   mv "$tmpfile" "$TARGET"
 fi
 
-BRANCH="$(rg -m1 '^branch:[[:space:]]*' "$TARGET" 2>/dev/null \
-          | sed 's/^branch:[[:space:]]*//' | tr -d '"' | tr -d "'")"
-
-if [[ -z "$BRANCH" ]]; then
+BRANCH="$(factory_task_field "$TARGET" branch)"
+if [[ -z "$BRANCH" || "$BRANCH" == "none" ]]; then
   echo "rescue-result: no branch: field in ${TARGET}" >&2
   exit 1
 fi
@@ -61,5 +71,4 @@ printf '\n# Result\n\nstatus: %s\nbranch: %s\nmr: %s\ncommit_sha: %s\n\nAuto-fil
 
 echo "rescue-result: ${TASK_ID} → branch=${BRANCH} pr=#${MR} sha=${COMMIT_SHA}"
 
-git add "$TARGET" 2>/dev/null || true
-git commit -m "factory: rescue ${TASK_ID} (auto-filled empty Result block)" 2>/dev/null || true
+"$REPO_ROOT/scripts/factory-git.sh" "factory: rescue ${TASK_ID} (auto-filled Result block)" "$TARGET" 2>/dev/null || true

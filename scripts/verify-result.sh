@@ -1,21 +1,18 @@
 #!/usr/bin/env bash
 # verify-result.sh — verify a claimed task's # Result block before moving to done/.
 #
-# Usage: scripts/verify-result.sh <task-id>
+# Result kinds:
+#   code       — branch + mr + commit_sha; remote branch + PR required
+#   manual     — manual-tester: branch none, mr 0, commit_sha none, evidence required
+#   monitoring — release-engineer pipeline watch: mr 0, status monitoring
 #
-# Reads factory/tasks/claimed/<id>.md and checks:
-#   1. A "# Result" block exists with non-empty status:, branch:, mr:, commit_sha:
-#   2. The branch exists on origin (git ls-remote)
-#   3. The PR is OPEN or MERGED (gh pr view)
-#
-# Exit 0 on success.
-# Exit 2 on failure; reason written to stderr as "reason:<field>: <detail>".
-#
-# Requires: rg (ripgrep), git, gh, jq
+# Exit 0 on success. Exit 2 on failure (reason:<field>: <detail> on stderr).
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/factory-common.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/factory-common.sh"
+REPO_ROOT="$(_factory_repo_root)"
 cd "$REPO_ROOT"
 
 TASK_ID="${1:?usage: $0 <task-id>}"
@@ -31,31 +28,36 @@ if ! rg -q '^# Result' "$CLAIMED" 2>/dev/null; then
   exit 2
 fi
 
-result_section="$(awk '/^# Result/{found=1; next} found{print}' "$CLAIMED")"
-
-_field() {
-  printf '%s\n' "$result_section" \
-    | rg -m1 "^${1}:[[:space:]]*" \
-    | sed "s/^${1}:[[:space:]]*//" \
-    | tr -d '"' \
-    | tr -d "'"
-}
-
-STATUS="$(_field status)"
-BRANCH="$(_field branch)"
-MR="$(_field mr)"
-COMMIT_SHA="$(_field commit_sha)"
+STATUS="$(factory_result_field "$CLAIMED" status)"
+BRANCH="$(factory_result_field "$CLAIMED" branch)"
+MR="$(factory_result_field "$CLAIMED" mr)"
+COMMIT_SHA="$(factory_result_field "$CLAIMED" commit_sha)"
+KIND="$(factory_result_kind "$CLAIMED")"
 
 [[ -n "$STATUS" ]] || { echo "reason:status: field 'status' is empty" >&2; exit 2; }
-[[ -n "$BRANCH" ]] || { echo "reason:branch: field 'branch' is empty" >&2; exit 2; }
-[[ -n "$MR" ]]     || { echo "reason:mr: field 'mr' is empty" >&2; exit 2; }
-[[ -n "$COMMIT_SHA" ]] || { echo "reason:commit_sha: field 'commit_sha' is empty" >&2; exit 2; }
 
-# Monitoring tasks (release-engineer pipeline watch) skip PR verification
-if [[ "$STATUS" == "monitoring" && "$MR" == "0" ]]; then
+if [[ "$KIND" == "monitoring" ]]; then
   echo "verify-result: ${TASK_ID} OK (monitoring task, mr=0)"
   exit 0
 fi
+
+if [[ "$KIND" == "manual" ]]; then
+  if [[ "$STATUS" != "passed" && "$STATUS" != "failed" ]]; then
+    echo "reason:status: manual task status must be passed or failed, got '${STATUS}'" >&2
+    exit 2
+  fi
+  if ! rg -q '^## Evidence' "$CLAIMED" 2>/dev/null; then
+    echo "reason:evidence: manual task missing '## Evidence' section" >&2
+    exit 2
+  fi
+  echo "verify-result: ${TASK_ID} OK (manual validation, status=${STATUS})"
+  exit 0
+fi
+
+# code task
+[[ -n "$BRANCH" ]] || { echo "reason:branch: field 'branch' is empty" >&2; exit 2; }
+[[ -n "$MR" ]]     || { echo "reason:mr: field 'mr' is empty" >&2; exit 2; }
+[[ -n "$COMMIT_SHA" ]] || { echo "reason:commit_sha: field 'commit_sha' is empty" >&2; exit 2; }
 
 if ! git ls-remote --exit-code origin "$BRANCH" >/dev/null 2>&1; then
   echo "reason:branch: branch '${BRANCH}' not found on origin" >&2

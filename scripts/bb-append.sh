@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="${FACTORY_REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 
 LINE="${1:?usage: $0 \"<line>\"}"
 LOCK="$REPO_ROOT/factory/.blackboard.lock"
