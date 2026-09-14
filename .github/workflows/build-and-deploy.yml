@@ -248,6 +248,10 @@ jobs:
           if [ -d .ebextensions ]; then
             zip -qr deploy-bundle.zip .ebextensions/
           fi
+          if [ -d .platform/hooks/postdeploy ]; then
+            chmod +x .platform/hooks/postdeploy/*.sh
+            zip -qr deploy-bundle.zip .platform/
+          fi
 
       - name: Deploy to idle env + staging smoke
         id: deploy
