@@ -28,7 +28,7 @@ CNAME_A=$(aws elasticbeanstalk describe-environments \
   --environment-names "$EB_ENV_A" \
   --query 'Environments[0].CNAME' --output text)
 
-if echo "$CNAME_A" | grep -q "mimir-prod"; then
+if echo "$CNAME_A" | grep -q "mimir-prod.eba-"; then
   LIVE_ENV="$EB_ENV_A"
   IDLE_ENV="$EB_ENV_B"
 else
@@ -115,5 +115,5 @@ echo ""
 echo "PROMOTE SUCCESS: ${PROD_URL}/health/ → 200, revision=${PROD_REVISION}."
 
 echo "Stopping the env that is now idle (former prod) to save compute..."
-PROD_CNAME_SUBSTRING="mimir-prod" \
+PROD_CNAME_SUBSTRING="mimir-prod.eba-" \
   bash "$(dirname "$0")/eb_idle_power.sh" stop

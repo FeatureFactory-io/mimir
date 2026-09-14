@@ -32,7 +32,7 @@ CNAME_A=$(aws elasticbeanstalk describe-environments \
   --environment-names "$EB_ENV_A" \
   --query 'Environments[0].CNAME' --output text)
 
-if echo "$CNAME_A" | grep -q "mimir-prod"; then
+if echo "$CNAME_A" | grep -q "mimir-prod.eba-"; then
   LIVE_ENV="$EB_ENV_A"
   IDLE_ENV="$EB_ENV_B"
 else
@@ -51,7 +51,7 @@ echo "IDLE_ENV=${IDLE_ENV}" >> "${GITHUB_OUTPUT:-/dev/null}" 2>/dev/null || true
 export IDLE_ENV
 
 echo "Ensuring idle env is running (scale-to-zero may have stopped it)..."
-PROD_CNAME_SUBSTRING="mimir-prod" EB_IDLE_WAIT_SSM=1 \
+PROD_CNAME_SUBSTRING="mimir-prod.eba-" EB_IDLE_WAIT_SSM=1 \
   bash "$(dirname "$0")/eb_idle_power.sh" start
 
 # ── 2. Pre-deploy DB backup (idle env, before new version rolls out) ─────────
