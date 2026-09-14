@@ -160,6 +160,27 @@ _wait_ssm() {
   exit 1
 }
 
+_idle_already_runnable() {
+  local env_name="$1"
+  local ids state asg min max
+  ids="$(_instance_ids "$env_name" || true)"
+  if [ -z "$ids" ] || [ "$ids" = "None" ]; then
+    return 1
+  fi
+  state=$(aws ec2 describe-instances --instance-ids $ids \
+    --query 'Reservations[].Instances[].State.Name' --output text)
+  echo "$state" | grep -q running || return 1
+  asg="$(_asg_name "$env_name")"
+  if [ -z "$asg" ] || [ "$asg" = "None" ]; then
+    return 0
+  fi
+  read -r min max _ <<< "$(aws autoscaling describe-auto-scaling-groups \
+    --auto-scaling-group-names "$asg" \
+    --query 'AutoScalingGroups[0].[MinSize,MaxSize,DesiredCapacity]' \
+    --output text)"
+  [ "${min:-0}" -ge 1 ] && [ "${max:-0}" -ge 1 ]
+}
+
 CNAME_A=$(_env_cname "$EB_ENV_A")
 if echo "$CNAME_A" | grep -q "$PROD_CNAME_SUBSTRING"; then
   LIVE_ENV="$EB_ENV_A"
@@ -190,8 +211,12 @@ if [ "$ACTION" = "stop" ]; then
 fi
 
 _resume_asg "$IDLE_ENV"
-_scale_asg "$IDLE_ENV" 1 1
-_wait_running_instance "$IDLE_ENV"
+if _idle_already_runnable "$IDLE_ENV"; then
+  echo "Idle ${IDLE_ENV} already has a running instance at MinSize>=1 — skipping ASG scale"
+else
+  _scale_asg "$IDLE_ENV" 1 1
+  _wait_running_instance "$IDLE_ENV"
+fi
 RUNNING_IDS=$(_instance_ids "$IDLE_ENV")
 if [ "${EB_IDLE_WAIT_SSM:-0}" = "1" ]; then
   _wait_ssm "$RUNNING_IDS"
