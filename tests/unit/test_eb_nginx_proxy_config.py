@@ -11,9 +11,10 @@ def test_nginx_fix_bootstraps_when_upstream_missing() -> None:
     assert "proxy_pass            http://docker" in CONFIG
 
 
-def test_nginx_fix_runs_on_every_deploy() -> None:
-    assert "container_commands:" in CONFIG
-    assert "01_run_nginx_fix_after_deploy" in CONFIG
+def test_nginx_fix_runs_after_app_deploy_not_postbuild() -> None:
+    assert "appdeploy/post/99_fix_nginx.sh" in CONFIG
+    assert "container_commands:" not in CONFIG
+    assert "nginx-eb-proxy-fix.service" in CONFIG
 
 
 def test_nginx_fix_patches_staging_upstream_and_reloads_gracefully() -> None:
