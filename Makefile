@@ -191,6 +191,18 @@ swap: ## [prod] Promote idle → prod: resolve live/idle, SHA guard, CNAME swap,
 	@EB_APP=$(EB_APP) EB_ENV_A=$(EB_ENV_A) EB_ENV_B=$(EB_ENV_B) \
 	  AWS_DEFAULT_REGION=$(AWS_REGION) bash scripts/promote-prod.sh
 
+.PHONY: idle-start
+idle-start: ## Start the idle EB env if scaled to 0 (used by deploy-idle.sh before backup)
+	@EB_APP=$(EB_APP) EB_ENV_A=$(EB_ENV_A) EB_ENV_B=$(EB_ENV_B) \
+	  AWS_DEFAULT_REGION=$(AWS_REGION) PROD_CNAME_SUBSTRING=mimir-prod EB_IDLE_WAIT_SSM=1 \
+	  bash scripts/eb_idle_power.sh start
+
+.PHONY: idle-stop
+idle-stop: ## Scale the idle EB env to 0 instances — never touches the env holding mimir-prod CNAME
+	@EB_APP=$(EB_APP) EB_ENV_A=$(EB_ENV_A) EB_ENV_B=$(EB_ENV_B) \
+	  AWS_DEFAULT_REGION=$(AWS_REGION) PROD_CNAME_SUBSTRING=mimir-prod \
+	  bash scripts/eb_idle_power.sh stop
+
 .PHONY: eb-status
 eb-status: ## Show health, CNAME, and version of both EB environments
 	@aws elasticbeanstalk describe-environments \

@@ -113,3 +113,7 @@ fi
 
 echo ""
 echo "PROMOTE SUCCESS: ${PROD_URL}/health/ → 200, revision=${PROD_REVISION}."
+
+echo "Stopping the env that is now idle (former prod) to save compute..."
+PROD_CNAME_SUBSTRING="mimir-prod" \
+  bash "$(dirname "$0")/eb_idle_power.sh" stop

@@ -50,6 +50,10 @@ echo "Image:     $ECR_REGISTRY/mimir:$IMAGE_SUFFIX"
 echo "IDLE_ENV=${IDLE_ENV}" >> "${GITHUB_OUTPUT:-/dev/null}" 2>/dev/null || true
 export IDLE_ENV
 
+echo "Ensuring idle env is running (scale-to-zero may have stopped it)..."
+PROD_CNAME_SUBSTRING="mimir-prod" EB_IDLE_WAIT_SSM=1 \
+  bash "$(dirname "$0")/eb_idle_power.sh" start
+
 # ── 2. Pre-deploy DB backup (idle env, before new version rolls out) ─────────
 : "${S3_BACKUP_BUCKET:?S3_BACKUP_BUCKET not set}"
 echo "Pre-deploy backup (SSM on ${IDLE_ENV})..."
