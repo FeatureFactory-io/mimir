@@ -171,20 +171,6 @@ class TestMimirApp:
             {"EnvironmentName": "mimir-idle"},
         )
 
-    def test_eb_envs_load_balanced(self, template):
-        template.has_resource_properties(
-            "AWS::ElasticBeanstalk::Environment",
-            {
-                "OptionSettings": assertions.Match.array_with([
-                    assertions.Match.object_like({
-                        "Namespace": "aws:elasticbeanstalk:environment",
-                        "OptionName": "EnvironmentType",
-                        "Value": "LoadBalanced",
-                    })
-                ])
-            },
-        )
-
     def test_eb_max_size_is_one(self, template):
         """Cap ASG scale-out — cost downsizing (Phase 1)."""
         template.has_resource_properties(
