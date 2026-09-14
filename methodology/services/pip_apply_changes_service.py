@@ -68,13 +68,14 @@ class PipApplyChangesService:
         pip: ProcessImprovementProposal,
         accepted: list[PipChange],
         playbook: Playbook,
-    ) -> None:
+    ) -> dict[str, tuple[str, int]]:
         """
         Apply accepted changes to the playbook in stable order.
 
         :param pip: Parent proposal (audit context).
         :param accepted: Ordered list accepted by administrators.
         :param playbook: Target released playbook row.
+        :return: ``internal_ref`` → ``(entity_type, pk)`` map built during apply.
         :raises ValidationError: if a change cannot be applied safely.
         """
         ref_map: dict[str, tuple[str, int]] = {}
@@ -85,6 +86,7 @@ class PipApplyChangesService:
                 change=change,
                 ref_map=ref_map,
             )
+        return ref_map
 
     @staticmethod
     def _apply_single_change(
@@ -636,6 +638,47 @@ class PipApplyChangesService:
         raise ValidationError(f"Unsupported DROP entity '{entity_type}'.")
 
     @staticmethod
+    def build_target_state_context(
+        *,
+        pip: ProcessImprovementProposal,
+        playbook: Playbook,
+    ) -> tuple[str, dict[str, tuple[str, int]]]:
+        """
+        Dry-run apply all PIP changes and return post-apply summary plus ref map.
+
+        :param pip: Parent proposal whose changes are applied in order.
+        :param playbook: Released playbook row to mutate transiently.
+        :return: ``(extended_summary, internal_ref_map)`` from rolled-back apply.
+        :raises ValidationError: when changes cannot be applied.
+        """
+        from methodology.services.galdr_prompts import build_extended_playbook_summary
+
+        changes = list(
+            PipChange.objects.filter(pip=pip).order_by("order", "pk"),
+        )
+        logger.info(
+            "PIP dry-run target state pip=%s playbook=%s change_count=%s",
+            pip.pk,
+            playbook.pk,
+            len(changes),
+        )
+        with transaction.atomic():
+            ref_map = PipApplyChangesService.apply_changes(
+                pip=pip,
+                accepted=changes,
+                playbook=playbook,
+            )
+            summary = build_extended_playbook_summary(playbook)
+            transaction.set_rollback(True)
+        logger.info(
+            "PIP dry-run target state complete pip=%s summary_chars=%s ref_count=%s",
+            pip.pk,
+            len(summary),
+            len(ref_map),
+        )
+        return summary, ref_map
+
+    @staticmethod
     def build_target_state_summary(
         *,
         pip: ProcessImprovementProposal,
@@ -651,29 +694,9 @@ class PipApplyChangesService:
         :return: Extended textual summary of the post-apply playbook.
         :raises ValidationError: when changes cannot be applied.
         """
-        from methodology.services.galdr_prompts import build_extended_playbook_summary
-
-        changes = list(
-            PipChange.objects.filter(pip=pip).order_by("order", "pk"),
-        )
-        logger.info(
-            "PIP dry-run target state pip=%s playbook=%s change_count=%s",
-            pip.pk,
-            playbook.pk,
-            len(changes),
-        )
-        with transaction.atomic():
-            PipApplyChangesService.apply_changes(
-                pip=pip,
-                accepted=changes,
-                playbook=playbook,
-            )
-            summary = build_extended_playbook_summary(playbook)
-            transaction.set_rollback(True)
-        logger.info(
-            "PIP dry-run target state complete pip=%s summary_chars=%s",
-            pip.pk,
-            len(summary),
+        summary, _ref_map = PipApplyChangesService.build_target_state_context(
+            pip=pip,
+            playbook=playbook,
         )
         return summary
 

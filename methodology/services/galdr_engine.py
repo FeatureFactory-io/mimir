@@ -125,8 +125,13 @@ class GaldrEngine:
             if not qs.exists():
                 raise GaldrLLMError("PIP has zero changes.")
 
-            for change in qs.iterator():
-                user_prompt = build_change_prompt(change, summary_text)
+            changes = list(qs)
+            for change in changes:
+                user_prompt = build_change_prompt(
+                    change,
+                    summary_text,
+                    all_changes=changes,
+                )
                 rec_text, reasoning = client.evaluate_change(user_prompt)
                 rec_upper = rec_text.upper()
                 if rec_upper not in cls.REC_CODE:
@@ -176,15 +181,18 @@ class GaldrEngine:
 
         try:
             current_summary = build_playbook_context_summary(playbook)
-            target_summary = PipApplyChangesService.build_target_state_summary(
-                pip=bootstrap,
-                playbook=playbook,
+            target_summary, ref_map = (
+                PipApplyChangesService.build_target_state_context(
+                    pip=bootstrap,
+                    playbook=playbook,
+                )
             )
             prompt = build_target_state_prompt(
                 bootstrap,
                 current_summary,
                 target_summary,
                 changes,
+                ref_map=ref_map,
             )
             client = get_galdr_client()
             holistic, payloads = client.evaluate_pip_holistically(prompt)
