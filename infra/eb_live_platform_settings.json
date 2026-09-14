@@ -103,7 +103,7 @@
     {
       "namespace": "aws:autoscaling:launchconfiguration",
       "option_name": "SecurityGroups",
-      "value": "sg-03f4090a028cf0084,sg-06e92f30da1444e79"
+      "value": "sg-03f4090a028cf0084,sg-0ac8004aef5e6f7a1"
     },
     {
       "namespace": "aws:autoscaling:trigger",
@@ -625,7 +625,7 @@
     {
       "namespace": "aws:autoscaling:launchconfiguration",
       "option_name": "SecurityGroups",
-      "value": "sg-03f4090a028cf0084,sg-06bd51302e9c9e000"
+      "value": "sg-03f4090a028cf0084,sg-0ac8004aef5e6f7a1"
     },
     {
       "namespace": "aws:autoscaling:trigger",
