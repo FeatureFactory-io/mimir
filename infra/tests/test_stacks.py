@@ -200,18 +200,35 @@ class TestMimirApp:
             },
         )
 
-    def test_eb_mirrors_live_http_listener(self, template):
-        """Live envs use HTTP on the default ALB listener (HTTPS is on CloudFront)."""
+    def test_eb_prod_still_load_balanced(self, template):
+        """Prod remains LoadBalanced until sequential cutover completes."""
         template.has_resource_properties(
             "AWS::ElasticBeanstalk::Environment",
             {
+                "EnvironmentName": "mimir-prod",
                 "OptionSettings": assertions.Match.array_with([
                     assertions.Match.object_like({
-                        "Namespace": "aws:elbv2:listener:default",
-                        "OptionName": "Protocol",
-                        "Value": "HTTP",
+                        "Namespace": "aws:elasticbeanstalk:environment",
+                        "OptionName": "EnvironmentType",
+                        "Value": "LoadBalanced",
                     })
-                ])
+                ]),
+            },
+        )
+
+    def test_eb_idle_is_single_instance(self, template):
+        """Idle env migrates to SingleInstance (no ALB) first."""
+        template.has_resource_properties(
+            "AWS::ElasticBeanstalk::Environment",
+            {
+                "EnvironmentName": "mimir-idle",
+                "OptionSettings": assertions.Match.array_with([
+                    assertions.Match.object_like({
+                        "Namespace": "aws:elasticbeanstalk:environment",
+                        "OptionName": "EnvironmentType",
+                        "Value": "SingleInstance",
+                    })
+                ]),
             },
         )
 
@@ -436,11 +453,11 @@ class TestMimirDns:
             },
         )
 
-    def test_route53_alias_record_created(self, template):
-        template.resource_count_is("AWS::Route53::RecordSet", 1)
+    def test_route53_cname_custom_resource_created(self, template):
+        template.resource_count_is("AWS::CloudFormation::CustomResource", 1)
 
-    def test_route53_record_targets_mimir_subdomain(self, template):
+    def test_cname_targets_mimir_subdomain(self, template):
         template.has_resource_properties(
-            "AWS::Route53::RecordSet",
-            {"Name": "mimir.example.com."},
+            "AWS::CloudFormation::CustomResource",
+            {"RecordName": "mimir.example.com."},
         )

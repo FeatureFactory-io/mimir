@@ -37,7 +37,10 @@ echo "Target instance: ${INSTANCE_ID}"
 
 REMOTE_CMD=$(cat <<EOF
 set -euo pipefail
-CONTAINER=\$(docker ps --filter "publish=80" --format '{{.ID}}' | head -1)
+CONTAINER=\$(docker ps --filter "publish=8080" --format '{{.ID}}' | head -1)
+if [ -z "\$CONTAINER" ]; then
+  CONTAINER=\$(docker ps --filter "publish=80" --format '{{.ID}}' | head -1)
+fi
 if [ -z "\$CONTAINER" ]; then
   CONTAINER=\$(docker ps -q | head -1)
 fi

@@ -939,16 +939,6 @@
     },
     {
       "namespace": "aws:ec2:vpc",
-      "option_name": "ELBScheme",
-      "value": "public"
-    },
-    {
-      "namespace": "aws:ec2:vpc",
-      "option_name": "ELBSubnets",
-      "value": "subnet-f82d49d9,subnet-40a08e0d,subnet-686df637"
-    },
-    {
-      "namespace": "aws:ec2:vpc",
       "option_name": "Subnets",
       "value": "subnet-686df637,subnet-f82d49d9,subnet-40a08e0d"
     },
@@ -1100,7 +1090,7 @@
     {
       "namespace": "aws:elasticbeanstalk:environment",
       "option_name": "EnvironmentType",
-      "value": "LoadBalanced"
+      "value": "SingleInstance"
     },
     {
       "namespace": "aws:elasticbeanstalk:environment",
@@ -1114,78 +1104,8 @@
     },
     {
       "namespace": "aws:elasticbeanstalk:environment",
-      "option_name": "LoadBalancerIsShared",
-      "value": "false"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment",
-      "option_name": "LoadBalancerType",
-      "value": "application"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment",
       "option_name": "ServiceRole",
       "value": "aws-elasticbeanstalk-service-role"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "DeregistrationDelay",
-      "value": "20"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "HealthCheckInterval",
-      "value": "15"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "HealthCheckPath",
-      "value": "/"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "HealthCheckTimeout",
-      "value": "5"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "HealthyThresholdCount",
-      "value": "3"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "MatcherHTTPCode",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "Port",
-      "value": "80"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "Protocol",
-      "value": "HTTP"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "StickinessEnabled",
-      "value": "false"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "StickinessLBCookieDuration",
-      "value": "86400"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "StickinessType",
-      "value": "lb_cookie"
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:environment:process:default",
-      "option_name": "UnhealthyThresholdCount",
-      "value": "5"
     },
     {
       "namespace": "aws:elasticbeanstalk:environment:proxy",
@@ -1281,96 +1201,6 @@
       "namespace": "aws:elasticbeanstalk:xray",
       "option_name": "XRayEnabled",
       "value": "false"
-    },
-    {
-      "namespace": "aws:elbv2:listener:443",
-      "option_name": "DefaultProcess",
-      "value": "default"
-    },
-    {
-      "namespace": "aws:elbv2:listener:443",
-      "option_name": "ListenerEnabled",
-      "value": "true"
-    },
-    {
-      "namespace": "aws:elbv2:listener:443",
-      "option_name": "Protocol",
-      "value": "HTTPS"
-    },
-    {
-      "namespace": "aws:elbv2:listener:443",
-      "option_name": "Rules",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elbv2:listener:443",
-      "option_name": "SSLCertificateArns",
-      "value": "arn:aws:acm:us-east-1:411113550285:certificate/b0d774c7-b9e4-46a5-ad27-3197d61b46f6"
-    },
-    {
-      "namespace": "aws:elbv2:listener:443",
-      "option_name": "SSLPolicy",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elbv2:listener:default",
-      "option_name": "DefaultProcess",
-      "value": "default"
-    },
-    {
-      "namespace": "aws:elbv2:listener:default",
-      "option_name": "ListenerEnabled",
-      "value": "true"
-    },
-    {
-      "namespace": "aws:elbv2:listener:default",
-      "option_name": "Protocol",
-      "value": "HTTP"
-    },
-    {
-      "namespace": "aws:elbv2:listener:default",
-      "option_name": "Rules",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elbv2:listener:default",
-      "option_name": "SSLCertificateArns",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elbv2:listener:default",
-      "option_name": "SSLPolicy",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elbv2:loadbalancer",
-      "option_name": "AccessLogsS3Bucket",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elbv2:loadbalancer",
-      "option_name": "AccessLogsS3Enabled",
-      "value": "false"
-    },
-    {
-      "namespace": "aws:elbv2:loadbalancer",
-      "option_name": "AccessLogsS3Prefix",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elbv2:loadbalancer",
-      "option_name": "IdleTimeout",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elbv2:loadbalancer",
-      "option_name": "IpAddressType",
-      "value": "ipv4"
-    },
-    {
-      "namespace": "aws:elbv2:loadbalancer",
-      "option_name": "SecurityGroups",
-      "value": "sg-00f880634e4d1778c"
     },
     {
       "namespace": "aws:rds:dbinstance",

@@ -243,7 +243,11 @@ jobs:
           echo "=== Deployment manifest ===" && cat docker-compose.yml
 
       - name: Package deployment bundle
-        run: zip -j deploy-bundle.zip docker-compose.yml
+        run: |
+          zip deploy-bundle.zip docker-compose.yml
+          if [ -d .ebextensions ]; then
+            zip -qr deploy-bundle.zip .ebextensions/
+          fi
 
       - name: Deploy to idle env + staging smoke
         id: deploy
