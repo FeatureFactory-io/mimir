@@ -166,7 +166,11 @@ class MimirApp(Stack):
 
         if self.node.try_get_context("eb_environments") != "false":
             minimal = self.node.try_get_context("eb_minimal_import") == "true"
+            skip_raw = self.node.try_get_context("eb_skip_envs") or ""
+            skip = {s.strip() for s in skip_raw.split(",") if s.strip()}
             for env_name in ("mimir-prod", "mimir-idle"):
+                if env_name in skip:
+                    continue
                 self._create_eb_env(eb_app, env_name, minimal=minimal)
 
     def _create_eb_env(
