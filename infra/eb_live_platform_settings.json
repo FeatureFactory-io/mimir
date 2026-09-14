@@ -103,57 +103,7 @@
     {
       "namespace": "aws:autoscaling:launchconfiguration",
       "option_name": "SecurityGroups",
-      "value": "sg-03f4090a028cf0084,sg-0ac8004aef5e6f7a1"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "BreachDuration",
-      "value": "5"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "EvaluationPeriods",
-      "value": "1"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "LowerBreachScaleIncrement",
-      "value": "-1"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "LowerThreshold",
-      "value": "2000000"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "MeasureName",
-      "value": "NetworkOut"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "Period",
-      "value": "5"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "Statistic",
-      "value": "Average"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "Unit",
-      "value": "Bytes"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "UpperBreachScaleIncrement",
-      "value": "1"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "UpperThreshold",
-      "value": "6000000"
+      "value": "sg-03f4090a028cf0084,sg-0ac8004aef5e6f7a1,sg-08ac7ba5e8fe27406"
     },
     {
       "namespace": "aws:autoscaling:updatepolicy:rollingupdate",
@@ -247,6 +197,16 @@
     },
     {
       "namespace": "aws:ec2:vpc",
+      "option_name": "ELBScheme",
+      "value": "public"
+    },
+    {
+      "namespace": "aws:ec2:vpc",
+      "option_name": "ELBSubnets",
+      "value": "subnet-686df637,subnet-f82d49d9,subnet-40a08e0d"
+    },
+    {
+      "namespace": "aws:ec2:vpc",
       "option_name": "Subnets",
       "value": "subnet-686df637,subnet-f82d49d9,subnet-40a08e0d"
     },
@@ -287,6 +247,11 @@
     },
     {
       "namespace": "aws:elasticbeanstalk:application:environment",
+      "option_name": "DEPLOYED_REVISION",
+      "value": "v0.0.32"
+    },
+    {
+      "namespace": "aws:elasticbeanstalk:application:environment",
       "option_name": "DJANGO_ALLOWED_HOSTS",
       "value": "mimir.featurefactory.io,.elasticbeanstalk.com,djwlr2sinmq0w.cloudfront.net,localhost"
     },
@@ -313,7 +278,7 @@
     {
       "namespace": "aws:elasticbeanstalk:application:environment",
       "option_name": "GITHUB_BUG_REPO",
-      "value": "FeatureFactory-io/mimir"
+      "value": "phainestai/mimir"
     },
     {
       "namespace": "aws:elasticbeanstalk:application:environment",
@@ -323,7 +288,7 @@
     {
       "namespace": "aws:elasticbeanstalk:application:environment",
       "option_name": "MIMIR_GIT_REVISION",
-      "value": "v0.0.47"
+      "value": "v0.0.72"
     },
     {
       "namespace": "aws:elasticbeanstalk:cloudwatch:logs",
@@ -428,7 +393,7 @@
     {
       "namespace": "aws:elasticbeanstalk:healthreporting:system",
       "option_name": "ConfigDocument",
-      "value": "{\"Version\":1,\"CloudWatchMetrics\":{\"Instance\":{\"CPUIrq\":null,\"LoadAverage5min\":null,\"ApplicationRequests5xx\":null,\"ApplicationRequests4xx\":null,\"CPUUser\":null,\"LoadAverage1min\":null,\"ApplicationLatencyP50\":null,\"CPUIdle\":null,\"InstanceHealth\":null,\"ApplicationLatencyP95\":null,\"ApplicationLatencyP85\":null,\"RootFilesystemUtil\":null,\"ApplicationLatencyP90\":null,\"CPUSystem\":null,\"ApplicationLatencyP75\":null,\"CPUSoftirq\":null,\"ApplicationLatencyP10\":null,\"ApplicationLatencyP99\":null,\"ApplicationRequestsTotal\":null,\"ApplicationLatencyP99.9\":null,\"ApplicationRequests3xx\":null,\"ApplicationRequests2xx\":null,\"CPUIowait\":null,\"CPUNice\":null},\"Environment\":{\"InstancesSevere\":null,\"InstancesDegraded\":null,\"ApplicationRequests5xx\":null,\"ApplicationRequests4xx\":null,\"ApplicationLatencyP50\":null,\"ApplicationLatencyP95\":null,\"ApplicationLatencyP85\":null,\"InstancesUnknown\":null,\"ApplicationLatencyP90\":null,\"InstancesInfo\":null,\"InstancesPending\":null,\"ApplicationLatencyP75\":null,\"ApplicationLatencyP10\":null,\"ApplicationLatencyP99\":null,\"ApplicationRequestsTotal\":null,\"InstancesNoData\":null,\"ApplicationLatencyP99.9\":null,\"ApplicationRequests3xx\":null,\"ApplicationRequests2xx\":null,\"InstancesOk\":null,\"InstancesWarning\":null}}}"
+      "value": "{\"Version\":1,\"CloudWatchMetrics\":{\"Instance\":{\"RootFilesystemUtil\":null,\"CPUIrq\":null,\"LoadAverage5min\":null,\"ApplicationRequests5xx\":null,\"ApplicationRequests4xx\":null,\"CPUUser\":null,\"LoadAverage1min\":null,\"ApplicationLatencyP50\":null,\"CPUIdle\":null,\"InstanceHealth\":null,\"ApplicationLatencyP95\":null,\"ApplicationLatencyP85\":null,\"ApplicationLatencyP90\":null,\"CPUSystem\":null,\"ApplicationLatencyP75\":null,\"CPUSoftirq\":null,\"ApplicationLatencyP10\":null,\"ApplicationLatencyP99\":null,\"ApplicationRequestsTotal\":null,\"ApplicationLatencyP99.9\":null,\"ApplicationRequests3xx\":null,\"ApplicationRequests2xx\":null,\"CPUIowait\":null,\"CPUNice\":null},\"Environment\":{\"InstancesSevere\":null,\"InstancesDegraded\":null,\"ApplicationRequests5xx\":null,\"ApplicationRequests4xx\":null,\"ApplicationLatencyP50\":null,\"ApplicationLatencyP95\":null,\"ApplicationLatencyP85\":null,\"InstancesUnknown\":null,\"ApplicationLatencyP90\":null,\"InstancesInfo\":null,\"InstancesPending\":null,\"ApplicationLatencyP75\":null,\"ApplicationLatencyP10\":null,\"ApplicationLatencyP99\":null,\"ApplicationRequestsTotal\":null,\"InstancesNoData\":null,\"ApplicationLatencyP99.9\":null,\"ApplicationRequests3xx\":null,\"ApplicationRequests2xx\":null,\"InstancesOk\":null,\"InstancesWarning\":null}}}"
     },
     {
       "namespace": "aws:elasticbeanstalk:healthreporting:system",
@@ -498,16 +463,6 @@
     {
       "namespace": "aws:elasticbeanstalk:sns:topics",
       "option_name": "Notification Topic Name",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:trafficsplitting",
-      "option_name": "EvaluationTime",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:trafficsplitting",
-      "option_name": "NewVersionPercent",
       "value": ""
     },
     {
@@ -628,56 +583,6 @@
       "value": "sg-03f4090a028cf0084,sg-0ac8004aef5e6f7a1"
     },
     {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "BreachDuration",
-      "value": "5"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "EvaluationPeriods",
-      "value": "1"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "LowerBreachScaleIncrement",
-      "value": "-1"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "LowerThreshold",
-      "value": "2000000"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "MeasureName",
-      "value": "NetworkOut"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "Period",
-      "value": "5"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "Statistic",
-      "value": "Average"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "Unit",
-      "value": "Bytes"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "UpperBreachScaleIncrement",
-      "value": "1"
-    },
-    {
-      "namespace": "aws:autoscaling:trigger",
-      "option_name": "UpperThreshold",
-      "value": "6000000"
-    },
-    {
       "namespace": "aws:autoscaling:updatepolicy:rollingupdate",
       "option_name": "MaxBatchSize",
       "value": ""
@@ -769,6 +674,16 @@
     },
     {
       "namespace": "aws:ec2:vpc",
+      "option_name": "ELBScheme",
+      "value": "public"
+    },
+    {
+      "namespace": "aws:ec2:vpc",
+      "option_name": "ELBSubnets",
+      "value": "subnet-686df637,subnet-f82d49d9,subnet-40a08e0d"
+    },
+    {
+      "namespace": "aws:ec2:vpc",
       "option_name": "Subnets",
       "value": "subnet-686df637,subnet-f82d49d9,subnet-40a08e0d"
     },
@@ -791,6 +706,11 @@
       "namespace": "aws:elasticbeanstalk:application:environment",
       "option_name": "AWS_SES_REGION_NAME",
       "value": "us-east-1"
+    },
+    {
+      "namespace": "aws:elasticbeanstalk:application:environment",
+      "option_name": "COOKIE_SECURE",
+      "value": "false"
     },
     {
       "namespace": "aws:elasticbeanstalk:application:environment",
@@ -834,13 +754,18 @@
     },
     {
       "namespace": "aws:elasticbeanstalk:application:environment",
+      "option_name": "GITHUB_BUG_REPO",
+      "value": "phainestai/mimir"
+    },
+    {
+      "namespace": "aws:elasticbeanstalk:application:environment",
       "option_name": "MIMIR_ENV",
       "value": "prod"
     },
     {
       "namespace": "aws:elasticbeanstalk:application:environment",
       "option_name": "MIMIR_GIT_REVISION",
-      "value": "main-25eed66"
+      "value": "v0.0.72"
     },
     {
       "namespace": "aws:elasticbeanstalk:cloudwatch:logs",
@@ -945,7 +870,7 @@
     {
       "namespace": "aws:elasticbeanstalk:healthreporting:system",
       "option_name": "ConfigDocument",
-      "value": "{\"Version\":1,\"CloudWatchMetrics\":{\"Instance\":{\"CPUIrq\":null,\"LoadAverage5min\":null,\"ApplicationRequests5xx\":null,\"ApplicationRequests4xx\":null,\"CPUUser\":null,\"LoadAverage1min\":null,\"ApplicationLatencyP50\":null,\"CPUIdle\":null,\"InstanceHealth\":null,\"ApplicationLatencyP95\":null,\"ApplicationLatencyP85\":null,\"RootFilesystemUtil\":null,\"ApplicationLatencyP90\":null,\"CPUSystem\":null,\"ApplicationLatencyP75\":null,\"CPUSoftirq\":null,\"ApplicationLatencyP10\":null,\"ApplicationLatencyP99\":null,\"ApplicationRequestsTotal\":null,\"ApplicationLatencyP99.9\":null,\"ApplicationRequests3xx\":null,\"ApplicationRequests2xx\":null,\"CPUIowait\":null,\"CPUNice\":null},\"Environment\":{\"InstancesSevere\":null,\"InstancesDegraded\":null,\"ApplicationRequests5xx\":null,\"ApplicationRequests4xx\":null,\"ApplicationLatencyP50\":null,\"ApplicationLatencyP95\":null,\"ApplicationLatencyP85\":null,\"InstancesUnknown\":null,\"ApplicationLatencyP90\":null,\"InstancesInfo\":null,\"InstancesPending\":null,\"ApplicationLatencyP75\":null,\"ApplicationLatencyP10\":null,\"ApplicationLatencyP99\":null,\"ApplicationRequestsTotal\":null,\"InstancesNoData\":null,\"ApplicationLatencyP99.9\":null,\"ApplicationRequests3xx\":null,\"ApplicationRequests2xx\":null,\"InstancesOk\":null,\"InstancesWarning\":null}}}"
+      "value": "{\"Version\":1,\"CloudWatchMetrics\":{\"Instance\":{\"RootFilesystemUtil\":null,\"CPUIrq\":null,\"LoadAverage5min\":null,\"ApplicationRequests5xx\":null,\"ApplicationRequests4xx\":null,\"CPUUser\":null,\"LoadAverage1min\":null,\"ApplicationLatencyP50\":null,\"CPUIdle\":null,\"InstanceHealth\":null,\"ApplicationLatencyP95\":null,\"ApplicationLatencyP85\":null,\"ApplicationLatencyP90\":null,\"CPUSystem\":null,\"ApplicationLatencyP75\":null,\"CPUSoftirq\":null,\"ApplicationLatencyP10\":null,\"ApplicationLatencyP99\":null,\"ApplicationRequestsTotal\":null,\"ApplicationLatencyP99.9\":null,\"ApplicationRequests3xx\":null,\"ApplicationRequests2xx\":null,\"CPUIowait\":null,\"CPUNice\":null},\"Environment\":{\"InstancesSevere\":null,\"InstancesDegraded\":null,\"ApplicationRequests5xx\":null,\"ApplicationRequests4xx\":null,\"ApplicationLatencyP50\":null,\"ApplicationLatencyP95\":null,\"ApplicationLatencyP85\":null,\"InstancesUnknown\":null,\"ApplicationLatencyP90\":null,\"InstancesInfo\":null,\"InstancesPending\":null,\"ApplicationLatencyP75\":null,\"ApplicationLatencyP10\":null,\"ApplicationLatencyP99\":null,\"ApplicationRequestsTotal\":null,\"InstancesNoData\":null,\"ApplicationLatencyP99.9\":null,\"ApplicationRequests3xx\":null,\"ApplicationRequests2xx\":null,\"InstancesOk\":null,\"InstancesWarning\":null}}}"
     },
     {
       "namespace": "aws:elasticbeanstalk:healthreporting:system",
@@ -1015,16 +940,6 @@
     {
       "namespace": "aws:elasticbeanstalk:sns:topics",
       "option_name": "Notification Topic Name",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:trafficsplitting",
-      "option_name": "EvaluationTime",
-      "value": ""
-    },
-    {
-      "namespace": "aws:elasticbeanstalk:trafficsplitting",
-      "option_name": "NewVersionPercent",
       "value": ""
     },
     {
