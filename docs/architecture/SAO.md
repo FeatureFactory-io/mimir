@@ -2218,6 +2218,126 @@ Must-have keys: `DJANGO_SECRET_KEY`, `DATABASE_URL`, `ANTHROPIC_API_KEY`, `GITHU
 
 ---
 
+## Production AWS Infrastructure
+
+Mimir runs in the **same AWS account and default VPC as Huginn** (`411113550285`, `us-east-1`). Infrastructure is owned by CDK under [`infra/`](../../infra/); routine app releases use GitHub Actions + `scripts/` (see [CI/CD Pipeline](#cicd-pipeline)). This section is the **source of truth** for the cost-conscious, shared-RDS blueprint adopted in 2026.
+
+### Design principles
+
+| Principle | Mimir today |
+|-----------|-------------|
+| **No dedicated VPC** | CDK **looks up** the account default VPC (`vpc-a2af05df`, `172.31.0.0/16`). It does **not** create a `10.0.0.0/16` VPC, private subnets, or NAT gateways. |
+| **Shared RDS** | PostgreSQL instance **`huginn-db`** is shared with Huginn (and other apps on the same host). Mimir uses logical database **`mimir`**. Mimir CDK must **never** create or replace the RDS instance. |
+| **Additive security-group rules only** | RDS security group **`huginn-rds`** (`sg-04b61b87c5f63a6aa`) is **imported by ID**. `MimirNetwork` adds a single ingress rule (`mimir-eb` → TCP 5432). Existing rules (e.g. Huginn EB) must not be removed. |
+| **LoadBalanced EB (for now)** | Both envs use **`EnvironmentType=LoadBalanced`** with an **Application Load Balancer each** (~$48/mo for two ALBs). Huginn uses **`SingleInstance`** (no ALB) + CloudFront — different pattern, same account. |
+| **Idle env off between releases** | The env that does **not** hold the `mimir-prod.eba-…` CNAME is scaled to **zero EC2 instances** after promote and before the next deploy cycle, via `scripts/eb_idle_power.sh`. ALBs remain; compute and public IPv4 on idle instances are saved. |
+| **CDK owns platform; CI owns app version** | EB option settings (VPC, instance type, ASG bounds, ALB) come from `infra/eb_live_platform_settings.json` + `cdk deploy`. Docker image rollouts use `deploy-idle.sh` → `update-environment`. |
+
+### Network (`MimirNetwork`)
+
+```
+Internet → ALB (:443 ACM / :80) → EB EC2 (mimir-eb SG) → huginn-db:5432/mimir
+                ↑
+Route53 CNAME mimir.featurefactory.io → mimir-prod.eba-….elasticbeanstalk.com
+```
+
+- **VPC:** `Vpc.from_lookup` on `vpc_id` from `infra/cdk.json` (`vpc-a2af05df`).
+- **EB security group:** `mimir-eb` — CDK-created; HTTP/HTTPS from `0.0.0.0/0` (ALB and direct checks).
+- **RDS access:** standalone `AWS::EC2::SecurityGroupIngress` on imported `huginn-rds` SG — same pattern as [`infra/stacks/network_stack.py`](../../infra/stacks/network_stack.py).
+
+### Database (shared `huginn-db`)
+
+| Attribute | Live value |
+|-----------|------------|
+| Instance id | `huginn-db` |
+| Engine | PostgreSQL 16 |
+| Class | `db.t3.micro` |
+| Multi-AZ | No (Single-AZ) |
+| Storage encrypted | **No** (do not flip to encrypted via CDK — that replaces the instance) |
+| Mimir logical DB | `mimir` (`DATABASE_URL` in EB secrets / `infra/.env`) |
+| Backup (app-level) | Pre-migrate `pg_dump` + `dumpdata` → S3 (`MimirBackups` stack) before every release deploy |
+
+RDS automated backups remain the baseline; S3 pre-migrate snapshots are for bad-migration recovery (see [Database backup before migrate](#database-backup-before-migrate) under CI/CD).
+
+### Elastic Beanstalk
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| Application | `mimir` | |
+| Environments | `mimir-prod`, `mimir-idle` | Fixed names; **CNAME labels swap** on promote |
+| Platform | Docker on 64bit Amazon Linux 2023 | `docker-compose` bundle from CI |
+| **EnvironmentType** | **`LoadBalanced`** | One ALB per env; **cannot** be changed in place — SingleInstance migration requires a **new env pair + CNAME cutover** (planned follow-up, not this blueprint) |
+| Instance type | `t3.small` | From platform snapshot |
+| ASG MinSize (CDK snapshot) | `1` | Platform default for both envs |
+| ASG MaxSize (CDK snapshot) | `2` → **target `1`** | Cap accidental scale-out; update snapshot + `cdk deploy MimirApp` |
+| Idle runtime | Min/Max **0** when stopped | Via `eb_idle_power.sh stop` on LoadBalanced envs (EB `update-environment`, not CDK MinSize=0) |
+| Idle runtime (deploy) | Min/Max **1** | `eb_idle_power.sh start` before SSM backup in `deploy-idle.sh` |
+| Prod CNAME fragment | `mimir-prod` | Whichever physical env holds this fragment is **live** |
+| Public URL | `https://mimir.featurefactory.io` | Route53 CNAME → `mimir-prod.eba-…`; **no CloudFront** (unlike Huginn) |
+| Container registry | ECR `411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir` | Tagged per release SHA |
+
+### Huginn vs Mimir (same account)
+
+| | Huginn | Mimir |
+|---|--------|-------|
+| EB topology | `SingleInstance` — no ALB | `LoadBalanced` — 2 ALBs |
+| Edge TLS | CloudFront → EB HTTP | ALB HTTPS (ACM on env) |
+| Prod DNS | `huginn.featurefactory.io` → CloudFront → `huginn-prod.eba-…` | `mimir.featurefactory.io` → `mimir-prod.eba-…` |
+| Idle stop | ASG suspend + terminate (SingleInstance quirk) | ASG MinSize=MaxSize=0 via EB API |
+| Shared RDS | `huginn-db` / DB `huginn` | `huginn-db` / DB `mimir` |
+
+### Cost ownership
+
+**In scope (this blueprint):**
+
+- Scale idle env to **0 instances** after `make swap` (`promote-prod.sh` → `eb_idle_power.sh stop`).
+- **Start idle env** before backup/deploy (`deploy-idle.sh` → `idle-start` / `eb_idle_power.sh start`; optional `EB_IDLE_WAIT_SSM=1` for SSM readiness).
+- **`MaxSize=1`** in `eb_live_platform_settings.json` + `cdk deploy MimirApp` to prevent runaway scale-out.
+
+**Out of scope (explicit non-goals):**
+
+- **Drop ALBs / convert to SingleInstance** (~$48/mo) — requires new EB environments and traffic cutover; EB cannot mutate `EnvironmentType` on existing envs.
+- **`MinSize=0` in CDK** for the idle env — runtime scaling only; platform snapshot keeps MinSize=1 so a fresh `cdk deploy` does not fight idle-stop.
+- Encrypt live `huginn-db`, Aurora, dedicated VPC/NAT, or a second RDS instance.
+
+### CDK stacks
+
+Code under [`infra/`](../../infra/). **Operational guide:** [`infra/README.md`](../../infra/README.md).
+
+| Stack | Role | Deploy status |
+|-------|------|---------------|
+| `MimirNetwork` | Default VPC lookup, `mimir-eb` SG, additive RDS ingress | Deployed |
+| `MimirSes` | SES configuration set + send policy | Deployed |
+| `MimirApp` | EB app, `mimir-prod` / `mimir-idle`, `mimir-ci` IAM, alarms; merges `eb_live_platform_settings.json` | Deployed — **platform changes** (e.g. MaxSize) go here |
+| `MimirBackups` | S3 pre-migrate bucket + SSM on EB instance role | Deployed |
+| `MimirDns` | Route53 CNAME `mimir.featurefactory.io` → `mimir-prod.eba-…` (idempotent Lambda UPSERT) | Deployed |
+
+Context keys in `infra/cdk.json`: `account`, `region`, `vpc_id`, `huginn_rds_sg_id`, `acm_cert_arn`, `domain`.
+
+**Two sources of truth:**
+
+| What | Where |
+|------|--------|
+| EB **platform** (VPC subnets, ALB, instance type, non-secret env vars) | `infra/eb_live_platform_settings.json` — export via `infra/scripts/export_eb_live_settings.py` |
+| EB **secrets** | `infra/.env` (gitignored) — merged at synth by `stacks/eb_env.py` |
+
+Before a platform-touching deploy: `infra/scripts/diff_eb_live_vs_cdk.py` should report **0** diffs (secrets excluded).
+
+**Disaster recovery (new region/account):** copy `infra/.env` from `.env.example` → `cdk deploy --all` → run **build-and-deploy** pipeline → `make swap`. Re-export or edit the platform snapshot if VPC/subnet IDs change.
+
+### Idle power scripts
+
+| Script / target | When | Behaviour |
+|-----------------|------|-----------|
+| `scripts/eb_idle_power.sh start\|stop` | Deploy / promote hooks | Resolves **idle** env by CNAME (`PROD_CNAME_SUBSTRING=mimir-prod`); never touches live env |
+| `scripts/deploy-idle.sh` | Every release deploy | `idle-start` → SSM backup → deploy → smoke on idle CNAME |
+| `scripts/promote-prod.sh` | `make swap` | CNAME swap → prod smoke → `idle-stop` on former prod |
+| `make idle-start` / `make idle-stop` | Local / CI | Wrap `eb_idle_power.sh` with `EB_APP`, `EB_ENV_A/B` from Makefile |
+
+Required env for idle power: `EB_APP`, `EB_ENV_A` (`mimir-prod`), `EB_ENV_B` (`mimir-idle`), `PROD_CNAME_SUBSTRING` (`mimir-prod`).
+
+---
+
 ## CI/CD Pipeline
 
 ### Overview
@@ -2277,19 +2397,9 @@ make swap
 
 ### Infrastructure (CDK)
 
-Code under [`infra/`](../../infra/). **Operational guide:** [`infra/README.md`](../../infra/README.md).
+Full blueprint: [Production AWS Infrastructure](#production-aws-infrastructure) (default VPC lookup, shared `huginn-db`, LoadBalanced EB, idle power, cost scope).
 
-| Stack | Role |
-|-------|------|
-| `MimirNetwork` | VPC, `mimir-eb` security group, RDS ingress |
-| `MimirSes` | SES configuration set + send policy |
-| `MimirApp` | EB app, `mimir-prod` / `mimir-idle`, `mimir-ci` IAM, alarms |
-| `MimirBackups` | S3 pre-migrate backup bucket |
-| `MimirDns` | Route53 CNAME → `mimir-prod.eba-…` |
-
-**Disaster recovery (new region/account):** copy `infra/.env` from `.env.example` → `cdk deploy --all` → run **build-and-deploy** pipeline → `make swap`. Platform snapshot may need re-export if VPC/subnet IDs change.
-
-**CDK vs pipeline:** `cdk deploy` recreates **infra**; GitHub **build-and-deploy** pushes the **Docker app** to the idle EB env (backup, then `update-environment`).
+**CDK vs pipeline:** `cdk deploy` applies **platform** (network, EB option settings, DNS, backups, IAM). GitHub **build-and-deploy** pushes the **Docker app** to the idle EB env (`deploy-idle.sh`: start idle → backup → `update-environment` → smoke). Do not run `cdk deploy` on every release unless platform settings changed.
 
 ### Elastic Beanstalk Deployment
 
