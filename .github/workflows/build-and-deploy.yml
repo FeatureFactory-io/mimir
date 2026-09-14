@@ -58,6 +58,7 @@ jobs:
           sudo apt-get install -y ripgrep
           pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -r requirements-facade.txt
           pip install pytest-cov pytest-html
 
       - name: Run database migrations
