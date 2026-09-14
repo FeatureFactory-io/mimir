@@ -200,8 +200,8 @@ class TestMimirApp:
             },
         )
 
-    def test_eb_prod_still_load_balanced(self, template):
-        """Prod remains LoadBalanced until sequential cutover completes."""
+    def test_eb_prod_is_single_instance(self, template):
+        """Both envs are SingleInstance after downsizing cutover."""
         template.has_resource_properties(
             "AWS::ElasticBeanstalk::Environment",
             {
@@ -210,14 +210,14 @@ class TestMimirApp:
                     assertions.Match.object_like({
                         "Namespace": "aws:elasticbeanstalk:environment",
                         "OptionName": "EnvironmentType",
-                        "Value": "LoadBalanced",
+                        "Value": "SingleInstance",
                     })
                 ]),
             },
         )
 
     def test_eb_idle_is_single_instance(self, template):
-        """Idle env migrates to SingleInstance (no ALB) first."""
+        """Idle env is SingleInstance (no ALB)."""
         template.has_resource_properties(
             "AWS::ElasticBeanstalk::Environment",
             {
