@@ -185,6 +185,21 @@ class TestMimirApp:
             },
         )
 
+    def test_eb_max_size_is_one(self, template):
+        """Cap ASG scale-out — cost downsizing (Phase 1)."""
+        template.has_resource_properties(
+            "AWS::ElasticBeanstalk::Environment",
+            {
+                "OptionSettings": assertions.Match.array_with([
+                    assertions.Match.object_like({
+                        "Namespace": "aws:autoscaling:asg",
+                        "OptionName": "MaxSize",
+                        "Value": "1",
+                    })
+                ])
+            },
+        )
+
     def test_eb_mirrors_live_http_listener(self, template):
         """Live envs use HTTP on the default ALB listener (HTTPS is on CloudFront)."""
         template.has_resource_properties(

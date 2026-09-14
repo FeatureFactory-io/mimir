@@ -23,7 +23,7 @@
     {
       "namespace": "aws:autoscaling:asg",
       "option_name": "MaxSize",
-      "value": "2"
+      "value": "1"
     },
     {
       "namespace": "aws:autoscaling:asg",
@@ -715,7 +715,7 @@
     {
       "namespace": "aws:autoscaling:asg",
       "option_name": "MaxSize",
-      "value": "2"
+      "value": "1"
     },
     {
       "namespace": "aws:autoscaling:asg",
