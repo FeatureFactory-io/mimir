@@ -95,6 +95,24 @@ _force_asg_zero() {
   fi
 }
 
+# Mirror of _force_asg_zero: stop drives ASG directly to 0/0/0, so start must
+# drive ASG directly to 1/1/1. EB update-environment alone leaves desired=0.
+_force_asg_one() {
+  local env_name="$1"
+  local asg
+  asg="$(_asg_name "$env_name")"
+  if [ -z "$asg" ] || [ "$asg" = "None" ]; then
+    echo "No Auto Scaling group on ${env_name}"
+    return 0
+  fi
+  echo "Scaling ASG ${asg} to MinSize=1 MaxSize=1 DesiredCapacity=1"
+  _resume_asg "$env_name"
+  aws autoscaling update-auto-scaling-group \
+    --auto-scaling-group-name "$asg" \
+    --min-size 1 --max-size 1 --desired-capacity 1 \
+    --output text >/dev/null
+}
+
 _resume_asg() {
   local env_name="$1"
   local asg
@@ -210,11 +228,16 @@ if [ "$ACTION" = "stop" ]; then
   exit 0
 fi
 
-_resume_asg "$IDLE_ENV"
 if _idle_already_runnable "$IDLE_ENV"; then
   echo "Idle ${IDLE_ENV} already has a running instance at MinSize>=1 — skipping ASG scale"
 else
-  _scale_asg "$IDLE_ENV" 1 1
+  ENV_TYPE="$(_env_type "$IDLE_ENV")"
+  echo "Idle EnvironmentType=${ENV_TYPE}"
+  if [ "$ENV_TYPE" = "LoadBalanced" ]; then
+    _scale_asg "$IDLE_ENV" 1 1
+  else
+    _force_asg_one "$IDLE_ENV"
+  fi
   _wait_running_instance "$IDLE_ENV"
 fi
 RUNNING_IDS=$(_instance_ids "$IDLE_ENV")

@@ -15,6 +15,7 @@ def test_power_script_never_stops_prod_cname() -> None:
     assert "suspend-processes" in POWER
     assert "SingleInstance" in POWER
     assert "_idle_already_runnable" in POWER
+    assert "_force_asg_one" in POWER
     assert "skipping ASG scale" in POWER
 
 

@@ -3,7 +3,7 @@ name: Build and Deploy Mimir
 # Mirrors Huginn's release model:
 #   gh release create vX.Y.Z
 #     → test → build → deploy-idle (dynamically resolved) → staging smoke
-#   Then: make swap  (or run promote.yml workflow_dispatch)
+#   Then: Promote to Production workflow (promote.yml) after reviewing idle staging
 #     → promote-prod.sh: SHA guard, CNAME swap, prod smoke
 #
 # Pipeline runs ONLY on published GitHub releases (not on every push).
@@ -189,7 +189,7 @@ jobs:
   deploy-idle:
     name: Deploy to Idle EB env (staging smoke)
     # Deploys to whichever env is currently idle (dynamically resolved by CNAME).
-    # Does NOT swap prod. Run "make swap" locally, or trigger promote.yml, after review.
+    # Does NOT swap prod. Trigger promote.yml after reviewing idle staging smoke.
     needs: build-and-push
     runs-on: ubuntu-latest
     # Only on published release or manual dispatch — not on every push to main.
@@ -283,4 +283,4 @@ jobs:
           echo "| **Web image** | \`${{ steps.ecr-login.outputs.registry }}/mimir:${{ steps.version.outputs.suffix }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **MCP image** | \`${{ env.DOCKERHUB_IMAGE }}:${{ steps.version.outputs.suffix }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Next step:** run \`make swap\` locally, or trigger the **Promote to Production** workflow after reviewing the idle URL." >> $GITHUB_STEP_SUMMARY
+          echo "**Next step:** trigger the **Promote to Production** workflow (\`promote.yml\`) after reviewing the idle URL." >> $GITHUB_STEP_SUMMARY
