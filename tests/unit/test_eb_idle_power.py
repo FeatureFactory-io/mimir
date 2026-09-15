@@ -21,10 +21,12 @@ def test_power_script_never_stops_prod_cname() -> None:
 
 def test_deploy_idle_starts_before_backup() -> None:
     start_pos = DEPLOY.find('eb_idle_power.sh" start')
+    wait_pos = DEPLOY.find("_wait_idle_app_ready")
     backup_pos = DEPLOY.find("run-eb-backup.sh")
     assert start_pos != -1
+    assert wait_pos != -1
     assert backup_pos != -1
-    assert start_pos < backup_pos
+    assert start_pos < wait_pos < backup_pos
 
 
 def test_promote_stops_new_idle_after_success() -> None:

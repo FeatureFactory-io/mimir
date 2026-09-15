@@ -54,6 +54,28 @@ echo "Ensuring idle env is running (scale-to-zero may have stopped it)..."
 PROD_CNAME_SUBSTRING="mimir-prod.eba-" EB_IDLE_WAIT_SSM=1 \
   bash "$(dirname "$0")/eb_idle_power.sh" start
 
+_wait_idle_app_ready() {
+  local cname http_status
+  cname=$(aws elasticbeanstalk describe-environments \
+    --application-name "$EB_APP" \
+    --environment-names "$IDLE_ENV" \
+    --query 'Environments[0].CNAME' --output text)
+  echo "Waiting for idle app container before backup: http://${cname}/health/ ..."
+  for i in $(seq 1 40); do
+    http_status=$(curl -o /dev/null -s -w "%{http_code}" \
+      --max-time 15 --retry 3 --retry-delay 5 --retry-all-errors \
+      "http://${cname}/health/" || echo "000")
+    echo "  [${i}/40] HTTP=${http_status}"
+    if [ "$http_status" = "200" ]; then
+      return 0
+    fi
+    sleep 15
+  done
+  echo "ERROR: idle app not healthy before pre-deploy backup" >&2
+  exit 1
+}
+_wait_idle_app_ready
+
 # ── 2. Pre-deploy DB backup (idle env, before new version rolls out) ─────────
 : "${S3_BACKUP_BUCKET:?S3_BACKUP_BUCKET not set}"
 echo "Pre-deploy backup (SSM on ${IDLE_ENV})..."
