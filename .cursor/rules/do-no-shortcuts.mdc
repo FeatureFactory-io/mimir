@@ -1,0 +1,34 @@
+---
+description: Stop before every shortcut — do the proper path instead
+alwaysApply: true
+---
+
+# Rule: No Shortcuts
+
+**Every time you are about to take a shortcut — STOP. Do it properly.**
+
+A shortcut is any path that skips the documented, release-grade, or user-approved process because something is blocked, slow, or inconvenient.
+
+## Before acting, ask
+
+1. What is the **proper** process for this task (SAO, playbook, pipeline, spec)?
+2. Am I choosing a faster path **only** because the proper path failed or is hard?
+3. If yes → **do not shortcut**. Fix the blocker or escalate; do not bypass.
+
+## Examples (Mimir)
+
+| Shortcut (forbidden) | Proper path |
+|----------------------|-------------|
+| `workflow_dispatch` deploy + promote to prod | `gh release create vX.Y.Z` → release CI → `promote.yml` with tag |
+| Promote `main-<sha>` revision to prod | Promote only semver release tags (`v0.0.73`) |
+| `make swap` / `make idle-start` as primary ship | GitHub Actions: Build and Deploy → Promote to Production |
+| Ship without release because CI is broken | Fix pipeline/infra first; then release |
+| Weaken tests or skip gates to go green | Fix implementation or fix tests to match spec |
+
+## When blocked
+
+- Diagnose and fix the **root cause** of the proper path failing.
+- Tell the user what is blocked and what the proper next step is.
+- **Do not** substitute an alternate path without explicit user approval.
+
+No exceptions for urgency, prior failures, or "just this once."
