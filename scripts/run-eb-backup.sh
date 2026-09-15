@@ -44,10 +44,13 @@ fi
 if [ -z "\$CONTAINER" ]; then
   CONTAINER=\$(docker ps -q | head -1)
 fi
-if [ -z "\$CONTAINER" ]; then
-  echo "ERROR: No running Docker container on EB host" >&2
+NETWORK_MODE="host"
+if [ -n "\$CONTAINER" ]; then
+  NETWORK_MODE="container:\${CONTAINER}"
+  echo "Using running container network: \${CONTAINER}"
+else
+  echo "No running app container — backup via host network + EB get-config"
   docker ps -a >&2 || true
-  exit 1
 fi
 echo "Loading EB environment variables from get-config"
 ENV_FILE=\$(mktemp)
@@ -79,8 +82,8 @@ fi
 echo "Logging in to ECR and pulling ${IMAGE}"
 aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
 docker pull ${IMAGE}
-echo "Running pre_deploy_backup in one-off container (network=container:\$CONTAINER)"
-docker run --rm --network "container:\${CONTAINER}" \\
+echo "Running pre_deploy_backup in one-off container (network=\${NETWORK_MODE})"
+docker run --rm --network "\${NETWORK_MODE}" \\
   --env-file "\$ENV_FILE" \\
   --entrypoint python \\
   ${IMAGE} \\
