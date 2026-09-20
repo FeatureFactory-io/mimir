@@ -353,6 +353,126 @@ def set_predecessor(activity_id: int, predecessor_id: int) -> dict:
 # WORKFLOW EXPORT / IMPORT TOOLS (4)
 # ============================================================================
 
+def _write_workflow_rule_files(resolved_target: Path, rule_files: list) -> tuple[Path | None, list[str]]:
+    """
+    Write linked rule files next to the playbook/workflow export root.
+
+    :param resolved_target: Export target directory. Example: Path(".cursor/playbooks/Edda")
+    :param rule_files: ``[{"filename": "pytest.mdc", "content": "..."}]``
+    :return: (rules directory or None, absolute paths written)
+    """
+    if not rule_files:
+        return None, []
+    rules_dir = resolved_target.parent / "rules"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    written_paths = []
+    for file_entry in rule_files:
+        dest = rules_dir / file_entry["filename"]
+        dest.write_text(file_entry["content"], encoding="utf-8")
+        written_paths.append(str(dest))
+    logger.info("HTTP Tool: wrote %s rule files to %s", len(written_paths), rules_dir)
+    return rules_dir, written_paths
+
+
+def _find_cursor_rules_dir(resolved_target: Path) -> Path | None:
+    """
+    Locate ``.cursor/rules`` from a Cursor playbook export target.
+
+    :param resolved_target: Export target. Example: Path("/repo/.cursor/playbooks/Edda")
+    :return: ``.cursor/rules`` path or None when the tree is not under ``.cursor``
+    """
+    for parent in (resolved_target, *resolved_target.parents):
+        if parent.name == ".cursor":
+            return parent / "rules"
+        if parent.name == "playbooks" and parent.parent.name == ".cursor":
+            return parent.parent / "rules"
+    return None
+
+
+def _copy_missing_cursor_rules(cursor_rules_dir: Path, rule_paths: list[str]) -> list[str]:
+    """
+    Copy exported rules into ``.cursor/rules`` only when the file is absent.
+
+    :param cursor_rules_dir: Active Cursor rules directory
+    :param rule_paths: Absolute paths of just-written playbook rule files
+    :return: Absolute paths copied
+    """
+    cursor_rules_dir.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for path in rule_paths:
+        src = Path(path)
+        dest = cursor_rules_dir / src.name
+        if dest.exists():
+            continue
+        dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        copied.append(str(dest))
+        logger.info("HTTP Tool: copied missing Cursor rule %s", dest)
+    return copied
+
+
+def _cursor_rules_sync_report(cursor_rules_dir: Path | None, rule_paths: list[str]) -> dict:
+    """
+    Compare exported rule files against active ``.cursor/rules`` copies.
+
+    :param cursor_rules_dir: Active Cursor rules directory or None
+    :param rule_paths: Absolute paths of exported playbook rule files
+    :return: Sync status dict
+    """
+    if not rule_paths:
+        return {
+            "active_cursor_rules_dir": str(cursor_rules_dir) if cursor_rules_dir else "",
+            "active_cursor_rules_synchronized": None,
+            "stale_or_missing_active_rules": [],
+        }
+    if cursor_rules_dir is None:
+        return {
+            "active_cursor_rules_dir": "",
+            "active_cursor_rules_synchronized": False,
+            "stale_or_missing_active_rules": [Path(path).name for path in rule_paths],
+        }
+    stale = []
+    for path in rule_paths:
+        src = Path(path)
+        dest = cursor_rules_dir / src.name
+        if not dest.exists() or dest.read_text(encoding="utf-8") != src.read_text(encoding="utf-8"):
+            stale.append(src.name)
+    return {
+        "active_cursor_rules_dir": str(cursor_rules_dir),
+        "active_cursor_rules_synchronized": len(stale) == 0,
+        "stale_or_missing_active_rules": stale,
+    }
+
+
+def _workflow_export_message(
+    wf_dir: Path,
+    rules_dir: Path | None,
+    rule_paths: list[str],
+    sync_report: dict,
+) -> str:
+    """Build the operator-facing export summary including rule destinations."""
+    if not rule_paths:
+        return (
+            f"Workflow exported to {wf_dir}. No linked rules. "
+            "Edit files locally and use import_workflow_from_local to apply changes."
+        )
+    names = ", ".join(Path(path).name for path in rule_paths)
+    dest = rules_dir or Path(rule_paths[0]).parent
+    active_dir = sync_report.get("active_cursor_rules_dir") or "(not a Cursor playbook tree)"
+    if sync_report.get("active_cursor_rules_synchronized") is True:
+        sync_text = f"Active Cursor rules at {active_dir} are synchronized."
+    else:
+        stale = ", ".join(sync_report.get("stale_or_missing_active_rules") or [])
+        sync_text = (
+            f"Active Cursor rules at {active_dir} are NOT synchronized"
+            + (f" (stale or missing: {stale})" if stale else "")
+            + ". Copy or re-export before execution."
+        )
+    return (
+        f"Workflow exported to {wf_dir}. {len(rule_paths)} linked rules "
+        f"({names}) were written to {dest}. {sync_text}"
+    )
+
+
 def export_workflow_to_local(
     workflow_id: int,
     target_directory: str = ".windsurf/workflows",
@@ -365,10 +485,14 @@ def export_workflow_to_local(
     the MCP container config. Relative target_directory values resolve against
     MIMIR_DEV_ROOT.
 
+    Linked rules are written to the sibling ``rules/`` folder. When the target
+    is a Cursor playbook tree, missing files are also copied to ``.cursor/rules/``.
+    Existing different copies are left untouched and reported as stale.
+
     :param workflow_id: Workflow ID. Example: 42
     :param target_directory: Target directory. Example: ".windsurf/workflows"
     :param folder_name: Folder name. Example: "FFE" (defaults to workflow slug)
-    :return: Export result with file paths and counts
+    :return: Export result with file paths, rule paths, and Cursor sync status
     """
     logger.info(
         'HTTP Tool: export_workflow_to_local workflow=%s target=%s folder=%s',
@@ -398,20 +522,13 @@ def export_workflow_to_local(
         wf_dir,
     )
 
-    rule_files_written = []
-    if data.get("rule_files"):
-        rules_dir = resolved_target.parent / "rules"
-        rules_dir.mkdir(parents=True, exist_ok=True)
-        for file_entry in data["rule_files"]:
-            (rules_dir / file_entry["filename"]).write_text(
-                file_entry["content"], encoding="utf-8"
-            )
-            rule_files_written.append(file_entry["filename"])
-        logger.info(
-            'HTTP Tool: wrote %s rule files to %s',
-            len(rule_files_written),
-            rules_dir,
-        )
+    rules_dir, rule_export_paths = _write_workflow_rule_files(
+        resolved_target, data.get("rule_files") or []
+    )
+    cursor_rules_dir = _find_cursor_rules_dir(resolved_target)
+    if cursor_rules_dir is not None and rule_export_paths:
+        _copy_missing_cursor_rules(cursor_rules_dir, rule_export_paths)
+    sync_report = _cursor_rules_sync_report(cursor_rules_dir, rule_export_paths)
 
     return {
         "status": "exported",
@@ -419,11 +536,13 @@ def export_workflow_to_local(
         "workflow_name": data["workflow_name"],
         "export_path": str(wf_dir),
         "files_created": [f["filename"] for f in data["workflow_files"]],
-        "rule_files_created": rule_files_written,
-        "message": (
-            "Workflow exported successfully. Edit files locally and use "
-            "import_workflow_from_local to apply changes."
-        ),
+        "rule_files_created": [Path(path).name for path in rule_export_paths],
+        "rule_export_paths": rule_export_paths,
+        "rules_export_path": str(rules_dir) if rules_dir else "",
+        "active_cursor_rules_dir": sync_report["active_cursor_rules_dir"],
+        "active_cursor_rules_synchronized": sync_report["active_cursor_rules_synchronized"],
+        "stale_or_missing_active_rules": sync_report["stale_or_missing_active_rules"],
+        "message": _workflow_export_message(wf_dir, rules_dir, rule_export_paths, sync_report),
     }
 
 

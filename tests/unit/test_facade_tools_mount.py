@@ -84,6 +84,113 @@ def test_export_writes_when_not_in_docker(
     assert workflow_md.read_text(encoding="utf-8") == "# Workflow\n"
 
 
+def _workflow_export_bundle_with_rules() -> dict:
+    return {
+        "workflow_id": 17,
+        "workflow_name": "Acceptance",
+        "folder_name": "MIN",
+        "workflow_files": [
+            {"filename": "_workflow.md", "content": "# MIN\n"},
+        ],
+        "rule_files": [
+            {
+                "filename": "assert-log-story.mdc",
+                "content": "---\nalwaysApply: true\n---\nLog story\n",
+            },
+            {
+                "filename": "assert-agent-story.mdc",
+                "content": "---\nalwaysApply: true\n---\nAgent story\n",
+            },
+        ],
+    }
+
+
+def _mock_workflow_export_client(monkeypatch, bundle: dict) -> MagicMock:
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = bundle
+    mock_client = MagicMock()
+    mock_client.post.return_value = mock_response
+    monkeypatch.setattr(tools, "get_client", lambda: mock_client)
+    return mock_client
+
+
+def test_workflow_export_returns_full_rule_paths(
+    configured_client,
+    tmp_path,
+    monkeypatch,
+):
+    """Issue #178: rule_files_created must include destination paths, not bare names."""
+    monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: False)
+    _mock_workflow_export_client(monkeypatch, _workflow_export_bundle_with_rules())
+
+    target = tmp_path / ".cursor" / "playbooks" / "Edda"
+    result = tools.export_workflow_to_local(
+        workflow_id=17,
+        target_directory=str(target),
+        folder_name="MIN",
+    )
+
+    playbook_rules = tmp_path / ".cursor" / "playbooks" / "rules"
+    log_story = playbook_rules / "assert-log-story.mdc"
+    assert log_story.exists()
+    assert str(log_story) in result["rule_export_paths"]
+    assert result["rules_export_path"] == str(playbook_rules)
+    assert "assert-log-story.mdc" in result["message"]
+    assert str(playbook_rules) in result["message"]
+
+
+def test_workflow_export_syncs_missing_cursor_root_rules(
+    configured_client,
+    tmp_path,
+    monkeypatch,
+):
+    """Issue #178: Cursor playbook export copies missing rules to .cursor/rules/."""
+    monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: False)
+    _mock_workflow_export_client(monkeypatch, _workflow_export_bundle_with_rules())
+
+    target = tmp_path / ".cursor" / "playbooks" / "Edda"
+    result = tools.export_workflow_to_local(
+        workflow_id=17,
+        target_directory=str(target),
+        folder_name="MIN",
+    )
+
+    active = tmp_path / ".cursor" / "rules"
+    assert (active / "assert-agent-story.mdc").exists()
+    assert (active / "assert-log-story.mdc").exists()
+    assert result["active_cursor_rules_synchronized"] is True
+    assert result["active_cursor_rules_dir"] == str(active)
+    assert "synchronized" in result["message"].lower()
+
+
+def test_workflow_export_does_not_overwrite_stale_cursor_rules(
+    configured_client,
+    tmp_path,
+    monkeypatch,
+):
+    """Issue #178: existing different .cursor/rules copies stay; report stale."""
+    monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: False)
+    _mock_workflow_export_client(monkeypatch, _workflow_export_bundle_with_rules())
+
+    active = tmp_path / ".cursor" / "rules"
+    active.mkdir(parents=True)
+    (active / "assert-log-story.mdc").write_text("OLD VERSION\n", encoding="utf-8")
+
+    target = tmp_path / ".cursor" / "playbooks" / "Edda"
+    result = tools.export_workflow_to_local(
+        workflow_id=17,
+        target_directory=str(target),
+        folder_name="MIN",
+    )
+
+    assert (active / "assert-log-story.mdc").read_text(encoding="utf-8") == "OLD VERSION\n"
+    assert (active / "assert-agent-story.mdc").exists()
+    assert result["active_cursor_rules_synchronized"] is False
+    assert "assert-log-story.mdc" in result["stale_or_missing_active_rules"]
+    assert "NOT synchronized" in result["message"]
+
+
 def _playbook_export_bundle() -> dict:
     return {
         "playbook_id": 3,

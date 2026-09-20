@@ -98,6 +98,10 @@ class WorkflowExportService:
             )
             files_created.extend(rule_files)
 
+        rule_export_paths = [
+            str((rules_dir / Path(name).name).absolute())
+            for name in rule_files
+        ] if rules_dir else []
         result = {
             'status': 'exported',
             'workflow_id': workflow_id,
@@ -106,7 +110,17 @@ class WorkflowExportService:
             'rules_export_path': str(rules_dir.absolute()) if rules_dir else '',
             'files_created': files_created,
             'rule_files_created': rule_files,
-            'message': 'Workflow exported successfully. Edit files locally and use import_workflow_from_local to apply changes.'
+            'rule_export_paths': rule_export_paths,
+            'message': (
+                f'Workflow exported to {export_path.absolute()}.'
+                + (
+                    f' {len(rule_export_paths)} linked rules were written to '
+                    f'{rules_dir.absolute()} ({", ".join(rule_files)}).'
+                    if rule_export_paths
+                    else ' No linked rules.'
+                )
+                + ' Edit files locally and use import_workflow_from_local to apply changes.'
+            ),
         }
         
         logger.info(f"Export completed: {len(files_created)} files created at {export_path}")
