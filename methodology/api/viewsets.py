@@ -737,11 +737,25 @@ class WorkflowViewSet(viewsets.ModelViewSet):
             )
 
         # Create workflow using service (takes playbook object, not playbook_id)
-        workflow = WorkflowService.create_workflow(
-            playbook=playbook,
-            name=serializer.validated_data["name"],
-            description=serializer.validated_data.get("description", ""),
-        )
+        try:
+            workflow = WorkflowService.create_workflow(
+                playbook=playbook,
+                name=serializer.validated_data["name"],
+                description=serializer.validated_data.get("description", ""),
+                order=serializer.validated_data.get("order"),
+                abbreviation=serializer.validated_data.get("abbreviation"),
+            )
+        except ValidationError as exc:
+            logger.warning(
+                "API: create_workflow rejected playbook=%s name=%s error=%s",
+                playbook_id,
+                serializer.validated_data.get("name"),
+                exc,
+            )
+            return Response(
+                {"error": str(exc), "code": "VALIDATION_ERROR"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Increment parent version
         old_version = playbook.version

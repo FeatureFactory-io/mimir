@@ -9,34 +9,100 @@ from methodology.services.playbook_service import PlaybookService
 
 logger = logging.getLogger(__name__)
 
+_ABBREVIATION_MIN_LEN = 2
+_ABBREVIATION_MAX_LEN = 8
+
+
+def _normalize_abbreviation(value: Optional[str]) -> Optional[str]:
+    """
+    Uppercase and validate an explicit workflow code.
+
+    :param value: Raw abbreviation or None. Example: "ida"
+    :return: Normalized code, empty string, or None if omitted. Example: "IDA"
+    :raises ValidationError: if the value is not 2–8 letters
+    """
+    if value is None:
+        return None
+    cleaned = str(value).strip().upper()
+    if not cleaned:
+        return ""
+    if not cleaned.isalpha() or not (
+        _ABBREVIATION_MIN_LEN <= len(cleaned) <= _ABBREVIATION_MAX_LEN
+    ):
+        raise ValidationError(
+            f"abbreviation must be {_ABBREVIATION_MIN_LEN}–{_ABBREVIATION_MAX_LEN} letters"
+        )
+    return cleaned
+
+
+def _assert_unique_abbreviation(playbook, abbreviation: str, exclude_id=None) -> None:
+    """
+    Reject an explicit code already used in the playbook.
+
+    :param playbook: Parent playbook
+    :param abbreviation: Normalized code. Example: "IDA"
+    :param exclude_id: Workflow pk to ignore on update. Example: 85
+    :raises ValidationError: if another workflow already uses the code
+    """
+    qs = Workflow.objects.filter(playbook=playbook, abbreviation=abbreviation)
+    if exclude_id is not None:
+        qs = qs.exclude(pk=exclude_id)
+    if qs.exists():
+        raise ValidationError(
+            f"Abbreviation '{abbreviation}' already exists in this playbook"
+        )
+
 
 class WorkflowService:
     """Service class for workflow operations."""
     
     @staticmethod
-    def create_workflow(playbook, name, description='', order=None):
-        """Create workflow with validation and auto-order."""
+    def create_workflow(playbook, name, description='', order=None, abbreviation=None):
+        """
+        Create workflow with validation, auto-order, and optional explicit code.
+
+        :param playbook: Parent playbook
+        :param name: Workflow name. Example: "IDA Demand Assessment"
+        :param description: Optional description
+        :param order: Optional 1-based position; defaults to max+1
+        :param abbreviation: Optional 2–8 letter code. Example: "IDA"
+        :return: Created Workflow
+        :raises ValidationError: on duplicate name or abbreviation
+        """
         logger.info(f"Creating workflow '{name}' in playbook {playbook.pk}")
         
         # Check for duplicate name
         if Workflow.objects.filter(playbook=playbook, name=name).exists():
             raise ValidationError(f"Workflow '{name}' already exists in this playbook")
+
+        normalized_abbr = _normalize_abbreviation(abbreviation)
+        if normalized_abbr:
+            _assert_unique_abbreviation(playbook, normalized_abbr)
         
-        # Auto-assign order if not provided
-        if order is None:
-            max_order = Workflow.objects.filter(playbook=playbook).aggregate(
-                max_order=models.Max('order')
-            )['max_order']
-            order = (max_order or 0) + 1
+        # Auto-assign order if not provided (lock siblings to avoid concurrent max+1 races)
+        with transaction.atomic():
+            if order is None:
+                locked = Workflow.objects.select_for_update().filter(playbook=playbook)
+                max_order = locked.aggregate(max_order=models.Max('order'))['max_order']
+                order = (max_order or 0) + 1
+
+            create_kwargs = {
+                "name": name,
+                "description": description,
+                "playbook": playbook,
+                "order": order,
+            }
+            if normalized_abbr:
+                create_kwargs["abbreviation"] = normalized_abbr
+            workflow = Workflow.objects.create(**create_kwargs)
         
-        workflow = Workflow.objects.create(
-            name=name,
-            description=description,
-            playbook=playbook,
-            order=order
+        logger.info(
+            "Workflow '%s' created with ID %s, order %s, abbreviation %s",
+            name,
+            workflow.pk,
+            workflow.order,
+            workflow.abbreviation,
         )
-        
-        logger.info(f"Workflow '{name}' created with ID {workflow.pk}, order {workflow.order}")
         return workflow
     
     @staticmethod
@@ -87,6 +153,20 @@ class WorkflowService:
         if 'name' in data and data['name'] != workflow.name:
             if Workflow.objects.filter(playbook=workflow.playbook, name=data['name']).exists():
                 raise ValidationError(f"Workflow '{data['name']}' already exists in this playbook")
+
+        if "abbreviation" in data:
+            normalized_abbr = _normalize_abbreviation(data["abbreviation"])
+            if normalized_abbr:
+                _assert_unique_abbreviation(
+                    workflow.playbook, normalized_abbr, exclude_id=workflow.pk
+                )
+            data["abbreviation"] = normalized_abbr or ""
+            logger.info(
+                "Workflow %s abbreviation %s → %s",
+                workflow_id,
+                workflow.abbreviation,
+                data["abbreviation"] or "(auto)",
+            )
         
         previous_order = workflow.order
         # Update fields

@@ -60,6 +60,40 @@ class TestMCPWorkflowUpdate:
         with pytest.raises(ValueError, match='Second'):
             await update_workflow(workflow_id=wf1['id'], name='Second')
 
+    @pytest.mark.asyncio
+    async def test_mcp_create_workflow_explicit_abbreviation_and_order(
+        self, setup_user_context, draft_playbook,
+    ):
+        """Issue #181/#182: create_workflow accepts order and abbreviation."""
+        result = await create_workflow(
+            playbook_id=draft_playbook['id'],
+            name='Investigate the Demand Assumption',
+            description='Feasibility before DUP',
+            order=2,
+            abbreviation='IDA',
+        )
+        assert result['abbreviation'] == 'IDA'
+        assert result['order'] == 2
+        stored = await sync_to_async(Workflow.objects.get)(id=result['id'])
+        assert stored.abbreviation == 'IDA'
+        assert stored.order == 2
+
+    @pytest.mark.asyncio
+    async def test_mcp_update_workflow_abbreviation(
+        self, setup_user_context, draft_playbook,
+    ):
+        """Issue #182: update_workflow can replace a frozen auto-code."""
+        created = await create_workflow(
+            playbook_id=draft_playbook['id'],
+            name='Investigate the Demand Assumption',
+        )
+        assert created.get('abbreviation') != 'IDA'
+        updated = await update_workflow(
+            workflow_id=created['id'],
+            abbreviation='IDA',
+        )
+        assert updated['abbreviation'] == 'IDA'
+
 
 @pytest.mark.django_db(transaction=True)
 class TestMCPWorkflowDelete:

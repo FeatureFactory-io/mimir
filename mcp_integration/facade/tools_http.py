@@ -143,19 +143,34 @@ def delete_playbook(playbook_id: int) -> dict:
 # WORKFLOW TOOLS (5)
 # ============================================================================
 
-def create_workflow(playbook_id: int, name: str, description: str = "") -> dict:
+def create_workflow(
+    playbook_id: int,
+    name: str,
+    description: str = "",
+    order: int = None,
+    abbreviation: str = None,
+) -> dict:
     """
     Create workflow in DRAFT playbook.
 
     :param playbook_id: Parent playbook ID. Example: 1
     :param name: Workflow name. Example: "Design Phase"
     :param description: Workflow description (optional)
+    :param order: Optional 1-based position. Example: 2
+    :param abbreviation: Optional 2–8 letter code. Example: "IDA"
     :return: Created workflow dict
     """
     logger.info(f'HTTP Tool: create_workflow name="{name}" playbook={playbook_id}')
-    r = get_client().post("/api/workflows/", json={
-        "playbook_id": playbook_id, "name": name, "description": description
-    })
+    payload = {
+        "playbook_id": playbook_id,
+        "name": name,
+        "description": description,
+    }
+    if order is not None:
+        payload["order"] = order
+    if abbreviation is not None:
+        payload["abbreviation"] = abbreviation
+    r = get_client().post("/api/workflows/", json=payload)
     return check_response(r, "create_workflow")
 
 
@@ -188,7 +203,8 @@ def update_workflow(
     workflow_id: int,
     name: str = None,
     description: str = None,
-    order: int = None
+    order: int = None,
+    abbreviation: str = None,
 ) -> dict:
     """
     Update workflow in DRAFT playbook. Increments parent version.
@@ -197,11 +213,15 @@ def update_workflow(
     :param name: New name or None
     :param description: New description or None
     :param order: New order or None
+    :param abbreviation: New 2–8 letter code or None. Example: "IDA"
     :return: Updated workflow dict
     """
     logger.info(f'HTTP Tool: update_workflow id={workflow_id}')
     payload = {k: v for k, v in {
-        "name": name, "description": description, "order": order
+        "name": name,
+        "description": description,
+        "order": order,
+        "abbreviation": abbreviation,
     }.items() if v is not None}
     r = get_client().patch(f"/api/workflows/{workflow_id}/", json=payload)
     return check_response(r, "update_workflow")

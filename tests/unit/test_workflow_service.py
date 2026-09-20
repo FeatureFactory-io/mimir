@@ -165,6 +165,42 @@ class TestWorkflowService:
         )
         
         assert updated.order == 5
+
+    def test_create_workflow_explicit_abbreviation(self, test_playbook):
+        """Issue #182: create accepts an explicit code instead of auto IAN."""
+        workflow = WorkflowService.create_workflow(
+            playbook=test_playbook,
+            name='Investigate the Demand Assumption',
+            abbreviation='IDA',
+        )
+        assert workflow.abbreviation == 'IDA'
+
+    def test_update_workflow_abbreviation(self, test_playbook):
+        """Issue #182: update can correct a bad auto-generated code."""
+        workflow = WorkflowService.create_workflow(
+            playbook=test_playbook,
+            name='Investigate the Demand Assumption',
+        )
+        assert workflow.abbreviation != 'IDA'
+        updated = WorkflowService.update_workflow(
+            workflow_id=workflow.id,
+            abbreviation='IDA',
+        )
+        assert updated.abbreviation == 'IDA'
+
+    def test_create_workflow_duplicate_abbreviation_fails(self, test_playbook):
+        """Explicit abbreviation must be unique per playbook."""
+        WorkflowService.create_workflow(
+            playbook=test_playbook,
+            name='First',
+            abbreviation='IDA',
+        )
+        with pytest.raises(ValidationError, match='IDA'):
+            WorkflowService.create_workflow(
+                playbook=test_playbook,
+                name='Second',
+                abbreviation='IDA',
+            )
     
     def test_update_workflow_duplicate_name_fails(self, test_playbook):
         """Test updating to duplicate name raises error."""

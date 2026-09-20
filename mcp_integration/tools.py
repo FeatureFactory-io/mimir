@@ -410,13 +410,21 @@ async def delete_playbook(playbook_id: int) -> dict:
 # WORKFLOW MCP TOOLS
 # ============================================================================
 
-async def create_workflow(playbook_id: int, name: str, description: str = "") -> dict:
+async def create_workflow(
+    playbook_id: int,
+    name: str,
+    description: str = "",
+    order: int = None,
+    abbreviation: str = None,
+) -> dict:
     """
     Create workflow in DRAFT playbook. Increments parent version.
     
     :param playbook_id: Parent playbook ID. Example: 1
     :param name: Workflow name. Example: "Design Phase"
     :param description: Workflow description (optional)
+    :param order: Optional 1-based position. Example: 2
+    :param abbreviation: Optional 2–8 letter code. Example: "IDA"
     :return: Created workflow dict
     :raises PermissionError: if parent playbook is released
     :raises ValueError: if playbook not found or duplicate workflow name
@@ -436,7 +444,13 @@ async def create_workflow(playbook_id: int, name: str, description: str = "") ->
     from methodology.services.workflow_service import WorkflowService
     old_version = playbook.version
     try:
-        workflow = await sync_to_async(WorkflowService.create_workflow)(playbook, name, description)
+        workflow = await sync_to_async(WorkflowService.create_workflow)(
+            playbook,
+            name,
+            description,
+            order=order,
+            abbreviation=abbreviation,
+        )
     except ValidationError as e:
         _handle_validation_error(e, 'create_workflow')
     
@@ -450,6 +464,7 @@ async def create_workflow(playbook_id: int, name: str, description: str = "") ->
         'id': workflow.id,
         'name': workflow.name,
         'description': workflow.description,
+        'abbreviation': workflow.abbreviation,
         'order': workflow.order,
         'playbook_id': playbook.id,
     }
@@ -477,6 +492,7 @@ async def list_workflows(playbook_id: int) -> list:
             'id': w.id,
             'name': w.name,
             'description': w.description,
+            'abbreviation': w.abbreviation,
             'order': w.order,
             'playbook_id': w.playbook_id,
         }
@@ -521,6 +537,7 @@ async def get_workflow(workflow_id: int) -> dict:
         'id': workflow.id,
         'name': workflow.name,
         'description': workflow.description,
+        'abbreviation': workflow.abbreviation,
         'order': workflow.order,
         'playbook_id': workflow.playbook_id,
         'activities': [
@@ -537,7 +554,8 @@ async def get_workflow(workflow_id: int) -> dict:
 
 
 async def update_workflow(workflow_id: int, name: str = None,
-                        description: str = None, order: int = None) -> dict:
+                        description: str = None, order: int = None,
+                        abbreviation: str = None) -> dict:
     """
     Update workflow in DRAFT playbook. Increments parent version.
     
@@ -545,6 +563,7 @@ async def update_workflow(workflow_id: int, name: str = None,
     :param name: New name or None
     :param description: New description or None
     :param order: New order or None
+    :param abbreviation: New 2–8 letter code or None. Example: "IDA"
     :return: Updated workflow dict
     :raises PermissionError: if parent playbook is released
     :raises ValueError: if not found or validation fails (e.g. duplicate workflow name)
@@ -581,6 +600,8 @@ async def update_workflow(workflow_id: int, name: str = None,
         update_data['description'] = description
     if order is not None:
         update_data['order'] = order
+    if abbreviation is not None:
+        update_data['abbreviation'] = abbreviation
     
     if update_data:
         from methodology.services.workflow_service import WorkflowService
@@ -602,6 +623,7 @@ async def update_workflow(workflow_id: int, name: str = None,
         'id': workflow.id,
         'name': workflow.name,
         'description': workflow.description,
+        'abbreviation': workflow.abbreviation,
         'order': workflow.order,
         'playbook_id': workflow.playbook_id,
     }
