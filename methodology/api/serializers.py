@@ -57,7 +57,7 @@ class WorkflowSerializer(serializers.ModelSerializer):
             'id', 'playbook_id', 'name', 'description', 'abbreviation',
             'order', 'activity_count', 'activities'
         ]
-        read_only_fields = ['id', 'order']
+        read_only_fields = ['id']
 
     def get_activity_count(self, obj):
         """Get count of activities in workflow."""

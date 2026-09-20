@@ -88,12 +88,22 @@ class WorkflowService:
             if Workflow.objects.filter(playbook=workflow.playbook, name=data['name']).exists():
                 raise ValidationError(f"Workflow '{data['name']}' already exists in this playbook")
         
+        previous_order = workflow.order
         # Update fields
         for field, value in data.items():
             setattr(workflow, field, value)
-        
+
         workflow.save()
-        logger.info(f"Workflow {workflow_id} updated")
+        if "order" in data and data["order"] != previous_order:
+            logger.info(
+                "Workflow %s order changed %s → %s playbook=%s",
+                workflow_id,
+                previous_order,
+                workflow.order,
+                workflow.playbook_id,
+            )
+        else:
+            logger.info(f"Workflow {workflow_id} updated")
         return workflow
     
     @staticmethod
