@@ -1,0 +1,27 @@
+name: Auto-assign new issues and pull requests
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  assign:
+    name: Assign to repository owner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign to petelind
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ITEM_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: >-
+          gh api
+          --method POST
+          "repos/${GITHUB_REPOSITORY}/issues/${ITEM_NUMBER}/assignees"
+          -f "assignees[]=petelind"
