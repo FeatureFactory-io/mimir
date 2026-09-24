@@ -220,7 +220,7 @@ class PipChangeSerializer(serializers.ModelSerializer):
     class Meta:
         model = PipChange
         fields = [
-            'id', 'order', 'change_type', 'entity_type', 'name',
+            'id', 'order', 'display_order', 'change_type', 'entity_type', 'name',
             'target_id', 'target_name_snapshot', 'content',
             'parent_workflow_id', 'insert_after_activity_id', 'append_to_playbook_end',
             'internal_ref', 'parent_workflow_ref', 'insert_after_activity_ref',

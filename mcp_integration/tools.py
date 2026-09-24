@@ -2858,6 +2858,7 @@ def _serialize_pip_change(ch) -> dict:
     return {
         "id": ch.id,
         "order": ch.order,
+        "display_order": ch.display_order,
         "change_type": ch.change_type,
         "entity_type": ch.entity_type,
         "name": ch.name or "",
@@ -3041,7 +3042,7 @@ async def add_pip_change(
     relationship_type (LINK/UNLINK): skill_activity, rule_activity, agent_activity,
     activity_workflow, artifact_activity, activity_predecessor.
 
-    ALTER Activity: optional display_order (1-based workflow position).
+    ALTER Activity/Workflow: optional display_order (1-based container position; beyond end appends).
 
     Full subtree recipe (call add_pip_change in order):
       1. ADD Phase       internal_ref="#phase1"  name="Construction"
