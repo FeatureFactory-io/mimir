@@ -5,7 +5,13 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth import get_user_model
 
-from methodology.models import Activity, PipChange, Playbook, ProcessImprovementProposal, Workflow
+from methodology.models import (
+    Activity,
+    PipChange,
+    Playbook,
+    ProcessImprovementProposal,
+    Workflow,
+)
 from methodology.services.pip_service import PIPService
 
 User = get_user_model()
@@ -33,13 +39,22 @@ def playbook_bundle(db, alice):
         order=1,
     )
     act74 = Activity.objects.create(
-        workflow=wf, name="Choose deployment style", guidance="EKS path", order=1,
+        workflow=wf,
+        name="Choose deployment style",
+        guidance="EKS path",
+        order=1,
     )
     act77 = Activity.objects.create(
-        workflow=wf, name="Build EKS Stack", guidance="EKS stack", order=2,
+        workflow=wf,
+        name="Build EKS Stack",
+        guidance="EKS stack",
+        order=2,
     )
     act82 = Activity.objects.create(
-        workflow=wf, name="Create Helm Chart", guidance="Helm values", order=3,
+        workflow=wf,
+        name="Create Helm Chart",
+        guidance="Helm values",
+        order=3,
     )
     return pb, wf, act74, act77, act82
 
@@ -112,6 +127,76 @@ def test_galdr_holistic_accepts_interdependent_changes(alice, playbook_bundle):
     changes = list(pip.changes.order_by("order", "pk"))
     assert len(changes) == 6
     for ch in changes:
-        assert ch.galdr_recommendation == PipChange.GALDR_ACCEPT, (
-            f"Change {ch.pk} expected ACCEPT, got {ch.galdr_recommendation}"
+        assert (
+            ch.galdr_recommendation == PipChange.GALDR_ACCEPT
+        ), f"Change {ch.pk} expected ACCEPT, got {ch.galdr_recommendation}"
+
+
+def test_review_with_58_pending_changes_preserves_parents_across_resubmission(
+    alice, playbook_bundle, caplog
+):
+    pb = playbook_bundle[0]
+    pip = PIPService.create_draft_for_playbook(
+        actor=alice, playbook_id=pb.pk, title="58-row pending batch"
+    )
+    PIPService.add_change(
+        actor=alice,
+        pip=pip,
+        change_type="ADD",
+        entity_type="Workflow",
+        name="Run Iteration",
+        internal_ref="#wf-rit",
+        content="Iteration orchestration",
+    )
+    for n in range(19):
+        PIPService.add_change(
+            actor=alice,
+            pip=pip,
+            change_type="ADD",
+            entity_type="Activity",
+            name=f"Step {n}",
+            internal_ref=f"#step-{n}",
+            parent_workflow_ref="#wf-rit",
+            content=f"Step {n} guidance",
         )
+        PIPService.add_change(
+            actor=alice,
+            pip=pip,
+            change_type="ADD",
+            entity_type="Rule",
+            name=f"Rule {n}",
+            internal_ref=f"#rule-{n}",
+            content=f"Rule {n} guidance",
+        )
+        PIPService.add_change(
+            actor=alice,
+            pip=pip,
+            change_type="LINK",
+            relationship_type="rule_activity",
+            source_entity_ref=f"#rule-{n}",
+            target_entity_ref=f"#step-{n}",
+        )
+    assert pip.changes.count() == 58
+    for _ in range(2):
+        PIPService.submit_for_review(actor=alice, pip=pip)
+        pip.refresh_from_db()
+        assert pip.status == ProcessImprovementProposal.STATUS_REVIEWED
+        assert "COHERENT" in pip.galdr_holistic_assessment
+        assert pip.changes.filter(galdr_recommendation="ACCEPT").count() == 58
+        assert not pb.workflows.filter(name="Run Iteration").exists()
+        assert not Activity.objects.filter(
+            workflow__playbook=pb, name="Step 0"
+        ).exists()
+        PIPService.revert_to_draft(pip, alice)
+        pip.refresh_from_db()
+    assert "mode=holistic" in caplog.text
+
+
+@pytest.mark.parametrize("enabled,mode", [(True, "holistic"), (False, "per_change")])
+def test_health_with_review_mode_reports_actual_runtime_setting(
+    client, settings, enabled, mode
+):
+    settings.GALDR_USE_TARGET_STATE = enabled
+    response = client.get("/health/")
+    assert response.status_code == 200
+    assert response.json()["galdr_review_mode"] == mode

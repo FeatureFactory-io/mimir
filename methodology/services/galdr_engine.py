@@ -4,12 +4,22 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import ClassVar
 
 from django.conf import settings
 from django.db import close_old_connections, transaction
 from django.utils import timezone
 
 from methodology.models import PipChange, ProcessImprovementProposal
+from methodology.services import galdr_client
+from methodology.services.galdr_client import GaldrLLMError
+from methodology.services.galdr_prompts import (
+    build_change_prompt,
+    build_playbook_context_summary,
+    build_target_state_prompt,
+)
+from methodology.services.galdr_validator import GaldrStructuralValidator
+from methodology.services.pip_apply_changes_service import PipApplyChangesService
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +27,7 @@ logger = logging.getLogger(__name__)
 class GaldrEngine:
     """Background worker transitioning ``processing_galdr → reviewed``."""
 
-    REC_CODE = {
+    REC_CODE: ClassVar[dict[str, str]] = {
         "ACCEPT": PipChange.GALDR_ACCEPT,
         "REJECT": PipChange.GALDR_REJECT,
         "NEEDS_CLARIFICATION": PipChange.GALDR_NEEDS_CLARIFICATION,
@@ -91,19 +101,19 @@ class GaldrEngine:
 
         Performs LLM turns **outside** DB locks to avoid holding rows open.
         """
-        if getattr(settings, "GALDR_USE_TARGET_STATE", False):
+        holistic = getattr(settings, "GALDR_USE_TARGET_STATE", True)
+        logger.info(
+            "Galdr assessment pip=%s mode=%s",
+            pip_id,
+            "holistic" if holistic else "per_change",
+        )
+        if holistic:
             cls._assess_sync_holistic(pip_id)
         else:
             cls._assess_sync_per_change(pip_id)
 
     @classmethod
     def _assess_sync_per_change(cls, pip_id: int) -> None:
-        from methodology.services.galdr_client import GaldrLLMError, get_galdr_client
-        from methodology.services.galdr_prompts import (
-            build_change_prompt,
-            build_playbook_context_summary,
-        )
-
         bootstrap = ProcessImprovementProposal.objects.select_related("playbook").get(
             pk=pip_id
         )
@@ -117,7 +127,7 @@ class GaldrEngine:
 
         playbook = bootstrap.playbook
         summary_text = build_playbook_context_summary(playbook)
-        client = get_galdr_client()
+        client = galdr_client.get_galdr_client()
 
         payloads: list[tuple[int, str, str]] = []
         try:
@@ -150,14 +160,6 @@ class GaldrEngine:
 
     @classmethod
     def _assess_sync_holistic(cls, pip_id: int) -> None:
-        from methodology.services.galdr_client import GaldrLLMError, get_galdr_client
-        from methodology.services.galdr_prompts import (
-            build_playbook_context_summary,
-            build_target_state_prompt,
-        )
-        from methodology.services.galdr_validator import GaldrStructuralValidator
-        from methodology.services.pip_apply_changes_service import PipApplyChangesService
-
         bootstrap = ProcessImprovementProposal.objects.select_related("playbook").get(
             pk=pip_id
         )
@@ -181,11 +183,9 @@ class GaldrEngine:
 
         try:
             current_summary = build_playbook_context_summary(playbook)
-            target_summary, ref_map = (
-                PipApplyChangesService.build_target_state_context(
-                    pip=bootstrap,
-                    playbook=playbook,
-                )
+            target_summary, ref_map = PipApplyChangesService.build_target_state_context(
+                pip=bootstrap,
+                playbook=playbook,
             )
             prompt = build_target_state_prompt(
                 bootstrap,
@@ -194,7 +194,7 @@ class GaldrEngine:
                 changes,
                 ref_map=ref_map,
             )
-            client = get_galdr_client()
+            client = galdr_client.get_galdr_client()
             holistic, payloads = client.evaluate_pip_holistically(prompt)
         except GaldrLLMError as exc:
             logger.warning(
@@ -219,10 +219,41 @@ class GaldrEngine:
                 cls._mark_submitted_retry(pip_id)
                 return
 
-        holistic_note = (
-            f"{holistic['overall_coherence']}: {holistic['reasoning']}"
-        )
+        holistic_note = f"{holistic['overall_coherence']}: {holistic['reasoning']}"
         cls._persist_recommendations(pip_id, payloads, holistic_note=holistic_note)
+
+    @classmethod
+    def _validate_assessment_batch(
+        cls,
+        pip: ProcessImprovementProposal,
+        payloads: list[tuple[int, str, str]],
+    ) -> None:
+        """Require one valid verdict for every change before persisting any verdict.
+
+        :param pip: Locked proposal being reviewed.
+        :param payloads: Model verdicts, e.g. [(1, "ACCEPT", "Coherent")].
+        :return: None for a complete batch.
+        :raises GaldrLLMError: For missing, duplicate, foreign or invalid verdicts.
+        """
+        expected = set(pip.changes.values_list("pk", flat=True))
+        received = [row[0] for row in payloads]
+        complete = (
+            bool(expected)
+            and len(received) == len(expected)
+            and set(received) == expected
+        )
+        valid = all(
+            type(cid) is int and code in cls.REC_CODE and bool(reason.strip())
+            for cid, code, reason in payloads
+        )
+        if not complete or not valid:
+            logger.warning(
+                "Galdr incomplete assessment pip=%s expected=%s received=%s",
+                pip.pk,
+                len(expected),
+                len(received),
+            )
+            raise GaldrLLMError("Expected exactly one valid assessment per PIP change.")
 
     @classmethod
     def _persist_recommendations(
@@ -244,9 +275,10 @@ class GaldrEngine:
                         pip.status,
                     )
                     return
+                cls._validate_assessment_batch(pip, payloads)
                 for cid, code, reasoning in payloads:
                     rec_value = cls.REC_CODE[code]
-                    PipChange.objects.filter(pk=cid).update(
+                    PipChange.objects.filter(pk=cid, pip_id=pip_id).update(
                         galdr_recommendation=rec_value,
                         galdr_reasoning=reasoning,
                         updated_at=timezone.now(),

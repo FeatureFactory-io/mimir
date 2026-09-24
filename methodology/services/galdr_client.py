@@ -5,13 +5,15 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Tuple
 
 from django.conf import settings
 
 from methodology.services.galdr_prompts import HOLISTIC_SYSTEM_PROMPT, SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
+
+_SINGLE_CHANGE_MAX_TOKENS = 4096
+_HOLISTIC_MAX_TOKENS = 16384  # Allow complete diagnostics for large (e.g. 58-row) PIPs.
 
 
 class GaldrLLMError(Exception):
@@ -26,7 +28,7 @@ class GaldrClient:
         rec, why = GaldrClient().evaluate_change("...")
     """
 
-    def evaluate_change(self, user_prompt: str) -> Tuple[str, str]:
+    def evaluate_change(self, user_prompt: str) -> tuple[str, str]:
         """
         Ask the model for a JSON verdict.
 
@@ -40,7 +42,7 @@ class GaldrClient:
     def evaluate_pip_holistically(
         self,
         user_prompt: str,
-    ) -> Tuple[dict[str, str], list[tuple[int, str, str]]]:
+    ) -> tuple[dict[str, str], list[tuple[int, str, str]]]:
         """
         Ask the model for a holistic PIP verdict with per-change diagnostics.
 
@@ -65,10 +67,18 @@ class GaldrClient:
         client = anthropic.Anthropic()
         message = client.messages.create(
             model=model,
-            max_tokens=4096,
+            max_tokens=(
+                _HOLISTIC_MAX_TOKENS
+                if system == HOLISTIC_SYSTEM_PROMPT
+                else _SINGLE_CHANGE_MAX_TOKENS
+            ),
             system=system,
             messages=[{"role": "user", "content": user_prompt}],
         )
+        if getattr(message, "stop_reason", None) == "max_tokens":
+            raise GaldrLLMError(
+                "Galdr assessment was truncated at the output token limit."
+            )
         pieces: list[str] = []
         for block in getattr(message, "content", []) or []:
             txt = getattr(block, "text", None)
@@ -91,7 +101,7 @@ class GaldrClient:
         fence = re.match(r"^```(?:json)?\s*(.*?)```", s, re.DOTALL | re.IGNORECASE)
         return fence.group(1).strip() if fence else s
 
-    def _parse_response(self, raw: str) -> Tuple[str, str]:
+    def _parse_response(self, raw: str) -> tuple[str, str]:
         blob = self._strip_code_fences(raw)
         try:
             payload = json.loads(blob)
@@ -108,7 +118,7 @@ class GaldrClient:
     def _parse_holistic_response(
         self,
         raw: str,
-    ) -> Tuple[dict[str, str], list[tuple[int, str, str]]]:
+    ) -> tuple[dict[str, str], list[tuple[int, str, str]]]:
         blob = self._strip_code_fences(raw)
         try:
             payload = json.loads(blob)
@@ -147,7 +157,7 @@ class StubGaldrClient(GaldrClient):
 
     STUB_SENTENCE = "Galdr stub — automated ACCEPT for integration tests."
 
-    def _call_llm_raw(self, user_prompt: str, *, system: str = SYSTEM_PROMPT) -> str:  # noqa: ARG002
+    def _call_llm_raw(self, user_prompt: str, *, system: str = SYSTEM_PROMPT) -> str:
         logger.info("StubGaldrClient returning canned ACCEPT")
         return json.dumps(
             {"recommendation": "ACCEPT", "reasoning": self.STUB_SENTENCE},
@@ -156,8 +166,11 @@ class StubGaldrClient(GaldrClient):
     def evaluate_pip_holistically(
         self,
         user_prompt: str,
-    ) -> Tuple[dict[str, str], list[tuple[int, str, str]]]:
-        change_ids = [int(m) for m in re.findall(r"Change \[(\d+)\]", user_prompt)]
+    ) -> tuple[dict[str, str], list[tuple[int, str, str]]]:
+        change_ids = [
+            int(m)
+            for m in re.findall(r"^Change \[(\d+)\] order=", user_prompt, re.MULTILINE)
+        ]
         logger.info(
             "StubGaldrClient holistic ACCEPT for change_ids=%s",
             change_ids,

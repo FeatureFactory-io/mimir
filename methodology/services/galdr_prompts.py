@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from methodology.models import PipChange
 
 SYSTEM_PROMPT = """You are Galdr, an AI reviewer for playbook improvement proposals.
 Assess whether each proposed change is consistent with the playbook's goals,
@@ -17,7 +21,12 @@ Evaluate the FULL proposed PIP holistically: assess whether the TARGET STATE (af
 changes are applied in order) is architecturally coherent, then provide per-change diagnostics
 in that full context — not against the current state in isolation.
 
-When a LINK or UNLINK row uses #internal_ref (e.g. #artifact-dsp-target), that slug labels
+Structural validation has already dry-run applied the complete batch atomically.
+Activities have a primary parent workflow and may be LINKed into secondary workflows.
+Do not invent a one-workflow-only restriction. Judge semantic coherence using all changes.
+Return exactly one assessment for every change ID; give concise reasons (1-2 sentences).
+
+When a parent, phase, producer, ordering, LINK or UNLINK field uses #internal_ref (e.g. #artifact-dsp-target), that slug labels
 a pending ADD in the same PIP — not a missing live catalog entity. Use the pending identity
 map and target state; do not REJECT solely because #slug is absent from the released snapshot.
 
@@ -34,7 +43,7 @@ Respond ONLY with a JSON object — no prose, no markdown fences:
 """
 
 INTERNAL_REF_IDENTITY_NOTE = (
-    "NOTE: #slug on LINK/UNLINK endpoints refers to a pending ADD in this PIP, "
+    "NOTE: #slug in parent, phase, producer, ordering or LINK/UNLINK fields refers to a pending ADD in this PIP, "
     "not a missing live catalog entry. Use the identity map and target state below."
 )
 
@@ -247,7 +256,10 @@ def _annotate_internal_ref_endpoint(
     ref_map: dict[str, tuple[str, int]] | None = None,
 ) -> str:
     from methodology.models import PipChange
-    from methodology.services.pip_link_service import is_internal_ref, normalize_internal_ref
+    from methodology.services.pip_link_service import (
+        is_internal_ref,
+        normalize_internal_ref,
+    )
 
     if not is_internal_ref(ref):
         return ref
@@ -270,6 +282,32 @@ def _annotate_internal_ref_endpoint(
     return ref
 
 
+def _change_reference_lines(
+    change: PipChange, changes: list[PipChange], ref_map: dict[str, tuple[str, int]],
+) -> list[str]:
+    """Describe explicit parent, phase, producer and insertion references.
+
+    :param change: PIP change whose structural fields are serialized.
+    :param changes: Full ordered PIP batch for pending identity resolution.
+    :param ref_map: Dry-run identity map, or an empty mapping.
+    :return: Annotated field lines, e.g. parent_workflow_ref: #wf (pending ADD ...).
+    """
+    lines: list[str] = []
+    for field in (
+        "parent_workflow_id",
+        "parent_workflow_ref",
+        "insert_after_activity_id",
+        "insert_after_activity_ref",
+        "phase_ref",
+        "produced_by_activity_ref",
+    ):
+        value = getattr(change, field)
+        if value:
+            annotated = _annotate_internal_ref_endpoint(str(value), changes, ref_map)
+            lines.append(f"  {field}: {annotated}")
+    return lines
+
+
 def _format_change_list(
     changes,
     ref_map: dict[str, tuple[str, int]] | None = None,
@@ -282,6 +320,7 @@ def _format_change_list(
             f"{change.change_type} {change.entity_type or change.relationship_type}"
         )
         body_lines = [header, f"  name: {change.name or '(empty)'}"]
+        body_lines.extend(_change_reference_lines(change, changes, ref_map))
         if change.display_order is not None:
             body_lines.append(f"  display_order: {change.display_order}")
         if change.target_id:
@@ -289,7 +328,7 @@ def _format_change_list(
         if change.target_name_snapshot:
             body_lines.append(f"  target_name_snapshot: {change.target_name_snapshot}")
         if change.content:
-            body_lines.append(f"  content: {change.content[:500]}")
+            body_lines.append(f"  content: {change.content}")
         if change.internal_ref:
             body_lines.append(f"  internal_ref: {change.internal_ref}")
         if change.change_type in {"LINK", "UNLINK"}:
@@ -303,6 +342,7 @@ def _format_change_list(
                 changes,
                 ref_map,
             )
+            body_lines.append(f"  relationship_type: {change.relationship_type}")
             body_lines.append(f"  link: {src} → {tgt}")
         blocks.append("\n".join(body_lines))
     return "\n\n".join(blocks)
@@ -344,14 +384,18 @@ def build_target_state_prompt(
             *identity_lines,
             INTERNAL_REF_IDENTITY_NOTE,
         ])
-    sections.extend([
-        "",
-        "--- Proposed Changes (in order) ---",
-        _format_change_list(changes, ref_map),
-        "",
-        "Evaluate target-state coherence first, then per-change recommendations "
-        "in the context of the full PIP.",
-    ])
+    sections.extend(
+        [
+            "",
+            "--- Proposed Changes (in order) ---",
+            _format_change_list(changes, ref_map),
+            "",
+            (
+                "Evaluate target-state coherence first, then per-change recommendations "
+                "in the context of the full PIP."
+            ),
+        ]
+    )
     return "\n".join(sections)
 
 
@@ -374,12 +418,22 @@ def build_change_prompt(
     from methodology.models import PipChange
 
     lines = [
-        "Assess this single proposed playbook change.",
+        (
+            "Assess the focused change in the context of the complete PIP below. "
+            "All changes form one atomic proposal; pending parents need not exist live."
+        ),
         "",
         "--- Playbook snapshot ---",
         context_summary,
     ]
     if all_changes:
+        lines.extend(
+            [
+                "",
+                "--- Complete PIP change set ---",
+                _format_change_list(all_changes, ref_map),
+            ]
+        )
         identity_lines = build_internal_ref_identity_lines(
             all_changes,
             ref_map,
@@ -402,6 +456,7 @@ def build_change_prompt(
         f"append_to_playbook_end: {change.append_to_playbook_end}",
         f"content / rationale:\n{change.content or '(empty)'}",
     ])
+    lines.extend(_change_reference_lines(change, all_changes or [change], ref_map or {}))
     if change.display_order is not None:
         lines.append(f"display_order: {change.display_order}")
     if change.target_name_snapshot:
