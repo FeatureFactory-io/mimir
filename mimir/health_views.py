@@ -54,5 +54,8 @@ def health_check(request):
     # Add environment info (non-sensitive)
     health_status['environment'] = getattr(settings, 'MIMIR_ENV', 'unknown')
     health_status['revision'] = get_deployed_revision()
+    health_status['galdr_review_mode'] = (
+        'holistic' if settings.GALDR_USE_TARGET_STATE else 'per_change'
+    )
 
     return JsonResponse(health_status, status=status_code)

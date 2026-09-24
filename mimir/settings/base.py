@@ -159,7 +159,7 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@mimir.local")
 GALDR_EAGER = False
 
 # Galdr v2: evaluate PIP changes against target state after all changes applied.
-GALDR_USE_TARGET_STATE = os.environ.get("GALDR_USE_TARGET_STATE", "").lower() in {
+GALDR_USE_TARGET_STATE = os.environ.get("GALDR_USE_TARGET_STATE", "true").lower() in {
     "1",
     "true",
     "yes",
