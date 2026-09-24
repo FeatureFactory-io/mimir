@@ -1447,6 +1447,7 @@ def add_pip_change(
     relationship_type: str = "",
     source_entity_ref: str = "",
     target_entity_ref: str = "",
+    display_order: Optional[int] = None,
 ) -> dict:
     """
     Add a typed change row to a Draft PIP.
@@ -1458,7 +1459,8 @@ def add_pip_change(
               Optionally set internal_ref="#slug" for later LINK/ref rows in this PIP.
               Never embed internal_ref slugs (#slug) in ADD/ALTER guidance content — use
               entity display names; slugs are PIP-only plumbing for ref fields.
-    - ALTER : entity_type + target_id + at least one of name/content required.
+    - ALTER : entity_type + target_id + at least one of name/content/display_order required.
+              Activity/Workflow: display_order moves to a 1-based container position; beyond end appends.
               Activity: optional phase_ref (pk or #slug).
     - DROP  : entity_type + target_id + rationale in content.
     - LINK  : relationship_type + source_entity_ref + target_entity_ref (entity_type="").
@@ -1497,6 +1499,7 @@ def add_pip_change(
     :param relationship_type: Required for LINK/UNLINK.
     :param source_entity_ref: Source entity — numeric PK or "#internal_ref".
     :param target_entity_ref: Target entity — numeric PK or "#internal_ref".
+    :param display_order: ALTER Activity/Workflow position, 1..32767; beyond end appends.
     :return: Dict with change_id
     """
     logger.info(f'HTTP Tool: add_pip_change pip={pip_id} type={change_type} entity={entity_type}')
@@ -1532,6 +1535,8 @@ def add_pip_change(
         payload["source_entity_ref"] = source_entity_ref
     if target_entity_ref:
         payload["target_entity_ref"] = target_entity_ref
+    if display_order is not None:
+        payload["display_order"] = display_order
     r = get_client().post(f"/api/pips/{pip_id}/changes/", json=payload)
     return check_response(r, "add_pip_change")
 

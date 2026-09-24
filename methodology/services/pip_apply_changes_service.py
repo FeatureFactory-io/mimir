@@ -500,6 +500,8 @@ class PipApplyChangesService:
                 wf.name = change.name.strip()[:100]
             wf.description = (body or wf.description or "")[:500]
             wf.save(update_fields=["name", "description", "updated_at"])
+            if change.display_order is not None:
+                _set_workflow_order(wf, change.display_order, pip_pk)
             logger.info("PIP apply ALTER Workflow pk=%s pip=%s", cid, pip_pk)
             return
 
@@ -699,6 +701,37 @@ class PipApplyChangesService:
             playbook=playbook,
         )
         return summary
+
+
+@transaction.atomic
+def _set_workflow_order(workflow: Workflow, position: int, pip_pk: int) -> None:
+    """Move a workflow and renumber its siblings in stable order.
+
+    :param workflow: Workflow in the PIP's validated playbook.
+    :param position: One-based position; positions past the end append.
+    :param pip_pk: PIP identifier for audit logging.
+    :return: None; sibling orders are persisted atomically.
+    :raises ValidationError: If position is not a positive integer.
+    """
+    if type(position) is not int or position < 1:
+        raise ValidationError("display_order must be a positive integer.")
+    siblings = list(
+        Workflow.objects.select_for_update()
+        .filter(playbook_id=workflow.playbook_id)
+        .order_by("order", "pk")
+    )
+    siblings = [sibling for sibling in siblings if sibling.pk != workflow.pk]
+    siblings.insert(min(position - 1, len(siblings)), workflow)
+    for order, sibling in enumerate(siblings, start=1):
+        if sibling.order != order:
+            logger.info(
+                "PIP workflow order pip=%s workflow=%s old=%s new=%s",
+                pip_pk,
+                sibling.pk,
+                sibling.order,
+                order,
+            )
+            Workflow.objects.filter(pk=sibling.pk).update(order=order)
 
 
 def _bump_orders_after_activity(workflow_id: int, after_order: int) -> None:

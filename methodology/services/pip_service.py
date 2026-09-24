@@ -328,6 +328,35 @@ def _persist_pip_change(
     return pc
 
 
+_MAX_DISPLAY_ORDER = 32767  # Portable PositiveSmallIntegerField limit.
+
+
+def _validate_display_order(
+    change_type: str, entity_type: str, position: Optional[int]
+) -> None:
+    """Validate an optional position before storing a draft change.
+
+    :param change_type: Normalized change operation, e.g. ALTER.
+    :param entity_type: Entity being repositioned, e.g. Workflow.
+    :param position: One-based container position or None.
+    :return: None when valid.
+    :raises ValidationError: For unsupported operations or invalid positions.
+    """
+    if position is None:
+        return
+    if change_type != PipChange.CHANGE_ALTER or entity_type.strip() not in {
+        PipChange.ENTITY_ACTIVITY,
+        PipChange.ENTITY_WORKFLOW,
+    }:
+        raise ValidationError(
+            "display_order is only supported for ALTER Activity/Workflow."
+        )
+    if type(position) is not int or not 1 <= position <= _MAX_DISPLAY_ORDER:
+        raise ValidationError(
+            f"display_order must be an integer from 1 to {_MAX_DISPLAY_ORDER}."
+        )
+
+
 def _persist_link_change(
     pip: ProcessImprovementProposal,
     *,
@@ -637,6 +666,7 @@ class PIPService:
     ) -> PipChange:
         _pip_require_draft(pip, actor)
         ct = (change_type or "").upper().strip()
+        _validate_display_order(ct, entity_type, display_order)
         if ct in {PipChange.CHANGE_LINK, PipChange.CHANGE_UNLINK}:
             return _persist_link_change(
                 pip=pip,

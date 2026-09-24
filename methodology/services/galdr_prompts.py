@@ -282,6 +282,8 @@ def _format_change_list(
             f"{change.change_type} {change.entity_type or change.relationship_type}"
         )
         body_lines = [header, f"  name: {change.name or '(empty)'}"]
+        if change.display_order is not None:
+            body_lines.append(f"  display_order: {change.display_order}")
         if change.target_id:
             body_lines.append(f"  target_id: {change.target_id}")
         if change.target_name_snapshot:
@@ -400,6 +402,8 @@ def build_change_prompt(
         f"append_to_playbook_end: {change.append_to_playbook_end}",
         f"content / rationale:\n{change.content or '(empty)'}",
     ])
+    if change.display_order is not None:
+        lines.append(f"display_order: {change.display_order}")
     if change.target_name_snapshot:
         lines.append(f"target_name_snapshot: {change.target_name_snapshot}")
     if change.parent_workflow_id:
