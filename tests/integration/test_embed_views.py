@@ -142,6 +142,7 @@ class TestEmbedReturnsFragment:
         content = response.content.decode()
         assert '<html' not in content, "embed should not contain <html>"
         assert 'main-navbar' not in content, "embed should not contain navbar"
+        assert 'realm-navbar' not in content, "embed should not contain realm navbar"
         assert entity_name in content, f"embed should contain entity name '{entity_name}'"
 
     def test_playbook_embed(self, client_auth, playbook):
@@ -213,7 +214,7 @@ class TestFullPageUnchanged:
     def _assert_full_page(self, response):
         assert response.status_code == 200
         content = response.content.decode()
-        assert 'main-navbar' in content, "full page should contain navbar"
+        assert 'realm-navbar' in content, "full page should contain realm navbar"
         assert '<html' in content, "full page should contain <html>"
 
     def test_playbook_full_page(self, client_auth, playbook):
@@ -286,6 +287,7 @@ class TestEmbedAnonymousPublicReleased:
         response = client.get(url)
         assert response.status_code == 200
         assert b'data-testid="main-navbar"' not in response.content
+        assert b'data-testid="realm-navbar"' not in response.content
 
 
 class TestEmbedAnonymousRedirects:

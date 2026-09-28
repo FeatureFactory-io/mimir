@@ -3,6 +3,8 @@
 Tests that navbar links use correct URLs per URL convention.
 This test would have caught the /accounts/ vs /auth/user/ discrepancy.
 """
+import re
+
 import pytest
 from django.contrib.auth.models import User
 from django.test import Client
@@ -36,6 +38,23 @@ class TestNavbarLinks:
 
         for testid in PRIMARY_NAV_TESTIDS:
             assert f'data-testid="{testid}"' in html
+        assert 'data-testid="realm-navbar"' in html
+        assert 'data-testid="app-sidebar"' in html
+        assert 'data-testid="realm-nav-featurefactory"' in html
+        assert 'data-testid="realm-nav-heimdall"' in html
+        for slug in (
+            "featurefactory",
+            "mimir",
+            "huginn",
+            "yggdrasil",
+            "heimdall",
+        ):
+            match = re.search(
+                rf'<a[^>]*data-testid="realm-nav-{slug}"[^>]*>',
+                html,
+            )
+            assert match, slug
+            assert "target=" not in match.group(0)
         assert 'data-testid="register-link"' in html
         assert 'data-testid="login-link"' in html
         assert 'data-testid="global-search-input"' not in html

@@ -11,7 +11,9 @@ def test_authenticated_dashboard_includes_hg_navbar_and_main(client, django_user
     response = client.get("/dashboard/")
     assert response.status_code == 200
     body = response.content.decode()
-    assert 'data-testid="main-navbar"' in body
+    assert 'data-testid="realm-navbar"' in body
+    assert 'data-testid="app-sidebar"' in body
+    assert 'data-testid="realm-nav-mimir"' in body
     assert "hg-navbar" in body
     assert 'class="hg-main flex-grow-1"' in body
     assert 'data-testid="nav-playbooks"' in body
@@ -48,6 +50,13 @@ def test_anonymous_landing_shows_full_primary_nav():
         "nav-rules",
         "nav-teams",
         "nav-pips",
+        "realm-nav-featurefactory",
+        "realm-nav-mimir",
+        "realm-nav-huginn",
+        "realm-nav-yggdrasil",
+        "realm-nav-heimdall",
+        "app-sidebar",
+        "sidebar-collapse-toggle",
     ):
         assert f'data-testid="{testid}"' in body
     assert 'data-testid="register-link"' in body
