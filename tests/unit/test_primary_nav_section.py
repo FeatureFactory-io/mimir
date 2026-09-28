@@ -100,3 +100,29 @@ def test_teams():
 
 def test_browser():
     assert _section("/browser/12/") == "playbooks"
+
+
+def test_shell_context_lists_realm_and_guest_chrome():
+    rf = RequestFactory()
+    req = rf.get("/")
+    ctx = primary_nav_section(req)
+    assert ctx["chrome"] == "guest"
+    assert ctx["active_realm"] == "mimir"
+    assert ctx["nav_section"] is None
+    slugs = [item["slug"] for item in ctx["realm_items"]]
+    assert slugs == [
+        "featurefactory",
+        "mimir",
+        "huginn",
+        "yggdrasil",
+        "heimdall",
+    ]
+    assert all(item["external"] is False for item in ctx["realm_items"])
+    testids = [
+        item["testid"]
+        for section in ctx["sidebar_sections"]
+        for item in section["items"]
+    ]
+    assert testids[0] == "nav-dashboard"
+    assert "nav-playbooks" in testids
+    assert testids[-1] == "nav-pips"
