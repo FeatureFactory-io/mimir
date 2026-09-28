@@ -1,6 +1,6 @@
 Feature: FOB-AGENTS-GLOBAL-LIST-1 Global Agents List and Navigation
   As a methodology author (Maria)
-  I want to view all agents across all playbooks from the main navbar
+  I want to view all agents across all playbooks from the app sidebar
   So that I can manage AI assistants globally and navigate to them quickly
 
   Status: 📋 PLANNED - Not yet implemented
@@ -14,9 +14,9 @@ Feature: FOB-AGENTS-GLOBAL-LIST-1 Global Agents List and Navigation
       | Product Discovery v2.0    |      5 |
       | UX Research Methodology   |      3 |
 
-  Scenario: AGENT-GLOBAL-01 Navigate to global agents list from navbar
+  Scenario: AGENT-GLOBAL-01 Navigate to global agents list from the app sidebar
     Given Maria is on any page in FOB
-    When she clicks "Agents" in the main navigation bar
+    When she clicks "Agents" in the app sidebar
     Then she is redirected to FOB-AGENTS-GLOBAL-LIST-1
     And she sees "All Agents" header
     And she sees agent count "(16 agents across 3 playbooks)"
@@ -84,9 +84,9 @@ Feature: FOB-AGENTS-GLOBAL-LIST-1 Global Agents List and Navigation
     When she clicks "Dashboard" in breadcrumb
     Then she returns to FOB-DASHBOARD-1
 
-  Scenario: AGENT-GLOBAL-12 Active navbar indicator
+  Scenario: AGENT-GLOBAL-12 Active sidebar indicator
     Given Maria is on global agents list
-    Then the "Agents" link in main navbar has "active" class
+    Then the "Agents" link in the app sidebar has "active" class
     And it shows she is on the Agents section
 
   # ============================================================
@@ -100,7 +100,7 @@ Feature: FOB-AGENTS-GLOBAL-LIST-1 Global Agents List and Navigation
     Then he sees the global agents list page
     And he sees "All Agents" header
     And he sees the guest banner with data-testid "guest-auth-banner"
-    And he sees all primary navbar links from Home through PIPs
+    And he sees all app sidebar links from Home through PIPs
     And he does not see the authenticated user menu with data-testid "user-display"
     And he does not see global search with data-testid "global-search-input"
 

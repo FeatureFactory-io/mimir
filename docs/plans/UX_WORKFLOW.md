@@ -102,7 +102,7 @@ This workflow defines the complete UX design-to-development process for Mimir, f
    
    #### Screen: FOB-[ENTITY]-LIST+FIND-1
    
-   [User] clicks "[Entity]" in the main navigation. The [entity] list page appears:
+   [User] clicks "[Entity]" in the app sidebar. The [entity] list page appears:
    
    **Layout**:
    - **Header**: "[Entity]" with count badge (e.g., "[Entity] (3)")
@@ -148,7 +148,7 @@ This workflow defines the complete UX design-to-development process for Mimir, f
    
    #### Screen: FOB-PLAYBOOKS-LIST+FIND-1
    
-   Maria clicks "Playbooks" in the main navigation. The playbooks list page appears 
+   Maria clicks "Playbooks" in the app sidebar. The playbooks list page appears 
    (this is the entry point for all playbook operations, marked with bold border in 
    flow diagrams):
    
@@ -616,7 +616,7 @@ This workflow defines the complete UX design-to-development process for Mimir, f
          | React Frontend Development  | Mike Chen       | v1.2    | Active   | Downloaded |
          | UX Research Methodology     | Maria Rodriguez | v2.1    | Active   | Owned      |
          | Design System Patterns      | Community       | v1.0    | Disabled | Downloaded |
-       When she clicks "Playbooks" in the main navigation
+       When she clicks "Playbooks" in the app sidebar
        Then she sees the playbooks list page
        And the header shows "Playbooks (3)"
        And she sees all 3 playbooks in the table
@@ -662,18 +662,18 @@ This workflow defines the complete UX design-to-development process for Mimir, f
    # NAVBAR INTEGRATION - Wire when [Entity] block is complete
    # ============================================================
    
-   Scenario: [PREFIX]-NAVBAR-01 [Entity] link appears in main navigation
+   Scenario: [PREFIX]-NAVBAR-01 [Entity] link appears in the app sidebar
      Given the [Entity] feature is fully implemented
      And [persona] is authenticated in FOB
      When [persona] views any page in FOB
-     Then [persona] sees "[Entity]" link in the main navbar
+     Then [persona] sees "[Entity]" link in the app sidebar
      And the link has icon "[fa-icon-name]"
      And the link has tooltip "[Helpful description]"
    
    Scenario: [PREFIX]-NAVBAR-02 Navigate to [Entity] from any page
      Given [persona] is authenticated in FOB
      And [persona] is on any page in FOB
-     When [persona] clicks "[Entity]" in the main navbar
+     When [persona] clicks "[Entity]" in the app sidebar
      Then [persona] is redirected to FOB-[ENTITY]-LIST+FIND-1
      And the [Entity] nav link is highlighted as active
    ```
@@ -684,18 +684,18 @@ This workflow defines the complete UX design-to-development process for Mimir, f
    # NAVBAR INTEGRATION - Wire when Playbooks block is complete
    # ============================================================
    
-   Scenario: PB-NAVBAR-01 Playbooks link appears in main navigation
+   Scenario: PB-NAVBAR-01 Playbooks link appears in the app sidebar
      Given the Playbooks feature is fully implemented
      And Maria is authenticated in FOB
      When she views any page in FOB
-     Then she sees "Playbooks" link in the main navbar
+     Then she sees "Playbooks" link in the app sidebar
      And the link has icon "fa-book-sparkles"
      And the link has tooltip "Browse and manage your engineering playbooks"
    
    Scenario: PB-NAVBAR-02 Navigate to Playbooks from any page
      Given Maria is authenticated in FOB
      And she is on any page in FOB
-     When she clicks "Playbooks" in the main navbar
+     When she clicks "Playbooks" in the app sidebar
      Then she is redirected to FOB-PLAYBOOKS-LIST+FIND-1
      And the Playbooks nav link is highlighted as active
    ```

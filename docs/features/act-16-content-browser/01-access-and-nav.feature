@@ -41,7 +41,7 @@ Feature: FOB-CONTENT-BROWSER-ACCESS Content Browser Access and Navigation
     Then he sees the guest banner with data-testid "guest-auth-banner"
     And the banner text includes "Sign in to create and edit playbooks"
     And he sees [Sign In] and [Register] in the guest banner
-    And he sees all primary navbar links from Home through PIPs
+    And he sees all app sidebar links from Home through PIPs
     And he does not see global search with data-testid "global-search-input"
     And he does not see the notification bell with data-testid "notification-bell"
     And he does not see the user menu with data-testid "user-display"

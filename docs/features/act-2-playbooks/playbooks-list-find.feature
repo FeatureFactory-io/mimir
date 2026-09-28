@@ -20,7 +20,7 @@ Feature: FOB-PLAYBOOKS-LIST+FIND-1 Playbooks List and Search
       | React Frontend Development | Mike Chen       | v1.2    | Active   | Downloaded |
       | UX Research Methodology    | Maria Rodriguez | v2.1    | Active   | Owned      |
       | Design System Patterns     | Community       | v1.0    | Disabled | Downloaded |
-    When she clicks "Playbooks" in the main navigation
+    When she clicks "Playbooks" in the app sidebar
     Then she sees the playbooks list page
     And the header shows "Playbooks (3)"
     And she sees all 3 playbooks in the table
@@ -225,18 +225,18 @@ Feature: FOB-PLAYBOOKS-LIST+FIND-1 Playbooks List and Search
   # NAVBAR INTEGRATION - Wire when Playbooks block is complete
   # ============================================================
 
-  Scenario: FOB-PLAYBOOKS-LIST+FIND-23 Playbooks link appears in main navigation
+  Scenario: FOB-PLAYBOOKS-LIST+FIND-23 Playbooks link appears in the app sidebar
     Given the Playbooks feature is fully implemented
     And Maria is authenticated in FOB
     When she views any page in FOB
-    Then she sees "Playbooks" link in the main navbar
+    Then she sees "Playbooks" link in the app sidebar
     And the link has icon "fa-book-sparkles"
     And the link has tooltip "Browse and manage your engineering playbooks"
 
   Scenario: FOB-PLAYBOOKS-LIST+FIND-24 Navigate to Playbooks from any page
     Given Maria is authenticated in FOB
     And she is on any page in FOB
-    When she clicks "Playbooks" in the main navbar
+    When she clicks "Playbooks" in the app sidebar
     Then she is redirected to FOB-PLAYBOOKS-LIST+FIND-1
     And the Playbooks nav link is highlighted as active
 

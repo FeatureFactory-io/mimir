@@ -350,6 +350,9 @@
             <root>
                 <mxCell id="v2-root-0"/>
                 <mxCell id="v2-root-1" parent="v2-root-0"/>
+                <mxCell id="v2-realm-sidebar-note" value="FOB entry chrome (FOB-REALM-NAV-SIDEBAR): persistent shell is a FeatureFactory realm top bar (FeatureFactory, Mimir, Huginn, Yggdrasil, Heimdall) plus an app sidebar (Home through PIPs). Screen boxes below are pages inside that shell." style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;align=left;spacingLeft=8;size=14;" parent="v2-root-1" vertex="1">
+                    <mxGeometry x="40" y="10" width="520" height="110" as="geometry"/>
+                </mxCell>
                 <mxCell id="v2-legend-box" value="Legend" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;fontSize=13;" parent="v2-root-1" vertex="1">
                     <mxGeometry x="1020" y="10" width="400" height="325" as="geometry"/>
                 </mxCell>
