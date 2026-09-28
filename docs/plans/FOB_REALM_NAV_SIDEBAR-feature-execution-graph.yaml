@@ -1,0 +1,76 @@
+feature_execution_graph:
+  feature_ref: FOB-REALM-NAV-SIDEBAR
+  nodes:
+    - id: N1-shell-context
+      title: Shell context and log story
+      bpe: BPE-02
+      depends_on: []
+      footprint:
+        - methodology/context_processors.py
+        - tests/unit/test_primary_nav_section.py
+        - tests/integration/test_app_shell_log_story.py
+      tests:
+        - test_app_shell_log_story_happy
+        - test_app_shell_log_story_guest
+      log_story_rows:
+        - primary_nav_section:entry
+        - primary_nav_section:branch
+        - primary_nav_section:exit
+      gate:
+        command: pytest tests/unit/test_primary_nav_section.py tests/integration/test_app_shell_log_story.py -x
+        log_story_command: pytest tests/integration/test_app_shell_log_story.py -k log_story -x
+      guidance_bundle:
+        activity: BPE/BPE-02-Implement_Backend.md
+        rules:
+          - do-skeletons-first
+          - do-test-first
+          - do-assert-log-story
+    - id: N2-graduate-shell
+      title: Graduate realm bar and sidebar into base.html
+      bpe: BPE-03
+      depends_on: [N1-shell-context]
+      mockup_source: templates/mockups/nav/_shell.html
+      production_template: templates/base.html
+      graduate_strategy: rewire
+      footprint:
+        - templates/base.html
+        - static/css/mimir-app.css
+        - tests/integration/test_base_shell.py
+        - tests/integration/test_navbar_links.py
+        - tests/integration/test_embed_views.py
+      tests:
+        - test_authenticated_dashboard_includes_hg_navbar_and_main
+        - test_anonymous_landing_shows_full_primary_nav
+        - test_navbar_login_link_when_not_authenticated
+      gate:
+        command: pytest tests/integration/test_base_shell.py tests/integration/test_navbar_links.py tests/integration/test_embed_views.py -x
+      guidance_bundle:
+        activity: BPE/BPE-03-Implement_Frontend.md
+        rules:
+          - do-test-first
+          - do-semantic-versioning-on-ui-elements
+    - id: N3-acceptance
+      title: Guest browse still matches the new shell
+      bpe: BPE-04
+      depends_on: [N2-graduate-shell]
+      footprint:
+        - tests/integration/test_guest_playbook_browse.py
+      gate:
+        command: pytest tests/integration/test_base_shell.py tests/integration/test_navbar_links.py tests/integration/test_embed_views.py tests/integration/test_guest_playbook_browse.py -x
+    - id: N4-e2e-chrome
+      title: Content Browser popup uses realm navbar
+      bpe: BPE-05
+      depends_on: [N3-acceptance]
+      footprint:
+        - tests/e2e/test_content_browser_detail_panel.py
+      gate:
+        command: pytest tests/e2e/test_content_browser_detail_panel.py -k navbar -x
+    - id: N5-dod
+      title: Definition of done
+      bpe: BPE-06
+      depends_on: [N4-e2e-chrome]
+      footprint:
+        - docs/architecture/SAO.md
+        - docs/plans/FOB_REALM_NAV_SIDEBAR_CHANGE_RECONCILIATION.md
+      gate:
+        command: pytest tests/integration/test_base_shell.py tests/integration/test_navbar_links.py tests/integration/test_app_shell_log_story.py -x
