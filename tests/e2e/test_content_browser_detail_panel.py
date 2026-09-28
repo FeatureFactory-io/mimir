@@ -310,7 +310,7 @@ class TestDetailPanelNavigation:
         popup.wait_for_load_state()
         assert f"/playbooks/{pb.pk}/workflows/{wf.pk}/" in popup.url
         # The opened page is full-page (has navbar)
-        assert "main-navbar" in popup.content()
+        assert "realm-navbar" in popup.content()
 
     def test_open_full_navigates_current_tab(
         self, page: Page, live_server, panel_playbook
