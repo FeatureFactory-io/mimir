@@ -20,18 +20,18 @@
       With every sprint and every feature built, your team and their AI get sharper — because the playbook they share keeps improving.
     </p>
     <div class="d-flex gap-4 flex-wrap justify-content-center align-items-center">
-      <a href="{% url 'use_cases' %}" class="hg-landing-link" data-testid="landing-cta-features">What Mimir Can Do</a>
-      <a href="{% url 'playbook_list' %}" class="hg-landing-link" data-testid="landing-cta-explore-playbooks">Explore public playbooks</a>
+      <a href="{% url 'use_cases' %}" class="hg-landing-link" data-testid="landing-cta-features" data-analytics-event="cta_click" data-analytics-cta="hero" data-analytics-target="use_cases">What Mimir Can Do</a>
+      <a href="{% url 'playbook_list' %}" class="hg-landing-link" data-testid="landing-cta-explore-playbooks" data-analytics-event="cta_click" data-analytics-cta="hero" data-analytics-target="public_playbooks">Explore public playbooks</a>
       {% if user.is_authenticated %}
       <a href="#mcp-config"
          class="btn btn-primary btn-lg px-5 d-inline-flex align-items-center gap-2"
-         data-testid="landing-cta-connect-mcp">
+         data-testid="landing-cta-connect-mcp" data-analytics-event="cta_click" data-analytics-cta="hero" data-analytics-target="mcp_connect">
         <i class="fa-solid fa-plug" aria-hidden="true"></i> Connect MCP
       </a>
       {% else %}
       <a href="{% url 'register' %}"
          class="btn btn-success btn-lg px-5 d-inline-flex align-items-center gap-2"
-         data-testid="landing-cta-register">
+         data-testid="landing-cta-register" data-analytics-event="cta_click" data-analytics-cta="hero" data-analytics-target="account_registration">
         <i class="fas fa-user-plus" aria-hidden="true"></i> Register
       </a>
       {% endif %}
@@ -42,7 +42,7 @@
 <!-- Connect MCP section -->
 <div class="hg-landing-features-wrap">
   <!-- Connect MCP section -->
-  <section class="card border-0 shadow-sm rounded-3 mb-4" id="mcp-config" data-testid="landing-mcp-connect">
+  <section class="card border-0 shadow-sm rounded-3 mb-4" id="mcp-config" data-testid="landing-mcp-connect" data-analytics-feature="mcp_connect">
     <div class="card-header bg-white border-bottom py-2 px-3 fw-semibold d-flex align-items-center">
       <i class="fa-solid fa-plug me-2 text-primary" aria-hidden="true"></i>
       <span>Connect Your AI IDE to Mimir via MCP</span>

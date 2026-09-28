@@ -44,7 +44,13 @@
     </script>
     {% block extra_css %}{% endblock %}
 </head>
-<body class="d-flex flex-column min-vh-100 {% block body_class %}{% endblock %}">
+<body class="d-flex flex-column min-vh-100 {% block body_class %}{% endblock %}"
+      data-analytics-measurement-id="G-5LC9BFJRK8"
+      data-analytics-product-id="mimir"
+      data-analytics-experiment-id="exp-mimir-product-market-001"
+      data-analytics-hypothesis-id="hyp-executable-playbook-activation-001"
+      data-analytics-variant-id="var-product-001"
+      {% if not user.is_authenticated %}data-analytics-enabled="true"{% endif %}>
     {% if user.is_authenticated %}
     <!-- Feedback: first direct child of body, fixed to viewport (no wrapper / absolute) -->
     <button type="button"
@@ -249,7 +255,7 @@
             {% if messages %}
             <div class="container mt-3">
                 {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show"
+                <div class="alert alert-{{ message.level_tag }} {{ message.tags }} alert-dismissible fade show"
                      role="alert"
                      data-testid="alert-message">
                     {{ message }}
@@ -324,6 +330,14 @@
             </form>
         </div>
     </div>
+    {% endif %}
+
+    {% if not user.is_authenticated %}
+    <button class="analytics-settings btn btn-sm btn-outline-secondary" type="button" data-analytics-settings aria-label="Change analytics preference">Analytics</button>
+    <aside class="analytics-consent" data-analytics-consent hidden aria-label="Analytics preference">
+        <p><strong>Help improve Mimir.</strong> Allow privacy-conscious product analytics? Registration works either way.</p>
+        <div><button type="button" class="btn btn-sm btn-outline-secondary" data-analytics-deny>Not now</button><button type="button" class="btn btn-sm btn-primary" data-analytics-allow>Allow analytics</button></div>
+    </aside>
     {% endif %}
 
     <!-- Bootstrap 5.3.8 JS Bundle (includes Popper) -->
@@ -539,6 +553,7 @@
 
     {% include "partials/copy_prompt/toast.html" %}
     <script src="{% static 'js/copy_prompt.js' %}"></script>
+    <script src="{% static 'js/product_analytics.js' %}"></script>
 
     {% block extra_js %}{% endblock %}
 </body>

@@ -777,6 +777,7 @@ def register(request):
         messages.info(
             request,
             "Account created. Please check your inbox and verify your email before logging in.",
+            extra_tags="analytics-sign-up",
         )
         return redirect(reverse("login"))
     except Exception as e:

@@ -909,3 +909,31 @@ mark.mm-search-highlight {
     width: var(--mm-sidebar-width);
   }
 }
+.analytics-consent {
+  align-items: center;
+  background: var(--bs-body-bg, #fff);
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 0.75rem;
+  bottom: 1rem;
+  box-shadow: 0 1rem 2.5rem rgba(26, 31, 46, 0.22);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  left: 50%;
+  max-width: min(44rem, calc(100vw - 2rem));
+  padding: 1rem;
+  position: fixed;
+  transform: translateX(-50%);
+  width: 100%;
+  z-index: 1090;
+}
+
+.analytics-consent[hidden] { display: none; }
+.analytics-consent p { margin: 0; }
+.analytics-consent > div { display: flex; gap: 0.5rem; flex-shrink: 0; }
+.analytics-settings { bottom: 1rem; position: fixed; right: 1rem; z-index: 1089; }
+
+@media (max-width: 620px) {
+  .analytics-consent { align-items: stretch; flex-direction: column; }
+  .analytics-consent > div { justify-content: flex-end; }
+}
