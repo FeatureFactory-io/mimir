@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title" data-symbol="launching-rocket">
-  <title id="title">Firestarter rocket</title>
-  <path fill="#111" d="M32 5c9 8 13 19 10 31l-10 10-10-10C19 24 23 13 32 5Z"/>
-  <path fill="#111" d="m22 31-9 9 11 2Zm20 0 9 9-11 2Z"/>
-  <circle cx="32" cy="23" r="5" fill="#fff"/>
-  <path fill="#111" d="m27 46 5 13 5-13-5 4Z"/>
-  <path fill="none" stroke="#111" stroke-linecap="round" stroke-width="3" d="M22 48l-4 7M42 48l4 7"/>
-</svg>

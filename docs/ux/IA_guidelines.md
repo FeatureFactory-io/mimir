@@ -391,7 +391,7 @@ Persistent top bar (`data-testid="realm-navbar"`, `.hg-navbar`). Product switche
 | Yggdrasil | `https://yggdrasil.featurefactory.io` | Same tab |
 | Heimdall | `https://heimdall.featurefactory.io` | Same tab |
 
-**Marks:** each item shows its file from `static/images/realm/` inside a **white circle** (featurefactory.io product-mark convention: white disc, `border-radius: 50%`, mark contained with a hair of padding). Files: `featurefactory-mark.svg`, `mimir-logo.png`, `huginn-logo.jpeg`, `yggdrasil-mark.svg`, `heimdall-mark.svg`. Class: `.mm-realm-mark`.
+**Marks:** each item shows its file from `static/images/realm/` inside a **white circle** (featurefactory.io product-mark convention: white disc, `border-radius: 50%`, mark contained with a hair of padding). Files: `featurefactory-logo.png`, `mimir-logo.png`, `huginn-logo.jpeg`, `yggdrasil-logo.png`, `heimdall-logo.png`. Class: `.mm-realm-mark`.
 
 **Right side (authenticated):** global search, notifications bell, user menu (View Profile, Logout).
 

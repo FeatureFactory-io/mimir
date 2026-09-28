@@ -1322,7 +1322,7 @@ MOCK_REALM_ITEMS = [
         "external": False,
         "tooltip": "FeatureFactory home",
         "icon": "",
-        "mark": "images/realm/featurefactory-mark.svg",
+        "mark": "images/realm/featurefactory-logo.png",
     },
     {
         "slug": "mimir",
@@ -1349,7 +1349,7 @@ MOCK_REALM_ITEMS = [
         "external": False,
         "tooltip": "Yggdrasil",
         "icon": "",
-        "mark": "images/realm/yggdrasil-mark.svg",
+        "mark": "images/realm/yggdrasil-logo.png",
     },
     {
         "slug": "heimdall",
@@ -1358,7 +1358,7 @@ MOCK_REALM_ITEMS = [
         "external": False,
         "tooltip": "Heimdall",
         "icon": "",
-        "mark": "images/realm/heimdall-mark.svg",
+        "mark": "images/realm/heimdall-logo.png",
     },
 ]
 

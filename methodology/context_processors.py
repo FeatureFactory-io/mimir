@@ -19,7 +19,7 @@ REALM_ITEMS = (
         "url": "https://featurefactory.io",
         "external": False,
         "tooltip": "FeatureFactory home",
-        "mark": "images/realm/featurefactory-mark.svg",
+        "mark": "images/realm/featurefactory-logo.png",
     },
     {
         "slug": "mimir",
@@ -43,7 +43,7 @@ REALM_ITEMS = (
         "url": "https://yggdrasil.featurefactory.io",
         "external": False,
         "tooltip": "Yggdrasil",
-        "mark": "images/realm/yggdrasil-mark.svg",
+        "mark": "images/realm/yggdrasil-logo.png",
     },
     {
         "slug": "heimdall",
@@ -51,7 +51,7 @@ REALM_ITEMS = (
         "url": "https://heimdall.featurefactory.io",
         "external": False,
         "tooltip": "Heimdall",
-        "mark": "images/realm/heimdall-mark.svg",
+        "mark": "images/realm/heimdall-logo.png",
     },
 )
 
