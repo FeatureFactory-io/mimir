@@ -1,0 +1,19 @@
+---
+alwaysApply: false
+---
+
+APPEND TO RULE:
+
+---
+
+## behave AT: Background + scenario idempotency
+
+Applies to acceptance tests (`docs/features/`) using behave-django, not only E2E preset JSON.
+
+When `Background:` loads or seeds entities and a scenario `Given` creates the same logical record (same slug, username, or other natural unique key):
+
+- Use `get_or_create` / update-in-place in the step definition.
+- Prefer factory `django_get_or_create` on stable keys when using FactoryBoy in Givens.
+- Treat `IntegrityError` during AT as a **fixture contract bug** until proven otherwise.
+
+Reference: Skill 45 Pattern 5; TFK-04 Build Fixture Library activity.

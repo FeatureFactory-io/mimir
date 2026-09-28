@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+
+# Rule: Release Roadmap Is Aspirational
+
+Charter section 6 (alpha to beta to gamma to RC) must be labeled aspirational/unvalidated in the Charter itself and cross-referenced to EST for feasibility. Dates or phases become commitments only after EST evidence and explicit authorized approval. Parallel planning, a generated roadmap, or an agent forecast does not create a commitment.

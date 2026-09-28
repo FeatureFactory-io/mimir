@@ -1,0 +1,23 @@
+---
+alwaysApply: true
+---
+
+# Rule: Plan Before Doing
+
+Use this rule before any activity that will mutate code, playbook state, project artifacts, tickets, infrastructure, or an external system.
+
+## Procedure
+
+1. Read the activity guidance, required inputs, linked artifacts/rules, and relevant architecture/specification material in full. Inspect implementation bodies and live state; do not infer completeness from names, signatures, or generated files.
+2. Validate prerequisites and identify unknowns, human gates, side effects, rollback/retry behavior, and the evidence required for Done.
+3. If the ADE provides an enforced **Plan mode**, enter it. Otherwise create or update the activity's explicit execution plan in the location named by its guidance.
+4. The plan must name ordered steps, dependencies, read/write footprints, safe parallel groups, convergence checks, tests/validation, and approval points.
+5. Show the plan and obtain required human approval before mutation. Approval of a parent plan covers only side effects explicitly listed there.
+6. Execute against the approved plan. Update status and evidence after material steps; when reality invalidates an assumption, pause affected work, revise the plan, and renew approval where scope or side effects change.
+7. Do not invent ADE capabilities. If enforced planning, subagents, or background tasks are unavailable, preserve the same plan/dependency/convergence semantics serially.
+
+## Bounded exceptions
+
+- Read-only inspection may precede the plan when needed to make it accurate.
+- A deterministic scheduled AIN run may execute from the already approved Charter and Huginn Assessment Contract without new approval per run; changing the contract, variables, thresholds, gating, ticket target, or schedule still requires planning and approval.
+- Trivial status reads and idempotent retries that use the same approved inputs and side-effect key do not require a new plan.

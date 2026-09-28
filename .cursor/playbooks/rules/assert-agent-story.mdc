@@ -1,0 +1,30 @@
+---
+alwaysApply: true
+---
+
+**Mimir metadata:** slug `do-assert-agent-story`; `always_apply: false` (link to BPE-02 / MIN-04 / TFK-02 / DTA-19).
+
+When a plan, iteration manifest, or SAO §17 row declares **Agent proof** scenarios (`PRF-*`, `agent_proof_script[]`, or `agent_proof_command`), you MUST prove orchestration with pytest integration tests using **CAP-004 ScriptedLLM** and the shared trace helper — not by asserting chat prose, grepping `logs/app.log` alone, or "the agent loop exists" checklists.
+
+## Requirements
+
+1. For each PRF row mapped in SAO §17, a test asserts **run trace beats** (workflow, tools offered/called, domain effects, blackboard/plan state as applicable) via `tests/support/agent_story.py` → `assert_agent_story(...)`.
+2. Cover **happy** and **reject** paths when the PRF is marked adverse or has a reject sketch (`test_*_agent_story_happy` / `test_*_agent_story_reject`).
+3. Use ordered LLM scripts from `tests/fixtures/llm_scripts/<prf-id>/` injected through the agent factory — only **CAP-004 ScriptedLLM** may stand in for the LLM in integration tests.
+4. Agent-proof tests ship in the **same commit** as the CAP/worker behavior they prove — never a deferred "agent testing pass".
+5. Never assert on raw secrets, tokens, or passwords in trace or log lines.
+6. Do not mock domain services, tools, or brokers in `@agent_proof` tests — real DB and real tool registry per Test Trophy.
+
+## Relationship to log story
+
+- **Log story** (`do-assert-log-story`): proves **logging beats** at decision points (caplog).
+- **Agent story**: proves **control-plane behavior** (trace + domain) under scripted LLM turns.
+- Both may apply to the same slice; both must green in the same commit when declared.
+
+## Anti-patterns
+
+- Behavior test green while PRF trace absent or weakened to "agent completed"
+- `FakeLLM` that returns `[]` on exhaustion instead of raising (hides missing script turns)
+- Mocking ToolExecutor or domain services in `@agent_proof` integration tests
+- Skipping `checkpoint.agent_proof_command` when the manifest lists PRF proofs
+- Using live LLM in PR merge gate (belongs to lane 3/4 — see TFK-01 §6)

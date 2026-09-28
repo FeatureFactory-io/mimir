@@ -1,0 +1,11 @@
+---
+alwaysApply: true
+---
+
+# Rule: Cadence and Iteration Length by Team Maturity
+
+Determine cadence at the start of every RIN cycle from the current Charter maturity classification and dated evidence:
+- L2 or early-L3: one-week iteration.
+- late-L3 or L4: one-day iteration.
+
+If maturity/evidence is absent or older than one completed iteration, reassess and version the Charter before choosing cadence. A different length requires Delivery Manager rationale, evidence, approval, and a review/expiry date. Recurring meeting overhead applies only when team size is greater than one; solo delivery uses asynchronous records and decision points.

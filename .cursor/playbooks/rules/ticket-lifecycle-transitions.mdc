@@ -1,0 +1,20 @@
+---
+alwaysApply: true
+---
+
+# Rule: Ticket Lifecycle Transitions
+
+Maintain one stable concern per project plus Charter variable_id; update it in place whenever the adapter supports that.
+
+- Green with no open concern: no action.
+- Green to Yellow/Orange: open Risk.
+- Yellow to/from Orange: keep Risk but update band, severity, evidence, freshness, assessment run, and gating policy.
+- Yellow/Orange to Red: reclassify the same concern to Problem.
+- Red to Yellow/Orange: reclassify the same concern to Risk and update evidence.
+- Fresh non-Green to Green: resolve the concern with recovery evidence.
+- Green to Red: open Problem.
+- Red to Green: resolve with fresh recovery evidence.
+- Any to Unknown: never close or mark Green; create/update the same concern as a measurement-health Risk unless Charter policy is stricter.
+- Unknown to measured band: transition that same concern according to the measured band.
+
+Use run_id plus variable_id as the side-effect idempotency key. Retry updates the same ticket/action record. Ticket-adapter failure leaves the assessment incomplete; it never authorizes a duplicate.

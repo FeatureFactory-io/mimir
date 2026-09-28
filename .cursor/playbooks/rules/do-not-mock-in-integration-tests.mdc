@@ -1,0 +1,30 @@
+---
+alwaysApply: false
+---
+
+Do not use mocks in integration tests — use real objects, real connections, real or real-like data from fixtures. Think of them as acceptance tests minus the UI.
+
+## CAP-004 carve-out (agent integration proofs)
+
+When SAO §17 applies and a test is marked `@pytest.mark.agent_proof`, **only CAP-004 ScriptedLLM** may stand in for the LLM provider. Everything else stays real:
+
+- Real database and transactions
+- Real tool registry / ToolExecutor wiring
+- Real broker and result backend (when CAP-060 in scope)
+- Real domain services — no `@patch` on services the agent invokes
+
+ScriptedLLM replays ordered responses from `tests/fixtures/llm_scripts/<prf-id>/`. It proves **orchestration**, not model quality.
+
+## FakeLLM ban
+
+Do **not** use `FakeLLM`, hand-rolled stub clients, or test doubles that:
+
+- Return empty lists / `{}` when the script queue is exhausted (hides missing turns)
+- Silently swallow parse errors
+- Bypass the LLM port protocol (CAP-001)
+
+If the scripted queue runs out, the test must **fail loudly**. Use CAP-004 ScriptedLLM or a real provider in lane 3/4 eval tests — never a silent fallback mock in PR merge gates.
+
+## Lane 2 reminder
+
+Deterministic shell tests (D0 pre-filter, JSON parse, validate-before-LLM) are ordinary integration tests — **no LLM mock at all**.

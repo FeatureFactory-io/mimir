@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+
+# Rule: Charter Is the Source of Truth for Variables
+
+Variable definitions and measurement contracts live in Charter section 3 and nowhere else. Every row must contain a stable variable_id, definition, unit, source, exact query/command, aggregation/window, freshness limit, measured bands, Unknown behavior, owner, and gating_policy. AIN reads the Charter version captured by its Assessment Run Record and never redefines thresholds locally. Drift between implementation and Charter is a versioned Charter-update decision at Bootstrap/Iteration retrospective, not an ad hoc assessment choice.

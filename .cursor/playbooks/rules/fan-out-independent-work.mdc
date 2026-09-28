@@ -1,0 +1,31 @@
+---
+alwaysApply: true
+---
+
+# Rule: Fan Out Independent Work
+
+Use this rule whenever an activity's work naturally decomposes into a list of items (scenarios, features, architectural domains, work packages) that can be planned or built without waiting on each other. Do not use it to force parallelism onto genuinely sequential work — see the activity's own guidance for whether this rule applies.
+
+## Procedure
+
+1. **Enumerate the items.** Produce the explicit list this activity will fan out over (e.g. all in-scope BDD scenarios, all architectural domains, all work packages). This list is the unit of dispatch — one worker per item.
+
+2. **Declare a footprint per item, before dispatch.** For each item, state which files/artifacts it will read and which it will write. An item that only reads shared upstream material (e.g. a single requirements document) and writes its own distinct output has an empty write-conflict footprint by construction.
+
+3. **Derive the conflict map.** For every pair of items, intersect their declared write-footprints. Non-empty intersection → conflict → these items must be serialized relative to each other. Empty intersection → safe to run concurrently.
+
+4. **Assign parallel groups.** Items with no mutual conflict go in the same dispatch wave. Conflicting items are ordered or assigned to different waves. Record the grouping (this is the same shape as an execution manifest's `parallel_groups`).
+
+5. **Dispatch one worker per item in a wave.** Each worker operates only within its declared footprint. A worker must not touch files outside its footprint, and must not pick up another item's work.
+
+6. **Collect results explicitly.** Each worker reports pass/fail (and, if it writes code, a commit reference) before the activity is considered done for that item. Do not treat silence as success.
+
+7. **Converge deliberately.** After all items in scope report back, run one explicit convergence step that: (a) confirms every item passed, and (b) checks for *cross-item* consequences that no single item's worker could see on its own — e.g. two architectural domains making incompatible choices, or two scenarios that turn out to need the same infrastructure. Serial execution gives an agent incidental cross-item awareness just by having read everything in order; parallel execution does not, so this convergence step must do that checking explicitly rather than assuming it happened implicitly.
+
+## When not to use this
+
+If an item's plan or output is a required input to another item (not just a shared upstream artifact both read), that is a real dependency, not a footprint conflict — sequence those items, don't force them into the same wave.
+
+## Source
+
+This pattern is not new: it is the mechanism Activity 181 (MIN-03, TL Dispatches Workers to Build) already uses for build-time node dispatch, and that Activity 142 (PIN-03, Contract) already uses for its footprint/conflict_map/parallel_groups manifest. This rule names it once so other activities can cite it by slug instead of re-deriving it.

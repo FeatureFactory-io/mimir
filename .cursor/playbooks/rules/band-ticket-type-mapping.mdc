@@ -1,0 +1,12 @@
+---
+alwaysApply: true
+---
+
+# Rule: Band to Ticket Type Mapping
+
+- Green = no open concern ticket.
+- Yellow or Orange = one Risk ticket.
+- Red = one Problem ticket.
+- Unknown = never Green and never an automatic close. Create or update the same concern as a measurement-health Risk unless the Charter declares a stricter treatment.
+
+Risk means a chance that a Problem will materialize; Problem means the risk has materialized and requires active handling. Tickets are filed in the Charter/Huginn-configured GH or Jira target and owned by the named variable owner with Delivery Manager oversight. The ticket type does not by itself decide delivery gating; use the Charter's gating_policy for that.

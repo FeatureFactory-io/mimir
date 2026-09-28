@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+
+# Rule: Variable Band Scale Flexibility
+
+A tracked variable may use a binary measured scale (Green/Red) or the full measured scale (Green/Yellow/Orange/Red). Unknown sits outside either performance scale and means evidence is missing, stale, inaccessible, malformed, or non-reproducible. Unknown is never coerced to zero or Green. Binary variables go directly Green to/from Red when measured; both scale forms still use the same stable concern, evidence, idempotency, and gating rules.

@@ -1,0 +1,71 @@
+---
+alwaysApply: false
+---
+
+**Mimir metadata:** slug `do-github-issues`; `always_apply: true` (extended 2026-08-17 — BPE/MIN commit–issue traceability; was `false`).
+
+## Issue Creation
+
+Issues are created during Activity "Publish" (PIN-04) of the Plan Iteration (PIN) Workflow. Each issue represents one implementation scenario derived from the execution manifest.
+
+**Goal:** Issues must be self-sufficient — an implementer with no prior domain knowledge must be able to complete the work from the issue alone.
+
+**Requirements:**
+1. Label with type: Feature / Scenario / Enhancement / Bug / Refactoring / Infra; and complexity: easy / medium / hard.
+2. Name the issue with its scenario identifier prefix where available (e.g., "LOG1.1: Scenario A").
+3. Transfer the full scenario content into the description.
+4. Embed the implementation plan from `docs/plans/` as a checklist-style guidance block in the description, if one exists.
+5. Before creating, verify no issue with the same prefix already exists. If a duplicate exists, halt and report to the user.
+
+---
+
+## Issue Update
+
+Issues are updated during Activity "Execute" (MIN-04) of the Manage Iteration (MIN) Workflow, and during Activities "Implement Backend" through "Finalize Feature" (BPE-02 through BPE-07) of the Build Feature (BPE) Workflow.
+
+**Goal:** Every update must allow any team member to reconstruct what happened, why, and what is planned next.
+
+**Requirements:**
+1. Reference a specific commit in every update.
+2. Describe what was done and the reason.
+3. If implementation deviated from the original plan, state the cause: user direction, technical constraint, or scope change.
+4. State the next steps explicitly.
+5. Update the checklist: mark completed items, add items completed but not originally planned, revise upcoming steps.
+6. Summarize the intended update to the user and obtain approval before posting.
+
+---
+
+## BPE / MIN — Commit–issue traceability (execution)
+
+When GitHub issue **#N** tracks the work (BPE-01 handoff or MIN manifest scenario):
+
+### Hard gate — issue before code
+- Do **not** commit changes under the implementation footprint until issue #N exists with sections A–F inline (or manifest scenario body) and a handoff commit is on the branch: `docs(plan): … Refs #N` or equivalent plan/docs-only commit cited in the first issue comment.
+- Creating the issue **after** implementation is a process violation.
+
+### Per plan slice (not per wave)
+After **each** plan slice (or BPE step that maps to a slice):
+1. `git commit` with Angular convention; footer **`Refs #N`** on every slice commit.
+2. **`gh issue comment N`** immediately — must include: short commit SHA, what changed, reason if deviated, **next step/slice name**.
+3. Do **not** start the next slice until both commit and issue comment are done.
+4. Only the **final** slice commit for #N uses **`Closes #N`** (or close via MIN checkpoint after that commit).
+
+### Anti-patterns
+- Entire wave/feature in one commit with `Closes #N` at the end only.
+- Commits with no `#N` reference while issue is active.
+- Issue closed with no commit SHA in the closing comment.
+
+---
+
+## Issue Closure
+
+Issues are closed during Activity "Execute" (MIN-04) of the Manage Iteration (MIN) Workflow, after the checkpoint command from the `<!-- SCENARIO -->` YAML block passes.
+
+**Prerequisite — Lessons Learned section:** The issue body must contain a `## Lessons Learned` section. This section is authored during Activity "Plan Feature" (BPE-01) of the Build Feature (BPE) Workflow and captures observations that feed Activity "Close Iteration" (MIN-05) of the Manage Iteration (MIN) Workflow, which in turn provides input to Activity "Orient & Validate Scope" (PIN-02) of the next Plan Iteration (PIN) Workflow.
+
+**Requirements:**
+1. Confirm the issue body contains a `## Lessons Learned` section. If absent, reconstruct it from implementation experience before closing.
+2. Include in the closing comment: "Lessons Learned reviewed — {N observations / none}."
+3. If the `## Lessons Learned` section contains architectural decisions not yet reflected in `docs/architecture/SAO.md`, state this explicitly in the closing comment: "SAO.md update required: {section}." These decisions must be applied to SAO.md before or immediately after closure — not deferred silently.
+4. An issue without a `## Lessons Learned` section in the body must not be closed.
+5. Closing comment must cite the **final commit SHA** that passed checkpoint (not close-only with no SHA).

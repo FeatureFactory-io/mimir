@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+
+# Rule: One Ticket Per Concern
+
+The stable concern key is project_id plus variable_id. Each Charter variable has at most one active bad-state/measurement-health lifecycle, reclassified and updated in place across assessment runs. Never create one ticket per run and never consolidate multiple variables into one ticket. Read-only lookups may run in parallel, but creates, updates, conversions, and closes must be serialized per concern key. When a tracker cannot change type in place, atomically link the replacement representation and close the old one so the concern still has one authoritative active ticket.
