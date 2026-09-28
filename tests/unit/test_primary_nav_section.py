@@ -118,6 +118,14 @@ def test_shell_context_lists_realm_and_guest_chrome():
         "heimdall",
     ]
     assert all(item["external"] is False for item in ctx["realm_items"])
+    icons = {item["slug"]: item["icon"] for item in ctx["realm_items"]}
+    assert icons == {
+        "featurefactory": "fa-solid fa-conveyor-belt-arm",
+        "mimir": "fa-solid fa-book-sparkles",
+        "huginn": "fa-solid fa-crow",
+        "yggdrasil": "fa-solid fa-tree",
+        "heimdall": "fa-solid fa-tower-observation",
+    }
     testids = [
         item["testid"]
         for section in ctx["sidebar_sections"]

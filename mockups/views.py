@@ -1,10 +1,94 @@
+import copy
 import logging
 import re
 
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils.html import escape, mark_safe
 
 logger = logging.getLogger(__name__)
+
+MOCK_INDEX_GROUPS = [
+    {
+        "title": "Realm nav + app sidebar",
+        "screens": [
+            {"label": "Authenticated Home", "url_name": "mockup_nav_dashboard"},
+            {"label": "Playbooks (sidebar active)", "url_name": "mockup_nav_playbooks"},
+            {"label": "Guest shell", "url_name": "mockup_nav_guest"},
+            {"label": "Mobile / offcanvas", "url_name": "mockup_nav_mobile"},
+        ],
+    },
+    {
+        "title": "Auth and profile",
+        "screens": [
+            {"label": "Register", "url_name": "mockup_auth_register"},
+            {"label": "Login", "url_name": "mockup_auth_login"},
+            {"label": "Profile", "url_name": "mockup_profile"},
+            {"label": "Edit profile", "url_name": "mockup_profile_edit"},
+        ],
+    },
+    {
+        "title": "PIPs",
+        "screens": [
+            {"label": "List", "url_name": "mockup_pip_list"},
+            {"label": "Create", "url_name": "mockup_pip_create"},
+            {"label": "Detail", "url_name": "mockup_pip_detail", "kwargs": {"pip_id": 42}},
+            {"label": "Admin review", "url_name": "mockup_pip_admin_review", "kwargs": {"pip_id": 42}},
+        ],
+    },
+    {
+        "title": "Teams",
+        "screens": [
+            {"label": "Browse", "url_name": "mockup_teams_browse"},
+            {"label": "Create", "url_name": "mockup_teams_create"},
+            {"label": "Detail", "url_name": "mockup_teams_detail", "kwargs": {"team_id": 1}},
+            {"label": "Manage", "url_name": "mockup_teams_manage", "kwargs": {"team_id": 1}},
+        ],
+    },
+    {
+        "title": "Search and copy prompt",
+        "screens": [
+            {"label": "Search results", "url_name": "mockup_search_results"},
+            {"label": "Use cases", "url_name": "mockup_use_cases"},
+            {"label": "Copy Prompt index", "url_name": "mockup_copy_prompt_index"},
+        ],
+    },
+]
+
+
+def mockup_index(request):
+    """
+    Directory of DEBUG-only mockup screens.
+
+    :param request: Django request. Example: GET /mockups/
+    :return: Rendered index. Example: HTTP 200 with realm-nav links
+    """
+    logger.info(
+        "Mockup: mockup_index | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    groups = [_index_group_with_hrefs(group) for group in MOCK_INDEX_GROUPS]
+    return render(request, "mockups/index.html", {"groups": groups})
+
+
+def _index_group_with_hrefs(group: dict) -> dict:
+    """
+    Resolve named mockup URLs for the index template.
+
+    :param group: Catalog group. Example: {"title": "PIPs", "screens": [...]}
+    :return: Group with href on each screen. Example: {"title": "PIPs", "screens": [{"href": "/mockups/pips/"}]}
+    """
+    screens = []
+    for screen in group["screens"]:
+        screens.append(
+            {
+                "label": screen["label"],
+                "url_name": screen["url_name"],
+                "href": reverse(screen["url_name"], kwargs=screen.get("kwargs") or {}),
+            }
+        )
+    return {"title": group["title"], "screens": screens}
+
 
 # ---------------------------------------------------------------------------
 # Shared mock data
@@ -1216,3 +1300,308 @@ def copy_prompt_activity_list_empty(request):
         "show_empty_state": True,
     }
     return render(request, "mockups/copy-prompt/activity_list.html", context)
+
+
+# ---------------------------------------------------------------------------
+# Realm top nav + in-app sidebar (FOB-REALM-NAV-SIDEBAR / ESM-06)
+# ---------------------------------------------------------------------------
+
+MOCK_REALM_URLS = {
+    "featurefactory": "https://featurefactory.io",
+    "mimir": "#",
+    "huginn": "https://huginn.featurefactory.io",
+    "yggdrasil": "https://yggdrasil.featurefactory.io",
+    "heimdall": "https://heimdall.featurefactory.io",
+}
+
+MOCK_REALM_ITEMS = [
+    {
+        "slug": "featurefactory",
+        "label": "FeatureFactory",
+        "url": MOCK_REALM_URLS["featurefactory"],
+        "external": False,
+        "tooltip": "FeatureFactory home",
+        "icon": "fa-solid fa-conveyor-belt-arm",
+    },
+    {
+        "slug": "mimir",
+        "label": "Mimir",
+        "url": "/mockups/nav/",
+        "external": False,
+        "tooltip": "Mimir — engineering playbooks (this app)",
+        "icon": "fas fa-book-sparkles",
+    },
+    {
+        "slug": "huginn",
+        "label": "Huginn",
+        "url": MOCK_REALM_URLS["huginn"],
+        "external": False,
+        "tooltip": "Huginn",
+        "icon": "fa-solid fa-crow",
+    },
+    {
+        "slug": "yggdrasil",
+        "label": "Yggdrasil",
+        "url": MOCK_REALM_URLS["yggdrasil"],
+        "external": False,
+        "tooltip": "Yggdrasil",
+        "icon": "fa-solid fa-tree",
+    },
+    {
+        "slug": "heimdall",
+        "label": "Heimdall",
+        "url": MOCK_REALM_URLS["heimdall"],
+        "external": False,
+        "tooltip": "Heimdall",
+        "icon": "fa-solid fa-tower-observation",
+    },
+]
+
+MOCK_SIDEBAR_SECTIONS = [
+    {
+        "id": "workspace",
+        "label": "Workspace",
+        "items": [
+            {
+                "slug": "home",
+                "label": "Home",
+                "url": "/mockups/nav/",
+                "testid": "nav-dashboard",
+                "icon": "fas fa-gauge",
+                "tooltip": "Overview and key metrics (dashboard)",
+                "badge": None,
+            },
+        ],
+    },
+    {
+        "id": "methodology",
+        "label": "Methodology",
+        "items": [
+            {
+                "slug": "playbooks",
+                "label": "Playbooks",
+                "url": "/mockups/nav/playbooks/",
+                "testid": "nav-playbooks",
+                "icon": "fas fa-book-sparkles",
+                "tooltip": "Browse and manage engineering playbooks",
+                "badge": None,
+            },
+            {
+                "slug": "workflows",
+                "label": "Workflows",
+                "url": "#",
+                "testid": "nav-workflows",
+                "icon": "fas fa-diagram-project",
+                "tooltip": "View all workflows across playbooks",
+                "badge": None,
+            },
+            {
+                "slug": "phases",
+                "label": "Phases",
+                "url": "#",
+                "testid": "nav-phases",
+                "icon": "fas fa-bars-progress",
+                "tooltip": "View all phases across playbooks",
+                "badge": None,
+            },
+            {
+                "slug": "activities",
+                "label": "Activities",
+                "url": "#",
+                "testid": "nav-activities",
+                "icon": "fas fa-list-check",
+                "tooltip": "View all activities across playbooks",
+                "badge": None,
+            },
+            {
+                "slug": "artifacts",
+                "label": "Artifacts",
+                "url": "#",
+                "testid": "nav-artifacts",
+                "icon": "fas fa-gift",
+                "tooltip": "View all artifacts across playbooks",
+                "badge": None,
+            },
+            {
+                "slug": "agents",
+                "label": "Agents",
+                "url": "#",
+                "testid": "nav-agents",
+                "icon": "fas fa-brain-circuit",
+                "tooltip": "View all agents across playbooks",
+                "badge": None,
+            },
+            {
+                "slug": "skills",
+                "label": "Skills",
+                "url": "#",
+                "testid": "nav-skills",
+                "icon": "fas fa-hand-holding-magic",
+                "tooltip": "View all skills across playbooks",
+                "badge": None,
+            },
+            {
+                "slug": "rules",
+                "label": "Rules",
+                "url": "#",
+                "testid": "nav-rules",
+                "icon": "fas fa-scale-balanced",
+                "tooltip": "View all IDE rules across playbooks",
+                "badge": None,
+            },
+        ],
+    },
+    {
+        "id": "collaborate",
+        "label": "Collaborate",
+        "items": [
+            {
+                "slug": "teams",
+                "label": "Teams",
+                "url": "#",
+                "testid": "nav-teams",
+                "icon": "fas fa-users",
+                "tooltip": "Browse and manage teams",
+                "badge": None,
+            },
+            {
+                "slug": "pips",
+                "label": "PIPs",
+                "url": "#",
+                "testid": "nav-pips",
+                "icon": "fas fa-lightbulb",
+                "tooltip": "Playbook Improvement Proposals",
+                "badge": 1,
+            },
+        ],
+    },
+]
+
+MOCK_NAV_PLAYBOOKS = [
+    {
+        "name": "React Frontend Development",
+        "description": "Modern React patterns and component architecture",
+        "status": "Released",
+        "status_css": "bg-success",
+        "version": "1.2",
+        "color": "red",
+        "author": "Mike Chen",
+        "opened": "2 hours ago",
+    },
+    {
+        "name": "Edda / FeatureFactory",
+        "description": "Product development playbook used to build Mimir",
+        "status": "Released",
+        "status_css": "bg-success",
+        "version": "71",
+        "color": "orange",
+        "author": "FeatureFactory",
+        "opened": "Yesterday",
+    },
+    {
+        "name": "UX Research",
+        "description": "Research ops and synthesis activities",
+        "status": "Draft",
+        "status_css": "bg-secondary",
+        "version": "0.4",
+        "color": "yellow",
+        "author": "maria",
+        "opened": "3 days ago",
+    },
+]
+
+
+def _nav_shell_context(
+    *,
+    active_nav: str,
+    variant: str,
+    is_authenticated: bool,
+) -> dict:
+    """
+    Shared context for realm + sidebar mockup screens.
+
+    Guests keep Teams and PIPs in the sidebar; those links (and Home) point at
+    the login mockup, matching the production login-redirect contract.
+
+    :param active_nav: Sidebar section item slug. Example: "playbooks"
+    :param variant: Mockup variant label. Example: "authenticated"
+    :param is_authenticated: Whether session chrome shows user menu. Example: True
+    :return: Template context dict. Example: {"active_realm": "mimir", ...}
+    """
+    sections = copy.deepcopy(MOCK_SIDEBAR_SECTIONS)
+    if not is_authenticated:
+        for section in sections:
+            for item in section["items"]:
+                if item["slug"] in {"home", "teams", "pips"}:
+                    item["url"] = "/mockups/auth/login/"
+                    item["tooltip"] = "Sign in required"
+    return {
+        "active_realm": "mimir",
+        "active_nav": active_nav,
+        "variant": variant,
+        "is_authenticated": is_authenticated,
+        "realm_urls": MOCK_REALM_URLS,
+        "realm_items": MOCK_REALM_ITEMS,
+        "sidebar_sections": sections,
+    }
+
+
+def nav_dashboard(request):
+    """FOB-REALM-NAV-SIDEBAR: authenticated Home with realm bar + app sidebar."""
+    logger.info(
+        "Mockup: nav_dashboard | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    context = _nav_shell_context(
+        active_nav="home",
+        variant="authenticated",
+        is_authenticated=True,
+    )
+    context["recent_playbooks"] = [
+        {"name": p["name"], "opened": p["opened"]} for p in MOCK_NAV_PLAYBOOKS
+    ]
+    return render(request, "mockups/nav/dashboard.html", context)
+
+
+def nav_playbooks(request):
+    """FOB-REALM-NAV-SIDEBAR: Playbooks list with nav-playbooks active in sidebar."""
+    logger.info(
+        "Mockup: nav_playbooks | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    context = _nav_shell_context(
+        active_nav="playbooks",
+        variant="authenticated",
+        is_authenticated=True,
+    )
+    context["playbooks"] = MOCK_NAV_PLAYBOOKS
+    return render(request, "mockups/nav/playbooks.html", context)
+
+
+def nav_guest(request):
+    """FOB-REALM-NAV-SIDEBAR: guest shell — realm + sidebar + Register/Login."""
+    logger.info(
+        "Mockup: nav_guest | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    context = _nav_shell_context(
+        active_nav="playbooks",
+        variant="guest",
+        is_authenticated=False,
+    )
+    context["playbooks"] = [p for p in MOCK_NAV_PLAYBOOKS if p["status"] == "Released"]
+    return render(request, "mockups/nav/guest.html", context)
+
+
+def nav_mobile(request):
+    """FOB-REALM-NAV-SIDEBAR: responsive offcanvas sidebar instructions."""
+    logger.info(
+        "Mockup: nav_mobile | user=%s",
+        getattr(request.user, "username", "anonymous"),
+    )
+    context = _nav_shell_context(
+        active_nav="home",
+        variant="mobile",
+        is_authenticated=True,
+    )
+    return render(request, "mockups/nav/mobile.html", context)

@@ -19,6 +19,7 @@ REALM_ITEMS = (
         "url": "https://featurefactory.io",
         "external": False,
         "tooltip": "FeatureFactory home",
+        "icon": "fa-solid fa-conveyor-belt-arm",
     },
     {
         "slug": "mimir",
@@ -26,6 +27,7 @@ REALM_ITEMS = (
         "url": "/",
         "external": False,
         "tooltip": "Mimir — engineering playbooks (this app)",
+        "icon": "fa-solid fa-book-sparkles",
     },
     {
         "slug": "huginn",
@@ -33,6 +35,7 @@ REALM_ITEMS = (
         "url": "https://huginn.featurefactory.io",
         "external": False,
         "tooltip": "Huginn",
+        "icon": "fa-solid fa-crow",
     },
     {
         "slug": "yggdrasil",
@@ -40,6 +43,7 @@ REALM_ITEMS = (
         "url": "https://yggdrasil.featurefactory.io",
         "external": False,
         "tooltip": "Yggdrasil",
+        "icon": "fa-solid fa-tree",
     },
     {
         "slug": "heimdall",
@@ -47,6 +51,7 @@ REALM_ITEMS = (
         "url": "https://heimdall.featurefactory.io",
         "external": False,
         "tooltip": "Heimdall",
+        "icon": "fa-solid fa-tower-observation",
     },
 )
 
