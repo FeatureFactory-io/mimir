@@ -869,10 +869,10 @@ mark.mm-search-highlight {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    position: absolute;
-    top: 50%;
+    position: fixed;
+    top: calc(3.5rem + (100vh - 3.5rem) / 2);
     left: var(--mm-sidebar-width);
-    z-index: 30;
+    z-index: 1020;
     width: 20px;
     height: 20px;
     padding: 0;

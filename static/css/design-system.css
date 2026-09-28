@@ -837,15 +837,11 @@ input.form-control-sm.hg-filter-control {
 
 /* Marketing landing — full-viewport hero (Taciturn-style) + features below. */
 
-/* Navbar floats transparently over the hero image. */
+/* Realm bar stays a solid strip above the sidebar. A transparent overlay hid the left realm links behind the sidebar. */
 body.hg-landing .hg-navbar {
-  position: absolute;
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  background: transparent;
-  border-bottom: none;
+  z-index: 1030;
 }
 
 /* Main loses its padding so the hero fills from the very top of the viewport. */
@@ -857,7 +853,7 @@ body.hg-landing main.hg-main {
 .hg-landing-hero {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: calc(100vh - 3.5rem);
   overflow: hidden;
   background-image: url('../images/mimir-hero.jpg');
   background-size: cover;
