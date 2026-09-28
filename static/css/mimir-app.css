@@ -836,7 +836,8 @@ mark.mm-search-highlight {
     position: static;
     transform: none !important;
     visibility: visible !important;
-    width: var(--mm-sidebar-width);
+    flex-grow: 0 !important;
+    width: var(--mm-sidebar-width) !important;
     height: auto !important;
     border-right: 1px solid var(--hg-border, #e5e9f0);
     background: #fff;
@@ -848,8 +849,8 @@ mark.mm-search-highlight {
   }
 
   html.mm-sidebar-collapsed .mm-app-sidebar.offcanvas-lg {
-    width: 0;
-    min-width: 0;
+    width: 0 !important;
+    min-width: 0 !important;
     border-right: none;
     overflow: hidden;
   }
