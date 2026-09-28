@@ -756,6 +756,16 @@ mark.mm-search-highlight {
   font-weight: 600;
 }
 
+.mm-realm-mark {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+  vertical-align: -0.2em;
+  margin-right: 0.35rem;
+  background: #fff;
+  border-radius: 2px;
+}
+
 .mm-app-sidebar {
   width: var(--mm-sidebar-width);
   flex-shrink: 0;

@@ -1,0 +1,422 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Nav Shell — Mockup{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+          rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+          crossorigin="anonymous">
+    <link href="{% static 'css/design-system.css' %}" rel="stylesheet">
+    <link href="{% static 'css/mimir-app.css' %}" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/600fa45ed9.js" crossorigin="anonymous"></script>
+    <script>
+        (function () {
+            try {
+                if (window.matchMedia("(min-width: 992px)").matches
+                    && localStorage.getItem("mm-sidebar-collapsed") === "1") {
+                    document.documentElement.classList.add("mm-sidebar-collapsed");
+                }
+            } catch (err) {
+                console.log("[mockup:nav] sidebar state unavailable", err);
+            }
+        })();
+    </script>
+    <style>
+        /* Mockup-only: realm + sidebar shell (do not ship to production until BPE) */
+        :root {
+            --mm-sidebar-width: 16.5rem;
+        }
+        body.mm-nav-mockup {
+            background: var(--hg-bg-body, #f5f7fa);
+        }
+        .mm-realm-navbar .nav-link {
+            font-size: 0.8125rem;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+        }
+        .mm-realm-navbar .nav-link.active {
+            font-weight: 600;
+        }
+        .mm-app-shell {
+            display: flex;
+            min-height: calc(100vh - 3.25rem);
+            position: relative;
+        }
+        .mm-app-sidebar {
+            width: var(--mm-sidebar-width);
+            flex-shrink: 0;
+            background: #fff;
+            border-right: 1px solid var(--hg-border, #e5e9f0);
+            display: flex;
+            flex-direction: column;
+        }
+        .mm-app-sidebar-brand {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--hg-border, #e5e9f0);
+        }
+        .mm-app-sidebar-brand .brand-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            line-height: 1.2;
+            color: var(--hg-primary, #1f3a5f);
+        }
+        .mm-app-sidebar-brand .brand-sub {
+            font-size: 0.75rem;
+            color: #6c757d;
+        }
+        .mm-sidebar-section-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #98a2b3;
+            padding: 0.85rem 1.25rem 0.35rem;
+        }
+        .mm-sidebar-nav .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.45rem 1.25rem;
+            color: #344054;
+            font-size: 0.875rem;
+            border-radius: 0;
+            border-left: 3px solid transparent;
+        }
+        .mm-sidebar-nav .nav-link i {
+            width: 1.1rem;
+            text-align: center;
+            color: #667085;
+        }
+        .mm-sidebar-nav .nav-link:hover {
+            background: rgba(31, 58, 95, 0.05);
+            color: var(--hg-primary, #1f3a5f);
+        }
+        .mm-sidebar-nav .nav-link.active {
+            background: rgba(31, 58, 95, 0.08);
+            color: var(--hg-primary, #1f3a5f);
+            font-weight: 600;
+            border-left-color: var(--hg-accent, #c9a227);
+        }
+        .mm-sidebar-nav .nav-link.active i {
+            color: var(--hg-primary, #1f3a5f);
+        }
+        .mm-app-main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .mm-app-main > main {
+            flex: 1;
+        }
+        @media (min-width: 992px) {
+            .mm-app-sidebar.offcanvas-lg {
+                position: static;
+                transform: none !important;
+                visibility: visible !important;
+                width: var(--mm-sidebar-width);
+                height: auto !important;
+                border-right: 1px solid var(--hg-border, #e5e9f0);
+                background: #fff;
+            }
+            .mm-app-sidebar .offcanvas-body {
+                overflow: visible;
+            }
+        }
+        @media (max-width: 991.98px) {
+            .mm-app-sidebar.offcanvas-lg {
+                width: var(--mm-sidebar-width);
+            }
+        }
+        .mm-mockup-banner {
+            font-size: 0.8rem;
+        }
+        .mm-sidebar-panel-toggle {
+            display: none;
+        }
+        @media (min-width: 992px) {
+            .mm-app-sidebar.offcanvas-lg {
+                transition: width 0.2s ease, min-width 0.2s ease;
+            }
+            html.mm-sidebar-collapsed .mm-app-sidebar.offcanvas-lg {
+                width: 0;
+                min-width: 0;
+                border-right: none;
+                overflow: hidden;
+            }
+            .mm-sidebar-panel-toggle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                position: absolute;
+                top: 50%;
+                left: var(--mm-sidebar-width);
+                z-index: 30;
+                width: 20px;
+                height: 20px;
+                padding: 0;
+                font-size: 10px;
+                line-height: 1;
+                color: #344054;
+                background: #fff;
+                border: 1px solid var(--hg-border, #e5e9f0);
+                border-radius: 50%;
+                box-shadow: 0 1px 4px rgba(31, 58, 95, 0.12);
+                transform: translate(-50%, -50%);
+                transition: left 0.2s ease;
+            }
+            html.mm-sidebar-collapsed .mm-sidebar-panel-toggle {
+                left: 10px;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="mm-nav-mockup d-flex flex-column min-vh-100"
+      data-testid="nav-shell-page"
+      data-mockup-variant="{{ variant|default:'authenticated' }}">
+
+    {# ── Realm top navbar ─────────────────────────────────────────────── #}
+    <nav class="navbar navbar-expand-lg navbar-dark hg-navbar mm-realm-navbar sticky-top"
+         data-testid="realm-navbar"
+         aria-label="FeatureFactory realm navigation">
+        <div class="container-fluid px-3">
+            <button class="btn btn-link text-white d-lg-none me-2 p-1"
+                    type="button"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#mmAppSidebar"
+                    aria-controls="mmAppSidebar"
+                    aria-label="Open in-app navigation"
+                    data-testid="sidebar-toggler"
+                    title="Open Mimir navigation">
+                <i class="fas fa-bars fa-lg" aria-hidden="true"></i>
+            </button>
+
+            <button class="navbar-toggler" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#realmNavCollapse"
+                    aria-controls="realmNavCollapse" aria-expanded="false"
+                    aria-label="Toggle realm navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="realmNavCollapse">
+                <ul class="navbar-nav me-auto" data-testid="realm-nav-list">
+                    {% for item in realm_items %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if item.slug == active_realm %}active{% endif %}"
+                           href="{{ item.url }}"
+                           data-testid="realm-nav-{{ item.slug }}"
+                           {% if item.external %}target="_blank" rel="noopener"{% endif %}
+                           {% if item.slug == active_realm %}aria-current="page"{% endif %}
+                           title="{{ item.tooltip }}">
+                            {% if item.mark %}<img src="{% static item.mark %}" alt="" class="mm-realm-mark" width="16" height="16">{% endif %}
+                            {{ item.label }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    {% if is_authenticated %}
+                    <li class="nav-item d-flex align-items-center me-2">
+                        <form class="d-flex" role="search" data-testid="global-search-form"
+                              onsubmit="console.log('[mockup:nav] search submit'); return false;">
+                            <input class="form-control form-control-sm me-2"
+                                   type="search" name="q" placeholder="Search…"
+                                   aria-label="Global search"
+                                   data-testid="global-search-input" id="global-search-input">
+                            <button class="btn btn-sm btn-outline-light" type="submit"
+                                    title="Search playbooks and entities">
+                                <i class="fas fa-search" aria-hidden="true"></i>
+                            </button>
+                        </form>
+                    </li>
+                    <li class="nav-item me-2">
+                        <a class="nav-link text-white position-relative py-2"
+                           href="#"
+                           data-testid="notification-bell"
+                           title="Notifications"
+                           onclick="console.log('[mockup:nav] notification bell'); return false;">
+                            <i class="fas fa-bell" aria-hidden="true"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                  data-testid="notification-badge">2</span>
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle text-white py-2"
+                           href="#" id="mockupUserMenu" role="button"
+                           data-bs-toggle="dropdown" aria-expanded="false"
+                           data-testid="user-display">
+                            <i class="fas fa-user" aria-hidden="true"></i> maria
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="mockupUserMenu">
+                            <li>
+                                <a class="dropdown-item" href="#" data-testid="nav-view-profile"
+                                   onclick="console.log('[mockup:nav] view profile'); return false;">
+                                    <i class="fas fa-id-card me-1" aria-hidden="true"></i> View Profile
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#" data-testid="logout-link"
+                                   onclick="console.log('[mockup:nav] logout'); return false;">
+                                    <i class="fas fa-sign-out-alt me-1" aria-hidden="true"></i> Logout
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li class="nav-item me-2">
+                        <a class="btn btn-sm btn-success" href="{% url 'mockup_auth_register' %}"
+                           data-testid="register-link" title="Create a new Mimir account">
+                            <i class="fas fa-user-plus" aria-hidden="true"></i> Register
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-sm btn-primary" href="{% url 'mockup_auth_login' %}"
+                           data-testid="login-link" title="Sign in to access Mimir">
+                            <i class="fas fa-sign-in-alt" aria-hidden="true"></i> Login
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="mm-app-shell">
+        <button type="button"
+                class="mm-sidebar-panel-toggle"
+                data-testid="sidebar-collapse-toggle"
+                aria-label="Toggle in-app navigation"
+                title="Toggle sidebar">‹</button>
+
+        {# ── In-app sidebar (Webpixels-style) ───────────────────────────── #}
+        <aside class="mm-app-sidebar offcanvas-lg offcanvas-start"
+               tabindex="-1"
+               id="mmAppSidebar"
+               data-testid="app-sidebar"
+               aria-label="Mimir in-app navigation">
+            <div class="offcanvas-header d-lg-none border-bottom">
+                <h2 class="offcanvas-title h6 mb-0">Mimir navigation</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas"
+                        data-bs-target="#mmAppSidebar" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body p-0 d-flex flex-column">
+                <div class="mm-app-sidebar-brand d-flex align-items-center gap-2">
+                    <img src="{% static 'images/mimir-logo.png' %}" alt="" width="28" height="28"
+                         class="rounded-1 bg-white border p-1 flex-shrink-0">
+                    <div class="mm-brand-text">
+                        <div class="brand-title">Mimir</div>
+                        <div class="brand-sub">Engineering playbooks</div>
+                    </div>
+                </div>
+
+                <nav class="mm-sidebar-nav flex-grow-1 py-2" aria-label="Primary in-app navigation">
+                    {% for section in sidebar_sections %}
+                    <div class="mm-sidebar-section-label" id="sidebar-sec-{{ section.id }}">
+                        {{ section.label }}
+                    </div>
+                    <ul class="nav flex-column mb-1" aria-labelledby="sidebar-sec-{{ section.id }}">
+                        {% for item in section.items %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if item.slug == active_nav %}active{% endif %}"
+                               href="{{ item.url }}"
+                               data-testid="{{ item.testid }}"
+                               {% if item.slug == active_nav %}aria-current="page"{% endif %}
+                               title="{{ item.tooltip }}">
+                                <i class="{{ item.icon }}" aria-hidden="true"></i>
+                                <span class="mm-sidebar-label">{{ item.label }}</span>
+                                {% if item.badge %}
+                                <span class="badge bg-primary ms-auto" data-testid="nav-pips-count">{{ item.badge }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endfor %}
+                </nav>
+            </div>
+        </aside>
+
+        <div class="mm-app-main">
+            {% if messages %}
+            <div class="container-fluid mt-3">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show"
+                     role="alert" data-testid="alert-message">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <main class="hg-main flex-grow-1">
+                {% block content %}{% endblock %}
+            </main>
+
+            <footer class="footer py-3 border-top bg-white" data-testid="page-footer">
+                <div class="container-fluid px-4 text-center">
+                    <span class="text-muted small">
+                        <i class="fas fa-book-sparkles" aria-hidden="true"></i>
+                        Mimir — Your Ever-Evolving Engineering Playbook
+                        <span class="ms-2 badge text-bg-warning mm-mockup-banner">Mockup shell</span>
+                    </span>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+            crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('[mockup:nav-shell] loaded variant={{ variant|default:"authenticated" }} active_nav={{ active_nav }}');
+            document.querySelectorAll('[title]').forEach(function (el) {
+                if (el.getAttribute('data-bs-toggle')) return;
+                new bootstrap.Tooltip(el);
+            });
+            document.querySelectorAll('[data-testid^="realm-nav-"]').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    console.log('[mockup:nav] realm click', link.getAttribute('data-testid'));
+                });
+            });
+            document.querySelectorAll('.mm-sidebar-nav .nav-link').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    console.log('[mockup:nav] sidebar click', link.getAttribute('data-testid'));
+                });
+            });
+            function setCollapsed(next) {
+                document.documentElement.classList.toggle('mm-sidebar-collapsed', next);
+                if (toggle) {
+                    toggle.textContent = next ? '\u203A' : '\u2039';
+                }
+                try {
+                    localStorage.setItem('mm-sidebar-collapsed', next ? '1' : '0');
+                } catch (err) {
+                    console.log('[mockup:nav] could not store sidebar state', err);
+                }
+                console.log('[mockup:nav] sidebar collapsed=' + next);
+            }
+            var toggle = document.querySelector('[data-testid="sidebar-collapse-toggle"]');
+            var collapsedNow = document.documentElement.classList.contains('mm-sidebar-collapsed');
+            if (toggle) {
+                toggle.textContent = collapsedNow ? '\u203A' : '\u2039';
+                toggle.addEventListener('click', function () {
+                    setCollapsed(!document.documentElement.classList.contains('mm-sidebar-collapsed'));
+                });
+            }
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

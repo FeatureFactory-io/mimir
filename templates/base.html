@@ -92,7 +92,7 @@
                            data-testid="realm-nav-{{ item.slug }}"
                            {% if item.slug == active_realm %}aria-current="page"{% endif %}
                            title="{{ item.tooltip }}">
-                            <i class="{{ item.icon }} me-1" aria-hidden="true"></i>{{ item.label }}
+                            {% if item.mark %}<img src="{% static item.mark %}" alt="" class="mm-realm-mark" width="16" height="16">{% endif %}{{ item.label }}
                         </a>
                     </li>
                     {% endfor %}

@@ -1321,7 +1321,8 @@ MOCK_REALM_ITEMS = [
         "url": MOCK_REALM_URLS["featurefactory"],
         "external": False,
         "tooltip": "FeatureFactory home",
-        "icon": "fa-solid fa-conveyor-belt-arm",
+        "icon": "",
+        "mark": "images/realm/featurefactory.png",
     },
     {
         "slug": "mimir",
@@ -1329,7 +1330,8 @@ MOCK_REALM_ITEMS = [
         "url": "/mockups/nav/",
         "external": False,
         "tooltip": "Mimir — engineering playbooks (this app)",
-        "icon": "fas fa-book-sparkles",
+        "icon": "",
+        "mark": "images/realm/mimir.png",
     },
     {
         "slug": "huginn",
@@ -1337,7 +1339,8 @@ MOCK_REALM_ITEMS = [
         "url": MOCK_REALM_URLS["huginn"],
         "external": False,
         "tooltip": "Huginn",
-        "icon": "fa-solid fa-crow",
+        "icon": "",
+        "mark": "images/realm/huginn.jpg",
     },
     {
         "slug": "yggdrasil",
@@ -1345,7 +1348,8 @@ MOCK_REALM_ITEMS = [
         "url": MOCK_REALM_URLS["yggdrasil"],
         "external": False,
         "tooltip": "Yggdrasil",
-        "icon": "fa-solid fa-tree",
+        "icon": "",
+        "mark": "images/realm/yggdrasil.png",
     },
     {
         "slug": "heimdall",
@@ -1353,7 +1357,8 @@ MOCK_REALM_ITEMS = [
         "url": MOCK_REALM_URLS["heimdall"],
         "external": False,
         "tooltip": "Heimdall",
-        "icon": "fa-solid fa-tower-observation",
+        "icon": "",
+        "mark": "",
     },
 ]
 
