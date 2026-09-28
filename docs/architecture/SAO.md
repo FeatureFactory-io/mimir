@@ -771,6 +771,8 @@ apt-get install graphviz
 - **Branding**: "Your Ever-Evolving Engineering Playbook" - emphasizes practical, modular, AI-enhanced approach
 - **Terminology**: User-facing language uses "playbook" (accessible, modern) while internal code uses "Methodology" models (technical accuracy)
 
+**FOB shell (FOB-REALM-NAV-SIDEBAR)**: Persistent chrome is two layers. The top `hg-navbar` is FeatureFactory **realm** navigation (FeatureFactory, Mimir, Huginn, Yggdrasil, Heimdall) plus session chrome (search, notifications, user — or Register/Login). In-app destinations (Home through PIPs) live in a left **app sidebar**, grouped Workspace / Methodology / Collaborate. Desktop collapse uses the Content Browser / Yggdrasil seam chevron and sets sidebar width to 0; only that boolean is stored in `localStorage` (`mm-sidebar-collapsed`). Active sidebar item follows the URL. Guests see the full sidebar; Home, Teams, and PIPs still login-redirect. Production chrome is `templates/base.html`. Canonical UX is `docs/ux/IA_guidelines.md` §3.1 and §4. The DEBUG prototype remains `/mockups/nav/`.
+
 **Icon Usage**:
 - **Playbook/Methodology**: `fa-book-sparkles` - primary identifier across nav, pages, footer
 - **Process Improvements**: `fa-lightbulb` - for PIPs (Process Improvement Proposals)
