@@ -1,0 +1,51 @@
+{% extends "mockups/nav/_shell.html" %}
+
+{% block title %}Mobile Sidebar — Nav Mockup{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0" data-testid="nav-mobile-page">
+    <div class="hg-page-header px-4">
+        <h1 class="hg-page-title d-flex align-items-center gap-2 mb-1">
+            <i class="fas fa-mobile-screen hg-page-title-icon text-primary" aria-hidden="true"></i>
+            <span>Responsive sidebar</span>
+        </h1>
+        <p class="text-muted small mb-0">Webpixels offcanvas-lg pattern — hamburger on the realm bar</p>
+    </div>
+
+    <div class="px-4 py-3">
+        <div class="card border mb-3">
+            <div class="card-body">
+                <h2 class="h5">How to try it</h2>
+                <ol class="mb-0">
+                    <li>Narrow the browser below the Bootstrap <code>lg</code> breakpoint (~992px), or use device toolbar.</li>
+                    <li>Click the <strong>bars</strong> control on the left of the realm navbar
+                        (<code>data-testid="sidebar-toggler"</code>).</li>
+                    <li>Sidebar opens as an offcanvas drawer with the same in-app links.</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="alert alert-secondary" role="status">
+            On <code>lg+</code> viewports the sidebar stays docked; the toggler is hidden.
+        </div>
+
+        <button type="button"
+                class="btn btn-outline-primary"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#mmAppSidebar"
+                data-testid="mobile-open-sidebar-demo"
+                title="Force-open the app sidebar offcanvas"
+                onclick="console.log('[mockup:nav-mobile] force open sidebar')">
+            <i class="fas fa-bars me-1" aria-hidden="true"></i> Open sidebar now
+        </button>
+
+        <div class="alert alert-light border mt-4 small" data-testid="mockup-nav-crosslinks">
+            <strong>Mockup screens:</strong>
+            <a href="{% url 'mockup_nav_dashboard' %}">Dashboard</a> ·
+            <a href="{% url 'mockup_nav_playbooks' %}">Playbooks</a> ·
+            <a href="{% url 'mockup_nav_guest' %}">Guest</a> ·
+            <a href="{% url 'mockup_nav_mobile' %}">Mobile</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

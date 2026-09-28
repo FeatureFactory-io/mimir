@@ -1,0 +1,76 @@
+{% extends "mockups/nav/_shell.html" %}
+
+{% block title %}Home — Nav Mockup{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0" data-testid="nav-dashboard-page">
+    <div class="hg-page-header px-4">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+                <h1 class="hg-page-title d-flex align-items-center gap-2 mb-1">
+                    <i class="fas fa-gauge hg-page-title-icon text-primary" aria-hidden="true"></i>
+                    <span>Home</span>
+                </h1>
+                <p class="text-muted small mb-0">Dashboard overview — realm bar + sidebar shell prototype</p>
+            </div>
+            <a href="{% url 'mockup_nav_playbooks' %}"
+               class="btn btn-primary"
+               data-testid="quick-new-playbook"
+               title="Create a new playbook from scratch"
+               onclick="console.log('[mockup:nav-dashboard] quick create'); return true;">
+                <i class="fas fa-plus-circle" aria-hidden="true"></i> New Playbook
+            </a>
+        </div>
+    </div>
+
+    <div class="px-4 py-3">
+        <div class="alert alert-info mm-mockup-banner mb-4" role="status">
+            <strong>Mockup:</strong> Top bar = FeatureFactory realm.
+            Left sidebar = current in-app destinations (Webpixels-style).
+            See <code>docs/plans/FOB_REALM_NAV_SIDEBAR_CHANGE_RECONCILIATION.md</code>.
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-8">
+                <div class="card hg-card border" data-testid="my-playbooks-section">
+                    <div class="card-body">
+                        <h2 class="h5">My Playbooks</h2>
+                        <p class="text-muted small">Recently accessed playbooks (mocked).</p>
+                        <ul class="list-group list-group-flush">
+                            {% for pb in recent_playbooks %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span><i class="fas fa-book-sparkles text-primary me-2" aria-hidden="true"></i>{{ pb.name }}</span>
+                                <span class="text-muted small">{{ pb.opened }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card border" data-testid="quick-actions-section">
+                    <div class="card-body">
+                        <h2 class="h5">Quick Actions</h2>
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'mockup_nav_playbooks' %}" class="btn btn-outline-primary btn-sm"
+                               title="Browse playbooks">Browse Playbooks</a>
+                            <a href="{% url 'mockup_nav_guest' %}" class="btn btn-outline-secondary btn-sm"
+                               title="Preview guest chrome">Guest shell</a>
+                            <a href="{% url 'mockup_nav_mobile' %}" class="btn btn-outline-secondary btn-sm"
+                               title="Preview mobile offcanvas hint">Mobile notes</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-light border mt-4 small" data-testid="mockup-nav-crosslinks">
+            <strong>Mockup screens:</strong>
+            <a href="{% url 'mockup_nav_dashboard' %}">Dashboard</a> ·
+            <a href="{% url 'mockup_nav_playbooks' %}">Playbooks</a> ·
+            <a href="{% url 'mockup_nav_guest' %}">Guest</a> ·
+            <a href="{% url 'mockup_nav_mobile' %}">Mobile</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

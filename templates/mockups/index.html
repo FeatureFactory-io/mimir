@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Mockups{% endblock %}
+
+{% block content %}
+<div class="container mt-4" data-testid="mockup-index-page">
+    <h1 class="hg-page-title d-flex align-items-center gap-2 mb-2">
+        <i class="fas fa-compass hg-page-title-icon text-primary" aria-hidden="true"></i>
+        <span>Mockups</span>
+    </h1>
+    <p class="text-muted">DEBUG-only prototypes. Realm navigation lives under Nav.</p>
+
+    {% for group in groups %}
+    <section class="mb-4" data-testid="mockup-index-group">
+        <h2 class="h5">{{ group.title }}</h2>
+        <ul class="list-group">
+            {% for screen in group.screens %}
+            <li class="list-group-item">
+                <a href="{{ screen.href }}"
+                   data-testid="mockup-index-link-{{ screen.url_name }}">
+                    {{ screen.label }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endfor %}
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    console.log('[mockup:index] page loaded');
+});
+</script>
+{% endblock %}

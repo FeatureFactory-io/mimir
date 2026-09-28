@@ -238,3 +238,7 @@ tests.log
 infra/cdk.out/
 infra/cfn-import-artifacts/
 infra/.venv/
+
+# Local MCP configuration (may contain credentials)
+.mcp.json
+.codex/config.toml

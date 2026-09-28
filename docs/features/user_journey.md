@@ -127,17 +127,18 @@ Mike is satisfied with the playbook and clicks **[Release]** on the playbook det
 
 #### Screen: FOB Landing Page (`/`)
 Bob opens the FOB root URL in an incognito session:
-- **Full primary navbar**: Home → Playbooks → Workflows → Phases → Activities → Artifacts → Agents → Skills → Rules → Teams → PIPs
-- Right side: **[Register]** and **[Login]** only (no global search, notifications bell, or user menu)
+- **Realm top navbar** (`data-testid="realm-navbar"`): FeatureFactory → Mimir (active) → Huginn → Yggdrasil → Heimdall. External products open in the **same tab**.
+- **App sidebar** (`data-testid="app-sidebar"`): same destinations as the former primary nav — Workspace (Home), Methodology (Playbooks → Rules), Collaborate (Teams, PIPs). On desktop a circular seam control (`‹` / `›`, same pattern as Content Browser and Yggdrasil) collapses the sidebar to zero width; that choice is remembered in `localStorage` (`mm-sidebar-collapsed`). Active item follows the URL.
+- Right side of the realm bar: **[Register]** and **[Login]** only (no global search, notifications bell, or user menu)
 - Hero section with product value proposition
 - Primary CTA: **[Explore public playbooks]** (`data-testid="landing-cta-explore-playbooks"`) → `/playbooks/`
 - Hero primary action (guest): **[Register]** (`data-testid="landing-cta-register"`) with user-plus icon → `/auth/user/register/`
 - Hero primary action (authenticated): **[Connect MCP]** (`data-testid="landing-cta-connect-mcp"`, primary button, plug icon) → `#mcp-config`
-- Auth-only nav targets (Home, Teams, PIPs) redirect to login when clicked
+- Auth-only sidebar targets (Home, Teams, PIPs) redirect to login when clicked. Public methodology sidebar targets stay browseable.
 
 #### Screen: Guest Playbooks List (`/playbooks/`)
 Bob clicks **[Explore public playbooks]** and lands on the public browse grid:
-- **Full primary navbar** (same as landing) + **[Register]** / **[Login]** on the right
+- **Realm navbar + app sidebar** (same shell as landing) + **[Register]** / **[Login]** on the realm bar right
 - **Guest banner** (`data-testid="guest-auth-banner"`): "Sign in to create and edit playbooks" with auth links
 - **Card grid**: released public playbooks only (e.g., Mike's "React Frontend Development")
   - Each card shows title, author ("by Mike Chen"), version, status
@@ -260,18 +261,21 @@ Maria **separately configures external MCP servers in Windsurf/Cursor**:
 #### Screen: FOB Main Interface Layout
 Maria's FOB web GUI (http://localhost:8000) has a consistent layout:
 
-**Top Navigation Bar** (persistent across all screens):
-- **Logo**: "Mimir" (links to Dashboard)
-- **Search**: Global search bar (playbook contents: playbooks, workflows, phases, activities, artifacts, skills, agents, rules; teams when implemented)
-- **Navigation Menu**:
-  - Home (Dashboard)
-  - Playbooks
-  - Workflows, Phases, Activities, Artifacts, Agents, Skills, Rules
-  - PIPs (with **status-change count pill** — see below)
-- **Notifications**: Bell icon with badge count (unread notifications) — *when implemented*
+**Realm top navigation bar** (persistent across all screens):
+- **Realm links** (left): FeatureFactory (`https://featurefactory.io`), **Mimir** (this app, active), Huginn (`https://huginn.featurefactory.io`), Yggdrasil (`https://yggdrasil.featurefactory.io`), Heimdall (`https://heimdall.featurefactory.io`). Non-Mimir links navigate in the **same tab**.
+- **Search**: Global search bar (playbook contents: playbooks, workflows, phases, activities, artifacts, skills, agents, rules; teams when implemented) — right side
+- **Notifications**: Bell icon with badge count (unread notifications) — right side
 - **User Menu**: Click **your username** in the top-right to open a dropdown:
   - **[View Profile]** → **FOB-PROFILE-1** (`/auth/user/profile/`) — name, email, API token (show / copy / **regenerate** with password), PIPs you created, playbooks you own, teams you belong to
   - **[Log Out]**
+
+**App sidebar** (persistent in-app navigation; Webpixels-style):
+- **Header**: Mimir mark + “Engineering playbooks”
+- **Workspace**: Home (Dashboard)
+- **Methodology**: Playbooks, Workflows, Phases, Activities, Artifacts, Agents, Skills, Rules
+- **Collaborate**: Teams, PIPs (PIPs shows a **status-change count pill** — see below)
+- **Collapse**: On desktop (`lg+`), a circular chevron on the sidebar seam (same control as Content Browser and the Yggdrasil navigator) toggles the sidebar between full width and **width 0**. The choice is stored in `localStorage` key `mm-sidebar-collapsed` and restored on the next visit. The highlighted item always follows the current URL.
+- **Narrow viewports** (`< lg`): sidebar is an offcanvas drawer opened from the realm bar.
 
 Staff users may also use dashboard shortcuts (e.g. Django admin) where applicable; primary account + token management for everyone is **FOB-PROFILE-1**.
 
@@ -314,7 +318,7 @@ Maria opens **View Profile** from the username menu.
 
 ---
 
-**Left Sidebar** (contextual, shown on detail pages):
+**Context rail** (on entity detail pages — not the app sidebar):
 - Quick links based on current context
 - Recently viewed playbooks
 - Active playbook indicator
@@ -393,7 +397,7 @@ Clicking "View all notifications" opens dedicated page:
   - Dismiss button
 
 #### Screen: FOB Global Search (NAV-06)
-Maria types "React" in the navbar search bar:
+Maria types "React" in the realm-bar search:
 - Live dropdown suggestions appear (top 5 per type, compact):
   - **Playbooks** (2): React Frontend Development · by Mike Chen
   - **Workflows** (1): Component Development → React Frontend Development
@@ -471,7 +475,7 @@ Full search page — refine and browse matches across **all playbook entity type
 
 #### Screen: FOB-PLAYBOOKS-LIST+FIND-1
 
-Maria clicks "Playbooks" in the main navigation. The playbooks list page appears (this is the entry point for all playbook operations, marked with bold border in flow diagrams):
+Maria clicks "Playbooks" in the app sidebar. The playbooks list page appears (this is the entry point for all playbook operations, marked with bold border in flow diagrams):
 
 **Layout** (MVP card grid):
 

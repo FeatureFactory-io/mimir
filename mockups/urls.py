@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("", views.mockup_index, name="mockup_index"),
     # ── Use cases (public landing) ────────────────────────────────────────
     path("use-cases/", views.use_cases, name="mockup_use_cases"),
     # ── Auth flow ──────────────────────────────────────────────────────────
@@ -55,4 +56,9 @@ urlpatterns = [
         views.copy_prompt_activity_detail_error,
         name="mockup_copy_prompt_activity_detail_error",
     ),
+    # ── Realm top nav + in-app sidebar (FOB-REALM-NAV-SIDEBAR) ──────────────
+    path("nav/", views.nav_dashboard, name="mockup_nav_dashboard"),
+    path("nav/playbooks/", views.nav_playbooks, name="mockup_nav_playbooks"),
+    path("nav/guest/", views.nav_guest, name="mockup_nav_guest"),
+    path("nav/mobile/", views.nav_mobile, name="mockup_nav_mobile"),
 ]

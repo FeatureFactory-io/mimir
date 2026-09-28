@@ -1,10 +1,11 @@
 @guest_access @navigation
-Feature: FOB-GUEST-NAV Anonymous Full Primary Navbar
+Feature: FOB-GUEST-NAV Anonymous Realm Bar and App Sidebar
   As an anonymous visitor (Bob)
-  I want the full primary navigation bar on every page
-  So that I can explore all public methodology surfaces before registering
+  I want the FeatureFactory realm bar and the full Mimir app sidebar on every page
+  So that I can explore public methodology surfaces before registering
 
-  # Full primary nav = Home through PIPs (same order as authenticated users).
+  # Realm bar = FeatureFactory, Mimir, Huginn, Yggdrasil, Heimdall.
+  # App sidebar = Home through PIPs (same destinations as the former primary navbar).
   # Auth-only destinations (Home, Teams, PIPs) redirect to login when clicked.
   # Right-side authenticated chrome (global search, notifications bell, user menu)
   # remains hidden for guests; Register and Login buttons are shown instead.
@@ -13,9 +14,10 @@ Feature: FOB-GUEST-NAV Anonymous Full Primary Navbar
     Given Bob is not logged in
 
 
-  Scenario: GUEST-NAV-01 Anonymous landing shows full primary nav and auth buttons
+  Scenario: GUEST-NAV-01 Anonymous landing shows realm bar, sidebar, and auth buttons
     Given Bob is on the FOB landing page at "/"
-    Then he sees all primary navbar links from Home through PIPs
+    Then he sees realm links FeatureFactory, Mimir, Huginn, Yggdrasil, and Heimdall
+    And he sees all app sidebar links from Home through PIPs
     And he sees [Register] with data-testid "register-link"
     And he sees [Login] with data-testid "login-link"
     And he does not see global search with data-testid "global-search-input"
@@ -23,10 +25,10 @@ Feature: FOB-GUEST-NAV Anonymous Full Primary Navbar
     And he does not see the user menu with data-testid "user-display"
 
 
-  Scenario: GUEST-NAV-02 Guest playbooks list highlights Playbooks nav tab
+  Scenario: GUEST-NAV-02 Guest playbooks list highlights Playbooks sidebar item
     Given Bob opens "/playbooks/"
-    Then he sees all primary navbar links from Home through PIPs
-    And the "Playbooks" link in main navbar has "active" class
+    Then he sees all app sidebar links from Home through PIPs
+    And the "Playbooks" link in the app sidebar has "active" class
     And he sees [Register] with data-testid "register-link"
     And he sees [Login] with data-testid "login-link"
 

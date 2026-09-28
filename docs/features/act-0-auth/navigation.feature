@@ -30,7 +30,7 @@ Feature: FOB-DASHBOARD-1 Dashboard and Navigation
 
   Scenario: FOB-DASHBOARD-04 Navigate to Playbooks
     Given Maria is on the dashboard
-    When she clicks "Playbooks" in main navigation
+    When she clicks "Playbooks" in the app sidebar
     Then she is redirected to FOB-PLAYBOOKS-LIST+FIND-1
 
   Scenario: FOB-DASHBOARD-05 Quick create playbook
@@ -43,9 +43,9 @@ Feature: FOB-DASHBOARD-1 Dashboard and Navigation
     When she clicks a recent playbook
     Then she is redirected to that playbook's view page
 
-  Scenario: FOB-DASHBOARD-07 Open profile from navbar
+  Scenario: FOB-DASHBOARD-07 Open profile from realm bar
     Given Maria is on the dashboard
-    When she clicks her username in the top navigation bar
+    When she clicks her username in the realm navigation bar
     Then a dropdown opens with items: [View Profile], [Logout]
     When she clicks [View Profile]
     Then she is redirected to FOB-PROFILE-VIEW-1 at /auth/user/profile/

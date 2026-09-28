@@ -1,0 +1,57 @@
+{% extends "mockups/nav/_shell.html" %}
+
+{% block title %}Playbooks — Nav Mockup{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0" data-testid="nav-playbooks-page">
+    <div class="hg-page-header px-4">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+                <h1 class="hg-page-title d-flex align-items-center gap-2 mb-1">
+                    <i class="fas fa-book-sparkles hg-page-title-icon text-primary" aria-hidden="true"></i>
+                    <span>Playbooks</span>
+                </h1>
+                <p class="text-muted small mb-0">
+                    <span data-testid="playbooks-count-badge">{{ playbooks|length }} playbooks</span>
+                    · sidebar item <code>nav-playbooks</code> is active
+                </p>
+            </div>
+            <button type="button" class="btn btn-primary" data-testid="playbook-create-btn"
+                    title="Create a new playbook"
+                    onclick="console.log('[mockup:nav-playbooks] create clicked')">
+                <i class="fas fa-plus" aria-hidden="true"></i> Create New Playbook
+            </button>
+        </div>
+    </div>
+
+    <div class="px-4 py-3">
+        <div class="row g-3" data-testid="playbooks-grid">
+            {% for pb in playbooks %}
+            <div class="col-md-6 col-xl-4">
+                <div class="card hg-card h-100">
+                    <div class="color-bar {{ pb.color }}"></div>
+                    <div class="card-body">
+                        <h2 class="h6 mb-1">{{ pb.name }}</h2>
+                        <p class="text-muted small mb-2">{{ pb.description }}</p>
+                        <span class="badge {{ pb.status_css }}">{{ pb.status }}</span>
+                        <span class="text-muted small ms-1">v{{ pb.version }}</span>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-secondary" data-testid="playbooks-empty">No playbooks yet</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="alert alert-light border mt-4 small" data-testid="mockup-nav-crosslinks">
+            <strong>Mockup screens:</strong>
+            <a href="{% url 'mockup_nav_dashboard' %}">Dashboard</a> ·
+            <a href="{% url 'mockup_nav_playbooks' %}">Playbooks</a> ·
+            <a href="{% url 'mockup_nav_guest' %}">Guest</a> ·
+            <a href="{% url 'mockup_nav_mobile' %}">Mobile</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

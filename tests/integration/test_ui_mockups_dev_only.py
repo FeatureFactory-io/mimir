@@ -9,6 +9,7 @@ from django.test import Client
 def test_mockup_urls_return_404_when_debug_false(client: Client):
     """Production and pytest use DEBUG=False — no /mockups/ mount."""
     assert settings.DEBUG is False
+    assert client.get("/mockups/").status_code == 404
     assert client.get("/mockups/auth/register/").status_code == 404
     assert client.get("/mockups/auth/login/").status_code == 404
     assert client.get("/mockups/pips/").status_code == 404
