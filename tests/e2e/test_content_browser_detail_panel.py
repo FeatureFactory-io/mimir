@@ -285,7 +285,7 @@ class TestDetailPanelClose:
 
 
 class TestDetailPanelNavigation:
-    def test_open_new_tab_button_opens_correct_url(
+    def test_open_new_tab_button_opens_correct_url_with_realm_navbar(
         self, page: Page, live_server, panel_playbook
     ):
         """[Open new tab] triggers window.open with the entity detail URL (FOB-09b)."""
