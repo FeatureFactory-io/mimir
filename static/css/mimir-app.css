@@ -738,8 +738,12 @@ mark.mm-search-highlight {
 
 .mm-app-shell {
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: calc(100vh - 3.5rem);
+  width: 100%;
   position: relative;
 }
 
@@ -817,7 +821,8 @@ mark.mm-search-highlight {
 }
 
 .mm-app-main {
-  flex: 1;
+  flex: 1 1 auto;
+  width: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -832,24 +837,29 @@ mark.mm-search-highlight {
 }
 
 @media (min-width: 992px) {
-  .mm-app-sidebar.offcanvas-lg {
+  .mm-app-shell > .mm-app-sidebar.offcanvas-lg {
     position: static;
     transform: none !important;
     visibility: visible !important;
-    flex-grow: 0 !important;
+    flex: 0 0 var(--mm-sidebar-width) !important;
     width: var(--mm-sidebar-width) !important;
-    height: auto !important;
+    max-width: var(--mm-sidebar-width) !important;
+    min-width: var(--mm-sidebar-width) !important;
+    height: auto;
+    align-self: stretch;
     border-right: 1px solid var(--hg-border, #e5e9f0);
     background: #fff;
-    transition: width 0.2s ease, min-width 0.2s ease;
+    transition: flex-basis 0.2s ease, width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease;
   }
 
   .mm-app-sidebar .offcanvas-body {
     overflow: visible;
   }
 
-  html.mm-sidebar-collapsed .mm-app-sidebar.offcanvas-lg {
+  html.mm-sidebar-collapsed .mm-app-shell > .mm-app-sidebar.offcanvas-lg {
+    flex: 0 0 0px !important;
     width: 0 !important;
+    max-width: 0 !important;
     min-width: 0 !important;
     border-right: none;
     overflow: hidden;
