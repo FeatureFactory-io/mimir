@@ -1322,7 +1322,7 @@ MOCK_REALM_ITEMS = [
         "external": False,
         "tooltip": "FeatureFactory home",
         "icon": "",
-        "mark": "images/realm/featurefactory.png",
+        "mark": "images/realm/featurefactory-mark.svg",
     },
     {
         "slug": "mimir",
@@ -1331,7 +1331,7 @@ MOCK_REALM_ITEMS = [
         "external": False,
         "tooltip": "Mimir — engineering playbooks (this app)",
         "icon": "",
-        "mark": "images/realm/mimir.png",
+        "mark": "images/realm/mimir-logo.png",
     },
     {
         "slug": "huginn",
@@ -1340,7 +1340,7 @@ MOCK_REALM_ITEMS = [
         "external": False,
         "tooltip": "Huginn",
         "icon": "",
-        "mark": "images/realm/huginn.jpg",
+        "mark": "images/realm/huginn-logo.jpeg",
     },
     {
         "slug": "yggdrasil",
@@ -1349,7 +1349,7 @@ MOCK_REALM_ITEMS = [
         "external": False,
         "tooltip": "Yggdrasil",
         "icon": "",
-        "mark": "images/realm/yggdrasil.png",
+        "mark": "images/realm/yggdrasil-mark.svg",
     },
     {
         "slug": "heimdall",
@@ -1358,7 +1358,7 @@ MOCK_REALM_ITEMS = [
         "external": False,
         "tooltip": "Heimdall",
         "icon": "",
-        "mark": "",
+        "mark": "images/realm/heimdall-mark.svg",
     },
 ]
 

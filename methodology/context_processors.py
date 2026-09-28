@@ -19,7 +19,7 @@ REALM_ITEMS = (
         "url": "https://featurefactory.io",
         "external": False,
         "tooltip": "FeatureFactory home",
-        "mark": "images/realm/featurefactory.png",
+        "mark": "images/realm/featurefactory-mark.svg",
     },
     {
         "slug": "mimir",
@@ -27,7 +27,7 @@ REALM_ITEMS = (
         "url": "/",
         "external": False,
         "tooltip": "Mimir — engineering playbooks (this app)",
-        "mark": "images/realm/mimir.png",
+        "mark": "images/realm/mimir-logo.png",
     },
     {
         "slug": "huginn",
@@ -35,7 +35,7 @@ REALM_ITEMS = (
         "url": "https://huginn.featurefactory.io",
         "external": False,
         "tooltip": "Huginn",
-        "mark": "images/realm/huginn.jpg",
+        "mark": "images/realm/huginn-logo.jpeg",
     },
     {
         "slug": "yggdrasil",
@@ -43,7 +43,7 @@ REALM_ITEMS = (
         "url": "https://yggdrasil.featurefactory.io",
         "external": False,
         "tooltip": "Yggdrasil",
-        "mark": "images/realm/yggdrasil.png",
+        "mark": "images/realm/yggdrasil-mark.svg",
     },
     {
         "slug": "heimdall",
@@ -51,7 +51,7 @@ REALM_ITEMS = (
         "url": "https://heimdall.featurefactory.io",
         "external": False,
         "tooltip": "Heimdall",
-        "mark": "",
+        "mark": "images/realm/heimdall-mark.svg",
     },
 )
 

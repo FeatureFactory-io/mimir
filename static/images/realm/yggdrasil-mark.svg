@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Yggdrasil</title>
+  <g fill="none" stroke="#111" stroke-linecap="round" stroke-linejoin="round" stroke-width="5">
+    <path d="M32 55V23M32 31 21 20M32 35l13-14M26 25 16 27M38 27l16 1M32 24V10M32 46 21 56M32 47l11 9"/>
+    <circle cx="32" cy="8" r="4"/>
+    <circle cx="19" cy="18" r="4"/>
+    <circle cx="47" cy="18" r="4"/>
+    <circle cx="8" cy="27" r="4"/>
+    <circle cx="56" cy="28" r="4"/>
+  </g>
+</svg>

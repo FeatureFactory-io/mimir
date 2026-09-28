@@ -189,15 +189,23 @@ Size scale and Huginn-specific classes:
 
 ### 3.1 Page Shell
 
-Every page follows this structure:
+Every page follows this structure (FOB-REALM-NAV-SIDEBAR):
 
 ```
-<navbar .hg-navbar>        ← fixed top, primary + gold accent border-bottom
-<div .hg-page-header>      ← white bar: page title + subtitle + top actions (placement: §3.4)
-<main .container-fluid>    ← body bg (#f5f7fa), px-4 py-3
-  [page-specific content]
-</main>
+<nav .hg-navbar data-testid="realm-navbar">
+  FeatureFactory · Mimir (active) · Huginn · Yggdrasil · Heimdall
+  … search · notifications · user | Register+Login
+</nav>
+<div .mm-app-shell>
+  <aside data-testid="app-sidebar">   ← in-app primary nav (§4.2)
+  <div>
+    <div .hg-page-header>
+    <main .hg-main>
+  </div>
+</div>
 ```
+
+The realm bar is the dark `hg-navbar`. The app sidebar is a light left column (Webpixels pattern). Entity VIEW **context rails** (`col-md-4`) are separate from this sidebar.
 
 ### 3.2 Layout Patterns
 
@@ -371,33 +379,47 @@ Shared rail utilities: `.mm-view-rail-scroll` / `.mm-view-rail-scroll-x` in `sta
 
 ## 4. Navigation
 
-### 4.1 Primary Nav Items
+### 4.1 Realm Nav
 
-**Production navbar order** (`templates/base.html`): Home → Playbooks → Workflows → Phases → Activities → Artifacts → Agents → Skills → Rules → Teams → PIPs.
+Persistent top bar (`data-testid="realm-navbar"`, `.hg-navbar`). Product switcher only — not methodology entities.
 
-| Nav item | Route | Icon (`data-testid`) |
+| Item | URL | Notes |
 |---|---|---|
-| Home | `/dashboard/` | `fa-gauge` — `nav-dashboard` |
-| Playbooks | `/playbooks/` | `fa-book-sparkles` — `nav-playbooks` |
-| Workflows | `/workflows/` (global list) | `fa-diagram-project` — `nav-workflows` |
-| Phases | `/phases/` | `fa-bars-progress` — `nav-phases` |
-| Activities | `/activities/` | `fa-list-check` — `nav-activities` |
-| Artifacts | `/artifacts/` | `fa-gift` — `nav-artifacts` |
-| Agents | `/agents/` | `fa-brain-circuit` — `nav-agents` |
-| Skills | `/skills/` | `fa-hand-holding-magic` — `nav-skills` |
-| Rules | `/rules/` | `fa-scale-balanced` — `nav-rules` |
-| Teams | `/teams/` | `fa-users` — `nav-teams` |
-| PIPs | `/pips/` | `fa-lightbulb` — `nav-pips` |
+| FeatureFactory | `https://featurefactory.io` | Same tab |
+| Mimir | this origin | `active` / `aria-current="page"` on FOB |
+| Huginn | `https://huginn.featurefactory.io` | Same tab |
+| Yggdrasil | `https://yggdrasil.featurefactory.io` | Same tab |
+| Heimdall | `https://heimdall.featurefactory.io` | Same tab |
 
-**Content Browser** is **not** in the navbar. Open it from **Playbook VIEW** via the Content Browser button (`data-testid="playbook-content-browser"`) → `/browser/<playbook_pk>/`. Nav highlight for browser URLs maps to **Playbooks** (`methodology.context_processors.primary_nav_section`).
+**Marks:** each item shows its file from `static/images/realm/` inside a **white circle** (featurefactory.io product-mark convention: white disc, `border-radius: 50%`, mark contained with a hair of padding). Files: `featurefactory-mark.svg`, `mimir-logo.png`, `huginn-logo.jpeg`, `yggdrasil-mark.svg`, `heimdall-mark.svg`. Class: `.mm-realm-mark`.
 
-**Anonymous sessions** (landing, browse routes, Content Browser, login/register pages): full primary navbar (Home → PIPs, same order as authenticated). Right side: **Register** + **Login** only. Auth-only nav targets (Home `/dashboard/`, Teams, PIPs) redirect to login; browse targets serve guest-readable content where implemented.
+**Right side (authenticated):** global search, notifications bell, user menu (View Profile, Logout).
+
+**Right side (anonymous):** Register + Login only. No search, bell, or user menu.
+
+### 4.2 App Sidebar (primary in-app nav)
+
+Left column (`data-testid="app-sidebar"`). Mimir mark in the header. Sections:
+
+| Section | Items (`data-testid`) |
+|---|---|
+| Workspace | Home — `nav-dashboard` → `/dashboard/` |
+| Methodology | Playbooks `nav-playbooks`, Workflows `nav-workflows`, Phases `nav-phases`, Activities `nav-activities`, Artifacts `nav-artifacts`, Agents `nav-agents`, Skills `nav-skills`, Rules `nav-rules` |
+| Collaborate | Teams `nav-teams`, PIPs `nav-pips` |
+
+Icons match the former top-nav set (`fa-gauge`, `fa-book-sparkles`, …). Active item is the URL (`nav_section` / `aria-current="page"`), never a stored preference.
+
+**Collapse (desktop `lg+`):** circular seam button (`data-testid="sidebar-collapse-toggle"`, `‹` expanded / `›` collapsed) slides the sidebar to width 0 — the same control as Content Browser’s left panel and Yggdrasil’s navigator. Persist only that boolean in `localStorage` key `mm-sidebar-collapsed` (`"1"` = collapsed). Restore on the next visit.
+
+**Narrow (`< lg`):** offcanvas drawer; realm-bar control `data-testid="sidebar-toggler"`.
+
+**Content Browser** is **not** in the realm bar or the sidebar. Open it from **Playbook VIEW** via the Content Browser button (`data-testid="playbook-content-browser"`) → `/browser/<playbook_pk>/`. Sidebar highlight for browser URLs maps to **Playbooks**.
+
+**Anonymous sessions:** same realm bar + full sidebar (Teams and PIPs included). Auth-only targets (Home `/dashboard/`, Teams, PIPs) redirect to login. Methodology browse targets serve guest-readable content where implemented.
 
 **Guest banner** (`data-testid="guest-auth-banner"`) on list and browse surfaces prompts sign-in to create or edit.
 
-Right-side (authenticated only): global search, notifications bell, user menu — hidden for guests.
-
-### 4.2 Breadcrumbs
+### 4.3 Breadcrumbs
 
 Used on detail screens (VIEW, EDIT, CREATE nested under a parent entity):
 
@@ -410,11 +432,11 @@ Used on detail screens (VIEW, EDIT, CREATE nested under a parent entity):
 </nav>
 ```
 
-### 4.3 Active State
+### 4.4 Active State
 
-Set `aria-current="page"` on the active nav link and add `.active` class. Active section is computed by `primary_nav_section` in `methodology/context_processors.py`.
+Set `aria-current="page"` on the active **app sidebar** link and add `.active` class. Active section is computed by `primary_nav_section` in `methodology/context_processors.py`. Realm item **Mimir** stays active for the whole FOB. Collapse state is not part of the active item.
 
-### 4.4 Mimir-specific surfaces
+### 4.5 Mimir-specific surfaces
 
 | Surface | Pattern | CSS / template |
 |---|---|---|
@@ -1051,7 +1073,8 @@ Standard series colours (in order): `HG.primary`, `HG.green`, `HG.orange`, `HG.r
 
 | Context | Element |
 |---|---|
-| Top navigation | `<nav aria-label="Primary navigation">` |
+| Top navigation | `<nav aria-label="FeatureFactory realm navigation">` |
+| App sidebar | `<aside aria-label="Mimir in-app navigation">` |
 | Page main content | `<main>` |
 | Side rail | `<aside aria-label="{rail title}">` |
 | Article card | `<article>` |

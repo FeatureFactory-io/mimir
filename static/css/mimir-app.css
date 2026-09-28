@@ -757,13 +757,15 @@ mark.mm-search-highlight {
 }
 
 .mm-realm-mark {
-  width: 1rem;
-  height: 1rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  box-sizing: border-box;
   object-fit: contain;
-  vertical-align: -0.2em;
+  vertical-align: -0.28em;
   margin-right: 0.35rem;
+  padding: 1px;
   background: #fff;
-  border-radius: 2px;
+  border-radius: 50%;
 }
 
 .mm-app-sidebar {

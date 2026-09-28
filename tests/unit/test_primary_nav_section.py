@@ -119,11 +119,11 @@ def test_shell_context_lists_realm_and_guest_chrome():
     ]
     assert all(item["external"] is False for item in ctx["realm_items"])
     marks = {item["slug"]: item["mark"] for item in ctx["realm_items"]}
-    assert marks["featurefactory"] == "images/realm/featurefactory.png"
-    assert marks["mimir"] == "images/realm/mimir.png"
-    assert marks["huginn"] == "images/realm/huginn.jpg"
-    assert marks["yggdrasil"] == "images/realm/yggdrasil.png"
-    assert marks["heimdall"] == ""
+    assert marks["featurefactory"] == "images/realm/featurefactory-mark.svg"
+    assert marks["mimir"] == "images/realm/mimir-logo.png"
+    assert marks["huginn"] == "images/realm/huginn-logo.jpeg"
+    assert marks["yggdrasil"] == "images/realm/yggdrasil-mark.svg"
+    assert marks["heimdall"] == "images/realm/heimdall-mark.svg"
     testids = [
         item["testid"]
         for section in ctx["sidebar_sections"]
