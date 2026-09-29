@@ -46,7 +46,7 @@ from methodology.api.viewsets_resources import (
     SkillViewSet,
     TeamViewSet,
 )
-from mimir import health_views
+from mimir import health_views, seo_views
 
 # DRF Router for API endpoints
 router = DefaultRouter()
@@ -64,6 +64,8 @@ router.register(r'teams', TeamViewSet, basename='api-team')
 
 urlpatterns = [
     path("health/", health_views.health_check, name="health_check"),
+    path("robots.txt", seo_views.robots_txt, name="robots_txt"),
+    path("sitemap.xml", seo_views.sitemap_xml, name="sitemap_xml"),
     path(
         "feedback/report/",
         feedback_views.submit_feedback,
