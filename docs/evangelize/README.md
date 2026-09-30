@@ -17,7 +17,7 @@ Community growth strategy for Mimir: persona-targeted live code-alongs, repurpos
 | File | Contents |
 |------|----------|
 | [strategy.md](./strategy.md) | Two-channel model (webinars + video), funnel, pricing waves, risks |
-| [webinar-format.md](./webinar-format.md) | 30-minute run-of-show, pre-work, tooling, success criteria |
+| [webinar-format.md](./webinar-format.md) | Luma + Zoom stack, run-of-show, pre-work, success criteria |
 | [content-pipeline.md](./content-pipeline.md) | Webinar → long YouTube → short clips → LinkedIn & communities |
 | [content-calendar.md](./content-calendar.md) | Persona content catalog (JTBD → demo), arc batches, Season 1 sequence |
 

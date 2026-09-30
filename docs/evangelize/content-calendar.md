@@ -242,7 +242,7 @@ First production season starts with Batch 1–3. Overlap clip posting with next 
 
 ### Launch infrastructure
 
-- [ ] Event landing / Eventbrite $5 SKU (before Batch 2 $5 events)
+- [ ] Luma calendar + Stripe + Zoom linked; $5 + complimentary ticket types (see [webinar-format.md](./webinar-format.md#webinar-stack-luma--zoom))
 - [ ] YouTube *FeatureFactory — building in the open*
 - [ ] Post-event survey (MCP connected Y/N)
 - [ ] Newsletter / mailing list
