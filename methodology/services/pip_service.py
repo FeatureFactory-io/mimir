@@ -224,52 +224,79 @@ def _persist_pip_change(
     producer_ref = _normalize_entity_ref(produced_by_activity_ref)
 
     _validate_ref_pair(
-        pip=pip, fk_set=bool(parent_workflow_id), ref_raw=parent_ref,
+        pip=pip,
+        fk_set=bool(parent_workflow_id),
+        ref_raw=parent_ref,
         field_label="parent_workflow",
     )
     _validate_ref_pair(
-        pip=pip, fk_set=bool(insert_after_activity_id), ref_raw=insert_ref,
+        pip=pip,
+        fk_set=bool(insert_after_activity_id),
+        ref_raw=insert_ref,
         field_label="insert_after_activity",
     )
 
     if ct == PipChange.CHANGE_ADD and et == PipChange.ENTITY_ACTIVITY:
         if not parent_workflow_id and not parent_ref:
-            raise ValidationError("ADD Activity requires parent_workflow_id or parent_workflow_ref.")
+            raise ValidationError(
+                "ADD Activity requires parent_workflow_id or parent_workflow_ref."
+            )
         if parent_ref:
             validate_pending_or_live_ref(
-                pip=pip, ref=parent_ref, expected_type=PipChange.ENTITY_WORKFLOW,
-                order_hint=order_val, playbook_id=pb.pk,
+                pip=pip,
+                ref=parent_ref,
+                expected_type=PipChange.ENTITY_WORKFLOW,
+                order_hint=order_val,
+                playbook_id=pb.pk,
             )
         if insert_ref:
             validate_pending_or_live_ref(
-                pip=pip, ref=insert_ref, expected_type=PipChange.ENTITY_ACTIVITY,
-                order_hint=order_val, playbook_id=pb.pk,
+                pip=pip,
+                ref=insert_ref,
+                expected_type=PipChange.ENTITY_ACTIVITY,
+                order_hint=order_val,
+                playbook_id=pb.pk,
             )
         if phase_ref_norm:
             validate_pending_or_live_ref(
-                pip=pip, ref=phase_ref_norm, expected_type=PipChange.ENTITY_PHASE,
-                order_hint=order_val, playbook_id=pb.pk,
+                pip=pip,
+                ref=phase_ref_norm,
+                expected_type=PipChange.ENTITY_PHASE,
+                order_hint=order_val,
+                playbook_id=pb.pk,
             )
 
     if ct == PipChange.CHANGE_ADD and et == PipChange.ENTITY_ARTIFACT:
         if not producer_ref:
             raise ValidationError("ADD Artifact requires produced_by_activity_ref.")
         validate_pending_or_live_ref(
-            pip=pip, ref=producer_ref, expected_type=PipChange.ENTITY_ACTIVITY,
-            order_hint=order_val, playbook_id=pb.pk,
+            pip=pip,
+            ref=producer_ref,
+            expected_type=PipChange.ENTITY_ACTIVITY,
+            order_hint=order_val,
+            playbook_id=pb.pk,
         )
 
-    if ct == PipChange.CHANGE_ALTER and et == PipChange.ENTITY_ACTIVITY and phase_ref_norm:
+    if (
+        ct == PipChange.CHANGE_ALTER
+        and et == PipChange.ENTITY_ACTIVITY
+        and phase_ref_norm
+    ):
         validate_pending_or_live_ref(
-            pip=pip, ref=phase_ref_norm, expected_type=PipChange.ENTITY_PHASE,
-            order_hint=order_val, playbook_id=pb.pk,
+            pip=pip,
+            ref=phase_ref_norm,
+            expected_type=PipChange.ENTITY_PHASE,
+            order_hint=order_val,
+            playbook_id=pb.pk,
         )
 
     display_name = nm
     if ct == PipChange.CHANGE_ADD and not nm:
         raise ValidationError("Name is required for ADD changes.")
     if ct == PipChange.CHANGE_ALTER and not nm and not body and display_order is None:
-        raise ValidationError("ALTER requires at least one of name, content, or display_order.")
+        raise ValidationError(
+            "ALTER requires at least one of name, content, or display_order."
+        )
     if ct == PipChange.CHANGE_DROP and not body:
         raise ValidationError("Rationale is required for DROP changes.")
     tgt = target_id
@@ -407,7 +434,9 @@ class PIPService:
     """CRUD-ish workflow helpers for ProcessImprovementProposal records."""
 
     @staticmethod
-    def create_pip_from_protocol(protocol_file: str, pip_title: str, actor=None) -> dict:
+    def create_pip_from_protocol(
+        protocol_file: str, pip_title: str, actor=None
+    ) -> dict:
         """
         MCP / API façade for WorkflowProtocolService (protocol-path PIPs).
 
@@ -420,8 +449,11 @@ class PIPService:
             WorkflowProtocolService,
         )
 
-        logger.info("PIPService.create_pip_from_protocol title=%s actor=%s",
-                    pip_title, getattr(actor, 'pk', None))
+        logger.info(
+            "PIPService.create_pip_from_protocol title=%s actor=%s",
+            pip_title,
+            getattr(actor, "pk", None),
+        )
         return WorkflowProtocolService.create_pip_from_protocol(
             protocol_file, pip_title, actor=actor
         )
@@ -521,9 +553,7 @@ class PIPService:
         :raises PermissionError: when neither owner nor staff.
         """
         pip = (
-            ProcessImprovementProposal.objects.select_related(
-                "playbook", "created_by"
-            )
+            ProcessImprovementProposal.objects.select_related("playbook", "created_by")
             .prefetch_related("changes")
             .get(pk=pip_id)
         )
@@ -544,7 +574,9 @@ class PIPService:
             raise ValidationError("This PIP can no longer be withdrawn.")
         pip.status = ProcessImprovementProposal.STATUS_WITHDRAWN
         pip.save(update_fields=["status"])
-        logger.info("PIPService.withdraw_pip set pip=%s to withdrawn actor=%s", pip.pk, actor.pk)
+        logger.info(
+            "PIPService.withdraw_pip set pip=%s to withdrawn actor=%s", pip.pk, actor.pk
+        )
 
     cancel_pip = withdraw_pip
 
@@ -580,7 +612,9 @@ class PIPService:
             pip.status,
             pip.pk,
         )
-        changes_cleared = pip.changes.update(galdr_recommendation="", galdr_reasoning="")
+        changes_cleared = pip.changes.update(
+            galdr_recommendation="", galdr_reasoning=""
+        )
         logger.info(
             "PIPService.revert_to_draft processing changes_cleared=%s pip=%s",
             changes_cleared,
@@ -791,3 +825,35 @@ class PIPService:
             transaction.on_commit(_enqueue)
         logger.info("PIP queued for Galdr pk=%s", pk_holder)
         return ProcessImprovementProposal.objects.get(pk=pk_holder)
+
+    @staticmethod
+    def _schedule_processing(
+        pip_id: int, actor_id: int, llm: BaseLLM | None, correlation_id: str
+    ) -> None:
+        """Dispatch existing Galdr processing with captured provider/correlation.
+
+        This callback is registered only after existing permission/structural
+        validation and successful processing transition. Preserve the current
+        GALDR_EAGER branch and production on_commit semantics.
+
+        :param pip_id: Committed processing proposal. Example: 7301.
+        :param actor_id: Validated submitter. Example: 42.
+        :param llm: Explicit/scoped port or None. Example: ScriptedLLM([...]).
+        :param correlation_id: Safe run ID. Example: "cedar-submit-01".
+        :return: None. Example: None after existing scheduler dispatch.
+        :raises ValueError: For malformed callback arguments.
+        """
+        raise NotImplementedError()
+
+
+def _normalize_processing_correlation(correlation_id: str | None) -> str:
+    """Accept a safe bounded request ID or generate a background identifier.
+
+    The bound is 100 characters, matching canonical ExpertProfile metadata.
+    Invalid string content is replaced with a generated ID, never logged raw.
+
+    :param correlation_id: Optional request identifier. Example: "cedar-submit-01".
+    :return: Safe correlation. Example: "cedar-submit-01".
+    :raises ValueError: For a non-string supplied value.
+    """
+    raise NotImplementedError()

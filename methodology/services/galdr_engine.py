@@ -294,3 +294,48 @@ class GaldrEngine:
         except Exception:
             logger.exception("Galdr DB persist pip id=%s", pip_id)
             cls._mark_submitted_retry(pip_id)
+
+    @classmethod
+    def _run_scheduled_processing(
+        cls, pip_id: int, llm: BaseLLM | None, correlation_id: str
+    ) -> None:
+        """Execute the existing eager/thread worker with explicit dependencies.
+
+        Preserve connection cleanup, missing-PIP handling and outer assessment
+        error handling. Never inspect provider queue internals.
+
+        :param pip_id: Processing proposal. Example: 7301.
+        :param llm: Captured provider injection or None. Example: ScriptedLLM([...]).
+        :param correlation_id: Safe run ID. Example: "cedar-submit-01".
+        :return: None. Example: None after assess_sync.
+        :raises ValueError: For malformed invocation arguments.
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def _processing_is_current(cls, pip_id: int) -> bool:
+        """Check current processing state before a summary/provider turn.
+
+        :param pip_id: Proposal identifier. Example: 7301.
+        :return: Whether processing is current. Example: False for a reviewed PIP.
+        :raises ValueError: For a malformed identifier.
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def _refresh_contribution_summary(
+        cls, pip_id: int, llm: BaseLLM | None, correlation_id: str
+    ) -> None:
+        """Invoke S23 orchestration once before existing assessment work.
+
+        Summary failure is isolated. Do not retry the completion, consume an
+        assessment response, decide the PIP or replace existing assessment recovery.
+        Log safe IDs/reason codes if composition/storage raises unexpectedly.
+
+        :param pip_id: Current processing proposal. Example: 7301.
+        :param llm: Shared explicit/scoped port or None. Example: ScriptedLLM([...]).
+        :param correlation_id: Safe run ID. Example: "cedar-submit-01".
+        :return: None. Example: None after success or isolated summary failure.
+        :raises ValueError: For malformed boundary arguments.
+        """
+        raise NotImplementedError()

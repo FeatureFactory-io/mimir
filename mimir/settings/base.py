@@ -184,21 +184,26 @@ SESSION_COOKIE_SAMESITE = "Lax"  # CSRF protection
 # https://www.django-rest-framework.org/api-guide/settings/
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # For browsable API
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",  # For browsable API
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 100,
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',  # Disable in prod
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 100,
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",  # Disable in prod
     ],
-    'EXCEPTION_HANDLER': 'methodology.api.exceptions.custom_exception_handler',
+    "EXCEPTION_HANDLER": "methodology.api.exceptions.custom_exception_handler",
 }
 
 # Django messages → Bootstrap alert classes (alert-danger, not alert-error).
-MESSAGE_TAGS = {message_constants.ERROR: 'danger'}
+MESSAGE_TAGS = {message_constants.ERROR: "danger"}
+
+# PIN S23: wire the reviewed GALDR-SUMMARY-01 collaborators after PIN-05 GO; preserve current behavior.
+
+# Explicit server-only port override; captured before normal Galdr dispatch.
+CONTRIBUTION_SUMMARY_LLM = None

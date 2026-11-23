@@ -53,10 +53,15 @@ def _validated_pip_focus_ids(pip, request) -> tuple[int | None, int | None]:
     act_id = int(act_raw) if act_raw and str(act_raw).isdigit() else None
     from methodology.models import Activity, Workflow
 
-    if wf_id is not None and not Workflow.objects.filter(pk=wf_id, playbook=pip.playbook).exists():
+    if (
+        wf_id is not None
+        and not Workflow.objects.filter(pk=wf_id, playbook=pip.playbook).exists()
+    ):
         wf_id = None
     if act_id is not None:
-        act = Activity.objects.filter(pk=act_id, workflow__playbook=pip.playbook).first()
+        act = Activity.objects.filter(
+            pk=act_id, workflow__playbook=pip.playbook
+        ).first()
         if act is None:
             act_id = None
         elif wf_id is not None and act.workflow_id != wf_id:
@@ -175,9 +180,7 @@ def _pip_detail_status_banner(pip) -> str:
         )
     if st == PipModel.STATUS_ACCEPTED_PARTIAL:
         qs = list(pip.changes.all())
-        accepted_n = sum(
-            1 for ch in qs if ch.admin_decision == PipChange.ADMIN_ACCEPT
-        )
+        accepted_n = sum(1 for ch in qs if ch.admin_decision == PipChange.ADMIN_ACCEPT)
         return (
             f"Partially accepted — {accepted_n} of {len(qs)} changes applied. "
             f"{pip.playbook.name} is now v{pip.playbook.version}."
@@ -201,10 +204,15 @@ def _pip_detail_context(pip, user):
         PipModel.STATUS_REVIEWED,
     }
     banner = _pip_detail_status_banner(pip)
-    can_submit = pip.status in {
-        PipModel.STATUS_DRAFT,
-        PipModel.STATUS_SUBMITTED,
-    } and change_count > 0 and pip.created_by_id == user.pk
+    can_submit = (
+        pip.status
+        in {
+            PipModel.STATUS_DRAFT,
+            PipModel.STATUS_SUBMITTED,
+        }
+        and change_count > 0
+        and pip.created_by_id == user.pk
+    )
     submit_label = (
         "Re-submit for Galdr review"
         if pip.status == PipModel.STATUS_SUBMITTED
@@ -214,7 +222,8 @@ def _pip_detail_context(pip, user):
     ctx = {
         "pip": pip,
         "status_banner": banner,
-        "can_edit": pip.status == PipModel.STATUS_DRAFT and pip.created_by_id == user.pk,
+        "can_edit": pip.status == PipModel.STATUS_DRAFT
+        and pip.created_by_id == user.pk,
         "can_submit": bool(can_submit),
         "submit_label": submit_label,
         "can_withdraw": withdrawable and pip.created_by_id == user.pk,
@@ -224,10 +233,7 @@ def _pip_detail_context(pip, user):
         "copy_prompt_text": CopyPromptService.build_pip_prompt(pip),
         "copy_prompt_text_testid": f"copy-prompt-text-pip-{pip.pk}",
     }
-    if (
-        getattr(user, "is_staff", False)
-        and pip.status == PipModel.STATUS_REVIEWED
-    ):
+    if getattr(user, "is_staff", False) and pip.status == PipModel.STATUS_REVIEWED:
         try:
             base = reverse("pip_admin_review", kwargs={"pk": pip.pk})
             ctx["admin_review_url"] = base
@@ -262,9 +268,7 @@ def _pip_list_params(request):
     status_filters = request.GET.getlist("status")
     playbook_raw = request.GET.get("playbook")
     playbook_pk = (
-        int(playbook_raw)
-        if playbook_raw and str(playbook_raw).isdigit()
-        else None
+        int(playbook_raw) if playbook_raw and str(playbook_raw).isdigit() else None
     )
     return scope, status_filters, playbook_pk
 
@@ -305,9 +309,7 @@ def pip_list(request):
             playbook_id=playbook_pk,
         )
     pips = list(queryset)
-    CopyPromptService.attach_copy_prompts(
-        pips, CopyPromptService.build_pip_prompt
-    )
+    CopyPromptService.attach_copy_prompts(pips, CopyPromptService.build_pip_prompt)
     rows = [
         {"pip": pip, "unread_dot": pip.status_changed_since_visit(last_visit)}
         for pip in pips
@@ -353,7 +355,9 @@ def pip_create(request):
     released = Playbook.objects.filter(status="released").order_by("name")
 
     prefill_raw = request.GET.get("playbook")
-    prefill_id = int(prefill_raw) if prefill_raw and str(prefill_raw).isdigit() else None
+    prefill_id = (
+        int(prefill_raw) if prefill_raw and str(prefill_raw).isdigit() else None
+    )
 
     pb_pre = Playbook.objects.filter(pk=prefill_id).first() if prefill_id else None
     if prefill_id and (
@@ -380,16 +384,23 @@ def pip_create(request):
             focus_raw = (request.POST.get("focus_workflow") or "").strip()
             focus_wf_id = int(focus_raw) if focus_raw.isdigit() else None
             if focus_wf_id is not None:
-                if not Workflow.objects.filter(pk=focus_wf_id, playbook_id=playbook_id).exists():
+                if not Workflow.objects.filter(
+                    pk=focus_wf_id, playbook_id=playbook_id
+                ).exists():
                     focus_wf_id = None
 
             focus_act_raw = (request.POST.get("focus_activity") or "").strip()
             focus_act_id = int(focus_act_raw) if focus_act_raw.isdigit() else None
             if focus_act_id is not None:
-                q = Activity.objects.filter(pk=focus_act_id, workflow__playbook_id=playbook_id)
+                q = Activity.objects.filter(
+                    pk=focus_act_id, workflow__playbook_id=playbook_id
+                )
                 if not q.exists():
                     focus_act_id = None
-                elif focus_wf_id is not None and not q.filter(workflow_id=focus_wf_id).exists():
+                elif (
+                    focus_wf_id is not None
+                    and not q.filter(workflow_id=focus_wf_id).exists()
+                ):
                     focus_act_id = None
 
             pip = PIPService.create_draft_for_playbook(
@@ -399,9 +410,9 @@ def pip_create(request):
                 summary=summary,
             )
             messages.success(request, f"Saved draft {pip}.")
-            url = reverse("pip_edit", kwargs={"pk": pip.pk}) + _pip_edit_suffix_from_focus(
-                focus_wf_id, focus_act_id
-            )
+            url = reverse(
+                "pip_edit", kwargs={"pk": pip.pk}
+            ) + _pip_edit_suffix_from_focus(focus_wf_id, focus_act_id)
             return redirect(url)
         except (TypeError, ValueError) as exc:
             messages.error(request, f"Invalid playbook id: {exc}")
@@ -525,7 +536,9 @@ def pip_add_change(request, pk: int):
             insert_after_activity_id=insert_id,
             insert_after_activity_ref=insert_ref,
             phase_ref=(post.get("phase_ref") or "").strip(),
-            produced_by_activity_ref=(post.get("produced_by_activity_ref") or "").strip(),
+            produced_by_activity_ref=(
+                post.get("produced_by_activity_ref") or ""
+            ).strip(),
             artifact_type=(post.get("artifact_type") or "").strip(),
             artifact_is_required=post.get("artifact_is_required") == "on",
             append_to_playbook_end=post.get("append_end") == "on",
@@ -537,7 +550,9 @@ def pip_add_change(request, pk: int):
         messages.success(request, "Change added.")
     except ValidationError as exc:
         messages.error(request, _format_validation_error(exc))
-    return redirect(reverse("pip_edit", kwargs={"pk": pip.pk}) + _pip_edit_query_suffix(request))
+    return redirect(
+        reverse("pip_edit", kwargs={"pk": pip.pk}) + _pip_edit_query_suffix(request)
+    )
 
 
 @login_required
@@ -551,7 +566,9 @@ def pip_remove_change(request, pk: int, change_id: int):
         messages.success(request, "Change removed.")
     except ValidationError as exc:
         messages.error(request, _format_validation_error(exc))
-    return redirect(reverse("pip_edit", kwargs={"pk": pip.pk}) + _pip_edit_query_suffix(request))
+    return redirect(
+        reverse("pip_edit", kwargs={"pk": pip.pk}) + _pip_edit_query_suffix(request)
+    )
 
 
 @login_required
@@ -574,7 +591,9 @@ def pip_submit_review(request, pk: int):
         messages.success(request, "PIP submitted — Galdr is reviewing your changes.")
     except ValidationError as exc:
         messages.error(request, _format_validation_error(exc))
-        return redirect(reverse("pip_edit", kwargs={"pk": pip.pk}) + _pip_edit_query_suffix(request))
+        return redirect(
+            reverse("pip_edit", kwargs={"pk": pip.pk}) + _pip_edit_query_suffix(request)
+        )
     return redirect("pip_detail", pk=pip.pk)
 
 
@@ -639,7 +658,9 @@ def pip_admin_review(request, pk: int):
         action = request.POST.get("action", "")
 
         if is_decided:
-            messages.error(request, "This PIP has already been decided and cannot be modified.")
+            messages.error(
+                request, "This PIP has already been decided and cannot be modified."
+            )
             return redirect("pip_detail", pk=pip.pk)
 
         if action == "save_decisions":
@@ -667,9 +688,11 @@ def pip_admin_review(request, pk: int):
                 status_label = (
                     "accepted"
                     if finalized_pip.status == PipModel.STATUS_ACCEPTED
-                    else "partially accepted"
-                    if finalized_pip.status == PipModel.STATUS_ACCEPTED_PARTIAL
-                    else "rejected"
+                    else (
+                        "partially accepted"
+                        if finalized_pip.status == PipModel.STATUS_ACCEPTED_PARTIAL
+                        else "rejected"
+                    )
                 )
                 messages.success(request, f"PIP {status_label} — changes applied.")
             except ValidationError as exc:
@@ -703,3 +726,12 @@ def pip_admin_review(request, pk: int):
         },
     )
 
+
+def _processing_correlation_from_request(request: HttpRequest) -> str:
+    """Normalize X-Request-ID for normal PIP processing.
+
+    :param request: Real request. Example: authenticated pip_submit_review POST.
+    :return: Safe correlation. Example: "cedar-submit-01".
+    :raises ValueError: For an invalid request object.
+    """
+    raise NotImplementedError()

@@ -196,3 +196,49 @@ def get_galdr_client() -> GaldrClient:
         return GaldrClient()
     logger.info("Galdr using stub client (no live LLM)")
     return StubGaldrClient()
+
+
+@classmethod
+def _from_port(cls, llm: BaseLLM) -> "GaldrClient":
+    """Attach a provider port to the existing assessment parser client.
+
+    Do not add a raising constructor that changes current instantiation.
+
+    :param llm: Valid provider port. Example: ScriptedLLM([...]).
+    :return: Existing parser client using that port. Example: GaldrClient().
+    :raises ValueError: For an invalid provider port.
+    """
+    raise NotImplementedError()
+
+
+def _complete_via_port(
+    self, llm: BaseLLM, user_prompt: str, system: str, max_tokens: int
+) -> str:
+    """Request private assessment text for the existing unchanged parsers.
+
+    Preserve existing assessment token limits and convert LLMError to the
+    existing GaldrLLMError contract. No public-evidence filtering belongs here:
+    authorized private assessment and public summary are distinct requests.
+
+    :param llm: Selected provider port. Example: ScriptedLLM([...]).
+    :param user_prompt: Existing assessment prompt. Example: "Change [7]...".
+    :param system: Existing assessment system policy. Example: HOLISTIC_SYSTEM_PROMPT.
+    :param max_tokens: Existing bound. Example: 16384.
+    :return: Raw text for existing parsing. Example: valid holistic verdict JSON.
+    :raises GaldrLLMError: For provider, empty or truncated assessment output.
+    """
+    raise NotImplementedError()
+
+
+def _select_galdr_port(injected: BaseLLM | None) -> BaseLLM | None:
+    """Select explicit/scoped injection or the configured production adapter.
+
+    If no injection and GALDR_USE_ANTHROPIC is false, return None so existing
+    legacy StubGaldrClient selection remains unchanged. New agent proofs
+    explicitly inject ScriptedLLM and therefore do not use that stub.
+
+    :param injected: Optional explicit provider. Example: ScriptedLLM([...]).
+    :return: Provider or legacy-selection sentinel. Example: None.
+    :raises ValueError: For an invalid configured provider.
+    """
+    raise NotImplementedError()

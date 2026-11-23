@@ -64,3 +64,47 @@ def test_s27_summary_with_exhausted_script_fails_loudly(
     :raises AssertionError: For fallback prose or a success outcome.
     """
     raise NotImplementedError()
+
+
+@pytest.mark.agent_proof
+@pytest.mark.django_db(transaction=True)
+def test_s23_submission_agent_story_happy() -> None:
+    """Prove PRF-EXPERTS-01 through real submit/query/prompt/store orchestration.
+
+    :return: None. Example: None after trace, requests and unchanged-ledger assertions.
+    :raises AssertionError: If a real collaborator is bypassed or prose is not stored.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.agent_proof
+@pytest.mark.django_db(transaction=True)
+def test_s23_submission_agent_story_reject() -> None:
+    """Prove essential PRF-EXPERTS-02 failure retention and assessment continuity.
+
+    :return: None. Example: None after failure trace and last-good assertions.
+    :raises AssertionError: For domain_write on failure or changed PIP recovery.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.agent_proof
+@pytest.mark.django_db(transaction=True)
+def test_s23_submission_with_private_sentinels_agent_story_happy() -> None:
+    """Prove PRF-EXPERTS-03 using the actual recorded summary request.
+
+    :return: None. Example: None after public-fact retention and sentinel exclusions.
+    :raises AssertionError: For private/unpublished evidence or mutable scores.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.agent_proof
+@pytest.mark.django_db(transaction=True)
+def test_s23_summary_interaction_agent_story_happy() -> None:
+    """Prove PRF-OBS-01 persisted correlation, usage, latency and unknown cost.
+
+    :return: None. Example: None after configured-rate and missing-rate assertions.
+    :raises AssertionError: For missing trace metadata or fabricated zero cost.
+    """
+    raise NotImplementedError()

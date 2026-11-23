@@ -13,7 +13,7 @@ dependencies:
 - S03
 - S27
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - a90598a10c13c88296b27963b83a43890227977734f811ef9de14513a4adfca2
 - fcbb7fe459e18074b28e076c910d4473cd6cf1e2ab21ea669857f837f3e2fd12
@@ -318,3 +318,7 @@ The shared ScriptedLLM currently cannot prove what was actually sent to the prov
 S03 foundation → S27 public-evidence/prompt/validation → S23 orchestration avoids a dependency cycle with S10’s display behavior. These ownership decisions and the reserved migration filename must be reconciled before skeleton application.
 
 Suggested delivery commits after the separate plan/docs handoff: adapter/schema foundation; lifecycle+behavior+log+agent proofs together; real HTTP acceptance. Use `Refs #N` until the final scenario slice, then `Closes #N`, with corresponding issue updates. PIN-04/05 owns publication and the combined human GO.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S23.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

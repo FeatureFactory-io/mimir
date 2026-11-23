@@ -1,0 +1,33 @@
+{
+  "scenario": "S23",
+  "status": "structural_skeleton_only",
+  "new_unimplemented_callables": 66,
+  "checks": [
+    {
+      "gate": "test-experts-s23",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S23-checkpoint.cast"
+    },
+    {
+      "gate": "test-experts-s23-log",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S23-log.cast"
+    },
+    {
+      "gate": "test-experts-s23-agent",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S23-agent.cast"
+    },
+    {
+      "gate": "test-experts-s23-at",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S23-at.cast"
+    }
+  ],
+  "behavior_implemented": false,
+  "existing_callable_AST": "unchanged"
+}

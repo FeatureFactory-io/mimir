@@ -19,29 +19,35 @@ from .team_playbook import TeamPlaybook
 from .notification import Notification
 
 __all__ = [
-    'Playbook',
-    'PlaybookVersion',
-    'VersionSource',
-    'ProcessImprovementProposal',
-    'PipChange',
-    'UserPIPListVisit',
-    'Workflow',
-    'Phase',
-    'Activity',
-    'ActivityWorkflowMembership',
-    'Artifact',
-    'ArtifactInput',
-    'Skill',
-    'Agent',
-    'Rule',
-    'Team',
-    'TeamMembership',
-    'JoinRequest',
-    'TeamPlaybook',
-    'Notification',
+    "Playbook",
+    "PlaybookVersion",
+    "VersionSource",
+    "ProcessImprovementProposal",
+    "PipChange",
+    "UserPIPListVisit",
+    "Workflow",
+    "Phase",
+    "Activity",
+    "ActivityWorkflowMembership",
+    "Artifact",
+    "ArtifactInput",
+    "Skill",
+    "Agent",
+    "Rule",
+    "Team",
+    "TeamMembership",
+    "JoinRequest",
+    "TeamPlaybook",
+    "Notification",
 ]
 
 from .karma_award import EventChannel, KarmaAward
 from .expert_profile import ExpertProfile
 
 __all__ += ["EventChannel", "KarmaAward", "ExpertProfile"]
+
+# PIN S23: wire the reviewed GALDR-SUMMARY-01 collaborators after PIN-05 GO; preserve current behavior.
+
+from .agent_interaction import AgentInteraction
+
+__all__ += ["AgentInteraction"]
