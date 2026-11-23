@@ -1,0 +1,1052 @@
+[
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "leaderboard",
+    "viewport": {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-leaderboard-wide-low.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "empty",
+    "viewport": {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-empty-wide-low.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "guest-list",
+    "viewport": {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-list-wide-low.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "loading",
+    "viewport": {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-loading-wide-low.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "error",
+    "viewport": {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-error-wide-low.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "public-profile",
+    "viewport": {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-public-profile-wide-low.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "guest-profile",
+    "viewport": {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-profile-wide-low.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "no-public-evidence",
+    "viewport": {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-no-public-evidence-wide-low.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-PROFILE-VIEW-1",
+    "variant": "own-profile",
+    "viewport": {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-own-profile-wide-low.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing profile"
+  },
+  {
+    "screen_id": "FOB-PLAYBOOKS-VIEW_PLAYBOOK-1",
+    "variant": "playbook",
+    "viewport": {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-playbook-wide-low.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing playbook collection view"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "leaderboard",
+    "viewport": {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-leaderboard-large-desktop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "empty",
+    "viewport": {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-empty-large-desktop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "guest-list",
+    "viewport": {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-list-large-desktop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "loading",
+    "viewport": {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-loading-large-desktop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "error",
+    "viewport": {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-error-large-desktop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "public-profile",
+    "viewport": {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-public-profile-large-desktop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "guest-profile",
+    "viewport": {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-profile-large-desktop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "no-public-evidence",
+    "viewport": {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-no-public-evidence-large-desktop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-PROFILE-VIEW-1",
+    "variant": "own-profile",
+    "viewport": {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-own-profile-large-desktop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing profile"
+  },
+  {
+    "screen_id": "FOB-PLAYBOOKS-VIEW_PLAYBOOK-1",
+    "variant": "playbook",
+    "viewport": {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-playbook-large-desktop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing playbook collection view"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "leaderboard",
+    "viewport": {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-leaderboard-laptop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "empty",
+    "viewport": {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-empty-laptop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "guest-list",
+    "viewport": {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-list-laptop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "loading",
+    "viewport": {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-loading-laptop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "error",
+    "viewport": {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-error-laptop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "public-profile",
+    "viewport": {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-public-profile-laptop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "guest-profile",
+    "viewport": {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-profile-laptop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "no-public-evidence",
+    "viewport": {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-no-public-evidence-laptop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-PROFILE-VIEW-1",
+    "variant": "own-profile",
+    "viewport": {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-own-profile-laptop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing profile"
+  },
+  {
+    "screen_id": "FOB-PLAYBOOKS-VIEW_PLAYBOOK-1",
+    "variant": "playbook",
+    "viewport": {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-playbook-laptop.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing playbook collection view"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "leaderboard",
+    "viewport": {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-leaderboard-tablet-portrait.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "empty",
+    "viewport": {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-empty-tablet-portrait.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "guest-list",
+    "viewport": {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-list-tablet-portrait.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "loading",
+    "viewport": {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-loading-tablet-portrait.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "error",
+    "viewport": {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-error-tablet-portrait.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "public-profile",
+    "viewport": {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-public-profile-tablet-portrait.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "guest-profile",
+    "viewport": {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-profile-tablet-portrait.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "no-public-evidence",
+    "viewport": {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-no-public-evidence-tablet-portrait.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-PROFILE-VIEW-1",
+    "variant": "own-profile",
+    "viewport": {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-own-profile-tablet-portrait.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing profile"
+  },
+  {
+    "screen_id": "FOB-PLAYBOOKS-VIEW_PLAYBOOK-1",
+    "variant": "playbook",
+    "viewport": {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-playbook-tablet-portrait.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing playbook collection view"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "leaderboard",
+    "viewport": {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-leaderboard-tablet-landscape.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "empty",
+    "viewport": {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-empty-tablet-landscape.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "guest-list",
+    "viewport": {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-list-tablet-landscape.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "loading",
+    "viewport": {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-loading-tablet-landscape.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "error",
+    "viewport": {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-error-tablet-landscape.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "public-profile",
+    "viewport": {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-public-profile-tablet-landscape.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "guest-profile",
+    "viewport": {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-profile-tablet-landscape.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "no-public-evidence",
+    "viewport": {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-no-public-evidence-tablet-landscape.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-PROFILE-VIEW-1",
+    "variant": "own-profile",
+    "viewport": {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-own-profile-tablet-landscape.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing profile"
+  },
+  {
+    "screen_id": "FOB-PLAYBOOKS-VIEW_PLAYBOOK-1",
+    "variant": "playbook",
+    "viewport": {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-playbook-tablet-landscape.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing playbook collection view"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "leaderboard",
+    "viewport": {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-leaderboard-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "empty",
+    "viewport": {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-empty-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "guest-list",
+    "viewport": {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-list-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "loading",
+    "viewport": {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-loading-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "error",
+    "viewport": {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-error-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "public-profile",
+    "viewport": {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-public-profile-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "guest-profile",
+    "viewport": {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-profile-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "no-public-evidence",
+    "viewport": {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-no-public-evidence-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-PROFILE-VIEW-1",
+    "variant": "own-profile",
+    "viewport": {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-own-profile-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing profile"
+  },
+  {
+    "screen_id": "FOB-PLAYBOOKS-VIEW_PLAYBOOK-1",
+    "variant": "playbook",
+    "viewport": {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-playbook-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing playbook collection view"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "leaderboard",
+    "viewport": {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-leaderboard-minimum-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "empty",
+    "viewport": {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-empty-minimum-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "guest-list",
+    "viewport": {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-list-minimum-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "loading",
+    "viewport": {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-loading-minimum-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERTS-LIST+FIND-1",
+    "variant": "error",
+    "viewport": {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-error-minimum-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "ranked cards"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "public-profile",
+    "viewport": {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-public-profile-minimum-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "guest-profile",
+    "viewport": {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-guest-profile-minimum-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-EXPERT-VIEW-1",
+    "variant": "no-public-evidence",
+    "viewport": {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-no-public-evidence-minimum-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "8+4 read/context"
+  },
+  {
+    "screen_id": "FOB-PROFILE-VIEW-1",
+    "variant": "own-profile",
+    "viewport": {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-own-profile-minimum-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing profile"
+  },
+  {
+    "screen_id": "FOB-PLAYBOOKS-VIEW_PLAYBOOK-1",
+    "variant": "playbook",
+    "viewport": {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    },
+    "result": "passed geometry, interactions and visual review",
+    "screenshot": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/screenshots/ESM06-v2-playbook-minimum-phone.png",
+    "reviewer": "implementing agent",
+    "exception": null,
+    "visual_review": "Reviewed actual browser screenshots in viewport review sheets; UX-01 tooltip clipping corrected with Bootstrap and checked against viewport bounds.",
+    "recipe": "existing playbook collection view"
+  }
+]
