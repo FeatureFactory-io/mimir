@@ -157,7 +157,7 @@ def live_server(
 ) -> Generator[live_server_helper.LiveServer, None, None]:
     """Django live server — session-scoped by default; set E2E_LIVE_SERVER_SCOPE=function to override."""
     if e2e_live_server_scope() == "function":
-        yield from request.getfixturevalue("_live_server_function")
+        yield request.getfixturevalue("_live_server_function")
     else:
         yield request.getfixturevalue("_live_server_session")
 
