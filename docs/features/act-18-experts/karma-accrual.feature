@@ -65,26 +65,6 @@ Feature: FOB-KARMA-ACCRUAL-1 Award contribution points for eligible events
     When Maria's PIP is draft, submitted, processing, reviewed or rejected without an accepted eligible change
     Then her total remains 8200
 
-  Scenario: KARMA-COPY-01 Credit a successful authenticated copy to both parties
-    Given Maria is authenticated
-    When she successfully copies Mike's public released activity 6203
-    Then the clipboard receives the actual activity prompt
-    And Maria's total becomes 8205 and Mike's becomes 12455
-    And both awards belong to Development
-
-  Scenario: KARMA-COPY-02 Let guests copy without creating an award
-    Given Bob is an anonymous visitor
-    When he copies Mike's public released activity 6203
-    Then the clipboard receives the actual activity prompt
-    And Mike remains at 12450
-    And no account or Karma award is created for Bob
-
-  Scenario: KARMA-COPY-03 Do not award self-copy
-    Given Mike is authenticated
-    When he copies his own activity 6203
-    Then the clipboard receives the actual activity prompt
-    And Mike remains at 12450
-
   Scenario Outline: KARMA-MCP-01 Credit eligible authenticated detail reads
     Given <consumer> has a valid MCP token and existing permission to read the independent <entity> fixture
     When the consumer reads that content using <tool>

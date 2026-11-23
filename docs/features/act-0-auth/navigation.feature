@@ -98,18 +98,3 @@ Feature: FOB-DASHBOARD-1 Dashboard and Navigation
     When she views the "Recently Contributed" section
     Then she sees "3 in last 24h" with data-testid "recently-used-window-count"
     And she does not see "83 recent" or a total-accessible-activities count in the section header
-
-  @wip @experts
-  Scenario: FOB-NAV-EXPERTS-01 Discover Experts in the existing app sidebar
-    Given Elena is authenticated in FOB
-    When she opens the Collaborate section of the app sidebar
-    Then Experts is a link to "/experts/" with data-testid "nav-experts"
-    When she follows Experts
-    Then "experts-leaderboard" is present and Experts is the active navigation item
-
-  @wip @experts @guest
-  Scenario: FOB-NAV-EXPERTS-02 Guest Experts navigation stays public
-    Given Bob is an anonymous visitor
-    When he follows Experts from the app sidebar
-    Then he reaches "/experts/" without a login redirect
-    And the guest banner explains sign-in and registration

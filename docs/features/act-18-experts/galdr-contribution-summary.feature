@@ -14,12 +14,6 @@ Feature: FOB-GALDR-CONTRIBUTION-SUMMARY-1 Refresh stable public contribution pro
     And the successful public summary is stored on her profile
     And it contains at most 14 sentences
 
-  Scenario: GALDR-SUMMARY-02 Present one stored summary consistently
-    Given Maria's contribution summary has refreshed
-    Then her own profile and public expert detail show that stored text
-    And her leaderboard hint is a visually truncated excerpt of it
-    And the public detail retains the complete paragraph
-
   Scenario: GALDR-SUMMARY-03 Refresh on normal withdrawal and resubmission
     Given Maria's PIP has reached Reviewed
     When she withdraws it and resubmits through the normal allowed lifecycle

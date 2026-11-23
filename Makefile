@@ -119,7 +119,7 @@ test-at-harness: ## Prove the Django-client acceptance harness on its real test 
 	DJANGO_SETTINGS_MODULE=mimir.settings.acceptance $(PYTHON) manage.py behave --simple --tags=@harness docs/features/act-0-auth/test-harness.feature
 
 test-at-experts: ## Run implemented Experts living specifications, excluding WIP
-	DJANGO_SETTINGS_MODULE=mimir.settings.acceptance $(PYTHON) manage.py behave --simple --tags='@experts and not @wip' docs/features/act-18-experts/ docs/features/act-0-auth/navigation.feature
+	DJANGO_SETTINGS_MODULE=mimir.settings.acceptance $(PYTHON) manage.py behave --simple --tags='@experts and not @wip' docs/features/act-18-experts/ docs/features/act-0-auth/experts-navigation.feature
 
 .PHONY: test-agent-experts
 test-agent-experts: ## Required Experts agent proofs after BPE; missing/empty suite fails

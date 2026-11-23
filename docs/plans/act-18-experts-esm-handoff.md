@@ -9,10 +9,12 @@ baseline, not by copying the reference branch's implementation.
 
 The six reference feature areas remain: leaderboard, public profile, contact,
 own profile, contribution-summary refresh and Karma accrual. Their specification
-now contains 47 scenario contracts; two existing-navigation additions bring AT scope to
-49. Five separate E2E contracts and four manual UAT contracts bring the current
-inventory to 58, before outline examples are expanded. This count describes
-requirements, not passing feature tests. New feature scenarios remain `@wip`.
+contains 49 planned acceptance contracts, including the two navigation additions.
+The PIN review places 43 in Django-client AT and six actual-interaction contracts
+in browser certification. Five additional journey/viewport contracts and four
+manual UAT contracts preserve 58 unique IDs. Outline expansion yields 83 server
+AT cases and 23 browser cases, plus four manual UAT contracts. These are
+requirements counts, not passing feature tests. All remain `@wip`.
 
 ## Artifact chain
 
@@ -23,8 +25,8 @@ requirements, not passing feature tests. New feature scenarios remain `@wip`.
 | Domain data contract | `test-data/experts/cedar-rfp-01.json` | Defined; model adapter belongs to implementation |
 | IA and responsive contract | `docs/ux/IA_guidelines.md` §11 | Existing Mimir tokens/recipes, seven exact viewports |
 | Dialogue map | `docs/ux/2_dialogue-maps/experts-flow.drawio`, `.dot`, `.svg` | Editable source and rendered flow |
-| Living AT specification | `docs/features/act-18-experts/*.feature`, navigation additions | Parsed; bindings and behavior still pending |
-| E2E extension | `tests/e2e/experts-journey.feature` | Browser-only jobs/geometry, separate from AT |
+| Living AT specification | `docs/features/act-18-experts/*.feature`, `docs/features/act-0-auth/experts-navigation.feature` | 43 parsed contracts; bindings and behavior still pending |
+| Browser acceptance and E2E extension | `tests/e2e/experts-interactions.feature`, `experts-journey.feature` | Six full interaction contracts plus five jobs/viewport contracts; separate from AT |
 | UAT extension | `tests/uat/e2e-uat-flow.feature`, UAT-18 | DO/SEE/RECORD/IF DIFFER; not executed as implemented product |
 | TAF assets and gaps | `docs/ux/experts-test-assets.md`, `docs/features/CATALOG.md`, `tests/fixtures/CATALOG.md` | Existing reuse mapped; scoped harness bootstrapped; Cedar adapter/bindings pending |
 | Django prototypes | `/mockups/experts/`, `/mockups/experts/mrodriguez/`, `/mockups/experts/profile/`, `/mockups/experts/playbooks/6101/` | Fixture-only, shared shell/banner/inventory |
@@ -32,8 +34,12 @@ requirements, not passing feature tests. New feature scenarios remain `@wip`.
 
 ## Verification performed
 
-- Gherkin parsed with the official parser, including the modified navigation,
-  E2E and UAT files. Scenario IDs are unique in `scenario-index.json`.
+- The official parser accepts all scoped Experts server and browser specification
+  files. Scenario IDs remain unique in `scenario-index.json`. The two Experts
+  navigation additions were relocated from malformed legacy prose with an
+  unrelated authenticated Background into their own Cedar-backed feature.
+  The six browser-backed contracts moved without changing any statement or ID;
+  clipboard, hover and visual layout are not simulated in Django-client AT.
 - All eleven prototype variants rendered at all seven IA viewports. Category
   ordering, primary color, Montserrat, overflow, contact restrictions, keyboard
   explanation, summary toggle and narrow detail stacking were checked.
@@ -63,16 +69,19 @@ SQLite DB and file-mail directory live under the production package's
 `runs/session-01/`. Production/idle databases have not received Cedar records.
 
 Capture combines real PTY cast/transcript files, Playwright videos/traces and
-native Cursor screenshots. The desktop tool denied Terminal access; the Mac
-later locked, pausing further native editor screenshots. Those constraints are
-logged; no later view will be labeled as original keystroke footage. Narration
-uses a male voice; the Daniel rehearsal is recorded.
+native Cursor screenshots, as Denis selected. Capture resumed after he unlocked
+the Mac; a later lock paused new native frames. CLI/browser recording continues.
+The CLI export rehearsal preserves actual output and timing, labels replay and
+source hash, and passed H.264/yuv420p/1080p inspection. No later view is labeled
+as original keystroke footage. Narration uses a male voice; Daniel was rehearsed.
 
 ## Next gates
 
-The architecture/test-strategy delta and scoped TFK harness/catalog bootstrap
-are recorded; their checks must pass before PIN readiness and orientation. Then
-contract each scenario with actual skeleton footprints and checkpoints. Publish
+The architecture/test-strategy delta and scoped TFK prerequisites passed their
+recorded checks. Denis confirmed all 49 contracts together; every dedicated
+read-only planning report has returned. Reconcile the complete plans, then
+apply only structural unimplemented skeletons with actual footprints/checkpoints.
+Publish
 the concrete issue/manifest package for PIN-05 human GO. Only then implement
 production behavior through BPE inside MIN, run AT/E2E/visual/UAT, and reach the
 real human merge/release gates. No production Experts feature, actual provider

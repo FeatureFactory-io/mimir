@@ -12,17 +12,6 @@ Feature: FOB-PROFILE-VIEW-1 Understand my contribution record
     And the primary playbook category is "Design"
     And existing account/profile controls remain available
 
-  Scenario: EXPERTS-PROFILE-02 Expand and collapse the long stored summary
-    Given Maria is authenticated and her stored paragraph exceeds four lines
-    When she opens her own profile
-    Then the summary initially displays a four-line preview
-    And Show more has aria-expanded "false"
-    When she activates Show more
-    Then the full stored paragraph is visible
-    And the control reads Show less with aria-expanded "true"
-    When she activates Show less
-    Then the four-line preview is restored
-
   Scenario: EXPERTS-PROFILE-03 Display four source rows that reconcile
     Given Maria is authenticated
     When she opens her own profile
