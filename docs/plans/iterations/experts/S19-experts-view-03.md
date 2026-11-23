@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S17
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - a246e8f16967da616a2263b54fe42d21d2adb41db0088a7fd129811e4f0a7893
 ```
@@ -225,3 +225,7 @@ Proposed footprint: the three new Python files above; append-only `Makefile` and
 PIN-04 owns issue publication and docs handoff; PIN-05 owns human GO. Then four node commits use Angular format and `Refs #N`; final certified commit uses `Closes #N`. Required issue updates cite each slice SHA, result and next node. No commit/issue operation was performed here.
 
 **Lessons Learned:** Existing guest routes already provide the destination behavior; the missing feature boundary is the Experts evidence projection, owned by S17. `can_view()` alone would admit broader authenticated content. A prototype evidence button can look correct while pointing to a mockup, so certification must follow the rendered production href through both existing screens. Existing local BPE-05 prose describes an obsolete Behave E2E runner; actual repository Playwright fixtures/settings and the replay precedence govern these browser gates.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S19.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

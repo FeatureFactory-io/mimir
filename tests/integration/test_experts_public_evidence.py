@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from django.test import Client
+from tests.support.experts_data import CedarDataset, load_cedar_baseline
+
 """S27 real-database public evidence, prompt, validator and log contracts."""
 from collections.abc import Mapping
 from typing import Any
@@ -101,5 +104,48 @@ def test_public_evidence_log_story_reject(
     :param caplog: Captured logging. Example: sanitized failure records.
     :return: None when the rejected log story passes.
     :raises AssertionError: For missing error context or sensitive logging.
+    """
+    raise NotImplementedError()
+
+
+@pytest.fixture
+def s19_cedar_dataset(db: None) -> CedarDataset:
+    """Load real Cedar objects without replaying live event hooks.
+
+    :param db: Isolated pytest database. Example: None.
+    :return: Cedar dataset. Example: dataset.playbooks_by_pk[6101].
+    :raises ValueError: If Cedar source data is invalid.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("username", ["esvensson", None])
+def test_public_evidence_with_cedar_release_links_existing_detail_route(
+    client: Client, s19_cedar_dataset: CedarDataset, username: str | None
+) -> None:
+    """Verify title/version, rendered href and real 200 destination.
+
+    :param client: Real Django client. Example: Client().
+    :param s19_cedar_dataset: Real Cedar objects. Example: playbook 6101.
+    :param username: Actor or guest. Example: "esvensson".
+    :return: None. Example: None after checking the extracted href.
+    :raises AssertionError: If href, version, badges or response differ.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("username", ["esvensson", None])
+def test_public_evidence_with_followed_workflow_exposes_cedar_activities(
+    client: Client, s19_cedar_dataset: CedarDataset, username: str | None
+) -> None:
+    """Follow rendered playbook and workflow anchors into real content.
+
+    :param client: Real Django client. Example: Client().
+    :param s19_cedar_dataset: Real Cedar graph. Example: playbook 6101.
+    :param username: Actor or guest. Example: None for anonymous.
+    :return: None. Example: None after checking all three Cedar activities.
+    :raises AssertionError: If a route redirects, fails or lacks the activity chain.
     """
     raise NotImplementedError()
