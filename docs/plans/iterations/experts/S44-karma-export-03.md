@@ -16,7 +16,7 @@ dependencies:
 - S41
 - S42
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - a5c3f04b1bad5c695489d64f8825d5ae81f2261f2c71094f375c96b16bf9266d
 ```
@@ -235,3 +235,7 @@ PIN-04/05 owns concrete issue/handoff publication and GO. Later certification sl
 4. Current service can update workflow abbreviation during import. Matching the prepared directory and target abbreviation avoids unrelated mutation without hiding it.
 5. Global immutable snapshots are stronger than Maria-only totals: they detect accidental Mike/unrelated awards, timestamp changes and summary regeneration.
 6. If future proofs expose a production regression, report its concrete evidence to the parent before adding production files or changing import semantics.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S44.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
