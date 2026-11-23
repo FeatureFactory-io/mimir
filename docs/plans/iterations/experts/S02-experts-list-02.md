@@ -13,7 +13,7 @@ dependencies:
 - S03
 - S01
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 9ae81c0ad2e87344fcf2030c94922be4e8cbab86442eab3daf454a3dedc47d51
 ```
@@ -233,3 +233,7 @@ feature_execution_graph:
 ## Lessons Learned
 
 The category controls already have a concrete prototype recipe, but production behavior is absent at this baseline. Assigning the complete list to S03 avoids duplicate parsers and ownership cycles. S02 still needs S01’s shared URL binding for its exact living specification. Global pytest options ignore E2E, so every browser gate must explicitly clear `addopts`. No tests were run and no files were written during this read-only planning task.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S02.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
