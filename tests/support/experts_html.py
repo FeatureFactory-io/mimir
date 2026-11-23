@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from django.http import HttpResponse
+
 from collections.abc import Iterator
 from django.test.html import Element, parse_html
 
@@ -54,5 +56,25 @@ def _text_fragments(element: Element) -> Iterator[str]:
     :param element: Parsed element. Example: a score span.
     :return: Ordered string fragments. Example: iterated "8,200".
     :raises ValueError: For a non-Element input.
+    """
+    raise NotImplementedError()
+
+
+def assert_no_expert_cards(response: HttpResponse) -> None:
+    """Assert a successful leaderboard has no contributor cards.
+
+    :param response: Real Django response. Example: client.get("/experts/?category=other").
+    :return: None when HTTP 200 and zero experts-card-* nodes are present.
+    :raises AssertionError: If status, leaderboard or card absence differs.
+    """
+    raise NotImplementedError()
+
+
+def assert_other_empty_message(response: HttpResponse) -> None:
+    """Assert exact Other explanation and current category.
+
+    :param response: Real Django response. Example: client.get("/experts/?category=other").
+    :return: None when experts-empty text is exact and Other is current.
+    :raises AssertionError: If status, element text or aria-current differs.
     """
     raise NotImplementedError()

@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S03
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - b8a05dcf48d7d896379c863efc94ef4fd1607fe2cae6109c9a34e5a6d68abc7f
 ```
@@ -181,3 +181,7 @@ The feature-level `@wip` tag makes the existing aggregate Experts target insuffi
 Browser configuration has deliberate plugin exclusions. Clearing `addopts` requires retaining those exclusions explicitly; browser checks remain separate from ordinary HTTP/caplog runs.
 
 No unresolved infrastructure or scope proposal, new architectural decision, or time estimate. Actual passes and final footprints remain unverified until authorized implementation.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S06.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
