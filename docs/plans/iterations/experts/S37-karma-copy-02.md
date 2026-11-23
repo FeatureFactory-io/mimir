@@ -14,7 +14,7 @@ dependencies:
 - S07
 - S36
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 701c21211322aeeac061597299338c602fbbf6a9eab97a35c0be0ca07e5372b1
 ```
@@ -202,3 +202,7 @@ feature_execution_graph:
 ## Lessons Learned
 
 The existing guest HTML test proves control availability only. Actual clipboard equality and zero observed receipt requests require browser execution. Bob is explicitly accountless in Cedar, so certify unchanged account/profile sets rather than inventing a guest user. S36’s older raw AT description must not turn its shared clipboard phrase into a markup assertion; this plan uses the parent’s corrected verification-layer ownership. All evidence remains pending implementation and execution.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S37.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
