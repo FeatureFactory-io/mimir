@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S10
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 24e18a9b5806e007e79f3e0c4ee01bf775ba5266eab7ccfd7c2d00b472b875cb
 ```
@@ -326,3 +326,7 @@ feature_execution_graph:
 - Generic Behave phrase ownership must be explicit: reuse S07/S03 instead of registering locally convenient duplicates.
 - Global pytest configuration and feature-level WIP selection can conceal tests; use the scoped commands and require actual execution counts.
 - No architecture amendment identified; these assertions enforce the existing SAO contract.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S13.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
