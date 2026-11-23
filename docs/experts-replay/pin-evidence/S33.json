@@ -1,0 +1,27 @@
+{
+  "scenario": "S33",
+  "status": "structural_skeleton_only",
+  "new_unimplemented_callables": 12,
+  "checks": [
+    {
+      "gate": "test-experts-s33",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S33-checkpoint.cast"
+    },
+    {
+      "gate": "test-experts-s33-log",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S33-log.cast"
+    },
+    {
+      "gate": "test-experts-s33-at",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S33-at.cast"
+    }
+  ],
+  "behavior_implemented": false,
+  "existing_callable_AST": "unchanged"
+}

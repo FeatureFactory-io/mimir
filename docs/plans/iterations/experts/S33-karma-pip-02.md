@@ -12,7 +12,7 @@ expanded_case_count: 20
 dependencies:
 - S32
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - da438dce2cc147d34e49ade3a65b2d848e88ac902ca23a75ee4c5d7daf7a5603
 ```
@@ -219,3 +219,7 @@ feature_execution_graph:
 - DROP tests need valid deletion preconditions and durable IDs, otherwise a classification test can pass without proving successful application.
 - Historical Maria PIP points already exist; independent baseline restoration and event-specific deltas prevent accidental replay.
 - Reviewed fixture certification is deliberately narrower than Galdr lifecycle certification. All gates above remain unexecuted.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S33.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

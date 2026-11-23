@@ -58,3 +58,19 @@ def assert_major_add_local_notification(context: Context) -> None:
     :raises AssertionError: If recipient, body, count or delivery timing differs.
     """
     raise NotImplementedError()
+
+
+@when("an Administrator accepts Maria's independent {operation} {entity} change")
+def accept_maria_independent_minor_change(
+    context: Context, operation: str, entity: str
+) -> None:
+    """Finalize one real Reviewed case through the existing staff POST.
+
+    :param context: Isolated AT context. Example: context.cedar_dataset.
+    :param operation: Exact Example operation. Example: "DROP".
+    :param entity: Exact Example entity. Example: "Phase".
+    :return: None. Example: shared PIP/change/target/response context populated.
+    :raises AssertionError: For failed effect, publication, receipt or local mail.
+    :raises ValueError: For an unsupported Example value.
+    """
+    raise NotImplementedError()
