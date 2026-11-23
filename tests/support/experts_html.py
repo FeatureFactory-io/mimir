@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 
 from django.http import HttpResponse
-
-from collections.abc import Iterator
-from django.test.html import Element, parse_html
+from django.test.html import Element, HTMLParseError, parse_html
 
 
 def find_by_test_id(html: str | bytes, test_id: str) -> Element:
@@ -19,7 +17,17 @@ def find_by_test_id(html: str | bytes, test_id: str) -> Element:
     :raises AssertionError: If zero or multiple elements match.
     :raises ValueError: For blank selector or malformed input type.
     """
-    raise NotImplementedError()
+    if not isinstance(test_id, str) or not test_id.strip():
+        raise ValueError("A nonblank test ID is required.")
+    matches = [
+        element
+        for element in _walk_elements(_parse_root(html))
+        if ("data-testid", test_id) in element.attributes
+    ]
+    assert (
+        len(matches) == 1
+    ), f"Expected one data-testid={test_id!r}, found {len(matches)}"
+    return matches[0]
 
 
 def element_text(element: Element) -> str:
@@ -29,7 +37,7 @@ def element_text(element: Element) -> str:
     :return: Normalized visible textual content. Example: "Maria Rodriguez 8,200".
     :raises ValueError: For an invalid element.
     """
-    raise NotImplementedError()
+    return " ".join(" ".join(_text_fragments(element)).split())
 
 
 def _walk_elements(root: Element) -> Iterator[Element]:
@@ -39,7 +47,12 @@ def _walk_elements(root: Element) -> Iterator[Element]:
     :return: Iterator including root. Example: iterated article then children.
     :raises ValueError: For a non-Element root.
     """
-    raise NotImplementedError()
+    if not isinstance(root, Element):
+        raise ValueError("A Django HTML Element is required.")  # noqa: TRY004
+    yield root
+    for child in root.children:
+        if isinstance(child, Element):
+            yield from _walk_elements(child)
 
 
 def _parse_root(html: str | bytes) -> Element:
@@ -49,7 +62,12 @@ def _parse_root(html: str | bytes) -> Element:
     :return: Parsed root. Example: an Element named "section".
     :raises ValueError: For unsupported type or invalid decoding.
     """
-    raise NotImplementedError()
+    if not isinstance(html, (str, bytes)):
+        raise ValueError("HTML must be text or UTF-8 bytes.")  # noqa: TRY004
+    try:
+        return parse_html(html.decode("utf-8") if isinstance(html, bytes) else html)
+    except (UnicodeDecodeError, HTMLParseError) as error:
+        raise ValueError("Could not parse the response as HTML.") from error
 
 
 def _text_fragments(element: Element) -> Iterator[str]:
@@ -59,7 +77,13 @@ def _text_fragments(element: Element) -> Iterator[str]:
     :return: Ordered string fragments. Example: iterated "8,200".
     :raises ValueError: For a non-Element input.
     """
-    raise NotImplementedError()
+    if not isinstance(element, Element):
+        raise ValueError("A Django HTML Element is required.")  # noqa: TRY004
+    for child in element.children:
+        if isinstance(child, Element):
+            yield from _text_fragments(child)
+        else:
+            yield child
 
 
 def assert_no_expert_cards(response: HttpResponse) -> None:
