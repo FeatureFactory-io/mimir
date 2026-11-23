@@ -1,5 +1,8 @@
 """CAP-004 ordered model responses for tests only; never a runtime fallback."""
 
+from __future__ import annotations
+from dataclasses import dataclass
+
 import logging
 from collections.abc import Sequence
 
@@ -58,6 +61,33 @@ class ScriptedLLM:
             return response
         return LLMResponse(content=response, model=self.model_id)
 
+    @property
+    def calls(self) -> tuple[ScriptedLLMCall, ...]:
+        """Expose immutable request copies for before-provider privacy proofs.
+
+        :return: Actual recorded calls. Example: (first_public_summary_call,).
+        :raises RuntimeError: If capture state is inconsistent.
+        """
+        raise NotImplementedError()
+
+    def _record_call(
+        self,
+        messages: Sequence[LLMMessage],
+        system: str,
+        max_tokens: int,
+        temperature: float,
+    ) -> None:
+        """Capture a validated actual request without changing queue semantics.
+
+        :param messages: Actual normalized messages. Example: public evidence data.
+        :param system: Actual layered policy. Example: summarizer safety/identity.
+        :param max_tokens: Output limit. Example: 1024.
+        :param temperature: Sampling value. Example: 0.2.
+        :return: None.
+        :raises ValueError: For malformed capture arguments.
+        """
+        raise NotImplementedError()
+
 
 def _validate_request(
     messages: Sequence[LLMMessage], system: str, max_tokens: int, temperature: float
@@ -87,3 +117,13 @@ def _validate_request(
         raise ValueError("max_tokens must be a positive integer")
     if not isinstance(temperature, (float, int)) or not 0 <= temperature <= 1:
         raise ValueError("temperature must be between zero and one")
+
+
+@dataclass(frozen=True)
+class ScriptedLLMCall:
+    """Immutable actual request capture retained only in test memory."""
+
+    messages: tuple[LLMMessage, ...]
+    system: str
+    max_tokens: int
+    temperature: float

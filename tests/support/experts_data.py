@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -348,5 +351,14 @@ def _verify_cedar_projection(dataset: CedarDataset) -> None:
     :param dataset: Complete actual baseline and independent oracle. Example: dataset.
     :return: None. Example: None.
     :raises AssertionError: For any persisted/oracle mismatch.
+    """
+    raise NotImplementedError()
+
+
+def seed_s27_summary_privacy_variant() -> Mapping[str, Any]:
+    """Extend the real Cedar baseline with independent privacy/publication cases.
+
+    :return: Real ORM rows and expected sentinels. Example: Maria plus draft PIPs.
+    :raises ValueError: If baseline/publication receipt invariants do not reconcile.
     """
     raise NotImplementedError()

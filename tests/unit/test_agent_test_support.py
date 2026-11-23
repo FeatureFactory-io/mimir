@@ -105,3 +105,12 @@ def test_agent_story_with_empty_requirements_rejects_vacuous_proof(workflow, bea
         assert_agent_story(
             {"workflow_id": "x", "events": []}, workflow=workflow, beats=beats
         )
+
+
+def test_scripted_llm_with_recorded_call_preserves_request_and_exhaustion() -> None:
+    """Prove immutable capture preserves actual request and loud exhaustion.
+
+    :return: None when capture, explicit errors and exhaustion remain correct.
+    :raises AssertionError: If capture mutates requests or changes queue semantics.
+    """
+    raise NotImplementedError()

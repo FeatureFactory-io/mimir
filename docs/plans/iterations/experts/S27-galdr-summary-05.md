@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S03
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - b1ad7a2fc13d4e3cb131f796863978a0f950ae348218c0e500ab16def37bb415
 ```
@@ -319,3 +319,7 @@ feature_execution_graph:
 5. A production body-free boundary trace makes the independent PRF genuine; lifecycle persistence remains S23’s responsibility.
 6. Cedar includes numerical language in its historical display fixture. The generated prompt must omit aggregate numerical contribution counts even when that canned display paragraph mentions them.
 7. No implementation, test assertion, provider call, file write or commit was performed by this worker.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S27.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
