@@ -1,0 +1,15 @@
+CASE PROP — fictional people, company and request
+
+Monday 23 November 2026, 09:10
+From: Noor Ibrahim, Bid Manager, Meridian Methods
+To: Elena Svensson, Competency Center Head
+Subject: Cedar RFP — accessibility contributor
+Due: Tuesday 24 November, 12:00
+
+We need one design contributor for the bank onboarding response. They must be
+able to discuss keyboard navigation, form errors and recovery. Please nominate
+someone and include an example of their published work.
+
+Elena's first note:
+I can name the most visible people. I cannot yet explain which one has the
+relevant contribution history.
