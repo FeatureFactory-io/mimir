@@ -1,9 +1,8 @@
 from __future__ import annotations
-
 from behave import then
 
-"""S10 Django-client acceptance bindings; no browser or model substitute."""
-from behave import given, then, when
+"S10 Django-client acceptance bindings; no browser or model substitute."
+from behave import given, when
 from behave.runner import Context
 
 
@@ -19,7 +18,10 @@ def maria_is_authenticated(context: Context) -> None:
 
 
 @when('she opens "{path}"')
-def maria_opens_profile_path(context: Context, path: str) -> None:
+@when("she opens her own profile")
+def maria_opens_profile_path(
+    context: Context, path: str = "/auth/user/profile/"
+) -> None:
     """Request a local route and retain the real response.
 
     :param context: Prepared authenticated context; example: Cedar Maria.

@@ -84,3 +84,12 @@ def test_profile_contribution_context_with_anonymous_request_log_story_reject(
     :raises AssertionError: If validation is bypassed or secrets are logged.
     """
     raise NotImplementedError()
+
+
+def test_own_profile_with_zero_karma_renders_neutral_category() -> None:
+    """Render Nora's authenticated existing profile with zero Karma and neutral category.
+
+    :return: None. Example: no category_label(None) failure or invented primary category.
+    :raises AssertionError: Account controls disappear, a category is invented or rendering fails.
+    """
+    raise NotImplementedError()

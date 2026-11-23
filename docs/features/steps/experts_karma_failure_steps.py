@@ -1,9 +1,11 @@
 from __future__ import annotations
+from behave import then, when
 
-"""S46 server-contract bindings; clipboard proof remains Playwright."""
+"S46 server-contract bindings; clipboard proof remains Playwright."
 from behave.runner import Context
 
 
+@when("a private read is denied or a clipboard write or export fails")
 def fail_or_deny_consumption(context: Context) -> None:
     """Run actual private-read denial and filesystem-service failure cases.
 
@@ -14,6 +16,7 @@ def fail_or_deny_consumption(context: Context) -> None:
     raise NotImplementedError()
 
 
+@then("no consumption award is created for either party")
 def assert_no_consumption_awards(context: Context) -> None:
     """Assert every captured server failure preserved the complete ledger.
 

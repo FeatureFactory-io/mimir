@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .playbook import Playbook
 from .process_improvement_proposal import ProcessImprovementProposal
 from .pip_change import PipChange

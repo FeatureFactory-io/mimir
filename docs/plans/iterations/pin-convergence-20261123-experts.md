@@ -103,6 +103,11 @@ uses a neutral category display. `experts_html.py` uses Django's existing HTML
 parser, list-of-pairs attributes and traversal including the root. S12 appends
 the shared source-row assertion used by S18.
 
+S03 also reserves the shared `experts/_breakdown.html` presentation component;
+own-profile and public-detail graduation consume that component. The shared
+`tests/support/experts_logs.py` context enables actual named loggers and restores
+their original configuration, without replacing production logging.
+
 ## Ledger and transaction contract
 
 Awards have recipient CASCADE, immutable optional integer content/change/entity

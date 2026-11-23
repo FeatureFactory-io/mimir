@@ -8,7 +8,7 @@ from typing import Any
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Mapping, Sequence
+from typing import Literal, Sequence
 from django.contrib.auth.models import User
 from methodology.models import (
     Activity,

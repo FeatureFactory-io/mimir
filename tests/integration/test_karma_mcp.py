@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-from tests.support.karma_mcp import (
-    mcp_client_factory,
-    mcp_dataset,
-    mcp_request_paths,
-    MCPClientFactory,
-    MCPDataset,
-)
+from tests.support.karma_mcp import MCPClientFactory, MCPDataset
 
 "Real MCP/HTTP/DB proofs for the nine eligible detail tools."
 import pytest
@@ -211,3 +205,6 @@ def test_phase_detail_with_actor_email_logs_only_identifiers(
     :raises AssertionError: Sensitive account metadata appears or read behavior changes.
     """
     raise NotImplementedError()
+
+
+pytest_plugins = ["tests.support.karma_mcp"]

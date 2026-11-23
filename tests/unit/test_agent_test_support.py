@@ -1,5 +1,7 @@
 """Failure-sensitive contracts for the agent test infrastructure."""
 
+from __future__ import annotations
+
 import pytest
 
 from methodology.llm.base import BaseLLM, LLMError, LLMMessage, LLMResponse

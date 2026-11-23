@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from behave import given, then, when
 from behave import given, then, when
 from behave.runner import Context
 
@@ -16,25 +16,30 @@ def prepare_maria_major_add_target(context: Context) -> None:
 
 
 @when("an Administrator accepts its eligible ADD {entity} change")
-def accept_maria_major_add(context: Context, entity: str) -> None:
-    """Create a reviewed real change and finalize through the administrator POST.
+@when("an Administrator accepts Maria's independent {operation} {entity} change")
+def accept_maria_change(context: Context, entity: str, operation: str = "ADD") -> None:
+    """Finalize one explicitly selected major/minor real reviewed fixture through the existing staff POST.
 
-    :param context: AT context with a real Django client. Example: context.client.
-    :param entity: Exact outline row. Example: "Artifact".
-    :return: None. Example: actual finalization response and change are retained.
-    :raises AssertionError: If authorization, application or finalization fails.
-    """
+    :param context: Real Cedar state and actual response. Example: Hana target v2.0.
+    :param entity: Exact major or minor matrix entity. Example: Activity or Workflow.
+    :param operation: Exact operation, default ADD for the major phrase. Example: ALTER.
+    :return: None after real application, publication and immutable award observation.
+    :raises AssertionError: Real permission, effect, version or award differs."""
     raise NotImplementedError()
 
 
-@then("Maria's total becomes 8700 and Design subtotal becomes 7700")
-def assert_maria_major_add_totals(context: Context) -> None:
-    """Assert live ledger projections and the submitter-only change award.
+@then("Maria's total becomes {total:d} and Design subtotal becomes {design:d}")
+@then("Maria's total becomes {total:d}")
+def assert_maria_pip_total(
+    context: Context, total: int, design: int | None = None
+) -> None:
+    """Assert the actual live total and optional Design subtotal after real finalization.
 
-    :param context: Context containing the real finalized change. Example: PIP 42.
-    :return: None. Example: Maria 8700/7700, Hana and administrator unchanged.
-    :raises AssertionError: If totals, recipient or immutable attribution differs.
-    """
+    :param context: Real finalized PIP and pre-event ledger snapshot. Example: context.cedar_dataset.
+    :param total: Expected actual overall total. Example: 8700 or 8300.
+    :param design: Optional expected Design subtotal. Example: 7700.
+    :return: None after recipient and immutable award reconciliation.
+    :raises AssertionError: Amount, category, recipient or unrelated state differs."""
     raise NotImplementedError()
 
 
@@ -60,22 +65,6 @@ def assert_major_add_local_notification(context: Context) -> None:
     raise NotImplementedError()
 
 
-@when("an Administrator accepts Maria's independent {operation} {entity} change")
-def accept_maria_independent_minor_change(
-    context: Context, operation: str, entity: str
-) -> None:
-    """Finalize one real Reviewed case through the existing staff POST.
-
-    :param context: Isolated AT context. Example: context.cedar_dataset.
-    :param operation: Exact Example operation. Example: "DROP".
-    :param entity: Exact Example entity. Example: "Phase".
-    :return: None. Example: shared PIP/change/target/response context populated.
-    :raises AssertionError: For failed effect, publication, receipt or local mail.
-    :raises ValueError: For an unsupported Example value.
-    """
-    raise NotImplementedError()
-
-
 @when(
     "Maria's PIP is draft, submitted, processing, reviewed or rejected without an accepted eligible change"
 )
@@ -89,6 +78,7 @@ def exercise_maria_nonaccepted_states(context: Context) -> None:
     raise NotImplementedError()
 
 
+@given("Maria's PIP contains one ADD Activity and one ALTER Activity")
 def prepare_maria_partial_pip(context: Context) -> None:
     """Prepare the independent two-change fixture using the shared Cedar context.
 
@@ -99,6 +89,7 @@ def prepare_maria_partial_pip(context: Context) -> None:
     raise NotImplementedError()
 
 
+@when("the Administrator accepts ADD and rejects ALTER")
 def finalize_maria_partial_pip(context: Context) -> None:
     """POST real staff decisions accepting ADD and rejecting ALTER.
 
@@ -109,11 +100,34 @@ def finalize_maria_partial_pip(context: Context) -> None:
     raise NotImplementedError()
 
 
+@then("Maria's total becomes 8700 rather than 8800")
 def assert_maria_partial_total(context: Context) -> None:
     """Assert exact accepted-only totals, immutable award and publication effects.
 
     :param context: Finalized real AT state. Example: accepted_partial PIP42.
     :return: None. Example: Maria8700/Design7700 with one500 award, not8800.
     :raises AssertionError: Totals, rejected content, award or receipt differ.
+    """
+    raise NotImplementedError()
+
+
+@then("{points:d} points are attributed to the target Design category")
+def minor_change_design_attribution_matches(context: Context, points: int) -> None:
+    """Inspect the actual new immutable award: Maria recipient, target Design category, accepted change identity and original decision time.
+
+    :param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
+    :return: None when the described real observation holds. Example: None.
+    :raises AssertionError: Actual domain, response or recorded boundary differs.
+    """
+    raise NotImplementedError()
+
+
+@then("her total remains {total:d}")
+def nonaccepted_total_remains(context: Context, total: int) -> None:
+    """Check every independent nonaccepted/rejected state and complete unchanged ledger snapshots, not only the last total.
+
+    :param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
+    :return: None when the described real observation holds. Example: None.
+    :raises AssertionError: Actual domain, response or recorded boundary differs.
     """
     raise NotImplementedError()

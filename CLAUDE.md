@@ -286,7 +286,7 @@ When tasked with **"Work on Milestone #N"**:
 3. Find next eligible scenario: `status-queued` + all `dependencies[]` issues are closed (`status-done`)
 4. Apply `status-in-progress` label, remove `status-queued`
 5. Post `<!-- EXECUTION_START -->` comment with timestamp and time budget
-6. Follow **BPE-02 → BPE-05** to fill the skeleton (implement the `raise NotImplementedError()` stubs)
+6. Execute the scenario's `feature_execution_graph` in dependency order. Dispatch a **fresh subagent per ready node**, with its BPE guidance bundle, exact footprint and pytest/Make gates. Fill only that node's approved skeleton, following **BPE-02 → BPE-05**. Require positive test selection; skipped or empty gates do not pass. Record `NODE_PASS` with the actual commit and result before the next node.
 7. Monitor files touched vs `codebase_footprint[]` from issue `<!-- SCENARIO -->` block
 8. Run `checkpoint.command` from issue YAML
 9. If **PASS**: commit, close issue, comment actual_duration + `status-done`, go to step 3
@@ -302,6 +302,7 @@ When tasked with **"Work on Milestone #N"**:
 - `scope_expansion` of production source file → **ESCALATE**
 - `time_overrun` ≥ 200% of budget → **ESCALATE**
 - `checkpoint_fail_retry` (second failure after retry) → **ESCALATE**
+- `footprint_violation`, `method_explosion` (new methods beyond the approved skeleton), or `sao_violation` → **ESCALATE**
 - 2+ absorbed signals on same scenario → **ESCALATE**
 
 ### Escalation
@@ -338,3 +339,9 @@ On every session start when an iteration is active:
 **Must escalate:** checkpoint fail after retry, production file outside footprint, time ≥ 2× budget, integration conflict not in manifest, 2+ absorbed signals on same scenario
 
 **Cannot do:** drop a scenario, add scope, modify manifest goal, merge to main, create release without human review
+
+Within each graph node, commit every completed plan slice with `Refs #N`, then
+post its commit-linked issue update and next step before starting another slice.
+Only the final passing slice uses `Closes #N`. PIN-05 human GO is required before
+implementation; main merge/release and production promotion retain their later
+human review gates.

@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from django.db import IntegrityError
+    from django.db import OperationalError
+    from methodology.models import PipChange
+    from methodology.models import ProcessImprovementProposal
+
 from typing import Literal
 from uuid import UUID
 from django.contrib.auth.models import AnonymousUser, User
@@ -8,7 +16,6 @@ from methodology.models import Playbook
 """Immutable contribution award commands shared by Django domain services."""
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser

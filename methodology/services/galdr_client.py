@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from methodology.llm.base import BaseLLM
+
 import json
 import logging
 import re

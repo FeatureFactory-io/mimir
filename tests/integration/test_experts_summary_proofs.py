@@ -175,3 +175,26 @@ def test_s29_summary_with_exhausted_script_fails_loudly() -> None:
     :raises AssertionError: If exhaustion becomes success or fallback prose.
     """
     raise NotImplementedError()
+
+
+@pytest.mark.django_db
+def test_s27_summary_log_story_happy(s27_proof_case: Mapping[str, Any], caplog: pytest.LogCaptureFixture) -> None:
+    """Capture actual ordinary logs across evidence, prompt validation and the read-only boundary.
+
+    :param s27_proof_case: Real independent public/private Cedar case. Example: Maria.
+    :param caplog: Real enabled-and-restored logger capture. Example: correlated INFO records.
+    :return: None after assert_log_story checks every declared happy beat and private exclusions.
+    :raises AssertionError: Missing beat, false domain write or leaked private material.
+    """
+    raise NotImplementedError()
+
+@pytest.mark.django_db
+def test_s27_summary_log_story_reject(s27_proof_case: Mapping[str, Any], caplog: pytest.LogCaptureFixture) -> None:
+    """Capture actual rejected prompt/output/boundary logs with safe reason codes and no body leakage.
+
+    :param s27_proof_case: Real adverse Cedar case. Example: private sentinel and unsafe response.
+    :param caplog: Real ordinary logger capture. Example: same correlated attempt.
+    :return: None after assert_log_story verifies the applicable rejection sequence.
+    :raises AssertionError: Missing error/exit beat or private text disclosed.
+    """
+    raise NotImplementedError()

@@ -1,10 +1,8 @@
 """Experts domain bindings using the real Django-client acceptance lifecycle."""
 
 from __future__ import annotations
-
 from behave import then
-
-from behave import given, then, when
+from behave import given, when
 from behave.runner import Context
 
 
@@ -20,6 +18,8 @@ def cedar_baseline_dataset(context: Context) -> None:
 
 
 @when('Elena opens "{path}"')
+@when('he opens "{path}"')
+@when('Bob opens "{path}"')
 def elena_opens_experts(context: Context, path: str) -> None:
     """Request the local production route using the real client.
 

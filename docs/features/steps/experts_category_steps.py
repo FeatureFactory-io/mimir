@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from behave import then, when
 
-from behave import given, when, then
+from behave import given
 from behave.runner import Context
 
 

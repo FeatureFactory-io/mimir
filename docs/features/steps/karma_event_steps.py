@@ -1,8 +1,11 @@
 from __future__ import annotations
-
+from behave import given, then, when
 from behave.runner import Context
 
 
+@given(
+    "one accepted eligible change or successful consumption has a stable event identity"
+)
 def prepare_stable_award_events(context: Context) -> None:
     """Prepare actual accepted receipt and successful consumption independently.
 
@@ -13,6 +16,7 @@ def prepare_stable_award_events(context: Context) -> None:
     raise NotImplementedError()
 
 
+@when("recording that same event is retried")
 def retry_recorded_award_events(context: Context) -> None:
     """Replay award recording only, preserving fixed identities and payloads.
 
@@ -23,6 +27,7 @@ def retry_recorded_award_events(context: Context) -> None:
     raise NotImplementedError()
 
 
+@then("exactly one award exists per applicable recipient")
 def assert_one_award_per_recipient(context: Context) -> None:
     """Assert complete row payloads and no duplicate applicable recipient.
 
@@ -33,6 +38,9 @@ def assert_one_award_per_recipient(context: Context) -> None:
     raise NotImplementedError()
 
 
+@then(
+    "acceptance has one submitter award while eligible other-person consumption has consumer and author awards"
+)
 def assert_event_recipient_cardinality(context: Context) -> None:
     """Assert one submitter award versus exact learner/author pair.
 
@@ -43,6 +51,7 @@ def assert_event_recipient_cardinality(context: Context) -> None:
     raise NotImplementedError()
 
 
+@then("a later intentional consumption is treated as a new event")
 def record_later_intentional_consumption(context: Context) -> None:
     """Use a new UUID and prove one additional complete consumption event.
 

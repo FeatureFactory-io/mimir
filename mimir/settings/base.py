@@ -5,6 +5,8 @@ Common settings shared across all environments (dev, test, prod).
 Environment-specific overrides in dev.py, test.py, prod.py.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 from pathlib import Path

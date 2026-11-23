@@ -8,6 +8,15 @@ same semantic return shapes as the ORM-based tools.py (where applicable).
 No Django, no ORM — only the standard library + httpx.
 """
 
+from __future__ import annotations
+
+import httpx
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from uuid import UUID
+
 import logging
 import os
 from pathlib import Path

@@ -1,9 +1,11 @@
 from __future__ import annotations
+from behave import when
 
-"""S44-owned import action; shared token/totals phrases remain single-owner."""
+"S44-owned import action; shared token/totals phrases remain single-owner."
 from behave.runner import Context
 
 
+@when("she imports a workflow")
 def imports_a_workflow(context: Context) -> None:
     """Perform real positive protocol import using the existing Django API.
 

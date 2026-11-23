@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractBaseUser
+    from methodology.services.karma_service import AwardOutcome
+
 import logging
 
 from django.core.exceptions import ValidationError

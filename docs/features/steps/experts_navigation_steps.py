@@ -1,10 +1,10 @@
 from __future__ import annotations
-
 from behave import given, then, when
 from behave.runner import Context
 
 
 @given("Elena is authenticated")
+@given("Elena is authenticated in FOB")
 def elena_is_authenticated(context: Context) -> None:
     """Authenticate the real baseline Elena account.
 
@@ -16,6 +16,7 @@ def elena_is_authenticated(context: Context) -> None:
 
 
 @when("she follows the Experts navigation link")
+@when("she follows Experts")
 def follows_experts_navigation_link(context: Context) -> None:
     """Follow the actual rendered shell destination with the Django client.
 

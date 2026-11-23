@@ -1,19 +1,8 @@
 from __future__ import annotations
 
-"""Django-client copy receipt AT; actual clipboard proof is Playwright-owned."""
+"Django-client copy receipt AT; actual clipboard proof is Playwright-owned."
 from behave import given, then, when
 from behave.runner import Context
-
-
-@given("Maria is authenticated")
-def maria_is_authenticated(context: Context) -> None:
-    """Authenticate the existing Cedar Maria account.
-
-    :param context: AT context with cedar_dataset and client. Example: Maria baseline.
-    :return: None with a real authenticated session.
-    :raises AssertionError: If the baseline actor is absent.
-    """
-    raise NotImplementedError()
 
 
 @when("she successfully copies Mike's public released activity 6203")

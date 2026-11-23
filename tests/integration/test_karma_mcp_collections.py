@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tests.support.experts_data import CedarDataset
+    from pytest_django.live_server_helper import LiveServer
+    from pytest import LogCaptureFixture
+    from pathlib import Path
+
 import pytest
-from tests.support.karma_mcp import (
-    mcp_client_factory,
-    mcp_dataset,
-    mcp_request_paths,
-    MCPClientFactory,
-)
+from tests.support.karma_mcp import MCPClientFactory
 
 
 @pytest.mark.parametrize("entrypoint", ["facade", "legacy"])
@@ -153,3 +156,6 @@ def test_collection_with_exact_acceptance_executes_one_contract() -> None:
     :raises AssertionError: Nonzero exit, missing execution or incorrect counts.
     """
     raise NotImplementedError()
+
+
+pytest_plugins = ["tests.support.karma_mcp"]

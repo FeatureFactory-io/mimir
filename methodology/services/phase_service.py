@@ -4,6 +4,13 @@ PhaseService for managing Phase CRUD operations.
 Handles creation, updating, deletion, and retrieval of phases within playbooks.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User
+
 import logging
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.db import transaction
@@ -23,7 +30,7 @@ class PhaseService:
     def create_phase(playbook_id, name, description, order, user):
         """
         Create a new phase in a playbook.
-
+        
         :param playbook_id: ID of parent playbook. Example: 1
         :param name: Phase name. Example: "Inception"
         :param description: Phase description. Example: "ESM & DTA & DSP focused"
@@ -33,7 +40,7 @@ class PhaseService:
         :rtype: Phase
         :raises PermissionDenied: If user doesn't own playbook or playbook is released
         :raises ValidationError: If validation fails
-
+        
         Example:
             >>> phase = PhaseService.create_phase(
             ...     playbook_id=1,
@@ -45,66 +52,55 @@ class PhaseService:
             >>> phase.name
             'Inception'
         """
-        logger.info(
-            f"Creating phase '{name}' in playbook {playbook_id} for user {user.email}"
-        )
-
+        logger.info(f"Creating phase '{name}' in playbook {playbook_id} for user {user.email}")
+        
         try:
             playbook = Playbook.objects.get(id=playbook_id)
         except Playbook.DoesNotExist:
             logger.error(f"Playbook {playbook_id} not found")
             raise ValidationError(f"Playbook with id {playbook_id} not found")
-
+        
         # Check permissions
         if not playbook.is_owned_by(user):
-            logger.warning(
-                f"User {user.email} attempted to create phase in playbook {playbook_id} they don't own"
-            )
+            logger.warning(f"User {user.email} attempted to create phase in playbook {playbook_id} they don't own")
             raise PermissionDenied("You don't have permission to modify this playbook")
-
+        
         if not playbook.can_edit(user):
-            logger.warning(
-                f"User {user.email} attempted to create phase in released playbook {playbook_id}"
-            )
-            raise PermissionDenied(
-                "Cannot modify released playbook. Submit a PIP instead."
-            )
-
+            logger.warning(f"User {user.email} attempted to create phase in released playbook {playbook_id}")
+            raise PermissionDenied("Cannot modify released playbook. Submit a PIP instead.")
+        
         # Check for duplicate name
         if Phase.objects.filter(playbook=playbook, name=name).exists():
-            logger.warning(
-                f"Phase with name '{name}' already exists in playbook {playbook_id}"
-            )
-            raise ValidationError(
-                f"Phase with name '{name}' already exists in this playbook"
-            )
-
+            logger.warning(f"Phase with name '{name}' already exists in playbook {playbook_id}")
+            raise ValidationError(f"Phase with name '{name}' already exists in this playbook")
+        
         # Create phase
         with transaction.atomic():
             # Auto-assign order if not provided
             if order is None:
                 max_order = Phase.objects.filter(playbook=playbook).aggregate(
-                    models.Max("order")
-                )["order__max"]
+                    models.Max('order')
+                )['order__max']
                 order = (max_order or 0) + 1
-
+            
             phase = Phase.objects.create(
-                playbook=playbook, name=name, description=description or "", order=order
+                playbook=playbook,
+                name=name,
+                description=description or "",
+                order=order
             )
-
+            
             # Increment playbook version
             playbook.increment_version()
-
-            logger.info(
-                f"Created phase {phase.id} '{phase.name}' in playbook {playbook_id}"
-            )
+            
+            logger.info(f"Created phase {phase.id} '{phase.name}' in playbook {playbook_id}")
             return phase
 
     @staticmethod
     def update_phase(phase_id, name=None, description=None, order=None, user=None):
         """
         Update an existing phase.
-
+        
         :param phase_id: Phase ID. Example: 1
         :param name: New name (optional). Example: "Elaboration"
         :param description: New description (optional)
@@ -114,7 +110,7 @@ class PhaseService:
         :rtype: Phase
         :raises PermissionDenied: If user doesn't own playbook or playbook is released
         :raises ValidationError: If phase not found
-
+        
         Example:
             >>> phase = PhaseService.update_phase(
             ...     phase_id=1,
@@ -124,28 +120,22 @@ class PhaseService:
             ... )
         """
         logger.info(f"Updating phase {phase_id} for user {user.email}")
-
+        
         try:
-            phase = Phase.objects.select_related("playbook").get(id=phase_id)
+            phase = Phase.objects.select_related('playbook').get(id=phase_id)
         except Phase.DoesNotExist:
             logger.error(f"Phase {phase_id} not found")
             raise ValidationError(f"Phase with id {phase_id} not found")
-
+        
         # Check permissions
         if not phase.is_owned_by(user):
-            logger.warning(
-                f"User {user.email} attempted to update phase {phase_id} they don't own"
-            )
+            logger.warning(f"User {user.email} attempted to update phase {phase_id} they don't own")
             raise PermissionDenied("You don't have permission to modify this phase")
-
+        
         if not phase.can_edit(user):
-            logger.warning(
-                f"User {user.email} attempted to update phase in released playbook"
-            )
-            raise PermissionDenied(
-                "Cannot modify released playbook. Submit a PIP instead."
-            )
-
+            logger.warning(f"User {user.email} attempted to update phase in released playbook")
+            raise PermissionDenied("Cannot modify released playbook. Submit a PIP instead.")
+        
         # Update fields
         with transaction.atomic():
             if name is not None:
@@ -154,12 +144,12 @@ class PhaseService:
                 phase.description = description
             if order is not None:
                 phase.order = order
-
+            
             phase.save()
-
+            
             # Increment playbook version
             phase.playbook.increment_version()
-
+            
             logger.info(f"Updated phase {phase_id}")
             return phase
 
@@ -167,62 +157,52 @@ class PhaseService:
     def delete_phase(phase_id, user):
         """
         Delete a phase.
-
+        
         :param phase_id: Phase ID. Example: 1
         :param user: User deleting the phase
         :returns: Dict with deleted=True
         :rtype: dict
         :raises PermissionDenied: If user doesn't own playbook or playbook is released
         :raises ValidationError: If phase has activities assigned
-
+        
         Example:
             >>> result = PhaseService.delete_phase(phase_id=1, user=maria)
             >>> result['deleted']
             True
         """
         logger.info(f"Deleting phase {phase_id} for user {user.email}")
-
+        
         try:
-            phase = Phase.objects.select_related("playbook").get(id=phase_id)
+            phase = Phase.objects.select_related('playbook').get(id=phase_id)
         except Phase.DoesNotExist:
             logger.error(f"Phase {phase_id} not found")
             raise ValidationError(f"Phase with id {phase_id} not found")
-
+        
         # Check permissions
         if not phase.is_owned_by(user):
-            logger.warning(
-                f"User {user.email} attempted to delete phase {phase_id} they don't own"
-            )
+            logger.warning(f"User {user.email} attempted to delete phase {phase_id} they don't own")
             raise PermissionDenied("You don't have permission to modify this phase")
-
+        
         if not phase.can_edit(user):
-            logger.warning(
-                f"User {user.email} attempted to delete phase in released playbook"
-            )
-            raise PermissionDenied(
-                "Cannot modify released playbook. Submit a PIP instead."
-            )
-
+            logger.warning(f"User {user.email} attempted to delete phase in released playbook")
+            raise PermissionDenied("Cannot modify released playbook. Submit a PIP instead.")
+        
         # Check if phase has activities
         activity_count = phase.get_activity_count()
         if activity_count > 0:
-            logger.warning(
-                f"Cannot delete phase {phase_id} - has {activity_count} activities assigned"
-            )
-            raise ValidationError(
-                f"Cannot delete phase with {activity_count} activities assigned. Reassign activities first."
-            )
-
+            logger.warning(f"Cannot delete phase {phase_id} - has {activity_count} activities assigned")
+            raise ValidationError(f"Cannot delete phase with {activity_count} activities assigned. Reassign activities first.")
+        
         # Delete phase
         with transaction.atomic():
             playbook = phase.playbook
             phase.delete()
-
+            
             # Increment playbook version
             playbook.increment_version()
-
+            
             logger.info(f"Deleted phase {phase_id}")
-            return {"deleted": True}
+            return {'deleted': True}
 
     @staticmethod
     def list_phases_global(user, query=None, playbook_filter=None):
@@ -262,14 +242,14 @@ class PhaseService:
     def list_phases(playbook_id, user):
         """
         List all phases in a playbook.
-
+        
         :param playbook_id: Playbook ID. Example: 1
         :param user: User requesting the list
         :returns: QuerySet of Phase objects
         :rtype: QuerySet
         :raises ValidationError: If playbook not found
         :raises PermissionDenied: If user doesn't have permission to view playbook
-
+        
         Example:
             >>> phases = PhaseService.list_phases(playbook_id=1, user=maria)
             >>> len(phases)
@@ -280,13 +260,13 @@ class PhaseService:
             playbook_id,
             getattr(user, "email", None) or getattr(user, "username", "anonymous"),
         )
-
+        
         try:
             playbook = Playbook.objects.get(id=playbook_id)
         except Playbook.DoesNotExist:
             logger.error(f"Playbook {playbook_id} not found")
             raise ValidationError(f"Playbook with id {playbook_id} not found")
-
+        
         # GUI read: owner always; any authenticated user may read public playbooks.
         if not playbook.can_view(user):
             logger.warning(
@@ -295,26 +275,24 @@ class PhaseService:
                 playbook_id,
             )
             raise PermissionDenied("You don't have permission to view this playbook")
-
-        phases = Phase.objects.filter(playbook=playbook).order_by("order", "name")
-        logger.info(
-            f"Found {phases.count()} phases in playbook {playbook_id} (source={playbook.source})"
-        )
-
+        
+        phases = Phase.objects.filter(playbook=playbook).order_by('order', 'name')
+        logger.info(f"Found {phases.count()} phases in playbook {playbook_id} (source={playbook.source})")
+        
         return phases
 
     @staticmethod
     def get_phase_with_activities(phase_id, user):
         """
         Get phase details with activities grouped by workflow.
-
+        
         :param phase_id: Phase ID. Example: 1
         :param user: User requesting the phase
         :returns: Dict with phase and workflow_activities
         :rtype: dict
         :raises ValidationError: If phase not found
         :raises PermissionDenied: If user doesn't own playbook
-
+        
         Example:
             >>> result = PhaseService.get_phase_with_activities(phase_id=1, user=maria)
             >>> result['phase'].name
@@ -327,13 +305,13 @@ class PhaseService:
             phase_id,
             getattr(user, "email", None) or getattr(user, "username", "anonymous"),
         )
-
+        
         try:
-            phase = Phase.objects.select_related("playbook").get(id=phase_id)
+            phase = Phase.objects.select_related('playbook').get(id=phase_id)
         except Phase.DoesNotExist:
             logger.error(f"Phase {phase_id} not found")
             raise ValidationError(f"Phase with id {phase_id} not found")
-
+        
         if not phase.playbook.can_view(user):
             logger.warning(
                 "User %s denied view on phase %s (playbook id=%s)",
@@ -342,25 +320,23 @@ class PhaseService:
                 phase.playbook_id,
             )
             raise PermissionDenied("You don't have permission to view this phase")
-
+        
         # Get activities grouped by workflow
         workflow_activities = phase.get_workflows_with_activities()
-
-        logger.info(
-            f"Retrieved phase {phase_id} with {len(workflow_activities)} workflows"
-        )
-
+        
+        logger.info(f"Retrieved phase {phase_id} with {len(workflow_activities)} workflows")
+        
         return {
-            "phase": phase,
-            "workflow_activities": workflow_activities,
-            "artifacts": phase.get_artifacts(),
+            'phase': phase,
+            'workflow_activities': workflow_activities,
+            'artifacts': phase.get_artifacts()
         }
 
     @staticmethod
     def reorder_phases(playbook_id, phase_order_list, user):
         """
         Reorder phases in a playbook.
-
+        
         :param playbook_id: Playbook ID. Example: 1
         :param phase_order_list: List of (phase_id, new_order) tuples. Example: [(1, 1), (2, 2), (3, 3)]
         :param user: User reordering phases
@@ -368,7 +344,7 @@ class PhaseService:
         :rtype: list
         :raises ValidationError: If playbook or phases not found
         :raises PermissionDenied: If user doesn't own playbook or playbook is released
-
+        
         Example:
             >>> phases = PhaseService.reorder_phases(
             ...     playbook_id=1,
@@ -376,31 +352,23 @@ class PhaseService:
             ...     user=maria
             ... )
         """
-        logger.info(
-            f"Reordering phases in playbook {playbook_id} for user {user.email}"
-        )
-
+        logger.info(f"Reordering phases in playbook {playbook_id} for user {user.email}")
+        
         try:
             playbook = Playbook.objects.get(id=playbook_id)
         except Playbook.DoesNotExist:
             logger.error(f"Playbook {playbook_id} not found")
             raise ValidationError(f"Playbook with id {playbook_id} not found")
-
+        
         # Check permissions
         if not playbook.is_owned_by(user):
-            logger.warning(
-                f"User {user.email} attempted to reorder phases in playbook {playbook_id} they don't own"
-            )
+            logger.warning(f"User {user.email} attempted to reorder phases in playbook {playbook_id} they don't own")
             raise PermissionDenied("You don't have permission to modify this playbook")
-
+        
         if not playbook.can_edit(user):
-            logger.warning(
-                f"User {user.email} attempted to reorder phases in released playbook"
-            )
-            raise PermissionDenied(
-                "Cannot modify released playbook. Submit a PIP instead."
-            )
-
+            logger.warning(f"User {user.email} attempted to reorder phases in released playbook")
+            raise PermissionDenied("Cannot modify released playbook. Submit a PIP instead.")
+        
         # Update phase orders
         with transaction.atomic():
             # First pass: set all to temporary negative orders to avoid unique constraint violations
@@ -412,24 +380,20 @@ class PhaseService:
                     phase.save()
                     phases_to_update.append((phase, new_order))
                 except Phase.DoesNotExist:
-                    logger.error(
-                        f"Phase {phase_id} not found in playbook {playbook_id}"
-                    )
+                    logger.error(f"Phase {phase_id} not found in playbook {playbook_id}")
                     raise ValidationError(f"Phase {phase_id} not found in playbook")
-
+            
             # Second pass: set final orders
             updated_phases = []
             for phase, new_order in phases_to_update:
                 phase.order = new_order
                 phase.save()
                 updated_phases.append(phase)
-
+            
             # Increment playbook version
             playbook.increment_version()
-
-            logger.info(
-                f"Reordered {len(updated_phases)} phases in playbook {playbook_id}"
-            )
+            
+            logger.info(f"Reordered {len(updated_phases)} phases in playbook {playbook_id}")
             return updated_phases
 
     @staticmethod

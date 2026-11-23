@@ -5,6 +5,11 @@ Shared by Django views, admin, and MCP tool wrappers.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from methodology.llm.base import BaseLLM
+
 import logging
 from datetime import datetime
 from typing import Iterable, Optional

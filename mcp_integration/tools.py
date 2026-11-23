@@ -16,6 +16,15 @@ Read-only tools (list/get) typically raise only ``ValueError`` for missing
 entities or wrong ownership. Write tools may raise both.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from uuid import UUID
+    from django.contrib.auth.models import User
+
 import os
 
 # CRITICAL: Allow Django ORM in async context (FastMCP runs in async event loop)
@@ -109,15 +118,15 @@ async def create_playbook(
 ) -> dict:
     """
     Create draft playbook.
-
+    
     Thin wrapper over PlaybookService.create_playbook().
-
+    
     :param name: Playbook name. Example: "React Development"
     :param description: Description. Example: "Modern React patterns"
     :param category: Category. Example: "development"
     :return: Created playbook dict with id, name, version, status
     :raises ValueError: if name empty or duplicate
-
+    
     Example:
         >>> result = create_playbook_tool(
         ...     name="React Dev",
@@ -131,71 +140,61 @@ async def create_playbook(
     """
     logger.info(
         f'MCP Tool: create_playbook called - name="{name}", category={category}, '
-        f"visibility={visibility}"
+        f'visibility={visibility}'
     )
-
+    
     # Phase 5: Get user from MCP context
     user = await sync_to_async(get_current_user)()
-
+    
     # Call existing service
     from methodology.services.playbook_service import PlaybookService
-
     try:
         playbook = await sync_to_async(PlaybookService.create_playbook)(
             name=name,
             description=description,
             category=category,
             author=user,
-            status="draft",  # MCP always creates drafts
+            status='draft',  # MCP always creates drafts
             visibility=visibility,
         )
     except ValidationError as e:
-        _handle_validation_error(e, "create_playbook")
-
+        _handle_validation_error(e, 'create_playbook')
+    
     result = {
-        "id": playbook.id,
-        "name": playbook.name,
-        "description": playbook.description,
-        "category": playbook.category,
-        "status": playbook.status,
-        "version": str(playbook.version),
-        "visibility": playbook.visibility,
+        'id': playbook.id,
+        'name': playbook.name,
+        'description': playbook.description,
+        'category': playbook.category,
+        'status': playbook.status,
+        'version': str(playbook.version),
+        'visibility': playbook.visibility,
     }
-    logger.info(
-        f"MCP Tool: Created playbook id={playbook.id}, version={playbook.version}"
-    )
+    logger.info(f'MCP Tool: Created playbook id={playbook.id}, version={playbook.version}')
     return result
 
 
-async def list_playbooks(
-    status: Literal["draft", "released", "active", "all"] = "all",
-) -> list:
+async def list_playbooks(status: Literal["draft", "released", "active", "all"] = "all") -> list:
     """
     List playbooks filtered by status (owned + public + team-shared).
-
+    
     :param status: Filter by status or "all". Example: "draft"
     :return: List of playbook dicts
     """
-    logger.info(f"MCP Tool: list_playbooks called - status={status}")
-
+    logger.info(f'MCP Tool: list_playbooks called - status={status}')
+    
     user = await sync_to_async(get_current_user)()
-
+    
     from methodology.services.playbook_service import PlaybookService
-
     status_filter = None if status == "all" else status
-    owned = await sync_to_async(PlaybookService.list_playbooks)(
-        user, status=status_filter
-    )
+    owned = await sync_to_async(PlaybookService.list_playbooks)(user, status=status_filter)
     public_others = await sync_to_async(PlaybookService.list_public_playbooks)(user)
-    team_playbooks = await sync_to_async(PlaybookService.list_team_playbooks_for_user)(
-        user
-    )
-
+    team_playbooks = await sync_to_async(PlaybookService.list_team_playbooks_for_user)(user)
+    
     # Apply status filter to public and team playbooks if needed
     if status_filter:
         public_others = [p for p in public_others if p.status == status_filter]
         team_playbooks = [p for p in team_playbooks if p.status == status_filter]
-
+    
     combined = list(owned) + public_others + team_playbooks
 
     def sort_key(p):
@@ -205,17 +204,17 @@ async def list_playbooks(
 
     result = [
         {
-            "id": p.id,
-            "name": p.name,
-            "description": p.description,
-            "category": p.category,
-            "status": p.status,
-            "version": str(p.version),
-            "visibility": p.visibility,
+            'id': p.id,
+            'name': p.name,
+            'description': p.description,
+            'category': p.category,
+            'status': p.status,
+            'version': str(p.version),
+            'visibility': p.visibility,
         }
         for p in combined
     ]
-    logger.info(f"MCP Tool: Returning {len(result)} playbooks (owned + public + team)")
+    logger.info(f'MCP Tool: Returning {len(result)} playbooks (owned + public + team)')
     return result
 
 
@@ -337,7 +336,7 @@ async def update_playbook(
 ) -> dict:
     """
     Update DRAFT playbook. Auto-increments version.
-
+    
     :param playbook_id: Playbook ID. Example: 1
     :param name: New name or None
     :param description: New description or None
@@ -346,93 +345,83 @@ async def update_playbook(
     :raises PermissionError: if playbook is released
     :raises ValueError: if not found, not owned, or validation fails (e.g. duplicate name)
     """
-    logger.info(f"MCP Tool: update_playbook called - id={playbook_id}")
-
+    logger.info(f'MCP Tool: update_playbook called - id={playbook_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     playbook = await _playbook_for_write(playbook_id, user)
 
     # Permission check
-    if playbook.status == "released":
-        logger.error(f"MCP Tool: Cannot update released playbook id={playbook_id}")
-        raise PermissionError(
-            f'Cannot modify released playbook "{playbook.name}". Use create_pip instead.'
-        )
+    if playbook.status == 'released':
+        logger.error(f'MCP Tool: Cannot update released playbook id={playbook_id}')
+        raise PermissionError(f'Cannot modify released playbook "{playbook.name}". Use create_pip instead.')
 
     # Build update data
     update_data = {}
     if name is not None:
-        update_data["name"] = name
+        update_data['name'] = name
     if description is not None:
-        update_data["description"] = description
+        update_data['description'] = description
     if category is not None:
-        update_data["category"] = category
+        update_data['category'] = category
     if visibility is not None:
-        update_data["visibility"] = visibility
+        update_data['visibility'] = visibility
 
     if update_data:
         from methodology.services.playbook_service import PlaybookService
-
         old_version = playbook.version
 
         # Update playbook
         try:
-            playbook = await sync_to_async(PlaybookService.update_playbook)(
-                playbook_id, **update_data
-            )
+            playbook = await sync_to_async(PlaybookService.update_playbook)(playbook_id, **update_data)
         except ValidationError as e:
-            _handle_validation_error(e, "update_playbook")
+            _handle_validation_error(e, 'update_playbook')
 
         # Increment version
-        playbook.version += Decimal("0.1")
+        playbook.version += Decimal('0.1')
         await sync_to_async(playbook.save)()
 
-        logger.info(
-            f"MCP Tool: Updated playbook, version {old_version} → {playbook.version}"
-        )
+        logger.info(f'MCP Tool: Updated playbook, version {old_version} → {playbook.version}')
 
     return {
-        "id": playbook.id,
-        "name": playbook.name,
-        "description": playbook.description,
-        "category": playbook.category,
-        "status": playbook.status,
-        "version": str(playbook.version),
-        "visibility": playbook.visibility,
+        'id': playbook.id,
+        'name': playbook.name,
+        'description': playbook.description,
+        'category': playbook.category,
+        'status': playbook.status,
+        'version': str(playbook.version),
+        'visibility': playbook.visibility,
     }
 
 
 async def delete_playbook(playbook_id: int) -> dict:
     """
     Delete DRAFT playbook (cascades to workflows/activities).
-
+    
     :param playbook_id: Playbook ID. Example: 1
     :return: Confirmation dict
     :raises PermissionError: if playbook is released
     :raises ValueError: if not found or not owned
     """
-    logger.info(f"MCP Tool: delete_playbook called - id={playbook_id}")
-
+    logger.info(f'MCP Tool: delete_playbook called - id={playbook_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     playbook = await _playbook_for_write(playbook_id, user)
 
     # Permission check
-    if playbook.status == "released":
-        logger.error(f"MCP Tool: Cannot delete released playbook id={playbook_id}")
+    if playbook.status == 'released':
+        logger.error(f'MCP Tool: Cannot delete released playbook id={playbook_id}')
         raise PermissionError(f'Cannot delete released playbook "{playbook.name}"')
 
     playbook_name = playbook.name
     workflow_count = await sync_to_async(playbook.workflows.count)()
 
     from methodology.services.playbook_service import PlaybookService
-
     await sync_to_async(PlaybookService.delete_playbook)(playbook_id)
-
-    logger.info(
-        f'MCP Tool: Deleted playbook "{playbook_name}" with {workflow_count} workflows'
-    )
-    return {"deleted": True, "playbook_id": playbook_id}
+    
+    logger.info(f'MCP Tool: Deleted playbook "{playbook_name}" with {workflow_count} workflows')
+    return {'deleted': True, 'playbook_id': playbook_id}
 
 
 # ============================================================================
@@ -449,7 +438,7 @@ async def create_workflow(
 ) -> dict:
     """
     Create workflow in DRAFT playbook. Increments parent version.
-
+    
     :param playbook_id: Parent playbook ID. Example: 1
     :param name: Workflow name. Example: "Design Phase"
     :param description: Workflow description (optional)
@@ -459,26 +448,19 @@ async def create_workflow(
     :raises PermissionError: if parent playbook is released
     :raises ValueError: if playbook not found or duplicate workflow name
     """
-    logger.info(
-        f'MCP Tool: create_workflow called - playbook_id={playbook_id}, name="{name}"'
-    )
-
+    logger.info(f'MCP Tool: create_workflow called - playbook_id={playbook_id}, name="{name}"')
+    
     user = await sync_to_async(get_current_user)()
 
     playbook = await _playbook_for_write(playbook_id, user)
 
     # Permission check
-    if playbook.status == "released":
-        logger.error(
-            f"MCP Tool: Cannot add workflow to released playbook id={playbook_id}"
-        )
-        raise PermissionError(
-            f'Cannot modify released playbook "{playbook.name}". Use create_pip instead.'
-        )
-
+    if playbook.status == 'released':
+        logger.error(f'MCP Tool: Cannot add workflow to released playbook id={playbook_id}')
+        raise PermissionError(f'Cannot modify released playbook "{playbook.name}". Use create_pip instead.')
+    
     # Call existing service
     from methodology.services.workflow_service import WorkflowService
-
     old_version = playbook.version
     try:
         workflow = await sync_to_async(WorkflowService.create_workflow)(
@@ -489,71 +471,66 @@ async def create_workflow(
             abbreviation=abbreviation,
         )
     except ValidationError as e:
-        _handle_validation_error(e, "create_workflow")
-
+        _handle_validation_error(e, 'create_workflow')
+    
     # Increment parent version
-    playbook.version += Decimal("0.1")
+    playbook.version += Decimal('0.1')
     await sync_to_async(playbook.save)()
-
-    logger.info(
-        f"MCP Tool: Created workflow id={workflow.id}, parent version {old_version} → {playbook.version}"
-    )
-
+    
+    logger.info(f'MCP Tool: Created workflow id={workflow.id}, parent version {old_version} → {playbook.version}')
+    
     return {
-        "id": workflow.id,
-        "name": workflow.name,
-        "description": workflow.description,
-        "abbreviation": workflow.abbreviation,
-        "order": workflow.order,
-        "playbook_id": playbook.id,
+        'id': workflow.id,
+        'name': workflow.name,
+        'description': workflow.description,
+        'abbreviation': workflow.abbreviation,
+        'order': workflow.order,
+        'playbook_id': playbook.id,
     }
 
 
 async def list_workflows(playbook_id: int) -> list:
     """
     List workflows for playbook.
-
+    
     :param playbook_id: Parent playbook ID. Example: 1
     :return: List of workflow dicts
     :raises ValueError: if playbook not found
     """
-    logger.info(f"MCP Tool: list_workflows called - playbook_id={playbook_id}")
-
+    logger.info(f'MCP Tool: list_workflows called - playbook_id={playbook_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     await _playbook_for_read(playbook_id, user)
 
     from methodology.services.workflow_service import WorkflowService
-
-    workflows = await sync_to_async(WorkflowService.get_workflows_for_playbook)(
-        playbook_id
-    )
-
+    workflows = await sync_to_async(WorkflowService.get_workflows_for_playbook)(playbook_id)
+    
     result = [
         {
-            "id": w.id,
-            "name": w.name,
-            "description": w.description,
-            "abbreviation": w.abbreviation,
-            "order": w.order,
-            "playbook_id": w.playbook_id,
+            'id': w.id,
+            'name': w.name,
+            'description': w.description,
+            'abbreviation': w.abbreviation,
+            'order': w.order,
+            'playbook_id': w.playbook_id,
         }
         for w in workflows
     ]
-    logger.info(f"MCP Tool: Returning {len(result)} workflows")
+    logger.info(f'MCP Tool: Returning {len(result)} workflows')
     return result
 
 
 async def get_workflow(workflow_id: int) -> dict:
     """
     Get workflow details with activities.
-
+    
     :param workflow_id: Workflow ID. Example: 1
     :return: Workflow dict with nested activities
     :raises ValueError: if not found or not owned
     """
-    logger.info(f"MCP Tool: get_workflow called - id={workflow_id}")
-
+    logger.info(f'MCP Tool: get_workflow called - id={workflow_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Workflow
@@ -568,43 +545,39 @@ async def get_workflow(workflow_id: int) -> dict:
                 prefetch_activities=True,
             )
         except Workflow.DoesNotExist:
-            raise ValueError(f"Workflow {workflow_id} not found") from None
+            raise ValueError(f'Workflow {workflow_id} not found') from None
         except PermissionError:
-            raise ValueError(f"Workflow {workflow_id} not found") from None
+            raise ValueError(f'Workflow {workflow_id} not found') from None
 
     workflow = await sync_to_async(_load)()
 
     activities = await sync_to_async(list)(workflow.activities.all())
     result = {
-        "id": workflow.id,
-        "name": workflow.name,
-        "description": workflow.description,
-        "abbreviation": workflow.abbreviation,
-        "order": workflow.order,
-        "playbook_id": workflow.playbook_id,
-        "activities": [
+        'id': workflow.id,
+        'name': workflow.name,
+        'description': workflow.description,
+        'abbreviation': workflow.abbreviation,
+        'order': workflow.order,
+        'playbook_id': workflow.playbook_id,
+        'activities': [
             {
-                "id": a.id,
-                "name": a.name,
-                "order": a.order,
+                'id': a.id,
+                'name': a.name,
+                'order': a.order,
             }
             for a in activities
-        ],
+        ]
     }
     logger.info(f'MCP Tool: Workflow has {len(result["activities"])} activities')
     return result
 
 
-async def update_workflow(
-    workflow_id: int,
-    name: str = None,
-    description: str = None,
-    order: int = None,
-    abbreviation: str = None,
-) -> dict:
+async def update_workflow(workflow_id: int, name: str = None,
+                        description: str = None, order: int = None,
+                        abbreviation: str = None) -> dict:
     """
     Update workflow in DRAFT playbook. Increments parent version.
-
+    
     :param workflow_id: Workflow ID. Example: 1
     :param name: New name or None
     :param description: New description or None
@@ -614,8 +587,8 @@ async def update_workflow(
     :raises PermissionError: if parent playbook is released
     :raises ValueError: if not found or validation fails (e.g. duplicate workflow name)
     """
-    logger.info(f"MCP Tool: update_workflow called - id={workflow_id}")
-
+    logger.info(f'MCP Tool: update_workflow called - id={workflow_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Workflow
@@ -627,72 +600,65 @@ async def update_workflow(
                 workflow_id, user, write=True, prefetch_activities=False
             )
         except Workflow.DoesNotExist:
-            raise ValueError(f"Workflow {workflow_id} not found") from None
+            raise ValueError(f'Workflow {workflow_id} not found') from None
         except PermissionError:
-            raise ValueError(f"Workflow {workflow_id} not found") from None
+            raise ValueError(f'Workflow {workflow_id} not found') from None
 
     workflow = await sync_to_async(_load)()
 
     # Permission check
-    if workflow.playbook.status == "released":
-        logger.error(f"MCP Tool: Cannot update workflow in released playbook")
-        raise PermissionError(
-            f'Cannot modify released playbook "{workflow.playbook.name}". Use create_pip instead.'
-        )
-
+    if workflow.playbook.status == 'released':
+        logger.error(f'MCP Tool: Cannot update workflow in released playbook')
+        raise PermissionError(f'Cannot modify released playbook "{workflow.playbook.name}". Use create_pip instead.')
+    
     # Build update data
     update_data = {}
     if name is not None:
-        update_data["name"] = name
+        update_data['name'] = name
     if description is not None:
-        update_data["description"] = description
+        update_data['description'] = description
     if order is not None:
-        update_data["order"] = order
+        update_data['order'] = order
     if abbreviation is not None:
-        update_data["abbreviation"] = abbreviation
-
+        update_data['abbreviation'] = abbreviation
+    
     if update_data:
         from methodology.services.workflow_service import WorkflowService
-
         old_version = workflow.playbook.version
-
+        
         # Update workflow
         try:
-            workflow = await sync_to_async(WorkflowService.update_workflow)(
-                workflow_id, **update_data
-            )
+            workflow = await sync_to_async(WorkflowService.update_workflow)(workflow_id, **update_data)
         except ValidationError as e:
-            _handle_validation_error(e, "update_workflow")
-
+            _handle_validation_error(e, 'update_workflow')
+        
         # Increment parent version
-        workflow.playbook.version += Decimal("0.1")
+        workflow.playbook.version += Decimal('0.1')
         await sync_to_async(workflow.playbook.save)()
-
-        logger.info(
-            f"MCP Tool: Updated workflow, parent version {old_version} → {workflow.playbook.version}"
-        )
-
+        
+        logger.info(f'MCP Tool: Updated workflow, parent version {old_version} → {workflow.playbook.version}')
+    
     return {
-        "id": workflow.id,
-        "name": workflow.name,
-        "description": workflow.description,
-        "abbreviation": workflow.abbreviation,
-        "order": workflow.order,
-        "playbook_id": workflow.playbook_id,
+        'id': workflow.id,
+        'name': workflow.name,
+        'description': workflow.description,
+        'abbreviation': workflow.abbreviation,
+        'order': workflow.order,
+        'playbook_id': workflow.playbook_id,
     }
 
 
 async def delete_workflow(workflow_id: int) -> dict:
     """
     Delete workflow in DRAFT playbook. Increments parent version.
-
+    
     :param workflow_id: Workflow ID. Example: 1
     :return: Confirmation dict
     :raises PermissionError: if parent playbook is released
     :raises ValueError: if not found
     """
-    logger.info(f"MCP Tool: delete_workflow called - id={workflow_id}")
-
+    logger.info(f'MCP Tool: delete_workflow called - id={workflow_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Workflow
@@ -704,18 +670,16 @@ async def delete_workflow(workflow_id: int) -> dict:
                 workflow_id, user, write=True, prefetch_activities=False
             )
         except Workflow.DoesNotExist:
-            raise ValueError(f"Workflow {workflow_id} not found") from None
+            raise ValueError(f'Workflow {workflow_id} not found') from None
         except PermissionError:
-            raise ValueError(f"Workflow {workflow_id} not found") from None
+            raise ValueError(f'Workflow {workflow_id} not found') from None
 
     workflow = await sync_to_async(_load)()
 
     # Permission check
-    if workflow.playbook.status == "released":
-        logger.error(f"MCP Tool: Cannot delete workflow in released playbook")
-        raise PermissionError(
-            f'Cannot modify released playbook "{workflow.playbook.name}". Use create_pip instead.'
-        )
+    if workflow.playbook.status == 'released':
+        logger.error(f'MCP Tool: Cannot delete workflow in released playbook')
+        raise PermissionError(f'Cannot modify released playbook "{workflow.playbook.name}". Use create_pip instead.')
 
     workflow_name = workflow.name
     playbook = workflow.playbook
@@ -723,15 +687,13 @@ async def delete_workflow(workflow_id: int) -> dict:
     old_version = playbook.version
 
     await sync_to_async(WorkflowService.delete_workflow)(workflow_id)
-
+    
     # Increment parent version
-    playbook.version += Decimal("0.1")
+    playbook.version += Decimal('0.1')
     await sync_to_async(playbook.save)()
-
-    logger.info(
-        f'MCP Tool: Deleted workflow "{workflow_name}" ({activity_count} activities), parent version {old_version} → {playbook.version}'
-    )
-    return {"deleted": True, "workflow_id": workflow_id}
+    
+    logger.info(f'MCP Tool: Deleted workflow "{workflow_name}" ({activity_count} activities), parent version {old_version} → {playbook.version}')
+    return {'deleted': True, 'workflow_id': workflow_id}
 
 
 # ============================================================================
@@ -837,16 +799,16 @@ async def create_activity(
 async def list_activities(workflow_id: int) -> list:
     """
     List activities for workflow.
-
+    
     Returns basic activity info (id, name, phase_id, order, etc.) without guidance.
     Use get_activity(id) to retrieve full details including guidance, agent, skill, and artifacts.
-
+    
     :param workflow_id: Parent workflow ID. Example: 1
     :return: List of activity dicts (without guidance field)
     :raises ValueError: if workflow not found
     """
-    logger.info(f"MCP Tool: list_activities called - workflow_id={workflow_id}")
-
+    logger.info(f'MCP Tool: list_activities called - workflow_id={workflow_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Workflow
@@ -859,52 +821,48 @@ async def list_activities(workflow_id: int) -> list:
                 workflow_id, user, write=False, prefetch_activities=False
             )
         except Workflow.DoesNotExist:
-            raise ValueError(f"Workflow {workflow_id} not found") from None
+            raise ValueError(f'Workflow {workflow_id} not found') from None
         except PermissionError:
-            raise ValueError(f"Workflow {workflow_id} not found") from None
+            raise ValueError(f'Workflow {workflow_id} not found') from None
 
     workflow = await sync_to_async(_load_wf)()
 
-    activities_qs = await sync_to_async(ActivityService.get_activities_for_workflow)(
-        workflow
-    )
-
+    activities_qs = await sync_to_async(ActivityService.get_activities_for_workflow)(workflow)
+    
     # Convert QuerySet to list
     activities = await sync_to_async(list)(activities_qs)
-
+    
     result = [
         {
-            "id": a.id,
-            "name": a.name,
-            "phase_id": a.phase_id,
-            "order": a.order,
-            "workflow_id": a.workflow_id,
-            "predecessor_id": a.predecessor_id,
-            "successor_id": a.successor_id,
+            'id': a.id,
+            'name': a.name,
+            'phase_id': a.phase_id,
+            'order': a.order,
+            'workflow_id': a.workflow_id,
+            'predecessor_id': a.predecessor_id,
+            'successor_id': a.successor_id,
         }
         for a in activities
     ]
-    logger.info(
-        f"MCP Tool: Returning {len(result)} activities (guidance excluded - use get_activity for details)"
-    )
+    logger.info(f'MCP Tool: Returning {len(result)} activities (guidance excluded - use get_activity for details)')
     return result
 
 
 async def get_activity(activity_id: int) -> dict:
     """
     Get activity details with dependencies, agent, skill, and artifacts.
-
+    
     Tracks activity access by updating last_accessed_at timestamp for
     the "Recently Used" dashboard section.
-
+    
     :param activity_id: Activity ID. Example: 1
     :return: Activity dict with predecessor/successor, agent, skill, and artifacts
     :raises ValueError: if not found or not owned
     """
-    logger.info(f"MCP Tool: get_activity called - id={activity_id}")
-
+    logger.info(f'MCP Tool: get_activity called - id={activity_id}')
+    
     user = await sync_to_async(get_current_user)()
-
+    
     # Run all database access in a single sync function
     def get_activity_data():
         from methodology.models import Activity
@@ -915,38 +873,38 @@ async def get_activity(activity_id: int) -> dict:
                 activity_id, user, write=False, with_full_detail=True
             )
         except Activity.DoesNotExist:
-            logger.error(f"MCP Tool: Activity id={activity_id} not found for user")
-            raise ValueError(f"Activity {activity_id} not found")
+            logger.error(f'MCP Tool: Activity id={activity_id} not found for user')
+            raise ValueError(f'Activity {activity_id} not found')
         except PermissionError:
-            logger.error(f"MCP Tool: Activity id={activity_id} not found for user")
-            raise ValueError(f"Activity {activity_id} not found")
-
+            logger.error(f'MCP Tool: Activity id={activity_id} not found for user')
+            raise ValueError(f'Activity {activity_id} not found')
+        
         # Build agent dict
         agent_dict = None
         if activity.agent:
             agent_dict = {
-                "id": activity.agent.id,
-                "name": activity.agent.name,
-                "description": activity.agent.description,
+                'id': activity.agent.id,
+                'name': activity.agent.name,
+                'description': activity.agent.description,
             }
-
+        
         # Build skills list
         skills_list = [
             {
-                "id": s.id,
-                "title": s.title,
-                "capability_domain": s.capability_domain,
-                "technology_stack": s.technology_stack,
+                'id': s.id,
+                'title': s.title,
+                'capability_domain': s.capability_domain,
+                'technology_stack': s.technology_stack,
             }
             for s in sorted(activity.skills.all(), key=lambda x: x.title.lower())
         ]
 
         rules_list = [
             {
-                "id": r.id,
-                "title": r.title,
-                "slug": r.slug,
-                "always_apply": r.always_apply,
+                'id': r.id,
+                'title': r.title,
+                'slug': r.slug,
+                'always_apply': r.always_apply,
             }
             for r in sorted(activity.rules.all(), key=lambda x: x.slug)
         ]
@@ -955,102 +913,94 @@ async def get_activity(activity_id: int) -> dict:
         output_artifacts = list(activity.output_artifacts.all())
         output_artifacts_list = [
             {
-                "id": artifact.id,
-                "name": artifact.name,
-                "type": artifact.type,
-                "is_required": artifact.is_required,
+                'id': artifact.id,
+                'name': artifact.name,
+                'type': artifact.type,
+                'is_required': artifact.is_required,
             }
             for artifact in output_artifacts
         ]
-
+        
         # Build input artifacts list
         input_artifact_inputs = list(activity.input_artifacts.all())
         input_artifacts_list = []
         for ai in input_artifact_inputs:
-            input_artifacts_list.append(
-                {
-                    "id": ai.artifact.id,
-                    "name": ai.artifact.name,
-                    "type": ai.artifact.type,
-                    "is_required": ai.is_required,
-                }
-            )
-
+            input_artifacts_list.append({
+                'id': ai.artifact.id,
+                'name': ai.artifact.name,
+                'type': ai.artifact.type,
+                'is_required': ai.is_required,
+            })
+        
         # Build predecessor dict
         predecessor_dict = None
         if activity.predecessor:
             predecessor_dict = {
-                "id": activity.predecessor.id,
-                "name": activity.predecessor.name,
+                'id': activity.predecessor.id,
+                'name': activity.predecessor.name,
             }
-
+        
         # Build successor dict
         successor_dict = None
         if activity.successor:
             successor_dict = {
-                "id": activity.successor.id,
-                "name": activity.successor.name,
+                'id': activity.successor.id,
+                'name': activity.successor.name,
             }
-
+        
         # Build phase dict
         phase_dict = None
         if activity.phase:
             phase_dict = {
-                "id": activity.phase.id,
-                "name": activity.phase.name,
+                'id': activity.phase.id,
+                'name': activity.phase.name,
             }
-
+        
         result = {
-            "id": activity.id,
-            "name": activity.name,
-            "guidance": activity.guidance,
-            "phase": phase_dict,
-            "order": activity.order,
-            "workflow_id": activity.workflow_id,
-            "predecessor": predecessor_dict,
-            "successor": successor_dict,
-            "agent": agent_dict,
-            "skills": skills_list,
-            "rules": rules_list,
-            "output_artifacts": output_artifacts_list,
-            "input_artifacts": input_artifacts_list,
+            'id': activity.id,
+            'name': activity.name,
+            'guidance': activity.guidance,
+            'phase': phase_dict,
+            'order': activity.order,
+            'workflow_id': activity.workflow_id,
+            'predecessor': predecessor_dict,
+            'successor': successor_dict,
+            'agent': agent_dict,
+            'skills': skills_list,
+            'rules': rules_list,
+            'output_artifacts': output_artifacts_list,
+            'input_artifacts': input_artifacts_list,
         }
-
+        
         logger.info(
-            f"MCP Tool: Activity with predecessor={activity.predecessor_id}, "
-            f"successor={activity.successor_id}, agent={activity.agent_id}, "
-            f"skills={len(skills_list)}, rules={len(rules_list)}, outputs={len(output_artifacts_list)}, "
-            f"inputs={len(input_artifacts_list)}"
+            f'MCP Tool: Activity with predecessor={activity.predecessor_id}, '
+            f'successor={activity.successor_id}, agent={activity.agent_id}, '
+            f'skills={len(skills_list)}, rules={len(rules_list)}, outputs={len(output_artifacts_list)}, '
+            f'inputs={len(input_artifacts_list)}'
         )
-
+        
         return result
-
+    
     # Execute all database operations in sync context
     result = await sync_to_async(get_activity_data)()
-
+    
     # Track access for "Recently Used" dashboard section (non-critical)
     try:
         from methodology.services.activity_service import ActivityService
-
         await sync_to_async(ActivityService.touch_activity_access)(activity_id)
     except Exception as e:
-        logger.warning(f"Failed to track access for activity {activity_id}: {e}")
-
+        logger.warning(f'Failed to track access for activity {activity_id}: {e}')
+    
     return result
 
 
-async def update_activity(
-    activity_id: int,
-    name: str = None,
-    guidance: str = None,
-    phase_id: int = None,
-    order: int = None,
-) -> dict:
+async def update_activity(activity_id: int, name: str = None, guidance: str = None,
+                        phase_id: int = None, order: int = None) -> dict:
     """
     Update activity in DRAFT playbook. Increments grandparent version.
-
+    
     Note: Use set_predecessor_tool() to change dependencies.
-
+    
     :param activity_id: Activity ID. Example: 1
     :param name: New name or None
     :param guidance: New guidance or None
@@ -1060,8 +1010,8 @@ async def update_activity(
     :raises PermissionError: if grandparent playbook is released
     :raises ValueError: if not found or validation fails (duplicate name, invalid phase_id, cross-playbook phase)
     """
-    logger.info(f"MCP Tool: update_activity called - id={activity_id}")
-
+    logger.info(f'MCP Tool: update_activity called - id={activity_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Activity
@@ -1073,71 +1023,64 @@ async def update_activity(
                 activity_id, user, write=True, with_full_detail=False
             )
         except Activity.DoesNotExist:
-            raise ValueError(f"Activity {activity_id} not found") from None
+            raise ValueError(f'Activity {activity_id} not found') from None
         except PermissionError:
-            raise ValueError(f"Activity {activity_id} not found") from None
+            raise ValueError(f'Activity {activity_id} not found') from None
 
     activity = await sync_to_async(_load)()
 
     # Permission check
-    if activity.workflow.playbook.status == "released":
-        logger.error(f"MCP Tool: Cannot update activity in released playbook")
-        raise PermissionError(
-            f"Cannot modify released playbook. Use create_pip instead."
-        )
-
+    if activity.workflow.playbook.status == 'released':
+        logger.error(f'MCP Tool: Cannot update activity in released playbook')
+        raise PermissionError(f'Cannot modify released playbook. Use create_pip instead.')
+    
     # Build update data
     update_data = {}
     if name is not None:
-        update_data["name"] = name
+        update_data['name'] = name
     if guidance is not None:
-        update_data["guidance"] = guidance
+        update_data['guidance'] = guidance
     if phase_id is not None:
-        update_data["phase_id"] = phase_id
+        update_data['phase_id'] = phase_id
     if order is not None:
-        update_data["order"] = order
-
+        update_data['order'] = order
+    
     if update_data:
         from methodology.services.activity_service import ActivityService
-
         old_version = activity.workflow.playbook.version
 
         try:
-            activity = await sync_to_async(ActivityService.update_activity)(
-                activity_id, **update_data
-            )
+            activity = await sync_to_async(ActivityService.update_activity)(activity_id, **update_data)
         except ValidationError as e:
-            _handle_validation_error(e, "update_activity")
+            _handle_validation_error(e, 'update_activity')
 
         # Increment grandparent version
-        activity.workflow.playbook.version += Decimal("0.1")
+        activity.workflow.playbook.version += Decimal('0.1')
         await sync_to_async(activity.workflow.playbook.save)()
 
-        logger.info(
-            f"MCP Tool: Updated activity, grandparent version {old_version} → {activity.workflow.playbook.version}"
-        )
-
+        logger.info(f'MCP Tool: Updated activity, grandparent version {old_version} → {activity.workflow.playbook.version}')
+    
     return {
-        "id": activity.id,
-        "name": activity.name,
-        "guidance": activity.guidance,
-        "phase_id": activity.phase_id,
-        "order": activity.order,
-        "workflow_id": activity.workflow_id,
+        'id': activity.id,
+        'name': activity.name,
+        'guidance': activity.guidance,
+        'phase_id': activity.phase_id,
+        'order': activity.order,
+        'workflow_id': activity.workflow_id,
     }
 
 
 async def delete_activity(activity_id: int) -> dict:
     """
     Delete activity in DRAFT playbook. Increments grandparent version.
-
+    
     :param activity_id: Activity ID. Example: 1
     :return: Confirmation dict
     :raises PermissionError: if grandparent playbook is released
     :raises ValueError: if not found
     """
-    logger.info(f"MCP Tool: delete_activity called - id={activity_id}")
-
+    logger.info(f'MCP Tool: delete_activity called - id={activity_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Activity
@@ -1149,51 +1092,44 @@ async def delete_activity(activity_id: int) -> dict:
                 activity_id, user, write=True, with_full_detail=False
             )
         except Activity.DoesNotExist:
-            raise ValueError(f"Activity {activity_id} not found") from None
+            raise ValueError(f'Activity {activity_id} not found') from None
         except PermissionError:
-            raise ValueError(f"Activity {activity_id} not found") from None
+            raise ValueError(f'Activity {activity_id} not found') from None
 
     activity = await sync_to_async(_load)()
 
     # Permission check
-    if activity.workflow.playbook.status == "released":
-        logger.error(f"MCP Tool: Cannot delete activity in released playbook")
-        raise PermissionError(
-            f"Cannot modify released playbook. Use create_pip instead."
-        )
-
+    if activity.workflow.playbook.status == 'released':
+        logger.error(f'MCP Tool: Cannot delete activity in released playbook')
+        raise PermissionError(f'Cannot modify released playbook. Use create_pip instead.')
+    
     activity_name = activity.name
     playbook = activity.workflow.playbook
     old_version = playbook.version
-
+    
     from methodology.services.activity_service import ActivityService
-
     await sync_to_async(ActivityService.delete_activity)(activity_id)
-
+    
     # Increment grandparent version
-    playbook.version += Decimal("0.1")
+    playbook.version += Decimal('0.1')
     await sync_to_async(playbook.save)()
-
-    logger.info(
-        f'MCP Tool: Deleted activity "{activity_name}", grandparent version {old_version} → {playbook.version}'
-    )
-    return {"deleted": True, "activity_id": activity_id}
+    
+    logger.info(f'MCP Tool: Deleted activity "{activity_name}", grandparent version {old_version} → {playbook.version}')
+    return {'deleted': True, 'activity_id': activity_id}
 
 
 async def set_predecessor(activity_id: int, predecessor_id: int) -> dict:
     """
     Set activity predecessor (validates no circular dependencies).
-
+    
     :param activity_id: Activity ID. Example: 2
     :param predecessor_id: Predecessor activity ID. Example: 1
     :return: Updated activity dict
     :raises PermissionError: if grandparent playbook is released
     :raises ValueError: if validation fails or circular dependency detected
     """
-    logger.info(
-        f"MCP Tool: set_predecessor called - activity_id={activity_id}, predecessor_id={predecessor_id}"
-    )
-
+    logger.info(f'MCP Tool: set_predecessor called - activity_id={activity_id}, predecessor_id={predecessor_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Activity
@@ -1209,40 +1145,35 @@ async def set_predecessor(activity_id: int, predecessor_id: int) -> dict:
             )
             return act, pred
         except Activity.DoesNotExist:
-            raise ValueError("Activity or predecessor not found") from None
+            raise ValueError('Activity or predecessor not found') from None
         except PermissionError:
-            raise ValueError("Activity or predecessor not found") from None
+            raise ValueError('Activity or predecessor not found') from None
 
     activity, predecessor = await sync_to_async(_load)()
 
     # Permission check
-    if activity.workflow.playbook.status == "released":
-        logger.error(f"MCP Tool: Cannot modify dependencies in released playbook")
-        raise PermissionError(
-            f"Cannot modify released playbook. Use create_pip instead."
-        )
-
+    if activity.workflow.playbook.status == 'released':
+        logger.error(f'MCP Tool: Cannot modify dependencies in released playbook')
+        raise PermissionError(f'Cannot modify released playbook. Use create_pip instead.')
+    
     # Call service (validates circular dependencies)
     from methodology.services.activity_service import ActivityService
-
     old_version = activity.workflow.playbook.version
     try:
         await sync_to_async(ActivityService.set_predecessor)(activity, predecessor)
     except ValidationError as e:
-        _handle_validation_error(e, "set_predecessor")
-
+        _handle_validation_error(e, 'set_predecessor')
+    
     # Increment grandparent version
-    activity.workflow.playbook.version += Decimal("0.1")
+    activity.workflow.playbook.version += Decimal('0.1')
     await sync_to_async(activity.workflow.playbook.save)()
-
-    logger.info(
-        f"MCP Tool: Set predecessor, grandparent version {old_version} → {activity.workflow.playbook.version}"
-    )
-
+    
+    logger.info(f'MCP Tool: Set predecessor, grandparent version {old_version} → {activity.workflow.playbook.version}')
+    
     return {
-        "activity_id": activity.id,
-        "predecessor_id": predecessor.id,
-        "updated": True,
+        'activity_id': activity.id,
+        'predecessor_id': predecessor.id,
+        'updated': True,
     }
 
 
@@ -1259,24 +1190,21 @@ async def set_predecessor(activity_id: int, predecessor_id: int) -> dict:
 async def export_workflow_to_local(
     workflow_id: int,
     target_directory: str = ".windsurf/workflows",
-    folder_name: str = None,
+    folder_name: str = None
 ) -> dict:
     """
     Export workflow to local AI workspace as markdown files.
-
+    
     :param workflow_id: Workflow ID. Example: 42
     :param target_directory: Target directory. Example: ".windsurf/workflows"
     :param folder_name: Folder name. Example: "FFE" (defaults to workflow slug)
     :return: Export result with file paths and counts
     """
-    logger.info(
-        f"MCP Tool: export_workflow_to_local called - workflow_id={workflow_id}"
-    )
-
+    logger.info(f'MCP Tool: export_workflow_to_local called - workflow_id={workflow_id}')
+    
     user = await sync_to_async(get_current_user)()
-
+    
     from methodology.services.workflow_export_service import WorkflowExportService
-
     try:
         result = await sync_to_async(WorkflowExportService.export_workflow_to_markdown)(
             workflow_id=workflow_id,
@@ -1285,8 +1213,8 @@ async def export_workflow_to_local(
             user=user,
         )
     except PermissionError as exc:
-        raise ValueError(f"Workflow {workflow_id} not found") from exc
-
+        raise ValueError(f'Workflow {workflow_id} not found') from exc
+    
     logger.info(f'MCP Tool: Exported workflow {workflow_id} to {result["export_path"]}')
     return result
 
@@ -1373,76 +1301,70 @@ async def export_playbook_to_local(
 
 
 async def import_workflow_from_local(
-    workflow_id: int, source_directory: str, auto_apply: bool = False
+    workflow_id: int,
+    source_directory: str,
+    auto_apply: bool = False
 ) -> dict:
     """
     Import workflow from local markdown files with change detection.
-
+    
     :param workflow_id: Workflow ID. Example: 42
     :param source_directory: Source directory. Example: ".windsurf/workflows/FFE"
     :param auto_apply: Auto-apply for draft playbooks. Example: False
     :return: Change detection result with protocol path
     """
-    logger.info(
-        f"MCP Tool: import_workflow_from_local called - workflow_id={workflow_id}"
-    )
-
+    logger.info(f'MCP Tool: import_workflow_from_local called - workflow_id={workflow_id}')
+    
     user = await sync_to_async(get_current_user)()
-
+    
     from methodology.services.workflow_import_service import WorkflowImportService
-
     try:
-        result = await sync_to_async(
-            WorkflowImportService.import_workflow_from_markdown
-        )(workflow_id=workflow_id, source_directory=source_directory)
+        result = await sync_to_async(WorkflowImportService.import_workflow_from_markdown)(
+            workflow_id=workflow_id,
+            source_directory=source_directory
+        )
     except ValidationError as e:
-        _handle_validation_error(e, "import_workflow_from_local")
-
-    if auto_apply and result["playbook_status"] == "draft":
+        _handle_validation_error(e, 'import_workflow_from_local')
+    
+    if auto_apply and result['playbook_status'] == 'draft':
         import os
 
         from methodology.services.workflow_protocol_service import (
             WorkflowProtocolService,
         )
-
-        protocol_file = os.path.join(source_directory, "_Upload_Protocol.md")
+        protocol_file = os.path.join(source_directory, '_Upload_Protocol.md')
         try:
-            apply_result = await sync_to_async(
-                WorkflowProtocolService.apply_upload_protocol
-            )(protocol_file=protocol_file)
+            apply_result = await sync_to_async(WorkflowProtocolService.apply_upload_protocol)(
+                protocol_file=protocol_file
+            )
         except ValidationError as e:
-            _handle_validation_error(e, "import_workflow_from_local")
-        result["auto_applied"] = True
-        result["apply_result"] = apply_result
-
-    logger.info(
-        f'MCP Tool: Imported workflow {workflow_id}, changes detected: {result["changes_count"]}'
-    )
+            _handle_validation_error(e, 'import_workflow_from_local')
+        result['auto_applied'] = True
+        result['apply_result'] = apply_result
+    
+    logger.info(f'MCP Tool: Imported workflow {workflow_id}, changes detected: {result["changes_count"]}')
     return result
 
 
 async def apply_upload_protocol(protocol_file: str) -> dict:
     """
     Apply upload protocol to draft playbook.
-
+    
     :param protocol_file: Path to _Upload_Protocol.md
     :return: Application result with change counts
     """
-    logger.info(
-        f"MCP Tool: apply_upload_protocol called - protocol_file={protocol_file}"
-    )
-
+    logger.info(f'MCP Tool: apply_upload_protocol called - protocol_file={protocol_file}')
+    
     user = await sync_to_async(get_current_user)()
-
+    
     from methodology.services.workflow_protocol_service import WorkflowProtocolService
-
     try:
         result = await sync_to_async(WorkflowProtocolService.apply_upload_protocol)(
             protocol_file=protocol_file
         )
     except ValidationError as e:
-        _handle_validation_error(e, "apply_upload_protocol")
-
+        _handle_validation_error(e, 'apply_upload_protocol')
+    
     logger.info(f'MCP Tool: Applied protocol, changes: {result["changes_applied"]}')
     return result
 
@@ -1450,24 +1372,24 @@ async def apply_upload_protocol(protocol_file: str) -> dict:
 async def create_pip_from_protocol(protocol_file: str, pip_title: str) -> dict:
     """
     Create PIP from upload protocol for released playbook.
-
+    
     :param protocol_file: Path to _Upload_Protocol.md
     :param pip_title: PIP title. Example: "Improve workflow"
     :return: Created PIP dict with ID and status
     """
-    logger.info(f"MCP Tool: create_pip_from_protocol called - pip_title={pip_title}")
-
+    logger.info(f'MCP Tool: create_pip_from_protocol called - pip_title={pip_title}')
+    
     user = await sync_to_async(get_current_user)()
-
+    
     from methodology.services.workflow_protocol_service import WorkflowProtocolService
-
     try:
         result = await sync_to_async(WorkflowProtocolService.create_pip_from_protocol)(
-            protocol_file=protocol_file, pip_title=pip_title
+            protocol_file=protocol_file,
+            pip_title=pip_title
         )
     except ValidationError as e:
-        _handle_validation_error(e, "create_pip_from_protocol")
-
+        _handle_validation_error(e, 'create_pip_from_protocol')
+    
     logger.info(f'MCP Tool: Created PIP {result["pip_id"]}')
     return result
 
@@ -2751,7 +2673,7 @@ async def unlink_artifact_from_activity(artifact_input_id: int) -> dict:
         await sync_to_async(ArtifactService.get_artifact_input_for_owner)(
             artifact_input_id, user
         )
-    except ArtifactInput.DoesNotExist, Playbook.DoesNotExist:
+    except (ArtifactInput.DoesNotExist, Playbook.DoesNotExist):
         raise ValueError(f"ArtifactInput {artifact_input_id} not found")
 
     await sync_to_async(ArtifactService.remove_artifact_input)(artifact_input_id)
@@ -2779,11 +2701,14 @@ def _phase_to_dict(phase):
 
 
 async def create_phase(
-    playbook_id: int, name: str, description: str = "", order: int | None = None
+    playbook_id: int,
+    name: str,
+    description: str = '',
+    order: int | None = None
 ) -> dict:
     """
     Create phase in draft playbook. Increments parent version.
-
+    
     :param playbook_id: Parent playbook ID. Example: 1
     :param name: Phase name (required, unique per playbook). Example: "Planning"
     :param description: Description (optional). Example: "Initial planning phase"
@@ -2792,30 +2717,27 @@ async def create_phase(
     :raises PermissionError: If playbook is released
     :raises ValueError: If playbook not found or validation fails
     """
-    logger.info(
-        f'MCP Tool: create_phase called - playbook_id={playbook_id}, name="{name}"'
-    )
-
+    logger.info(f'MCP Tool: create_phase called - playbook_id={playbook_id}, name="{name}"')
+    
     user = await sync_to_async(get_current_user)()
 
     playbook = await _playbook_for_write(playbook_id, user)
 
-    if playbook.status == "released":
-        raise PermissionError("Cannot create phases in released playbook")
-
+    if playbook.status == 'released':
+        raise PermissionError('Cannot create phases in released playbook')
+    
     from methodology.services.phase_service import PhaseService
-
     try:
         phase = await sync_to_async(PhaseService.create_phase)(
             playbook_id=playbook_id,
             name=name,
             description=description,
             order=order,
-            user=user,
+            user=user
         )
     except ValidationError as e:
-        _handle_validation_error(e, "create_phase")
-
+        _handle_validation_error(e, 'create_phase')
+    
     phase_dict = _phase_to_dict(phase)
     logger.info(f'MCP Tool: Phase {phase_dict["id"]} created in playbook {playbook_id}')
     return phase_dict
@@ -2824,41 +2746,38 @@ async def create_phase(
 async def list_phases(playbook_id: int) -> list[dict]:
     """
     List all phases for a playbook.
-
+    
     :param playbook_id: Playbook ID. Example: 1
     :return: List of phase dicts with activity counts
     :raises ValueError: If playbook not found
     """
-    logger.info(f"MCP Tool: list_phases called - playbook_id={playbook_id}")
-
+    logger.info(f'MCP Tool: list_phases called - playbook_id={playbook_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     await _playbook_for_read(playbook_id, user)
 
     from methodology.services.phase_service import PhaseService
-
     phases = await sync_to_async(PhaseService.list_phases)(playbook_id, user)
-
+    
     # Convert QuerySet to list of dicts
     phases_list = await sync_to_async(list)(phases)
     phases_dicts = [_phase_to_dict(p) for p in phases_list]
-
-    logger.info(
-        f"MCP Tool: Retrieved {len(phases_dicts)} phases for playbook {playbook_id}"
-    )
+    
+    logger.info(f'MCP Tool: Retrieved {len(phases_dicts)} phases for playbook {playbook_id}')
     return phases_dicts
 
 
 async def get_phase(phase_id: int) -> dict:
     """
     Get phase details with activities.
-
+    
     :param phase_id: Phase ID. Example: 1
     :return: Phase dict with activities list
     :raises ValueError: If phase not found or not owned
     """
-    logger.info(f"MCP Tool: get_phase called - phase_id={phase_id}")
-
+    logger.info(f'MCP Tool: get_phase called - phase_id={phase_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     from django.core.exceptions import PermissionDenied
@@ -2866,43 +2785,39 @@ async def get_phase(phase_id: int) -> dict:
     from methodology.services.phase_service import PhaseService
 
     try:
-        phase_data = await sync_to_async(PhaseService.get_phase_with_activities)(
-            phase_id, user
-        )
+        phase_data = await sync_to_async(PhaseService.get_phase_with_activities)(phase_id, user)
     except ValidationError:
-        raise ValueError(f"Phase {phase_id} not found")
+        raise ValueError(f'Phase {phase_id} not found')
     except PermissionDenied:
-        raise ValueError(f"Phase {phase_id} not found")
-
+        raise ValueError(f'Phase {phase_id} not found')
+    
     # Convert phase object to dict — serialize ORM objects to JSON-safe primitives
-    raw_activities = phase_data["workflow_activities"]
-    serialized_activities = (
-        [
-            {
-                "workflow_id": wf.id,
-                "workflow_name": wf.name,
-                "activities": [
-                    {"id": a.id, "name": a.name, "order": a.order} for a in acts
-                ],
-            }
-            for wf, acts in raw_activities.items()
-        ]
-        if isinstance(raw_activities, dict)
-        else list(raw_activities)
-    )
+    raw_activities = phase_data['workflow_activities']
+    serialized_activities = [
+        {
+            'workflow_id': wf.id,
+            'workflow_name': wf.name,
+            'activities': [
+                {'id': a.id, 'name': a.name, 'order': a.order}
+                for a in acts
+            ]
+        }
+        for wf, acts in raw_activities.items()
+    ] if isinstance(raw_activities, dict) else list(raw_activities)
 
-    raw_artifacts = phase_data["artifacts"]
+    raw_artifacts = phase_data['artifacts']
     serialized_artifacts = [
-        {"id": a.id, "name": a.name, "type": a.type} for a in raw_artifacts
+        {'id': a.id, 'name': a.name, 'type': a.type}
+        for a in raw_artifacts
     ]
 
     result = {
-        **_phase_to_dict(phase_data["phase"]),
-        "activities": serialized_activities,
-        "artifacts": serialized_artifacts,
+        **_phase_to_dict(phase_data['phase']),
+        'activities': serialized_activities,
+        'artifacts': serialized_artifacts,
     }
-
-    logger.info(f"MCP Tool: Retrieved phase {phase_id}")
+    
+    logger.info(f'MCP Tool: Retrieved phase {phase_id}')
     return result
 
 
@@ -2910,11 +2825,11 @@ async def update_phase(
     phase_id: int,
     name: str | None = None,
     description: str | None = None,
-    order: int | None = None,
+    order: int | None = None
 ) -> dict:
     """
     Update phase in draft playbook. Increments parent version.
-
+    
     :param phase_id: Phase ID. Example: 1
     :param name: New name (optional). Example: "Execution"
     :param description: New description (optional)
@@ -2923,24 +2838,22 @@ async def update_phase(
     :raises PermissionError: If playbook is released
     :raises ValueError: If phase not found or validation fails
     """
-    logger.info(f"MCP Tool: update_phase called - phase_id={phase_id}")
-
+    logger.info(f'MCP Tool: update_phase called - phase_id={phase_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Phase
     from methodology.services.phase_service import PhaseService
 
     try:
-        phase = await sync_to_async(PhaseService.get_phase_for_user)(
-            phase_id, user, write=True
-        )
+        phase = await sync_to_async(PhaseService.get_phase_for_user)(phase_id, user, write=True)
     except Phase.DoesNotExist:
-        raise ValueError(f"Phase {phase_id} not found")
+        raise ValueError(f'Phase {phase_id} not found')
     except PermissionError:
-        raise ValueError(f"Phase {phase_id} not found")
+        raise ValueError(f'Phase {phase_id} not found')
 
-    if phase.playbook.status == "released":
-        raise PermissionError("Cannot update phases in released playbook")
+    if phase.playbook.status == 'released':
+        raise PermissionError('Cannot update phases in released playbook')
 
     try:
         updated_phase = await sync_to_async(PhaseService.update_phase)(
@@ -2948,88 +2861,88 @@ async def update_phase(
             name=name,
             description=description,
             order=order,
-            user=user,
+            user=user
         )
     except ValidationError as e:
-        _handle_validation_error(e, "update_phase")
-
+        _handle_validation_error(e, 'update_phase')
+    
     phase_dict = _phase_to_dict(updated_phase)
-    logger.info(f"MCP Tool: Phase {phase_id} updated")
+    logger.info(f'MCP Tool: Phase {phase_id} updated')
     return phase_dict
 
 
 async def delete_phase(phase_id: int) -> dict:
     """
     Delete phase in draft playbook. Clears phase from activities. Increments parent version.
-
+    
     :param phase_id: Phase ID. Example: 1
     :return: Dict with deleted=True
     :raises PermissionError: If playbook is released
     :raises ValueError: If phase not found or not owned
     """
-    logger.info(f"MCP Tool: delete_phase called - phase_id={phase_id}")
-
+    logger.info(f'MCP Tool: delete_phase called - phase_id={phase_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     from methodology.models import Phase
     from methodology.services.phase_service import PhaseService
 
     try:
-        phase = await sync_to_async(PhaseService.get_phase_for_user)(
-            phase_id, user, write=True
-        )
+        phase = await sync_to_async(PhaseService.get_phase_for_user)(phase_id, user, write=True)
     except Phase.DoesNotExist:
-        raise ValueError(f"Phase {phase_id} not found")
+        raise ValueError(f'Phase {phase_id} not found')
     except PermissionError:
-        raise ValueError(f"Phase {phase_id} not found")
+        raise ValueError(f'Phase {phase_id} not found')
 
-    if phase.playbook.status == "released":
-        raise PermissionError("Cannot delete phases in released playbook")
+    if phase.playbook.status == 'released':
+        raise PermissionError('Cannot delete phases in released playbook')
 
     try:
         await sync_to_async(PhaseService.delete_phase)(phase_id, user)
     except ValidationError as e:
-        _handle_validation_error(e, "delete_phase")
-
-    logger.info(f"MCP Tool: Phase {phase_id} deleted")
-    return {"deleted": True}
+        _handle_validation_error(e, 'delete_phase')
+    
+    logger.info(f'MCP Tool: Phase {phase_id} deleted')
+    return {'deleted': True}
 
 
 async def reorder_phases(playbook_id: int, phase_order: list[int]) -> dict:
     """
     Reorder phases in draft playbook. Increments parent version.
-
+    
     :param playbook_id: Playbook ID. Example: 1
     :param phase_order: List of phase IDs in desired order. Example: [3, 1, 2]
     :return: Dict with reordered=True and count
     :raises PermissionError: If playbook is released
     :raises ValueError: If playbook not found or validation fails
     """
-    logger.info(f"MCP Tool: reorder_phases called - playbook_id={playbook_id}")
-
+    logger.info(f'MCP Tool: reorder_phases called - playbook_id={playbook_id}')
+    
     user = await sync_to_async(get_current_user)()
 
     playbook = await _playbook_for_write(playbook_id, user)
 
-    if playbook.status == "released":
-        raise PermissionError("Cannot reorder phases in released playbook")
-
+    if playbook.status == 'released':
+        raise PermissionError('Cannot reorder phases in released playbook')
+    
     from methodology.services.phase_service import PhaseService
-
     # Convert list of IDs to list of (id, order) tuples
     phase_order_list = [(phase_id, idx + 1) for idx, phase_id in enumerate(phase_order)]
     try:
         updated_phases = await sync_to_async(PhaseService.reorder_phases)(
-            playbook_id=playbook_id, phase_order_list=phase_order_list, user=user
+            playbook_id=playbook_id,
+            phase_order_list=phase_order_list,
+            user=user
         )
     except ValidationError as e:
-        _handle_validation_error(e, "reorder_phases")
-
-    result = {"reordered": True, "count": len(updated_phases)}
-
-    logger.info(
-        f'MCP Tool: Reordered {result["count"]} phases in playbook {playbook_id}'
-    )
+        _handle_validation_error(e, 'reorder_phases')
+    
+    result = {
+        'reordered': True,
+        'count': len(updated_phases)
+    }
+    
+    logger.info(f'MCP Tool: Reordered {result["count"]} phases in playbook {playbook_id}')
     return result
 
 
@@ -3525,7 +3438,7 @@ async def get_team(team_id: int) -> dict:
     service = TeamService()
     try:
         team = await sync_to_async(service.get_team_or_404)(team_id, user)
-    except Team.DoesNotExist, _Http404:
+    except (Team.DoesNotExist, _Http404):
         raise ValueError(f"Team {team_id} not found or not accessible")
 
     # Get members

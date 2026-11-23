@@ -1,9 +1,13 @@
 from __future__ import annotations
+from behave import given, then, when
 
-"""S39-owned living-spec step skeletons."""
+"S39-owned living-spec step skeletons."
 from behave.runner import Context
 
 
+@given(
+    "{consumer} has a valid MCP token and existing permission to read the independent {entity} fixture"
+)
 def eligible_mcp_reader(context: Context, consumer: str, entity: str) -> None:
     """Prepare the exact independently restored authorized Cedar fixture.
 
@@ -16,6 +20,7 @@ def eligible_mcp_reader(context: Context, consumer: str, entity: str) -> None:
     raise NotImplementedError()
 
 
+@when("the consumer reads that content using {tool}")
 def read_mcp_content(context: Context, tool: str) -> None:
     """Execute the actual authorized detail and explicit receipt boundary.
 
@@ -27,6 +32,7 @@ def read_mcp_content(context: Context, tool: str) -> None:
     raise NotImplementedError()
 
 
+@then("the actual authorized entity content is returned")
 def authorized_content_returned(context: Context) -> None:
     """Compare returned content with the actual selected ORM fixture.
 
@@ -37,6 +43,9 @@ def authorized_content_returned(context: Context) -> None:
     raise NotImplementedError()
 
 
+@then(
+    "the consumer total becomes {consumer_total:d} and target playbook author {author} becomes {author_total:d}"
+)
 def paired_totals(
     context: Context, consumer_total: int, author: str, author_total: int
 ) -> None:
@@ -52,6 +61,7 @@ def paired_totals(
     raise NotImplementedError()
 
 
+@then("private content remains protected by its existing access checks")
 def private_access_preserved(context: Context) -> None:
     """Exercise existing denied private/PIP paths with real requests.
 
@@ -62,6 +72,7 @@ def private_access_preserved(context: Context) -> None:
     raise NotImplementedError()
 
 
+@given("Maria has a valid MCP token")
 def maria_mcp_token(context: Context) -> None:
     """Prepare real Maria token and global before snapshot.
     :param context: Cedar AT context; example: existing context.cedar_dataset.
@@ -71,6 +82,7 @@ def maria_mcp_token(context: Context) -> None:
     raise NotImplementedError()
 
 
+@when("she calls list_activities")
 def list_activities_without_consumption(context: Context) -> None:
     """Call actual authorized activity collection through Django-client AT.
     :param context: Prepared token context; example: workflow 6202.
@@ -80,6 +92,7 @@ def list_activities_without_consumption(context: Context) -> None:
     raise NotImplementedError()
 
 
+@then("Maria remains at 8200 and Mike remains at 12450")
 def maria_and_mike_unchanged(context: Context) -> None:
     """Assert exact totals plus global ledger and summary invariants.
     :param context: AT response/snapshot; example: Maria 8200, Mike 12450.

@@ -1,5 +1,13 @@
 """Workflow Export Service - Export workflows to markdown files."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from uuid import UUID
+    from django.contrib.auth.models import User
+
 import logging
 import re
 from pathlib import Path
@@ -24,7 +32,7 @@ class WorkflowExportService:
     ) -> dict:
         """
         Export workflow and activities as markdown files.
-
+        
         :param workflow_id: Workflow ID. Example: 42
         :param target_directory: Target directory path. Example: ".windsurf/workflows"
         :param folder_name: Folder name. Example: "FFE" (defaults to workflow slug)
@@ -35,38 +43,35 @@ class WorkflowExportService:
         :raises PermissionError: If directory not writable
         """
         logger.info(f"Exporting workflow {workflow_id} to {target_directory}")
-
+        
         try:
             if user is not None:
                 workflow = WorkflowService.get_workflow_for_user(
                     workflow_id, user, write=False, prefetch_activities=False
                 )
             else:
-                workflow = Workflow.objects.select_related("playbook").get(
-                    pk=workflow_id
-                )
+                workflow = Workflow.objects.select_related('playbook').get(pk=workflow_id)
         except ObjectDoesNotExist:
             logger.error(f"Workflow {workflow_id} not found")
             raise ObjectDoesNotExist(f"Workflow with ID {workflow_id} does not exist")
         except PermissionError:
             raise
-
+        
         # Fetch activities with agent, skill, artifacts, and rules
         activities = list(
-            workflow.activities.select_related("agent")
-            .prefetch_related("skills", "rules")
+            workflow.activities.select_related('agent').prefetch_related('skills', 'rules')
             .prefetch_related(
-                "output_artifacts",
-                "input_artifacts__artifact",
-                "rules",
+                'output_artifacts',
+                'input_artifacts__artifact',
+                'rules',
             )
-            .order_by("order")
+            .order_by('order')
         )
         logger.info(f"Found {len(activities)} activities in workflow '{workflow.name}'")
-
+        
         if not folder_name:
             folder_name = WorkflowExportService._slugify(workflow.name)
-
+        
         export_path = Path(target_directory) / folder_name
         try:
             export_path.mkdir(parents=True, exist_ok=True)
@@ -74,24 +79,22 @@ class WorkflowExportService:
         except OSError as e:
             logger.error(f"Failed to create directory {export_path}: {e}")
             raise PermissionError(f"Cannot create directory {export_path}: {e}")
-
+        
         files_created = []
-
-        workflow_md = WorkflowExportService._generate_workflow_metadata_md(
-            workflow, len(activities)
-        )
+        
+        workflow_md = WorkflowExportService._generate_workflow_metadata_md(workflow, len(activities))
         workflow_file = export_path / "_workflow.md"
-        workflow_file.write_text(workflow_md, encoding="utf-8")
+        workflow_file.write_text(workflow_md, encoding='utf-8')
         files_created.append("_workflow.md")
         logger.info("Created _workflow.md")
-
+        
         slug_prefix = folder_name
         for activity in activities:
             filename, content = WorkflowExportService._generate_activity_md(
                 activity, activity.order, slug_prefix
             )
             activity_file = export_path / filename
-            activity_file.write_text(content, encoding="utf-8")
+            activity_file.write_text(content, encoding='utf-8')
             files_created.append(filename)
             logger.info(f"Created {filename}")
 
@@ -103,35 +106,32 @@ class WorkflowExportService:
             )
             files_created.extend(rule_files)
 
-        rule_export_paths = (
-            [str((rules_dir / Path(name).name).absolute()) for name in rule_files]
-            if rules_dir
-            else []
-        )
+        rule_export_paths = [
+            str((rules_dir / Path(name).name).absolute())
+            for name in rule_files
+        ] if rules_dir else []
         result = {
-            "status": "exported",
-            "workflow_id": workflow_id,
-            "workflow_name": workflow.name,
-            "export_path": str(export_path.absolute()),
-            "rules_export_path": str(rules_dir.absolute()) if rules_dir else "",
-            "files_created": files_created,
-            "rule_files_created": rule_files,
-            "rule_export_paths": rule_export_paths,
-            "message": (
-                f"Workflow exported to {export_path.absolute()}."
+            'status': 'exported',
+            'workflow_id': workflow_id,
+            'workflow_name': workflow.name,
+            'export_path': str(export_path.absolute()),
+            'rules_export_path': str(rules_dir.absolute()) if rules_dir else '',
+            'files_created': files_created,
+            'rule_files_created': rule_files,
+            'rule_export_paths': rule_export_paths,
+            'message': (
+                f'Workflow exported to {export_path.absolute()}.'
                 + (
-                    f" {len(rule_export_paths)} linked rules were written to "
+                    f' {len(rule_export_paths)} linked rules were written to '
                     f'{rules_dir.absolute()} ({", ".join(rule_files)}).'
                     if rule_export_paths
-                    else " No linked rules."
+                    else ' No linked rules.'
                 )
-                + " Edit files locally and use import_workflow_from_local to apply changes."
+                + ' Edit files locally and use import_workflow_from_local to apply changes.'
             ),
         }
-
-        logger.info(
-            f"Export completed: {len(files_created)} files created at {export_path}"
-        )
+        
+        logger.info(f"Export completed: {len(files_created)} files created at {export_path}")
         return result
 
     @staticmethod
@@ -236,12 +236,10 @@ After editing, use import_workflow_from_local MCP tool to import changes.
         return md
 
     @staticmethod
-    def _generate_activity_md(
-        activity, order: int, slug_prefix: str
-    ) -> tuple[str, str]:
+    def _generate_activity_md(activity, order: int, slug_prefix: str) -> tuple[str, str]:
         """
         Generate activity markdown file with agent, skill, and artifacts.
-
+        
         :param activity: Activity instance with prefetched agent, skill, artifacts
         :param order: Activity order number
         :param slug_prefix: Prefix for filename
@@ -249,27 +247,23 @@ After editing, use import_workflow_from_local MCP tool to import changes.
         """
         slug = WorkflowExportService._slugify(activity.name)
         filename = f"{slug_prefix}-{order:02d}-{slug}.md"
-
+        
         dependencies = []
         if activity.predecessor:
-            dependencies.append(
-                f"Predecessor: Activity {activity.predecessor.id} ({activity.predecessor.name})"
-            )
+            dependencies.append(f"Predecessor: Activity {activity.predecessor.id} ({activity.predecessor.name})")
         if activity.successor:
-            dependencies.append(
-                f"Successor: Activity {activity.successor.id} ({activity.successor.name})"
-            )
-
+            dependencies.append(f"Successor: Activity {activity.successor.id} ({activity.successor.name})")
+        
         dependencies_text = "\n".join(dependencies) if dependencies else "None"
         phase_text = activity.phase.name if activity.phase else "None"
-
+        
         # Build agent section (Issue #72)
         if activity.agent:
             agent_text = f"""**Name**: {activity.agent.name}
 **Description**: {activity.agent.description if activity.agent.description else 'No description'}"""
         else:
             agent_text = "None"
-
+        
         # Build skill section (Issue #72)
         linked_skills = list(activity.skills.all())
         if linked_skills:
@@ -277,13 +271,9 @@ After editing, use import_workflow_from_local MCP tool to import changes.
             for skill in linked_skills:
                 skill_lines.append(f"**Title**: {skill.title}")
                 if skill.capability_domain:
-                    skill_lines.append(
-                        f"**Capability Domain**: {skill.capability_domain}"
-                    )
+                    skill_lines.append(f"**Capability Domain**: {skill.capability_domain}")
                 if skill.technology_stack:
-                    skill_lines.append(
-                        f"**Technology Stack**: {skill.technology_stack}"
-                    )
+                    skill_lines.append(f"**Technology Stack**: {skill.technology_stack}")
                 skill_lines.append("")
             skill_text = "\n".join(skill_lines).strip()
         else:
@@ -291,10 +281,7 @@ After editing, use import_workflow_from_local MCP tool to import changes.
 
         rule_links = list(activity.rules.all())
         if rule_links:
-            rules_lines = [
-                f"- **{r.title}** (`{r.slug}`)"
-                for r in sorted(rule_links, key=lambda x: x.slug)
-            ]
+            rules_lines = [f"- **{r.title}** (`{r.slug}`)" for r in sorted(rule_links, key=lambda x: x.slug)]
             rules_text = "\n".join(rules_lines)
         else:
             rules_text = "None"
@@ -311,7 +298,7 @@ After editing, use import_workflow_from_local MCP tool to import changes.
             artifacts_produced_text = "\n".join(artifacts_produced_lines)
         else:
             artifacts_produced_text = "None"
-
+        
         # Build artifacts consumed section (Issue #72)
         input_artifact_inputs = list(activity.input_artifacts.all())
         if input_artifact_inputs:
@@ -324,7 +311,7 @@ After editing, use import_workflow_from_local MCP tool to import changes.
             artifacts_consumed_text = "\n".join(artifacts_consumed_lines)
         else:
             artifacts_consumed_text = "None"
-
+        
         content = f"""# Activity: {activity.name}
 
 **Activity ID**: {activity.id}
@@ -364,7 +351,7 @@ After editing, use import_workflow_from_local MCP tool to import changes.
 
 No additional notes.
 """
-
+        
         return filename, content
 
     @staticmethod

@@ -242,3 +242,6 @@ infra/.venv/
 # Local MCP configuration (may contain credentials)
 .mcp.json
 .codex/config.toml
+
+# Behave formatter output; capture evidence belongs outside the source tree.
+pretty.output

@@ -45,7 +45,7 @@ async def test_mcp_detail_with_invalid_token_preserves_global_ledger(
 def test_receipt_with_forged_fields_or_revoked_access_preserves_global_ledger() -> None:
     """Reject forged attribution and UUID reuse through actual receipt views.
 
-    :return: None. Example: another actor cannot replay an eligible UUID.
+    :return: None. Example: same actor/channel/UUID with changed payload conflicts; another authorized actor/channel is independent.
     :raises AssertionError: Rejection alters any existing or new award.
     """
     raise NotImplementedError()

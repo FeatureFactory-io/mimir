@@ -3,6 +3,8 @@
 Injects global context variables into all template contexts.
 """
 
+from __future__ import annotations
+
 import logging
 
 from django.urls import reverse

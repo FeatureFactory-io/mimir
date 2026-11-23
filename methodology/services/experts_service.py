@@ -8,7 +8,7 @@ from django.contrib.auth.models import AbstractUser
 from methodology.models import Playbook
 
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Sequence
 
 LEADERBOARD_LIMIT = 5
 SOURCE_BUCKETS = ("Released", "PIP", "Consumption", "Learning")

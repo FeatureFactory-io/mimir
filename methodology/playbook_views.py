@@ -5,6 +5,14 @@ Provides views for listing, creating, viewing, editing, and deleting playbooks.
 Includes a 3-step creation wizard and export/import functionality.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from django.http import HttpRequest
+    from methodology.services.playbook_service import ReleaseOutcome
+
 import json
 import logging
 from decimal import Decimal

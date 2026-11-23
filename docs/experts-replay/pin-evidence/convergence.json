@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "baseline": "1ee55d3",
+  "existing_callable_ASTs_unchanged": 371,
+  "new_raising_callable_count": 907,
+  "grammar": "Python 3.12",
+  "incidental_existing_method_formatting_restored": 0,
+  "scope": "Structure only; all new callable bodies raise. No Cedar or feature behavior.",
+  "working_regressions": {
+    "passed": 29,
+    "deselected_unimplemented": 1,
+    "scope": "Existing profile, release and model-seam tests."
+  },
+  "server_registry": {
+    "contracts": 43,
+    "expanded_cases": 83,
+    "steps": 410,
+    "undefined": 0,
+    "result": "dry-run only, all untested; no behavior pass claimed"
+  }
+}
