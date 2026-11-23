@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S23
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 86730a150c5aad93dad96b87d805c68f47c9ddd0a520451f9b3207adc5a2b47e
 ```
@@ -307,3 +307,7 @@ A refresh is evidenced by a new actual request and persisted interaction. Change
 S23/S27 reports contain older shared-interface proposals (`requests`, mapping-based Cedar input and competing fixture names). Apply parent convergence: `.calls`, `CedarDataset`, S27 single-call `PRF-EXPERTS-03/happy.json`, and S23 separate two-call submission script. S25 adds only its own four-turn scripts.
 
 No repository writes, mutations, tests, provider requests, commits or GitHub actions were performed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S25.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

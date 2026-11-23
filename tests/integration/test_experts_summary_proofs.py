@@ -108,3 +108,25 @@ def test_s23_summary_interaction_agent_story_happy() -> None:
     :raises AssertionError: For missing trace metadata or fabricated zero cost.
     """
     raise NotImplementedError()
+
+
+@pytest.mark.agent_proof
+@pytest.mark.django_db(transaction=True)
+def test_s25_resubmission_agent_story_happy() -> None:
+    """Prove genuine two-cycle summary orchestration and public-only requests.
+
+    :return: None. Example: None after traces, four calls and real DB assertions.
+    :raises AssertionError: For synthetic trace, private input or missing writes.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.agent_proof
+@pytest.mark.django_db(transaction=True)
+def test_s25_resubmission_agent_story_reject() -> None:
+    """Prove authentic second-run failure trace and last-good retention.
+
+    :return: None. Example: None after failure trace and assessment assertions.
+    :raises AssertionError: For swallowed failure or successful replacement.
+    """
+    raise NotImplementedError()

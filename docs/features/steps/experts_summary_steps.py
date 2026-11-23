@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from behave import given, then, when
+
 from behave import then, when
 from behave.runner import Context
 
@@ -57,5 +59,38 @@ def assert_submission_is_not_publication(context: Context) -> None:
     :param context: Real proposal plus assembled request. Example: Screen Reader PIP.
     :return: None when submission grants no publication.
     :raises AssertionError: If unpublished title/content enters public evidence.
+    """
+    raise NotImplementedError()
+
+
+@given("Maria's PIP has reached Reviewed")
+def s25_maria_pip_reached_reviewed(context: Context) -> None:
+    """Reach Reviewed through genuine initial submission and finite model turns.
+
+    :param context: Real AT context. Example: context.cedar_dataset from S03.
+    :return: None. Example: context retains PIP, script and first interaction.
+    :raises AssertionError: If real initial processing does not reach Reviewed.
+    """
+    raise NotImplementedError()
+
+
+@when("she withdraws it and resubmits through the normal allowed lifecycle")
+def s25_withdraw_and_resubmit(context: Context) -> None:
+    """POST existing revert and submit routes with Maria's real session.
+
+    :param context: Reviewed run context. Example: first summary persisted.
+    :return: None. Example: context retains real responses and refreshed PIP.
+    :raises AssertionError: For incorrect transitions or failed HTTP requests.
+    """
+    raise NotImplementedError()
+
+
+@then("summary refresh is requested again before an administrator decision")
+def s25_assert_second_refresh_before_decision(context: Context) -> None:
+    """Assert second request, interaction and valid stored prose before decision.
+
+    :param context: Completed resubmission context. Example: four consumed calls.
+    :return: None. Example: None after real interaction/decision assertions.
+    :raises AssertionError: For missing refresh, publication or administrator action.
     """
     raise NotImplementedError()
