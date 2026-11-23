@@ -13,7 +13,7 @@ dependencies:
 - S03
 - S01
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 9ef80850b87d55686d19ba18884b703ac5913b191a6ba889d880703eca22487d
 ```
@@ -260,3 +260,7 @@ Lessons Learned:
 - Prototype behavior supports planning but does not prove production recovery.
 - Disabled test loggers and the global E2E ignore setting require explicit, separate certification setup.
 - No files were written, tests run, issues posted or commits created by this worker.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S09.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
