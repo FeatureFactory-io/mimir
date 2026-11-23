@@ -1,0 +1,27 @@
+{
+  "scenario": "S40",
+  "status": "structural_skeleton_only",
+  "new_unimplemented_callables": 17,
+  "checks": [
+    {
+      "gate": "test-experts-s40",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S40-checkpoint.cast"
+    },
+    {
+      "gate": "test-experts-s40-log",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S40-log.cast"
+    },
+    {
+      "gate": "test-experts-s40-at",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S40-at.cast"
+    }
+  ],
+  "behavior_implemented": false,
+  "existing_callable_AST": "unchanged"
+}

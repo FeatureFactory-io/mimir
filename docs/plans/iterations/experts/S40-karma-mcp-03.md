@@ -12,7 +12,7 @@ expanded_case_count: 10
 dependencies:
 - S39
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - ccc316d25b939b61ac7a5e0414c150dc44cbe437b699801bde865e7a26057f8d
 ```
@@ -242,3 +242,7 @@ feature_execution_graph:
 ## Lessons Learned
 
 Existing permission and self-consumption are separate decisions: creator-or-staff authorizes a PIP read; creator-or-target-author excludes its awards. The two PIP examples deliberately distinguish those roles. Existing facade protocol clients are reusable, but their development-server fixture is unsuitable for isolated certification. No new architectural decision or SAO change is proposed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S40.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
