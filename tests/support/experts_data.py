@@ -402,3 +402,13 @@ def create_nonaccepted_pip_case(
     :raises ValidationError: If real creation or rejected finalization fails.
     """
     raise NotImplementedError()
+
+
+def create_reviewed_partial_pip(dataset: CedarDataset) -> ProcessImprovementProposal:
+    """Build a real two-change Maria fixture without assessment or awards.
+
+    :param dataset: Restored Cedar data. Example: Hana6106 at version2.0.
+    :return: Reviewed proposal with undecided ADD/ALTER. Example: new PIP42.
+    :raises ValueError: Missing target workflow/activity or incompatible baseline.
+    """
+    raise NotImplementedError()

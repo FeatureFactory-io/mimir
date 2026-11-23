@@ -87,3 +87,33 @@ def exercise_maria_nonaccepted_states(context: Context) -> None:
     :raises AssertionError: If any case awards points or changes target content.
     """
     raise NotImplementedError()
+
+
+def prepare_maria_partial_pip(context: Context) -> None:
+    """Prepare the independent two-change fixture using the shared Cedar context.
+
+    :param context: Behave state. Example: context.cedar_dataset from S03.
+    :return: None. Example: real reviewed proposal retained for finalization.
+    :raises AssertionError: Baseline or fixture violates Section C.
+    """
+    raise NotImplementedError()
+
+
+def finalize_maria_partial_pip(context: Context) -> None:
+    """POST real staff decisions accepting ADD and rejecting ALTER.
+
+    :param context: Prepared AT state. Example: actual ADD/ALTER primary keys.
+    :return: None. Example: actual response and persisted terminal PIP retained.
+    :raises AssertionError: Unauthorized response or unsuccessful finalization.
+    """
+    raise NotImplementedError()
+
+
+def assert_maria_partial_total(context: Context) -> None:
+    """Assert exact accepted-only totals, immutable award and publication effects.
+
+    :param context: Finalized real AT state. Example: accepted_partial PIP42.
+    :return: None. Example: Maria8700/Design7700 with one500 award, not8800.
+    :raises AssertionError: Totals, rejected content, award or receipt differ.
+    """
+    raise NotImplementedError()

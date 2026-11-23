@@ -13,7 +13,7 @@ dependencies:
 - S32
 - S33
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - f26ae2e2c3b925cd1b4447c01133fa798078fdc7c81ca19ae39c7c449d8b4104
 ```
@@ -211,3 +211,7 @@ feature_execution_graph:
 - Capturing callbacks is not evidence of actual commit timing; transaction-capable tests can prove real `on_commit` behavior without mocks.
 - The existing admin message/email contains no Karma earnings amount. Preserving it avoids inventing product copy or misleading the administrator about the recipient.
 - No files, tests, database state, issues or commits were changed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S34.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
