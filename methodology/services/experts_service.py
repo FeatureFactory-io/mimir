@@ -14,7 +14,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db.models import Count, Sum
 
 from methodology.models import EventChannel, KarmaAward, Playbook
-from methodology.services.expert_text import category_label
+from methodology.services.expert_text import CATEGORY_LABELS, category_label
 
 logger = logging.getLogger(__name__)
 LEADERBOARD_LIMIT = 5
@@ -238,14 +238,16 @@ class ExpertsService:
     def _load_released_counts(
         self, user_ids: Sequence[int]
     ) -> dict[int, dict[str, int]]:
-        """Count current released authored Playbook PKs by category in bulk.
+        """Count current released authored Playbook PKs by recognized category.
 
         :param user_ids: Candidate account IDs. Example: (42,).
         :return: Counts including private released books. Example: {42: {"design": 1}}.
         :raises ValueError: For invalid account identifiers.
         """
         rows = (
-            Playbook.objects.filter(author_id__in=user_ids, status="released")
+            Playbook.objects.filter(
+                author_id__in=user_ids, status="released", category__in=CATEGORY_LABELS
+            )
             .order_by()
             .values_list("author_id", "category")
             .annotate(amount=Count("pk", distinct=True))

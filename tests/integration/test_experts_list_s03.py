@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import fields
+from dataclasses import fields, replace
 
 import pytest
 from django.db import connection
@@ -233,6 +233,40 @@ def test_experts_list_with_development_renders_expected_order(
         ("jlee", "6,100", "6100", "6100"),
     ]
     assert b'experts-card-mrodriguez"' not in development.content
+
+
+@pytest.mark.parametrize("category", ["", "retired"], ids=["blank", "retired"])
+def test_experts_list_with_legacy_released_category_preserves_ranking(
+    client: Client, cedar_baseline: CedarBaseline, category: str
+) -> None:
+    """Keep ranked awards readable alongside an existing legacy release.
+
+    :param client: Real Django client. Example: Client().
+    :param cedar_baseline: Persisted Cedar data. Example: CedarBaseline({}, {}, {}).
+    :param category: Legacy category stored on a released book. Example: "".
+    :return: None. Example: None.
+    :raises AssertionError: If ranking changes or the public book stops counting.
+    """
+    maria = cedar_baseline.users_by_username["mrodriguez"]
+    service = ExpertsService()
+    before = service.project_user(maria.pk)
+    ranking = _rendered_ranking(client.get(DESIGN_PATH))
+    Playbook.objects.create(
+        author=maria,
+        name="Legacy release",
+        category=category,
+        visibility="public",
+        status="released",
+        version=1,
+    )
+
+    response = client.get(DESIGN_PATH)
+
+    assert response.status_code == 200
+    assert _rendered_ranking(response) == ranking
+    assert service.project_user(maria.pk) == replace(
+        before, released_public_playbook_count=before.released_public_playbook_count + 1
+    )
 
 
 @pytest.mark.parametrize(
