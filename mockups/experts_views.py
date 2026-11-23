@@ -49,8 +49,12 @@ def _person(person: dict) -> dict:
         for key, value in person.get("karma_by_source", {}).items()
     ]
     result["hint"] = person.get("summary") or (
-        f"{len(person.get('public_playbooks', []))} public released playbooks"
+        f"{len(person.get('public_playbooks', []))} released playbooks · {person.get('copy_count', 0)} copies"
     )
+    result["category_rows"] = [
+        {"label": key, "points": f"{value:,}"}
+        for key, value in person.get("karma_by_category", {}).items()
+    ]
     return result
 
 

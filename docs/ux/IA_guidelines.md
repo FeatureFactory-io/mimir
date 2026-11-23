@@ -1214,3 +1214,5 @@ Record Screen ID, variant, recipe, viewport, result, screenshot, reviewer and
 any defect in `docs/ux/experts-responsive-evidence.json`. Empty, guest, long text,
 initials, missing summary and missing public evidence are actual design states,
 not paragraphs standing in for unrendered screens. ESM-06 must inspect them.
+
+Profiles display a separate **Karma by playbook category** section in the context rail, in addition to the four source rows. Mike’s missing-summary state displays **2 released playbooks · 47 copies** on his public profile and leaderboard hint; the 47 GUI-copy events are a subset of his 470 total author-consumption awards.
