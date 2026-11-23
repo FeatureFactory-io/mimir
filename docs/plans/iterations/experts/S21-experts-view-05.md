@@ -12,7 +12,7 @@ expanded_case_count: 2
 dependencies:
 - S17
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 6cdcb1d95acb745fe1dc53cd2acbc6bd06ab1b7a8dc8b092bfc70f965557615f
 ```
@@ -215,3 +215,7 @@ feature_execution_graph:
 - Existing 404 markup supplies a visual recipe, but its playbook-specific copy cannot be reused unchanged.
 - Shared actor/path/status aliases need one owner; duplicate Behave registrations would obscure otherwise valid acceptance coverage.
 - This is a certification scenario with no production footprint. Any discovered implementation defect belongs to S17’s policy owner and must follow the parent footprint/drift rules.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S21.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
