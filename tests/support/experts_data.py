@@ -388,3 +388,17 @@ def _major_add_change_payload(
     :raises ValueError: If a required workflow or producer cannot be resolved.
     """
     raise NotImplementedError()
+
+
+def create_nonaccepted_pip_case(
+    dataset: CedarDataset, status: str
+) -> ProcessImprovementProposal:
+    """Prepare an explicit eligibility fixture; rejected uses real finalization.
+
+    :param dataset: Real restored Cedar objects. Example: load_cedar_baseline().
+    :param status: Exact supported stored state. Example: "processing_galdr".
+    :return: Persisted proposal. Example: reviewed PIP targeting playbook 6106.
+    :raises ValueError: If status is outside the five contracted states.
+    :raises ValidationError: If real creation or rejected finalization fails.
+    """
+    raise NotImplementedError()

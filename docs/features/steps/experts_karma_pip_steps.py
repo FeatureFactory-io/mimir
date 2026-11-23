@@ -74,3 +74,16 @@ def accept_maria_independent_minor_change(
     :raises ValueError: For an unsupported Example value.
     """
     raise NotImplementedError()
+
+
+@when(
+    "Maria's PIP is draft, submitted, processing, reviewed or rejected without an accepted eligible change"
+)
+def exercise_maria_nonaccepted_states(context: Context) -> None:
+    """Record five independently restored cases and real rejected finalization.
+
+    :param context: Real AT context. Example: context.cedar_dataset.
+    :return: None. Example: five persisted outcomes retained for shared assertions.
+    :raises AssertionError: If any case awards points or changes target content.
+    """
+    raise NotImplementedError()

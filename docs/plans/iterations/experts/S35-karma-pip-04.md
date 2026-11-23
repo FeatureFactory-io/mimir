@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S32
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 95f7481c3f865db3b86bdca9801e972c1ba9d1cbfdd5a00351f350ce8e321328
 ```
@@ -214,3 +214,7 @@ Lessons Learned:
 - S32 owns runtime fixes. A failing certification requiring production changes must be reconciled with S32 rather than silently expanding S35.
 
 No files changed, tests run, commits made or external mutations performed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S35.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
