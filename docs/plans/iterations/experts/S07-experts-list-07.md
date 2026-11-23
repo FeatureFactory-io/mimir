@@ -13,7 +13,7 @@ dependencies:
 - S03
 - S01
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 5ead70f80bd8b2dec59b2093a7429f7ccbc6ee49e03ed349a2b2249da154afd9
 ```
@@ -247,3 +247,7 @@ Lessons Learned:
 - Existing AT target excludes WIP and cannot currently select one exact contract.
 - E2E collection needs its own config and explicit global-addopts override.
 - No system-infrastructure or scope-reduction proposal is necessary.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S07.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
