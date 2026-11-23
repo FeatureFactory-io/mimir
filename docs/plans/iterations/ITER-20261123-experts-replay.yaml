@@ -10,6 +10,13 @@ iteration:
   human_go: false
   scope: all 49 original acceptance contracts; 5 additional browser and 4 manual UAT obligations
   convergence_contract: docs/plans/iterations/pin-convergence-20261123-experts.md
+  publication:
+    status: skipped_by_user
+    decision: No, skip this part
+    milestone_created: false
+    issues_created: false
+    operational_contract: local manifest and 49 local drafts
+    implementation_go: false
 conflict_map:
   docs/features/steps/experts_category_steps.py:
   - S47

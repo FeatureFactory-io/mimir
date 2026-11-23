@@ -1,13 +1,12 @@
-# Experts replay: publication review
+# Experts replay: local execution contract
 
 All 49 acceptance contracts are planned together, as requested. This package
 contains the scenario plans, unimplemented application/test scaffolds, actual
 commit footprints and the execution manifest. Implementation has not begun.
 
-The proposed next action is to publish **one GitHub milestone and 49 scenario
-issues** in `FeatureFactory-io/mimir`, using the exact drafts linked below.
-PIN-04 requires approval before creating those records. PIN-05 then presents
-the published contract for the separate implementation GO.
+Denis declined GitHub publication: “No, skip this part.” No milestone or issues
+were created. The 49 drafts and the complete manifest remain local. Any future
+execution uses this local contract; implementation GO has not been recorded.
 
 ## Product and film result
 
@@ -109,6 +108,6 @@ five additional browser and four manual UAT obligations preserve 58 unique IDs.
 | S44 | KARMA-EXPORT-03 | F | S03, S23, S39, S41, S42 | [Read](experts/issues/S44.md) |
 | S46 | KARMA-EVENT-02 | F | S36, S39, S42, S45 | [Read](experts/issues/S46.md) |
 
-## Publication gate source
+## Recorded publication decision
 
-The repository’s [PIN-04 Publish](../../../.windsurf/workflows/Edda/PIN/PIN-04-Publish.md) says: “Ask user before creating.” Its Step 1 asks whether to create the milestone and issues from the manifest. No external record has been created.
+The repository’s [PIN-04 Publish](../../../.windsurf/workflows/Edda/PIN/PIN-04-Publish.md) says: “Ask user before creating.” Its Step 1 asks whether to create the milestone and issues from the manifest. Denis declined this publication step. No external record has been created.
