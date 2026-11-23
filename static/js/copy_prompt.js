@@ -97,3 +97,5 @@
         handleCopyClick(btn);
     });
 })();
+
+/* PIN S36: KARMA-COPY-01 wiring and interaction contract remains unimplemented until GO. */

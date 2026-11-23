@@ -211,3 +211,12 @@ def _expert_detail_urlpatterns() -> list[URLPattern]:
     :raises NotImplementedError: Until the authorized backend slice wires the route.
     """
     raise NotImplementedError()
+
+
+def _karma_copy_receipt_route() -> "URLPattern":
+    """Describe the future successful-copy receipt route.
+
+    :return: Named route. Example: /karma/copy-receipts/, karma_copy_receipt.
+    :raises NotImplementedError: Until approved URL wiring.
+    """
+    raise NotImplementedError()

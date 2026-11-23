@@ -13,7 +13,7 @@ dependencies:
 - S03
 - S30
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 2334fe9d42fd2e2d4e7312bd6a4ce7575a15fa7ca402f28a3eb44457d0a18493
 ```
@@ -299,3 +299,7 @@ feature_execution_graph:
 - Clipboard success and receipt delivery are distinct outcomes. A copied prompt must remain copied and visibly successful while only its receipt is retried.
 - The living-spec clipboard wording spans two test lanes. Django-client AT proves the reported action boundary and actual prompt payload; Playwright must independently prove clipboard contents.
 - Event identity scope and shared source-kind/category names require one parent reconciliation with S03/S30. No new schema, seed importer or parallel award persistence should be invented.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S36.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

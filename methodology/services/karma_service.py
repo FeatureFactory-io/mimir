@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from typing import Literal
+from uuid import UUID
+from django.contrib.auth.models import AnonymousUser, User
+from methodology.models import Playbook
+
 """Immutable contribution award commands shared by Django domain services."""
 from dataclasses import dataclass
 from datetime import datetime
@@ -184,3 +189,112 @@ class KarmaService:
         :raises ValidationError: If recipient, points or attribution conflicts.
         """
         raise NotImplementedError()
+
+    @staticmethod
+    def award_successful_consumption(
+        actor: User | AnonymousUser,
+        entity_type: str,
+        entity_id: int,
+        event_identity: UUID,
+        *,
+        channel: ConsumptionChannel,
+    ) -> tuple[AwardOutcome, ...]:
+        """Persist eligible learner/author awards after a successful operation.
+
+        :param actor: Server-authenticated actor. Example: Maria.
+        :param entity_type: Allowlisted entity kind. Example: "activity".
+        :param entity_id: Positive entity identifier. Example: 6203.
+        :param event_identity: Action identity retained across retries. Example: UUID4.
+        :param channel: Trusted server operation kind. Example: "gui_copy".
+        :return: Atomic pair or empty excluded outcome. Example: two AwardOutcome values.
+        :raises ValueError: If identity, channel or entity input is invalid.
+        :raises PermissionError: If existing access policy denies the target.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _validate_consumption_input(
+        entity_type: str,
+        entity_id: int,
+        event_identity: UUID,
+        channel: ConsumptionChannel,
+    ) -> None:
+        """Validate bounded consumption inputs.
+
+        :param entity_type: Existing allowlisted kind. Example: "activity".
+        :param entity_id: Positive integer, excluding bool. Example: 6203.
+        :param event_identity: Action UUID. Example: UUID4.
+        :param channel: Trusted operation kind. Example: "gui_copy".
+        :return: None on valid input.
+        :raises ValueError: If any boundary input is invalid.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _resolve_consumption_target(
+        actor: User, entity_type: str, entity_id: int
+    ) -> ConsumptionTarget:
+        """Reload and authorize through existing entity services.
+
+        :param actor: Authenticated service caller. Example: Maria.
+        :param entity_type: Authorized entity kind. Example: "activity".
+        :param entity_id: Target identifier. Example: 6203.
+        :return: Target carrying its real playbook. Example: activity 6203/playbook 6201.
+        :raises PermissionError: If the existing reader rejects access.
+        :raises ObjectDoesNotExist: If the entity is absent.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _consumption_exclusion(
+        actor: User | AnonymousUser, target: ConsumptionTarget | None
+    ) -> str | None:
+        """Determine guest/self exclusion without assigning points.
+
+        :param actor: Server actor. Example: Mike.
+        :param target: Authorized target, or None for a guest. Example: activity 6203.
+        :return: Exclusion reason or None. Example: "self_consumption".
+        :raises ValueError: If an authenticated actor has no target.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _canonical_consumption_identity(
+        actor_id: int, event_identity: UUID, channel: ConsumptionChannel
+    ) -> str:
+        """Identify one action independently of its target.
+
+        :param actor_id: Authenticated actor PK. Example: 42.
+        :param event_identity: Retry-stable action UUID. Example: UUID(int=45).
+        :param channel: Trusted operation. Example: "gui_copy".
+        :return: Canonical key. Example: "consumption:gui_copy:42:<uuid>".
+        :raises ValueError: Invalid actor, UUID, channel or resulting length.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _build_consumption_specs(
+        actor: User, target: ConsumptionTarget, canonical_identity: str
+    ) -> tuple[AwardSpec, ...]:
+        """Build the learner and author five-point immutable award specifications.
+
+        :param actor: Authenticated learner. Example: Maria.
+        :param target: Authorized target with real author/category. Example: Mike/Development.
+        :param canonical_identity: Scoped stable ledger key. Example: "consumption:gui_copy:…".
+        :return: Learning then Consumption specifications. Example: a two-item tuple.
+        :raises ValueError: If attribution is missing or not recognized.
+        """
+        raise NotImplementedError()
+
+
+ConsumptionChannel = Literal["gui_copy", "mcp_detail", "export"]
+
+
+@dataclass(frozen=True)
+class ConsumptionTarget:
+    """Authorized entity and immutable attribution inputs."""
+
+    entity_type: str
+    entity_id: int
+    playbook: Playbook
+    pip_creator_id: int | None = None
