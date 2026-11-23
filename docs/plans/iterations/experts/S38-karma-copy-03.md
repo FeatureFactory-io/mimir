@@ -15,7 +15,7 @@ dependencies:
 - S36
 - S37
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 9630969855b293691a38e3dbd31dbb63b8027731c0711532a43b4b6660362217
 ```
@@ -248,3 +248,7 @@ feature_execution_graph:
 - Mike’s 47-copy fallback is an independent ledger projection that self-copy must preserve.
 - UAT lanes require independent restores; running guest/self after Maria’s award without reset produces misleading baselines.
 - Earlier S36 raw Behave clipboard wording is superseded by the explicit browser-layer mapping; preserve the complete acceptance contract.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S38.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

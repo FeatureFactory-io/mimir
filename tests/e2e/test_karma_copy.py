@@ -33,3 +33,38 @@ def test_copy_prompt_with_list_and_embed_surfaces_reports_same_entity(
     :raises AssertionError: If either surface loses entity metadata or prompt content.
     """
     raise NotImplementedError()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_copy_prompt_with_mike_copies_actual_prompt_without_awards(
+    page: Page, context: BrowserContext, live_server_url: str
+) -> None:
+    """Certify KARMA-COPY-03 through real browser clipboard and network.
+
+    :param page: Existing fresh page; authenticates real Cedar mchen.
+    :param context: Existing context granted origin-scoped clipboard permissions.
+    :param live_server_url: Existing function-scoped Django live server origin.
+    :return: None after full prompt, real self receipt and unchanged ledger proofs.
+    :raises AssertionError: If clipboard, receipt, totals or copy count differs.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.parametrize("actor_username", ["mrodriguez", None, "mchen"])
+@pytest.mark.django_db(transaction=True)
+def test_copy_uat_with_independent_baseline_lanes_matches_contract(
+    page: Page,
+    context: BrowserContext,
+    live_server_url: str,
+    actor_username: str | None,
+) -> None:
+    """Compose scripted UAT-18-04 with a fresh baseline for every actor lane.
+
+    :param page: Existing fresh page for this parametrized invocation.
+    :param context: Existing isolated clipboard-enabled browser context.
+    :param live_server_url: Existing real function-scoped server origin.
+    :param actor_username: Cedar Maria, anonymous guest or Mike; e.g. "mchen".
+    :return: None after actual clipboard and lane-specific real domain assertions.
+    :raises AssertionError: If isolation, receipt policy or expected effects differ.
+    """
+    raise NotImplementedError()

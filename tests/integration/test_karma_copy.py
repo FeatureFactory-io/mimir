@@ -100,3 +100,46 @@ def test_copy_receipt_log_story_reject(
     :raises AssertionError: If rejection is unobservable or leaks private data.
     """
     raise NotImplementedError()
+
+
+@pytest.mark.django_db
+def test_award_successful_consumption_with_self_activity_returns_no_awards() -> None:
+    """Prove authorized self-consumption has no domain effect.
+
+    :return: None after empty result, ledger and 12450/8200/47 assertions.
+    :raises AssertionError: If self-copy changes any award or projection.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.django_db
+def test_copy_receipt_with_self_activity_returns_successful_exclusion() -> None:
+    """Exercise a genuine strict-CSRF self-copy receipt.
+
+    :return: None after HTTP 200, self-exclusion and unchanged-domain assertions.
+    :raises AssertionError: If real token, route, result or effects differ.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.django_db
+def test_copy_receipt_with_self_activity_without_csrf_returns_forbidden() -> None:
+    """Prove authenticated self-copy does not bypass CSRF middleware.
+
+    :return: None after HTTP 403 and unchanged ledger assertions.
+    :raises AssertionError: If a tokenless session receipt succeeds.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.django_db
+def test_copy_receipt_with_self_activity_log_story_happy(
+    caplog: LogCaptureFixture,
+) -> None:
+    """Prove the real successful exclusion story without sensitive bodies.
+
+    :param caplog: INFO records from the strict-CSRF real request.
+    :return: None after correlated ordered beats and no-persistence assertions.
+    :raises AssertionError: If logging omits exclusion or leaks request content.
+    """
+    raise NotImplementedError()
