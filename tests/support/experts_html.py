@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from django.http import HttpResponse
 
 from collections.abc import Iterator
@@ -76,5 +78,20 @@ def assert_other_empty_message(response: HttpResponse) -> None:
     :param response: Real Django response. Example: client.get("/experts/?category=other").
     :return: None when experts-empty text is exact and Other is current.
     :raises AssertionError: If status, element text or aria-current differs.
+    """
+    raise NotImplementedError()
+
+
+def assert_karma_source_rows(
+    html: str, expected: Mapping[str, int], total_test_id: str, expected_total: int
+) -> None:
+    """Assert four source body rows reconcile with footer and card total.
+
+    :param html: Actual production response HTML. Example: response.content.decode().
+    :param expected: Ordered source amounts. Example: {"Released": 5000, "PIP": 1600, "Consumption": 1200, "Learning": 400}.
+    :param total_test_id: Total card selector. Example: "profile-karma-total".
+    :param expected_total: Required integer total. Example: 8200.
+    :return: None. Example: all body, footer and card assertions pass.
+    :raises AssertionError: For missing, duplicated, unexpected or inconsistent rows.
     """
     raise NotImplementedError()

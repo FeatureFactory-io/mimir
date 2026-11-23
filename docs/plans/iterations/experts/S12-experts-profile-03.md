@@ -13,7 +13,7 @@ dependencies:
 - S03
 - S10
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 158ae8dbbb7a4abcf21a1943422beca69e4898229cccf5aecc5f3fdd71c4b3e5
 ```
@@ -191,3 +191,7 @@ feature_execution_graph:
 ## Lessons Learned
 
 The fixture’s Design subtotal 7200 differs from Maria’s overall 8200: source PIP must include Development’s 1000. Parsing every numeric cell across both source and category sections would double-count totals, so certification must scope source `tbody` separately from its footer and category section. Existing global pytest defaults ignore E2E, and default Behave tags exclude this contract; both need explicit scoped gates. No files changed, commands executed as tests, or behavior certified during planning.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S12.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

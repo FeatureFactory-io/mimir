@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from behave import then
+
 """S10 Django-client acceptance bindings; no browser or model substitute."""
 from behave import given, then, when
 from behave.runner import Context
@@ -73,5 +75,34 @@ def existing_profile_controls_remain(context: Context) -> None:
     :param context: Real authenticated response; example: Maria profile.
     :return: None; example: all existing controls and destinations remain.
     :raises AssertionError: If any account function was replaced or removed.
+    """
+    raise NotImplementedError()
+
+
+@then("the source rows show {released:d}, {pip:d}, {consumption:d} and {learning:d}")
+def source_rows_show(
+    context: Context, released: int, pip: int, consumption: int, learning: int
+) -> None:
+    """Check the real response's four rows against expected and persisted awards.
+
+    :param context: Real HTTP/Cedar context. Example: context.cedar_dataset.
+    :param released: Release subtotal. Example: 5000.
+    :param pip: Combined major/minor subtotal across categories. Example: 1600.
+    :param consumption: Author-consumption subtotal. Example: 1200.
+    :param learning: Learner subtotal. Example: 400.
+    :return: None. Example: four exact source rows match ORM and HTML.
+    :raises AssertionError: If HTTP, ledger or rendered source rows differ.
+    """
+    raise NotImplementedError()
+
+
+@then("their sum equals the displayed total {total:d}")
+def source_sum_matches_total(context: Context, total: int) -> None:
+    """Reconcile source body, footer, card and persisted total.
+
+    :param context: Context retaining actual profile HTTP. Example: context.response.
+    :param total: Required total. Example: 8200.
+    :return: None. Example: every independently read total equals 8200.
+    :raises AssertionError: If any total or source arithmetic differs.
     """
     raise NotImplementedError()
