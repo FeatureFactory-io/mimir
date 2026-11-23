@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S03
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - f70c5d1800ac947db0872c38b3b95f5b71b487b7c14a5fe1cf7dbfef549dc015
 ```
@@ -281,3 +281,7 @@ feature_execution_graph:
 ## Lessons Learned
 
 The prototype copies the entire fixture person, including private fields, before template rendering. Graduation must replace that data shape with an allowlisted public projection. Likewise, existing general playbook visibility is broader than the public expert evidence contract. The adapter and browser fixtures are not yet implemented; naming an assumed Cedar fixture would conceal a real prerequisite. No files were written, tests run or provider calls made.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S17.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

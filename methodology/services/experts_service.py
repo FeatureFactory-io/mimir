@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import TypedDict
+from django.contrib.auth.models import AbstractUser
+from methodology.models import Playbook
+
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
@@ -183,3 +188,96 @@ class ExpertsService:
         :raises ValueError: For invalid category or projection data.
         """
         raise NotImplementedError()
+
+    @classmethod
+    def public_detail(cls, username: str, *, correlation_id: str) -> PublicExpertDetail:
+        """Read an eligible public profile without writes or generation.
+
+        :param username: Exact account name. Example: "mrodriguez".
+        :param correlation_id: Safe request identifier. Example: "cedar-s17".
+        :return: Allowlisted public payload. Example: {"name": "Maria Rodriguez", ...}.
+        :raises ValueError: For malformed inputs.
+        :raises LookupError: For a missing or nonpositive contributor.
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def _detail_subject(cls, username: str) -> AbstractUser:
+        """Resolve a subject without exposing account fields.
+
+        :param username: Validated username. Example: "mrodriguez".
+        :return: Internal user for projection only. Example: Maria's persisted user.
+        :raises LookupError: When the account does not exist.
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def _detail_public_books(cls, subject_id: int) -> tuple[PublicExpertBook, ...]:
+        """Project only currently public released authored playbooks.
+
+        :param subject_id: Real account key. Example: 101.
+        :return: Allowlisted evidence ordered deterministically. Example: ({"pk": 6101, ...},).
+        :raises ValueError: For an invalid subject key.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _detail_book(playbook: Playbook) -> PublicExpertBook:
+        """Extract safe evidence fields without broad model serialization.
+
+        :param playbook: Public released book. Example: Accessibility Audit Playbook.
+        :return: Public display fields. Example: {"pk": 6101, "version": "1.0", ...}.
+        :raises ValueError: If visibility or release preconditions fail.
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def _detail_payload(
+        cls,
+        subject: AbstractUser,
+        projection: ExpertProjection,
+        public_books: tuple[PublicExpertBook, ...],
+    ) -> PublicExpertDetail:
+        """Combine foundation numeric values and unchanged stored public prose.
+
+        :param subject: Internal subject. Example: Maria's user.
+        :param projection: S03 numeric projection. Example: total 8200, primary Design.
+        :param public_books: Safe evidence. Example: Accessibility Audit Playbook v1.0.
+        :return: Escapable public values only. Example: summary equals the stored paragraph.
+        :raises LookupError: When total Karma is not positive.
+        :raises ValueError: When the projection contract is invalid.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _detail_log(detail: PublicExpertDetail, *, correlation_id: str) -> None:
+        """Record projection metadata without prose or contact information.
+
+        :param detail: Safe detail projection. Example: Maria's 8200-point payload.
+        :param correlation_id: Shared request ID. Example: "cedar-s17".
+        :return: None. Example: no value.
+        :raises ValueError: When correlation identity is invalid.
+        """
+        raise NotImplementedError()
+
+
+class PublicExpertBook(TypedDict):
+    pk: int
+    title: str
+    version: str
+    category: str
+
+
+class PublicExpertDetail(TypedDict):
+    subject_id: int
+    username: str
+    name: str
+    initials: str
+    total_karma: int
+    formatted_karma: str
+    primary_category: str
+    summary: str
+    numeric_fallback: str
+    source_rows: tuple[Mapping[str, object], ...]
+    category_rows: tuple[Mapping[str, object], ...]
+    public_playbooks: tuple[PublicExpertBook, ...]

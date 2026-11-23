@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+from methodology.services.experts_service import PublicExpertDetail
+
 from django.http import HttpRequest, HttpResponse
 
 
@@ -52,5 +55,39 @@ def _ranked_people_context(category: str, correlation_id: str) -> dict[str, obje
     :param correlation_id: Request identity. Example: "cedar-s03".
     :return: Numeric/public identity context. Example: {"people": ()}.
     :raises ValueError: For invalid service inputs.
+    """
+    raise NotImplementedError()
+
+
+def expert_detail(request: HttpRequest, username: str) -> HttpResponse:
+    """Render a public expert using real projections and production chrome.
+
+    :param request: Django GET. Example: anonymous or Elena's authenticated request.
+    :param username: Route account name. Example: "mrodriguez".
+    :return: HTML response. Example: status 200, experts/detail.html.
+    :raises Http404: For a missing, invalid or nonpositive expert.
+    """
+    raise NotImplementedError()
+
+
+def _detail_correlation_id(request: HttpRequest) -> str:
+    """Reuse a safe bounded request ID or generate one.
+
+    :param request: Incoming request. Example: X-Request-ID "cedar-s17".
+    :return: Safe correlation string. Example: "cedar-s17".
+    :raises ValueError: For an unusable request object.
+    """
+    raise NotImplementedError()
+
+
+def _detail_context(
+    request: HttpRequest, detail: PublicExpertDetail
+) -> dict[str, object]:
+    """Build allowlisted template context and category-preserving breadcrumb.
+
+    :param request: Actual request/session. Example: Elena with category=design.
+    :param detail: Public projection. Example: Maria's detail payload.
+    :return: Template context. Example: {"person": detail, "nav_section": "experts", ...}.
+    :raises ValueError: For malformed projection values.
     """
     raise NotImplementedError()
