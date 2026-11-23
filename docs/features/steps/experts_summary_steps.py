@@ -139,3 +139,58 @@ def no_public_summary_paragraph_is_fabricated(context: Context) -> None:
     :raises AssertionError: If prose is rendered or persisted without a summary.
     """
     raise NotImplementedError()
+
+
+@given("Maria has a stored successful contribution summary")
+def s29_given_successful_summary(context: Context) -> None:
+    """Prepare the real Cedar draft and exact nine-sentence successful record.
+
+    :param context: Isolated acceptance context with shared CedarDataset.
+    :return: None; retain original text/time/ledger identities in context.
+    :raises ValueError: If baseline or normal draft preparation is invalid.
+    """
+    raise NotImplementedError()
+
+
+@when("its next generation attempt fails")
+def s29_when_generation_fails(context: Context) -> None:
+    """Submit normally with summary error followed by valid assessment.
+
+    :param context: Real draft and ScriptedLLM-only model seam.
+    :return: None; retain actual submission result and interaction.
+    :raises AssertionError: If normal submission does not execute two calls.
+    """
+    raise NotImplementedError()
+
+
+@then("the last good paragraph is retained")
+def s29_then_last_good_retained(context: Context) -> None:
+    """Compare exact stored text/time and failed safe refresh metadata.
+
+    :param context: Completed actual submission context.
+    :return: None when text/timestamp persist and failure metadata is correct.
+    :raises AssertionError: If paragraph, timestamp or metadata differs.
+    """
+    raise NotImplementedError()
+
+
+@then("the PIP follows its existing failure/recovery behavior")
+def s29_then_existing_lifecycle(context: Context) -> None:
+    """Verify valid assessment continues to Reviewed without applying changes.
+
+    :param context: Actual proposal, calls and failure interaction.
+    :return: None when summary failure leaves assessment policy unchanged.
+    :raises AssertionError: If processing skips assessment or changes decisions.
+    """
+    raise NotImplementedError()
+
+
+@then("no Karma is awarded for summary generation")
+def s29_then_no_summary_award(context: Context) -> None:
+    """Verify Maria remains at 8200 and original ledger identities persist.
+
+    :param context: Real Cedar projection and pre-attempt award snapshot.
+    :return: None when no award, accepted change or publication was created.
+    :raises AssertionError: If any numerical or publication effect occurs.
+    """
+    raise NotImplementedError()

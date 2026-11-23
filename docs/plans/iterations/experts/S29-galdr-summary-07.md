@@ -15,7 +15,7 @@ dependencies:
 - S10
 - S17
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - ca4594a546e58a4fb91b231e35f786262003de922039b445e8c5f5760abe2fc8
 ```
@@ -274,3 +274,7 @@ feature_execution_graph:
 4. Disabled Django test loggers require explicit restoration-aware capture.
 5. Real partial traces and captured `.calls` prevent orchestration proofs from passing through bypassed collaborators.
 6. PIN placeholders and zero-selected WIP runs are structural evidence only; delivery requires actual executed contracts.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S29.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

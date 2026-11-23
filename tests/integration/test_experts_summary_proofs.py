@@ -140,3 +140,38 @@ def test_s28_points_change_agent_story_happy() -> None:
     :raises AssertionError: For bypassed orchestration or changed calls/state.
     """
     raise NotImplementedError()
+
+
+@pytest.mark.django_db
+@pytest.mark.agent_proof
+def test_s29_summary_agent_story_reject() -> None:
+    """Assert persisted authentic failure trace through real normal submission.
+
+    :return: None when PRF-EXPERTS-02, retention and bounded calls pass.
+    :raises AssertionError: For missing beats, domain writes or unexpected awards.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.django_db
+@pytest.mark.agent_proof
+def test_s29_summary_interaction_with_failure_preserves_usage_agent_story_reject() -> (
+    None
+):
+    """Parameterize supplied usage, absent usage and absent configured rates.
+
+    :return: None when failed interactions retain known usage and unknown nulls.
+    :raises AssertionError: For false zero cost, lost tokens or unsafe trace data.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.django_db
+@pytest.mark.agent_proof
+def test_s29_summary_with_exhausted_script_fails_loudly() -> None:
+    """Exhaust a finite queue through the real read-only production boundary.
+
+    :return: None when typed failure preserves explicit exhaustion and DB state.
+    :raises AssertionError: If exhaustion becomes success or fallback prose.
+    """
+    raise NotImplementedError()
