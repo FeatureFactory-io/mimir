@@ -14,7 +14,7 @@ dependencies:
 - S07
 - S14
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 39ad6ab4fdaa2e310012dcd62838000bd64b49fcfa42999409399cfe1b0b2028
 ```
@@ -201,3 +201,7 @@ feature_execution_graph:
 The exact acceptance scenario crosses verification layers: Django-client assertions establish emitted HTML, while actual hover, Tab focus and phone tooltip bounds require a browser. Making that distinction explicit avoids either weakening the contract or importing browser behavior into AT.
 
 Existing prototype evidence identified tooltip clipping that document-overflow checks missed; production certification must retain both checks. No writes, tests, commits, provider calls or emails were performed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S15.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
