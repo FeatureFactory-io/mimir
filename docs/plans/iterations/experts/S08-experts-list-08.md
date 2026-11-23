@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S03
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - ef0c0439665ef960d3f20832fe43d50df9233254ba7b9ee9e32ccb7eafd947bf
 ```
@@ -236,3 +236,7 @@ Lessons Learned:
 5. Equal totals and primary-category ties are independent contracts.
 
 No writes, commits, tests or implementation execution were performed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S08.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
