@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S10
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 411ebe97a342913a58f1c83bffac756fcd855dfce8f753f3d78a24695322733b
 ```
@@ -225,3 +225,7 @@ Lessons:
 4. Exact activation phrases expose a real AT/E2E boundary. Catalog the boundary rather than manufacture successful Django-client transitions.
 
 No writes, tests, commits, issues or production actions were performed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S11.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
