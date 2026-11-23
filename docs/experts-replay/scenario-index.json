@@ -1,0 +1,458 @@
+[
+  {
+    "id": "EXPERTS-REACH-01",
+    "title": "EXPERTS-REACH-01 Give authenticated Elena the correct contact destination",
+    "feature_file_path": "docs/features/act-18-experts/experts-reach-out.feature",
+    "line": 8,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-REACH-02",
+    "title": "EXPERTS-REACH-02 Explain guest contact restriction on the list",
+    "feature_file_path": "docs/features/act-18-experts/experts-reach-out.feature",
+    "line": 14,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-REACH-03",
+    "title": "EXPERTS-REACH-03 Apply the same guest restriction on public detail",
+    "feature_file_path": "docs/features/act-18-experts/experts-reach-out.feature",
+    "line": 22,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-VIEW-01",
+    "title": "EXPERTS-VIEW-01 Show Maria's identity and full contribution paragraph",
+    "feature_file_path": "docs/features/act-18-experts/experts-view.feature",
+    "line": 8,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-VIEW-02",
+    "title": "EXPERTS-VIEW-02 Reconcile the public score-source breakdown",
+    "feature_file_path": "docs/features/act-18-experts/experts-view.feature",
+    "line": 16,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-VIEW-03",
+    "title": "EXPERTS-VIEW-03 Follow relevant public released evidence",
+    "feature_file_path": "docs/features/act-18-experts/experts-view.feature",
+    "line": 22,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-VIEW-04",
+    "title": "EXPERTS-VIEW-04 Keep private data out of the public response",
+    "feature_file_path": "docs/features/act-18-experts/experts-view.feature",
+    "line": 28,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-VIEW-05",
+    "title": "EXPERTS-VIEW-05 Reject missing and ineligible profiles",
+    "feature_file_path": "docs/features/act-18-experts/experts-view.feature",
+    "line": 35,
+    "kind": "Scenario Outline",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-VIEW-06",
+    "title": "EXPERTS-VIEW-06 Explain a positive contributor with no public released playbook",
+    "feature_file_path": "docs/features/act-18-experts/experts-view.feature",
+    "line": 43,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-LIST-01",
+    "title": "EXPERTS-LIST-01 Open Experts from the in-app navigation",
+    "feature_file_path": "docs/features/act-18-experts/experts-list.feature",
+    "line": 9,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-LIST-02",
+    "title": "EXPERTS-LIST-02 Preserve category selection in the URL",
+    "feature_file_path": "docs/features/act-18-experts/experts-list.feature",
+    "line": 17,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-LIST-03",
+    "title": "EXPERTS-LIST-03 Rank Design by total points and enforce the five-person boundary",
+    "feature_file_path": "docs/features/act-18-experts/experts-list.feature",
+    "line": 25,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-LIST-04",
+    "title": "EXPERTS-LIST-04 Show readable contribution signals and actions",
+    "feature_file_path": "docs/features/act-18-experts/experts-list.feature",
+    "line": 41,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-LIST-05",
+    "title": "EXPERTS-LIST-05 Follow Maria to her full public evidence",
+    "feature_file_path": "docs/features/act-18-experts/experts-list.feature",
+    "line": 48,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-LIST-06",
+    "title": "EXPERTS-LIST-06 Explain an empty category",
+    "feature_file_path": "docs/features/act-18-experts/experts-list.feature",
+    "line": 54,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-LIST-07",
+    "title": "EXPERTS-LIST-07 Allow Bob to evaluate public rankings",
+    "feature_file_path": "docs/features/act-18-experts/experts-list.feature",
+    "line": 59,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-LIST-08",
+    "title": "EXPERTS-LIST-08 Resolve an equal total deterministically",
+    "feature_file_path": "docs/features/act-18-experts/experts-list.feature",
+    "line": 66,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-LIST-09",
+    "title": "EXPERTS-LIST-09 Recover an unknown category",
+    "feature_file_path": "docs/features/act-18-experts/experts-list.feature",
+    "line": 71,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-PROFILE-01",
+    "title": "EXPERTS-PROFILE-01 Add contribution signals to Maria's existing profile",
+    "feature_file_path": "docs/features/act-18-experts/experts-profile.feature",
+    "line": 7,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-PROFILE-02",
+    "title": "EXPERTS-PROFILE-02 Expand and collapse the long stored summary",
+    "feature_file_path": "docs/features/act-18-experts/experts-profile.feature",
+    "line": 15,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-PROFILE-03",
+    "title": "EXPERTS-PROFILE-03 Display four source rows that reconcile",
+    "feature_file_path": "docs/features/act-18-experts/experts-profile.feature",
+    "line": 26,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "EXPERTS-PROFILE-04",
+    "title": "EXPERTS-PROFILE-04 Keep own-profile account controls authenticated",
+    "feature_file_path": "docs/features/act-18-experts/experts-profile.feature",
+    "line": 32,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "GALDR-SUMMARY-01",
+    "title": "GALDR-SUMMARY-01 Refresh on submission without awarding acceptance points",
+    "feature_file_path": "docs/features/act-18-experts/galdr-contribution-summary.feature",
+    "line": 8,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "GALDR-SUMMARY-02",
+    "title": "GALDR-SUMMARY-02 Present one stored summary consistently",
+    "feature_file_path": "docs/features/act-18-experts/galdr-contribution-summary.feature",
+    "line": 16,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "GALDR-SUMMARY-03",
+    "title": "GALDR-SUMMARY-03 Refresh on normal withdrawal and resubmission",
+    "feature_file_path": "docs/features/act-18-experts/galdr-contribution-summary.feature",
+    "line": 22,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "GALDR-SUMMARY-04",
+    "title": "GALDR-SUMMARY-04 Use a live numeric fallback without summary prose",
+    "feature_file_path": "docs/features/act-18-experts/galdr-contribution-summary.feature",
+    "line": 28,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "GALDR-SUMMARY-05",
+    "title": "GALDR-SUMMARY-05 Exclude private data and mutable scores from generated prose",
+    "feature_file_path": "docs/features/act-18-experts/galdr-contribution-summary.feature",
+    "line": 34,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "GALDR-SUMMARY-06",
+    "title": "GALDR-SUMMARY-06 Preserve stable prose when points change",
+    "feature_file_path": "docs/features/act-18-experts/galdr-contribution-summary.feature",
+    "line": 40,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "GALDR-SUMMARY-07",
+    "title": "GALDR-SUMMARY-07 Preserve last good summary on provider failure",
+    "feature_file_path": "docs/features/act-18-experts/galdr-contribution-summary.feature",
+    "line": 47,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-RELEASE-01",
+    "title": "KARMA-RELEASE-01 Award the first released playbook once",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 8,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-RELEASE-02",
+    "title": "KARMA-RELEASE-02 Do not repeat the first-release award on later versions",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 15,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-PIP-01",
+    "title": "KARMA-PIP-01 Award an accepted ADD Activity",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 20,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-PIP-02",
+    "title": "KARMA-PIP-02 Award an accepted ALTER Activity",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 27,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-PIP-03",
+    "title": "KARMA-PIP-03 Award only accepted changes in a partial decision",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 32,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-PIP-04",
+    "title": "KARMA-PIP-04 Do not award draft, submitted or rejected-only proposals",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 37,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-COPY-01",
+    "title": "KARMA-COPY-01 Credit a successful authenticated copy to both parties",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 41,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-COPY-02",
+    "title": "KARMA-COPY-02 Let guests copy without creating an award",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 48,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-COPY-03",
+    "title": "KARMA-COPY-03 Do not award self-copy",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 55,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-MCP-01",
+    "title": "KARMA-MCP-01 Credit an eligible authenticated content read",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 61,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-MCP-02",
+    "title": "KARMA-MCP-02 Do not award collection listings",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 68,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-EXPORT-01",
+    "title": "KARMA-EXPORT-01 Credit one eligible export call regardless of file count",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 73,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-EXPORT-02",
+    "title": "KARMA-EXPORT-02 Do not award self-export",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 80,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-EXPORT-03",
+    "title": "KARMA-EXPORT-03 Do not award import",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 85,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-EVENT-01",
+    "title": "KARMA-EVENT-01 Do not double-apply an event on write retry",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 90,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-EVENT-02",
+    "title": "KARMA-EVENT-02 Do not award failed or unauthorized consumption",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 96,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "KARMA-CATEGORY-01",
+    "title": "KARMA-CATEGORY-01 Resolve primary-category ties",
+    "feature_file_path": "docs/features/act-18-experts/karma-accrual.feature",
+    "line": 100,
+    "kind": "Scenario Outline",
+    "layer": "at"
+  },
+  {
+    "id": "FOB-NAV-EXPERTS-01",
+    "title": "FOB-NAV-EXPERTS-01 Discover Experts in the existing app sidebar",
+    "feature_file_path": "docs/features/act-0-auth/navigation.feature",
+    "line": 103,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "FOB-NAV-EXPERTS-02",
+    "title": "FOB-NAV-EXPERTS-02 Guest Experts navigation stays public",
+    "feature_file_path": "docs/features/act-0-auth/navigation.feature",
+    "line": 111,
+    "kind": "Scenario",
+    "layer": "at"
+  },
+  {
+    "id": "CEDAR-JOURNEY-01",
+    "title": "CEDAR-JOURNEY-01 Nominate a contributor using evidence rather than rank alone",
+    "feature_file_path": "tests/e2e/experts-journey.feature",
+    "line": 8,
+    "kind": "Scenario",
+    "layer": "e2e"
+  },
+  {
+    "id": "CEDAR-JOURNEY-02",
+    "title": "CEDAR-JOURNEY-02 Let Bob evaluate evidence while explaining restricted contact",
+    "feature_file_path": "tests/e2e/experts-journey.feature",
+    "line": 21,
+    "kind": "Scenario",
+    "layer": "e2e"
+  },
+  {
+    "id": "CEDAR-JOURNEY-03",
+    "title": "CEDAR-JOURNEY-03 Show current numeric values with stable contribution prose",
+    "feature_file_path": "tests/e2e/experts-journey.feature",
+    "line": 28,
+    "kind": "Scenario",
+    "layer": "e2e"
+  },
+  {
+    "id": "EXPERTS-LIST-10",
+    "title": "EXPERTS-LIST-10 Keep ranking and actions usable at required viewports",
+    "feature_file_path": "tests/e2e/experts-journey.feature",
+    "line": 36,
+    "kind": "Scenario Outline",
+    "layer": "e2e"
+  },
+  {
+    "id": "EXPERTS-VIEW-07",
+    "title": "EXPERTS-VIEW-07 Preserve the read-and-context recipe",
+    "feature_file_path": "tests/e2e/experts-journey.feature",
+    "line": 52,
+    "kind": "Scenario Outline",
+    "layer": "e2e"
+  },
+  {
+    "id": "UAT-18-01",
+    "title": "UAT-18-01 Elena supplies a defensible Cedar nomination",
+    "feature_file_path": "tests/uat/e2e-uat-flow.feature",
+    "line": 799,
+    "kind": "Scenario",
+    "layer": "uat"
+  },
+  {
+    "id": "UAT-18-02",
+    "title": "UAT-18-02 Bob can inspect evidence but contact requires sign-in",
+    "feature_file_path": "tests/uat/e2e-uat-flow.feature",
+    "line": 820,
+    "kind": "Scenario",
+    "layer": "uat"
+  },
+  {
+    "id": "UAT-18-03",
+    "title": "UAT-18-03 Maria understands her record and the proposal/acceptance distinction",
+    "feature_file_path": "tests/uat/e2e-uat-flow.feature",
+    "line": 832,
+    "kind": "Scenario",
+    "layer": "uat"
+  },
+  {
+    "id": "UAT-18-04",
+    "title": "UAT-18-04 Signed-in consumption and guest consumption differ only in awards",
+    "feature_file_path": "tests/uat/e2e-uat-flow.feature",
+    "line": 846,
+    "kind": "Scenario",
+    "layer": "uat"
+  }
+]

@@ -786,3 +786,68 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
 ############################################################################
   # When SEE diverges materially, FIRST confirm whether DEVIATIONS block intentionally documents mismatch.
   # Optional exploratory branch AFTER happy path: deliberately reject single change combinations (UAT-07-04) — defer unless stakeholders request destructive admin experiment on disposable clone.
+
+#############################################################################
+# Journey 18 — Cedar contribution discovery job (ESM draft; not yet executed)
+#############################################################################
+  # DATA: CEDAR-RFP-01; restore before each independent scenario.
+  # BASE_URL: selected isolated environment; session 1 uses http://127.0.0.1:18180.
+  # ACTORS: Elena esvensson; Maria mrodriguez; anonymous Bob; separate Administrator.
+  # These comments are operator instructions, not executable AT bindings.
+
+  @manual @uat @wip @experts @cedar
+  Scenario: UAT-18-01 Elena supplies a defensible Cedar nomination
+    # E01 DO: Start authenticated as Elena with Noor's brief; start timer on Experts navigation.
+    # E01 SEE: Existing Mimir app sidebar offers Experts; no developer guidance is needed.
+    # E02 DO: Open Experts; select Design.
+    # E02 SEE: /experts/?category=design; Sofia 15,400, Maria 8,200, Priya 7,600, Daniel 6,900, Hana 5,800. No Mike or Theo card.
+    # E03 DO: Open Sofia's View profile and read her public contribution evidence.
+    # E03 SEE: Service-blueprint/design-operations evidence, without a system claim that first place fits Cedar.
+    # E04 DO: Return to the leaderboard; open Maria's View profile.
+    # E04 SEE: Design preserved; /experts/mrodriguez/; 8,200, Design, complete contribution paragraph and four reconciled source rows.
+    # E05 DO: Read the full public summary; inspect listed playbooks.
+    # E05 SEE: Accessibility Audit Playbook v1.0; no Cedar Bid Pricing, Internal staffing notes for Cedar or account token.
+    # E06 DO: Open Accessibility Audit Playbook and inspect Lead an Accessibility Review.
+    # E06 SEE: Trace Keyboard Focus and Review Form Feedback provide relevant public examples.
+    # E07 DO: Return to Maria's profile; inspect Reach out's destination without activating external mail.
+    # E07 SEE: mailto:maria.rodriguez@example.com. STOP before any Send action.
+    # E08 DO: Write an external nomination note and stop timer.
+    # E08 SEE: Maria; relevant public playbook; keyboard/form-feedback reason; discussion as next step; availability unconfirmed.
+    # RECORD: elapsed time, nomination text, screenshot/clip, fixture hash, commit and actual viewport. Proposed target <=5 minutes.
+    # IF DIFFER: File UAT-18-01 + E-step, expected and observed; do not replace evidence with the scripted success.
+
+  @manual @uat @wip @experts @guest
+  Scenario: UAT-18-02 Bob can inspect evidence but contact requires sign-in
+    # G01 DO: In fresh anonymous context, open Design and Maria's public profile.
+    # G01 SEE: Same public ranks, complete contribution text and public released playbook.
+    # G02 DO: Hover then keyboard-focus the disabled Reach out wrapper on list and detail.
+    # G02 SEE: You need to be logged in to reach out to the expert; no mailto destination.
+    # G03 DO: Inspect the public page and follow its public playbook.
+    # G03 SEE: Public evidence accessible; no private sentinels or account token.
+    # G04 DO: Open Other; then request /experts/nberg/ and /experts/no-such-cedar-user/.
+    # G04 SEE: Honest empty Other; both ineligible/missing public profiles return 404.
+    # IF DIFFER: File UAT-18-02 + G-step with actual evidence.
+
+  @manual @uat @wip @experts @profile
+  Scenario: UAT-18-03 Maria understands her record and the proposal/acceptance distinction
+    # C01 DO: Restore baseline, sign in as Maria and open her own profile.
+    # C01 SEE: 8,200, Design, source rows 5,000/1,600/1,200/400. Existing account controls remain.
+    # C02 DO: Activate Show more, then Show less by keyboard.
+    # C02 SEE: Full paragraph then four-line preview; accessible expanded state follows the control.
+    # C03 DO: Submit ADD Screen Reader Error Recovery against Hana's Accessible Forms Review v2.0 through the normal PIP UI.
+    # C03 SEE: Normal processing/review; summary refresh requested; total stays 8,200; new proposal is not described as accepted.
+    # C04 DO: As separate Administrator accept the ADD using the existing decision flow.
+    # C04 SEE: Maria 8,700; Design 7,700 and Development 1,000; Hana v3.0; a local decision-mail artifact.
+    # C05 DO: Reopen public and own profiles.
+    # C05 SEE: Numeric total is current; stable cached prose remains valid without an additional refresh.
+    # IF DIFFER: File UAT-18-03 + C-step with actual evidence.
+
+  @manual @uat @wip @experts @copy
+  Scenario: UAT-18-04 Signed-in consumption and guest consumption differ only in awards
+    # A01 DO: Restore baseline; sign in as Maria; copy Mike's activity 6203.
+    # A01 SEE: Actual prompt in clipboard; Maria 8,205 and Mike 12,455; Development attribution.
+    # A02 DO: Restore baseline; in fresh anonymous context copy the same public activity.
+    # A02 SEE: Clipboard still works; Mike 12,450; no Bob account or award.
+    # A03 DO: Restore baseline; as Mike copy his own activity.
+    # A03 SEE: Clipboard works; Mike remains 12,450.
+    # IF DIFFER: File UAT-18-04 + A-step with actual evidence.

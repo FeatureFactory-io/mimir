@@ -62,6 +62,13 @@ PIN GO, with separate test DBs and replay environment ownership checks.
 
 ## Capability hypothesis
 
+| Candidate approach | Discover | Inspect evidence | Contact handoff | Decision |
+| --- | --- | --- | --- | --- |
+| Ask colleagues | Depends on who replies | Depends on their explanation | Usually available | Useful fallback; hard to repeat or verify |
+| Browse playbook authors | Manual across playbooks | Yes | Fragmented | Evidence exists but category discovery is slow |
+| Enrich private profiles | Limited to known people | Partial | Account dependent | Does not provide public discovery |
+| Category discovery plus public evidence | Yes | Yes | Authenticated handoff | Supports the complete Cedar job |
+
 Call the discover-and-inspect capability **Experts**. Present top contributors
 by their primary playbook category. Use contribution history as a starting point
 for discovery, then let Elena inspect public evidence and choose whom to contact.
