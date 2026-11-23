@@ -13,7 +13,7 @@ dependencies:
 - S01
 - S07
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 59e77652fb381038762092493dd9a8d3840940a5042ff6584af12deba6d0d21d
 ```
@@ -221,3 +221,7 @@ feature_execution_graph:
 - Public `/` already supplies a valid entry, avoiding a dashboard login redirect introduced by the test itself.
 - S03 defaults to Development. Certify that landing first, then explicitly navigate to Design for the shared five-person comparison.
 - Existing browser fixtures and S07 assertions suffice; a new lifecycle or duplicate step library would add contradictions.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S49.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
