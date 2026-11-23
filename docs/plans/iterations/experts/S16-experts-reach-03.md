@@ -19,7 +19,7 @@ dependencies:
 - S06
 - S21
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 18a8de3c144b19913ca9b3373c5351610a9b68c820ac3d6f1d9718919c3c9b30
 ```
@@ -219,3 +219,7 @@ feature_execution_graph:
 - Clarify Cedar oracle access during parent convergence once; preserve its raw fixture records or document the single canonical accessor without inventing parallel data loaders.
 
 PIN-04/05 owns issue publication and human GO. Later slices: handoff docs `Refs #N`; server proof `Refs #N`; AT bindings/catalog `Refs #N`; browser proof `Refs #N`; final observed DoD evidence `Closes #N`, each with required approved issue update. No writes, tests, commits or external actions were performed by this worker.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S16.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
