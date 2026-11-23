@@ -60,3 +60,30 @@ def private_access_preserved(context: Context) -> None:
     :raises AssertionError: Permission widened or denied read awards.
     """
     raise NotImplementedError()
+
+
+def maria_mcp_token(context: Context) -> None:
+    """Prepare real Maria token and global before snapshot.
+    :param context: Cedar AT context; example: existing context.cedar_dataset.
+    :return: None; example: real authenticated Django client ready.
+    :raises AssertionError: Maria baseline or token authentication differs.
+    """
+    raise NotImplementedError()
+
+
+def list_activities_without_consumption(context: Context) -> None:
+    """Call actual authorized activity collection through Django-client AT.
+    :param context: Prepared token context; example: workflow 6202.
+    :return: None; example: actual collection response retained.
+    :raises AssertionError: Response or actual metadata is incorrect.
+    """
+    raise NotImplementedError()
+
+
+def maria_and_mike_unchanged(context: Context) -> None:
+    """Assert exact totals plus global ledger and summary invariants.
+    :param context: AT response/snapshot; example: Maria 8200, Mike 12450.
+    :return: None; example: no learner, author or unrelated recipient changes.
+    :raises AssertionError: Any required invariant differs.
+    """
+    raise NotImplementedError()

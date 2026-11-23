@@ -14,7 +14,7 @@ dependencies:
 - S39
 - S23
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 5fc937125a651e62c257c23fe2d89bb6675dd3a5e2b5f7e4fb9f85d51596ba7d
 ```
@@ -202,3 +202,7 @@ feature_execution_graph:
 - Workflow metadata legitimately nests activity identifiers; that does not justify detail-tool calls or consumption receipts.
 - Legacy PIP listing changes notification-read state, so blanket database-immutability assertions would reject valid existing behavior.
 - Existing subprocess tests provide protocol mechanics but need isolated databases; direct wrapper tests alone do not prove registration.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S41.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
