@@ -1,0 +1,8 @@
+Experts replay recording preflight
+
+This file checks editor capture before the real JTD/ESM work begins.
+Case: CEDAR-RFP-01
+Baseline: 333c36ded6bf58bdef94049ca0f5bf98c9ce3124
+Native editor screenshot: pending
+Terminal capture: tool access blocked; decision pending
+Narration: male voice, Daniel baseline
