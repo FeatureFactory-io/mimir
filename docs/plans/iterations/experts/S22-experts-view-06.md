@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S17
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 3acd2eb73e00ffec3b74c19cef89571b167cbdb6eb85dc3d6a7dc991c05f58f7
 ```
@@ -330,3 +330,7 @@ PIN applies raising stubs only; no assertions or production behavior are filled 
 - Authenticated `can_view` would incorrectly admit disabled public evidence.
 - Feature-level WIP and globally ignored E2E paths make explicit selection and positive execution counts essential.
 - No commands, tests, writes or commits were executed by this worker.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S22.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
