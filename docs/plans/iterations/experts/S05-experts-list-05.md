@@ -14,7 +14,7 @@ dependencies:
 - S17
 - S19
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 136d6efcfa12da852d251fa3e99069fb69f7caf24c7542e2309a6f11d38b5ba7
 ```
@@ -198,3 +198,7 @@ No infrastructure or scope proposal. Converge the S17 exact phrase alias and any
 The handoff must prove both the real link and complete destination prose: checking `/experts/mrodriguez/` independently would miss a broken card action. Root pytest configuration excludes E2E and uses different settings, so the browser gate explicitly overrides `addopts` and selects the existing E2E settings.
 
 No writes, commits, test runs or completion claims were made.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S05.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
