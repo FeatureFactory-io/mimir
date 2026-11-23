@@ -15,7 +15,7 @@ dependencies:
 - S10
 - S17
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 7f710feb3c3efdd8e3c54540463149a977a8a73c725aa6e11ad8a3d8917c2ef0
 ```
@@ -458,3 +458,7 @@ feature_execution_graph:
 ## Lessons Learned
 
 The stale prose-baseline instruction was contradicted by the actual Cedar source and resolved in favor of that source. The important distinction is 47 eligible GUI-copy author awards within 470 total author-consumption awards; a fixture-backed prototype can display the correct sentence while proving none of the live filtering behavior. S26 should expose mistakes through persisted-row mutations and fresh requests, while leaving counter/presenter ownership upstream. No files, tests, commits or external changes were performed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S26.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

@@ -94,3 +94,48 @@ def s25_assert_second_refresh_before_decision(context: Context) -> None:
     :raises AssertionError: For missing refresh, publication or administrator action.
     """
     raise NotImplementedError()
+
+
+@given("Mike has no stored contribution summary")
+def mike_has_no_stored_contribution_summary(context: Context) -> None:
+    """Verify the shared baseline normalized Mike's null prose to empty storage.
+
+    :param context: Shared Cedar AT context. Example: context.cedar_dataset.
+    :return: None. Example: None with persisted public_summary == "".
+    :raises AssertionError: If Mike is absent or stored prose is nonempty.
+    """
+    raise NotImplementedError()
+
+
+@when("Elena opens the Development leaderboard")
+def elena_opens_development_leaderboard(context: Context) -> None:
+    """Use common Elena authentication and a real production Django GET.
+
+    :param context: Shared AT context. Example: context.client.
+    :return: None. Example: None with response for /experts/?category=development.
+    :raises AssertionError: If the request does not return the actual leaderboard.
+    """
+    raise NotImplementedError()
+
+
+@then('Mike\'s hint is "{expected}" from live released-playbook and GUI-copy counts')
+def mike_hint_matches_live_counts(context: Context, expected: str) -> None:
+    """Compare the real card hint and independently persisted qualifying rows.
+
+    :param context: AT response and shared Cedar context. Example: context.response.
+    :param expected: Exact hint. Example: "2 released playbooks · 47 copies".
+    :return: None. Example: None after exact rendered and row-count assertions.
+    :raises AssertionError: If hint, qualifying counts or 47/470 distinction fails.
+    """
+    raise NotImplementedError()
+
+
+@then("no public-summary paragraph is fabricated")
+def no_public_summary_paragraph_is_fabricated(context: Context) -> None:
+    """Inspect real public response and unchanged empty profile storage.
+
+    :param context: Shared response context. Example: Mike's rendered card.
+    :return: None. Example: None with no summary paragraph and empty storage.
+    :raises AssertionError: If prose is rendered or persisted without a summary.
+    """
+    raise NotImplementedError()
