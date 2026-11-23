@@ -185,7 +185,8 @@ feature_execution_graph:
     - ExpertsService.public_detail:processing
     - expert_detail:exit
     gate:
-      command: pytest tests/integration/test_expert_detail.py -k 'projection or persisted_state or log_story' -x
+      command: pytest tests/integration/test_expert_detail.py -k 'projection or persisted_state or log_story'
+        -x
       log_story_command: pytest tests/integration/test_expert_detail.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -230,8 +231,8 @@ feature_execution_graph:
     - test_public_detail_with_cedar_maria_returns_identity_and_complete_summary
     gate:
       command: make test-experts-s17-at
-    required_acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py behave
-      --simple --name '^EXPERTS-VIEW-01 ' docs/features/act-18-experts/experts-view.feature
+    required_acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py
+      behave --simple --name '^EXPERTS-VIEW-01 ' docs/features/act-18-experts/experts-view.feature
     guidance_bundle:
       activity: BPE/BPE-04-Implement_Feature_Acceptance_Tests.md
       rules:
@@ -243,7 +244,6 @@ feature_execution_graph:
     depends_on:
     - N3-acceptance
     footprint:
-    - docs/ux/experts-responsive-evidence.json
     - tests/e2e/test_expert_detail.py
     tests:
     - test_public_detail_with_full_summary_has_no_visual_truncation
@@ -260,14 +260,13 @@ feature_execution_graph:
     bpe: BPE-06
     depends_on:
     - N4-browser
-    footprint:
-    - docs/ux/experts-responsive-evidence.json
+    footprint: []
     gate:
       command: make test-experts-s17
       log_story_command: pytest tests/integration/test_expert_detail.py -k log_story -x
     required_browser_command: pytest -c tests/e2e/pytest.ini -o addopts= tests/e2e/test_expert_detail.py -x
-    required_acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py behave
-      --simple --name '^EXPERTS-VIEW-01 ' docs/features/act-18-experts/experts-view.feature
+    required_acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py
+      behave --simple --name '^EXPERTS-VIEW-01 ' docs/features/act-18-experts/experts-view.feature
     guidance_bundle:
       activity: BPE/BPE-06-Check_Definition_of_Done.md
       rules:
@@ -285,3 +284,9 @@ The prototype copies the entire fixture person, including private fields, before
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S17.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S17.json`, `docs/features/steps/experts_detail_steps.py`, `docs/plans/iterations/experts/S17-experts-view-01.md`, `methodology/expert_views.py`, `methodology/services/experts_service.py`, `mimir/urls.py`, `templates/experts/detail.html`, `tests/e2e/test_expert_detail.py`, `tests/integration/test_expert_detail.py`
+
+Skeleton: `f042c884552a15c127982b6a2e1b7cde07744cb7`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

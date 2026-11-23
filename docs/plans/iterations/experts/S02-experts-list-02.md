@@ -237,3 +237,9 @@ The category controls already have a concrete prototype recipe, but production b
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S02.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S02.json`, `docs/features/steps/experts_category_steps.py`, `docs/plans/iterations/experts/S02-experts-list-02.md`, `tests/e2e/test_experts_category_persistence.py`, `tests/integration/test_experts_category_persistence.py`, `tests/support/experts_category_html.py`
+
+Skeleton: `4c31344d9b88875f649b885abac80183b5d2fbd6`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

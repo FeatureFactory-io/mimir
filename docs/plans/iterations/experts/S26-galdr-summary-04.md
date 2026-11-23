@@ -435,8 +435,8 @@ feature_execution_graph:
       command: make test-experts-s26
       log_story_command: pytest tests/integration/test_experts_numeric_fallback.py::test_numeric_fallback_log_story_happy
         -x
-      acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance python manage.py behave --simple --tags=@experts
-        --name='^GALDR-SUMMARY-04 Use a live numeric fallback without summary prose$' docs/features/act-18-experts/galdr-contribution-summary.feature
+      acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance python manage.py behave --simple
+        --tags=@experts --name='^GALDR-SUMMARY-04 Use a live numeric fallback without summary prose$' docs/features/act-18-experts/galdr-contribution-summary.feature
       browser_command: E2E_LIVE_SERVER_SCOPE=function pytest -c tests/e2e/pytest.ini -o addopts= -p no:playwright
         -p no:asyncio -p no:anyio tests/e2e/test_experts_numeric_fallback.py -x
       convergence_commands:
@@ -462,3 +462,9 @@ The stale prose-baseline instruction was contradicted by the actual Cedar source
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S26.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S26.json`, `docs/features/steps/experts_summary_steps.py`, `docs/plans/iterations/experts/S26-galdr-summary-04.md`, `tests/e2e/test_experts_numeric_fallback.py`, `tests/integration/test_experts_numeric_fallback.py`
+
+Skeleton: `24a08d9789e699bc963dbe95cc9e0fcc2595fdef`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

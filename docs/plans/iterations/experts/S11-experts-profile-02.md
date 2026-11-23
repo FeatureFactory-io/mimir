@@ -171,7 +171,8 @@ feature_execution_graph:
       - do-test-first
       - do-not-mock-in-integration-tests
     notes: Explicitly server-contract coverage only. Full exact click/geometry scenario maps to N3; no simulated
-      Behave state or browser inside Django-client AT. Parent must reconcile living-spec layer mapping before completion.
+      Behave state or browser inside Django-client AT. Parent must reconcile living-spec layer mapping before
+      completion.
   - id: S11-N3-browser
     title: Certify full exact scenario keyboard and short-content behavior
     bpe: BPE-05
@@ -208,9 +209,9 @@ feature_execution_graph:
       rules:
       - do-test-first
       - do-github-issues
-    notes: Rollup runs named server-contract gate, existing profile regression suite, and separate browser command.
-      Require positive counts and no skips. Confirm one handler, S10-owned CSS, unchanged paragraph and retained
-      account controls; resolve living-spec mapping before claiming EXPERTS-PROFILE-02 done.
+    notes: Rollup runs named server-contract gate, existing profile regression suite, and separate browser
+      command. Require positive counts and no skips. Confirm one handler, S10-owned CSS, unchanged paragraph
+      and retained account controls; resolve living-spec mapping before claiming EXPERTS-PROFILE-02 done.
 ```
 
 ## Lessons Learned
@@ -229,3 +230,9 @@ No writes, tests, commits, issues or production actions were performed.
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S11.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S11.json`, `docs/plans/iterations/experts/S11-experts-profile-02.md`, `tests/e2e/test_experts_profile_summary.py`, `tests/integration/test_experts_profile_summary.py`
+
+Skeleton: `3eaa42a03eeb20fe57917e436c2229daf0890628`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

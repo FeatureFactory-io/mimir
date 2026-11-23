@@ -334,3 +334,9 @@ PIN applies raising stubs only; no assertions or production behavior are filled 
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S22.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S22.json`, `docs/features/steps/experts_empty_evidence_steps.py`, `docs/plans/iterations/experts/S22-experts-view-06.md`, `tests/e2e/test_experts_empty_evidence.py`, `tests/integration/test_experts_empty_evidence.py`
+
+Skeleton: `36188e3e95cb7199220d8571e9f1168a1d3ec7df`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

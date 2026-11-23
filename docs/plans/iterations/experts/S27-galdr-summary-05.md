@@ -228,8 +228,7 @@ feature_execution_graph:
     - validate_summary_response:validation
     gate:
       command: pytest tests/integration/test_experts_public_evidence.py -k 'prompt or response' -x
-      log_story_command: pytest tests/integration/test_experts_public_evidence.py tests/integration/test_experts_summary_proofs.py
-        -k "s27 and log_story" -x
+      log_story_command: pytest tests/integration/test_experts_public_evidence.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
       rules:
@@ -253,18 +252,20 @@ feature_execution_graph:
     - test_s27_summary_agent_story_happy
     - test_s27_summary_agent_story_reject
     - test_s27_summary_with_exhausted_script_fails_loudly
+    - test_s27_summary_log_story_happy
+    - test_s27_summary_log_story_reject
     log_story_rows:
     - PublicContributionSummaryBoundary.complete:entry
     - PublicContributionSummaryBoundary.complete:processing
     - PublicContributionSummaryBoundary.complete:exit
     - PublicContributionSummaryBoundary.complete:error
     gate:
-      command: pytest tests/unit/test_agent_test_support.py tests/integration/test_experts_summary_proofs.py -k
-        'recorded_call or s27_summary' -x
+      command: pytest tests/unit/test_agent_test_support.py tests/integration/test_experts_summary_proofs.py
+        -k 'recorded_call or s27_summary' -x
       agent_proof_command: pytest tests/integration/test_experts_summary_proofs.py -m agent_proof -k s27_summary
         -x
-      log_story_command: pytest tests/integration/test_experts_public_evidence.py tests/integration/test_experts_summary_proofs.py
-        -k "s27 and log_story" -x
+      log_story_command: pytest tests/integration/test_experts_summary_proofs.py -k "s27_summary and log_story"
+        -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
       rules:
@@ -323,3 +324,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S27.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S27.json`, `docs/features/steps/experts_summary_steps.py`, `docs/plans/iterations/experts/S27-galdr-summary-05.md`, `methodology/services/contribution_summary_boundary.py`, `methodology/services/contribution_summary_prompts.py`, `methodology/services/public_contribution_evidence.py`, `tests/fixtures/llm_scripts/PRF-EXPERTS-03/happy.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-03/reject_unsafe.json`, `tests/integration/test_experts_public_evidence.py`, `tests/integration/test_experts_summary_proofs.py`, `tests/support/experts_data.py`, `tests/support/scripted_llm.py`, `tests/unit/test_agent_test_support.py`
+
+Skeleton: `2fa4ee24e826e5e286a675452fbfc67800706116`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

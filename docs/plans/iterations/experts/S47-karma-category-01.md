@@ -372,8 +372,7 @@ feature_execution_graph:
     - S47-backend
     - S47-at
     - S47-browser
-    footprint:
-    - docs/architecture/SAO.md
+    footprint: []
     gate:
       command: make test-experts-s47
       required_passed_nodes:
@@ -401,3 +400,9 @@ After PIN-04 issue/handoff and PIN-05 GO: one backend-plus-log slice, one AT sli
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S47.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S47.json`, `docs/features/steps/experts_category_steps.py`, `docs/plans/iterations/experts/S47-karma-category-01.md`, `tests/e2e/test_experts_category_ties.py`, `tests/integration/test_experts_category_acceptance.py`, `tests/integration/test_experts_category_ties.py`, `tests/support/experts_category_ties.py`
+
+Skeleton: `a9ba8e436b3c75dc82ad0c104a3c53d14a511e24`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

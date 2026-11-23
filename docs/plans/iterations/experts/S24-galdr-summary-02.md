@@ -204,8 +204,7 @@ feature_execution_graph:
     bpe: BPE-06
     depends_on:
     - S24-N3-browser
-    footprint:
-    - docs/ux/experts-responsive-evidence.json
+    footprint: []
     gate:
       command: make test-experts-s24
       additional_commands:
@@ -238,3 +237,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S24.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S24.json`, `docs/features/steps/experts_stored_summary_steps.py`, `docs/plans/iterations/experts/S24-galdr-summary-02.md`, `tests/e2e/test_experts_stored_summary.py`, `tests/integration/test_experts_stored_summary.py`
+
+Skeleton: `6ca6a7245842061b6e918cb115b6fb7a7ed59b3b`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

@@ -180,14 +180,14 @@ feature_execution_graph:
     bpe: BPE-06
     depends_on:
     - S16-N3-browser
-    footprint:
-    - docs/ux/experts-responsive-evidence.json
+    footprint: []
     gate:
       command: make test-experts-s16
-      acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py behave --simple
-        --tags=@experts --name='^EXPERTS-REACH-03 Apply the same guest restriction on public detail$' docs/features/act-18-experts/experts-reach-out.feature
-      browser_command: E2E_LIVE_SERVER_SCOPE=function .venv/bin/pytest -c tests/e2e/pytest.ini -o addopts= -p no:playwright
-        -p no:asyncio -p no:anyio tests/e2e/test_experts_guest_detail.py -x
+      acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py behave
+        --simple --tags=@experts --name='^EXPERTS-REACH-03 Apply the same guest restriction on public detail$'
+        docs/features/act-18-experts/experts-reach-out.feature
+      browser_command: E2E_LIVE_SERVER_SCOPE=function .venv/bin/pytest -c tests/e2e/pytest.ini -o addopts=
+        -p no:playwright -p no:asyncio -p no:anyio tests/e2e/test_experts_guest_detail.py -x
       make_commands:
       - make test-at-harness
       - make test-at-experts
@@ -223,3 +223,9 @@ PIN-04/05 owns issue publication and human GO. Later slices: handoff docs `Refs 
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S16.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S16.json`, `docs/features/steps/experts_contact_steps.py`, `docs/plans/iterations/experts/S16-experts-reach-03.md`, `tests/e2e/test_experts_guest_detail.py`, `tests/integration/test_experts_guest_detail.py`, `tests/support/experts_guest_detail.py`
+
+Skeleton: `666655d4353407ea03bfcba6cd7b30486b9c9819`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

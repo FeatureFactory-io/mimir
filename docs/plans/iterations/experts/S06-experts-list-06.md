@@ -185,3 +185,9 @@ No unresolved infrastructure or scope proposal, new architectural decision, or t
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S06.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S06.json`, `docs/features/steps/experts_empty_steps.py`, `docs/plans/iterations/experts/S06-experts-list-06.md`, `tests/e2e/test_experts_empty_category.py`, `tests/integration/test_experts_empty_category.py`, `tests/support/experts_html.py`
+
+Skeleton: `04402ab629c90267f3e0ac0a9646199c89d578c2`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

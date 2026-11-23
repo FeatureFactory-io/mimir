@@ -366,3 +366,9 @@ PIN-04/05 owns the combined issue/handoff/human GO gate. After GO, commit each g
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S18.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S18.json`, `docs/features/steps/experts_steps.py`, `docs/plans/iterations/experts/S18-experts-view-02.md`, `tests/e2e/test_experts_public_score_breakdown.py`, `tests/integration/test_experts_public_score_breakdown.py`, `tests/integration/test_experts_s18_behave.py`
+
+Skeleton: `668c95b5d370e529a67466d69f7301aa8873b2a0`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

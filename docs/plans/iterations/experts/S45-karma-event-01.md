@@ -220,8 +220,8 @@ feature_execution_graph:
     - KarmaService._assert_matching_event:branch
     - KarmaService.persist_awards:exit
     gate:
-      command: pytest tests/integration/karma_event/test_retry.py -k 'repeated_write or changed_payload or partial_existing
-        or log_story' -x
+      command: pytest tests/integration/karma_event/test_retry.py -k 'repeated_write or changed_payload or
+        partial_existing or log_story' -x
       log_story_command: pytest tests/integration/karma_event/test_retry.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -254,8 +254,8 @@ feature_execution_graph:
     - KarmaService.persist_awards:branch
     - KarmaService.persist_awards:error
     gate:
-      command: pytest tests/integration/karma_event/test_retry.py -k 'outer_rollback or concurrent_writers or database_constraints
-        or historical_marker or log_story' -x
+      command: pytest tests/integration/karma_event/test_retry.py -k 'outer_rollback or concurrent_writers
+        or database_constraints or historical_marker or log_story' -x
       log_story_command: pytest tests/integration/karma_event/test_retry.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -278,8 +278,8 @@ feature_execution_graph:
     - test_copy_receipt_with_retry_and_changed_target_enforces_identity
     gate:
       command: make test-experts-s45-at
-    acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py behave --simple
-      --tags=@experts --name='KARMA-EVENT-01' docs/features/act-18-experts/karma-accrual.feature
+    acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py behave
+      --simple --tags=@experts --name='KARMA-EVENT-01' docs/features/act-18-experts/karma-accrual.feature
     required_acceptance_scenarios: 1
     guidance_bundle:
       activity: BPE/BPE-04-Implement_Feature_Acceptance_Tests.md
@@ -292,8 +292,7 @@ feature_execution_graph:
     bpe: BPE-06
     depends_on:
     - S45-N3-acceptance
-    footprint:
-    - docs/architecture/SAO.md
+    footprint: []
     gate:
       command: make test-experts-s45
       log_story_command: pytest tests/integration/karma_event/test_retry.py -k log_story -x
@@ -328,3 +327,9 @@ No files, tests, database state, issues or commits were changed.
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S45.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S45.json`, `docs/features/steps/karma_event_steps.py`, `docs/plans/iterations/experts/S45-karma-event-01.md`, `methodology/services/karma_service.py`, `tests/integration/karma_event/conftest.py`, `tests/integration/karma_event/test_retry.py`
+
+Skeleton: `923582242ec3446be65478594ac67b54ed913278`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

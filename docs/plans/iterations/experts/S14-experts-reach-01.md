@@ -192,8 +192,8 @@ feature_execution_graph:
     - expert_contact_context.build_expert_contact_context:exit
     - expert_contact_context.build_expert_contact_context:validation
     gate:
-      command: pytest tests/unit/test_expert_contact_context.py tests/integration/test_experts_reach_out.py -k 'contact_context
-        or log_story' -x
+      command: pytest tests/unit/test_expert_contact_context.py tests/integration/test_experts_reach_out.py
+        -k 'contact_context or log_story' -x
       log_story_command: pytest tests/integration/test_experts_reach_out.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -289,3 +289,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S14.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S14.json`, `docs/features/steps/experts_reach_out_steps.py`, `docs/plans/iterations/experts/S14-experts-reach-01.md`, `methodology/expert_views.py`, `methodology/services/expert_contact_context.py`, `templates/experts/_reach_out.html`, `templates/experts/detail.html`, `templates/experts/list.html`, `tests/e2e/test_experts_reach_out.py`, `tests/integration/test_experts_reach_out.py`, `tests/unit/test_expert_contact_context.py`
+
+Skeleton: `a343ed603f01f564eb9bd23db204ede1610347f7`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

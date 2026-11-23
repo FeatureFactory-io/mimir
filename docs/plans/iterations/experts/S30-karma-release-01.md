@@ -359,3 +359,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S30.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S30.json`, `docs/features/steps/experts_karma_release_steps.py`, `docs/plans/iterations/experts/S30-karma-release-01.md`, `methodology/playbook_views.py`, `methodology/services/karma_service.py`, `methodology/services/playbook_service.py`, `tests/e2e/test_experts_release.py`, `tests/integration/test_experts_release_acceptance.py`, `tests/integration/test_experts_release_log_story.py`, `tests/support/experts_release.py`, `tests/unit/test_karma_release_service.py`
+
+Skeleton: `37cfba144a00adf2b219d5403d37b5d9bb94475c`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

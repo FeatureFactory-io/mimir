@@ -178,7 +178,6 @@ feature_execution_graph:
     depends_on:
     - N1-self-domain-proof
     footprint:
-    - docs/ux/experts-test-assets.md
     - tests/integration/test_karma_copy.py
     tests:
     - test_copy_receipt_with_self_activity_returns_successful_exclusion
@@ -214,8 +213,7 @@ feature_execution_graph:
     bpe: BPE-06
     depends_on:
     - N3-self-clipboard-and-composed-lanes
-    footprint:
-    - docs/ux/experts-test-assets.md
+    footprint: []
     tests:
     - tests/integration/test_karma_copy.py
     - tests/e2e/test_karma_copy.py
@@ -252,3 +250,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S38.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S38.json`, `docs/plans/iterations/experts/S38-karma-copy-03.md`, `tests/e2e/test_karma_copy.py`, `tests/integration/test_karma_copy.py`
+
+Skeleton: `33a61030b0888af55a81bb8719dc22de798d099e`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

@@ -246,7 +246,8 @@ feature_execution_graph:
     - test_own_profile_with_anonymous_request_redirects_without_private_render
     - test_own_profile_with_followed_anonymous_redirect_shows_login_only
     gate:
-      command: pytest tests/integration/test_experts_profile_auth.py tests/integration/test_profile_page.py -x
+      command: pytest tests/integration/test_experts_profile_auth.py tests/integration/test_profile_page.py
+        -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
       rules:
@@ -303,8 +304,8 @@ feature_execution_graph:
     footprint: []
     gate:
       command: make test-experts-s13
-      acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance python manage.py behave --simple --tags=@experts
-        --name='^EXPERTS-PROFILE-04 Keep own-profile account controls authenticated$' docs/features/act-18-experts/experts-profile.feature
+      acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance python manage.py behave --simple
+        --tags=@experts --name='^EXPERTS-PROFILE-04 Keep own-profile account controls authenticated$' docs/features/act-18-experts/experts-profile.feature
       browser_command: E2E_LIVE_SERVER_SCOPE=function pytest -c tests/e2e/pytest.ini -o addopts= -p no:playwright
         -p no:asyncio -p no:anyio tests/e2e/test_experts_profile_auth.py -x
       harness_command: make test-at-harness
@@ -316,7 +317,8 @@ feature_execution_graph:
       - do-small-increments
       - do-github-issues
       - pytest
-    notes: Record nonzero execution counts and deployed/local identity accurately; no merge/release permission implied.
+    notes: Record nonzero execution counts and deployed/local identity accurately; no merge/release permission
+      implied.
 ```
 
 ## Lessons Learned
@@ -330,3 +332,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S13.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S13.json`, `docs/features/steps/experts_profile_auth_steps.py`, `docs/plans/iterations/experts/S13-experts-profile-04.md`, `tests/e2e/test_experts_profile_auth.py`, `tests/integration/test_experts_profile_auth.py`
+
+Skeleton: `ec400cefdf14368de642adb73c510102eda6d9ce`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

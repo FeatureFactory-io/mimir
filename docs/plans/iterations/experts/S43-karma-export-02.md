@@ -222,7 +222,8 @@ feature_execution_graph:
       - do-not-mock-in-integration-tests
       - do-assert-log-story
       - pytest
-    notes: All gates must pass; S42 complete-output/packaging gates remain prerequisites. No agent/browser gate.
+    notes: All gates must pass; S42 complete-output/packaging gates remain prerequisites. No agent/browser
+      gate.
     mockup_graduation: not_applicable
     agent_proofs: []
 ```
@@ -234,3 +235,9 @@ A zero-award assertion is incomplete without first proving actual successful out
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S43.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S43.json`, `docs/features/steps/experts_export_steps.py`, `docs/plans/iterations/experts/S43-karma-export-02.md`, `tests/integration/test_karma_exports.py`, `tests/support/experts_exports.py`
+
+Skeleton: `b4ecca6a499524fdfbad94bc47d023c50ad93587`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

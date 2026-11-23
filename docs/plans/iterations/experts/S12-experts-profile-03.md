@@ -195,3 +195,9 @@ The fixture’s Design subtotal 7200 differs from Maria’s overall 8200: source
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S12.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S12.json`, `docs/features/steps/experts_profile_steps.py`, `docs/plans/iterations/experts/S12-experts-profile-03.md`, `tests/e2e/test_experts_profile_sources.py`, `tests/integration/test_experts_profile_sources.py`, `tests/support/experts_html.py`
+
+Skeleton: `e14a42ad76ed1aaf24845bd478c7d541732ce480`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

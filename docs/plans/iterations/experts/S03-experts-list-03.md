@@ -240,15 +240,16 @@ feature_execution_graph:
     - methodology/services/expert_text.py
     - methodology/services/experts_service.py
     - tests/conftest.py
-  - tests/e2e/conftest.py
-  - tests/support/experts_fixtures.py
+    - tests/e2e/conftest.py
     - tests/fixtures/CATALOG.md
     - tests/integration/test_experts_acceptance_runner.py
     - tests/integration/test_experts_data.py
     - tests/integration/test_experts_list_s03.py
     - tests/support/experts_acceptance.py
     - tests/support/experts_data.py
+    - tests/support/experts_fixtures.py
     - tests/support/experts_html.py
+    - tests/support/experts_logs.py
     - tests/unit/test_experts_projection.py
     tests:
     - test_load_cedar_baseline_with_historical_rows_reconciles_oracle
@@ -273,7 +274,8 @@ feature_execution_graph:
     gate:
       command: pytest tests/unit/test_experts_projection.py tests/integration/test_experts_data.py tests/integration/test_experts_list_s03.py
         -k "not renders and not experts_list_with_design_log_story_happy" -x
-      log_story_command: pytest tests/integration/test_experts_list_s03.py -k "list_leaders and log_story" -x
+      log_story_command: pytest tests/integration/test_experts_list_s03.py -k "list_leaders and log_story"
+        -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
       rules:
@@ -292,6 +294,7 @@ feature_execution_graph:
     footprint:
     - methodology/expert_views.py
     - mimir/urls.py
+    - templates/experts/_breakdown.html
     - templates/experts/list.html
     - tests/integration/test_experts_list_s03.py
     tests:
@@ -373,3 +376,9 @@ Shared file ownership must be reconciled before skeleton application: S03 owns q
 ## Structural application evidence
 
 See `docs/experts-replay/pin-evidence/S03.json`. All new callable bodies raise. Collection succeeded; behavior/log/AT/browser gates remain red with NotImplementedError. Real empty schema and tracked seed are committed together. No feature implementation is claimed.
+
+## Actual structural footprint
+
+`Makefile`, `docs/experts-replay/pin-evidence/S03.json`, `docs/features/CATALOG.md`, `docs/features/steps/experts_steps.py`, `docs/plans/iterations/experts/S03-experts-list-03.md`, `methodology/expert_views.py`, `methodology/migrations/0027_experts_schema.py`, `methodology/models/__init__.py`, `methodology/models/expert_profile.py`, `methodology/models/karma_award.py`, `methodology/services/expert_text.py`, `methodology/services/experts_service.py`, `mimir.db`, `mimir/urls.py`, `templates/experts/_breakdown.html`, `templates/experts/list.html`, `tests/conftest.py`, `tests/e2e/conftest.py`, `tests/e2e/test_experts_list_s03.py`, `tests/fixtures/CATALOG.md`, `tests/integration/test_experts_acceptance_runner.py`, `tests/integration/test_experts_data.py`, `tests/integration/test_experts_list_s03.py`, `tests/integration/test_experts_schema.py`, `tests/support/experts_acceptance.py`, `tests/support/experts_data.py`, `tests/support/experts_fixtures.py`, `tests/support/experts_html.py`, `tests/support/experts_logs.py`, `tests/unit/test_experts_html.py`, `tests/unit/test_experts_projection.py`, `tests/unit/test_experts_text.py`
+
+Skeleton: `2e78cb52812d05889185604865c91dd620a93c79`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

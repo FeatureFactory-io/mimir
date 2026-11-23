@@ -264,3 +264,9 @@ Lessons Learned:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S09.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S09.json`, `docs/features/steps/experts_fallback_steps.py`, `docs/plans/iterations/experts/S09-experts-list-09.md`, `tests/e2e/test_experts_category_fallback.py`, `tests/integration/test_experts_category_fallback.py`, `tests/support/experts_fallback_assertions.py`
+
+Skeleton: `41449cecfd54f7bca74616f7d01a26bd002b7cef`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

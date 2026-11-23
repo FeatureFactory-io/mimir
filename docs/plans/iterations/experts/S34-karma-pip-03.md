@@ -131,8 +131,8 @@ feature_execution_graph:
     - KarmaService.award_accepted_changes:exit
     - PIPAdminService.finalize_pip:processing
     gate:
-      command: pytest tests/integration/test_experts_karma_partial.py -k 'reviewed_state or accepted_add or log_story'
-        -x
+      command: pytest tests/integration/test_experts_karma_partial.py -k 'reviewed_state or accepted_add or
+        log_story' -x
       log_story_command: pytest tests/integration/test_experts_karma_partial.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -215,3 +215,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S34.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S34.json`, `docs/features/steps/experts_karma_pip_steps.py`, `docs/plans/iterations/experts/S34-karma-pip-03.md`, `tests/integration/test_experts_karma_partial.py`, `tests/support/experts_data.py`
+
+Skeleton: `f60a5ef9905b18832ecfc0d8038ac84298cac87d`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

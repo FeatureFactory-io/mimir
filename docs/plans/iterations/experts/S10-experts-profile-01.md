@@ -210,8 +210,8 @@ feature_execution_graph:
     - accounts.views._profile_contribution_context:exit
     - accounts.views._validate_profile_contribution_request:validation
     gate:
-      command: pytest -o addopts= tests/integration/test_experts_own_profile.py -k "context or other_subject or
-        missing_expert" -x
+      command: pytest -o addopts= tests/integration/test_experts_own_profile.py -k "context or other_subject
+        or missing_expert" -x
       log_story_command: pytest -o addopts= tests/integration/test_experts_own_profile.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -259,10 +259,10 @@ feature_execution_graph:
       rules:
       - do-not-mock-in-integration-tests
       - do-test-first
-    notes: 'The current Makefile ignores AT_PROFILE_SCENARIO; this command must not be accepted as a scoped gate.
-      Use the exact Behave command from Section D as an additional required execution gate, without a Makefile change.
-      Aggregate make test-at-experts is useful only with recorded selected scenario counts. Zero/skipped scenarios
-      fail certification.
+    notes: 'The current Makefile ignores AT_PROFILE_SCENARIO; this command must not be accepted as a scoped
+      gate. Use the exact Behave command from Section D as an additional required execution gate, without a
+      Makefile change. Aggregate make test-at-experts is useful only with recorded selected scenario counts.
+      Zero/skipped scenarios fail certification.
 
       '
   - id: N4-profile-browser
@@ -321,3 +321,9 @@ Lessons Learned:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S10.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`accounts/views.py`, `docs/experts-replay/pin-evidence/S10.json`, `docs/features/steps/experts_profile_steps.py`, `docs/plans/iterations/experts/S10-experts-profile-01.md`, `static/css/mimir-app.css`, `templates/accounts/profile.html`, `tests/e2e/test_experts_own_profile.py`, `tests/integration/test_experts_own_profile.py`
+
+Skeleton: `26d29adfc227baf6a39309dcdd1622a7ae5b8935`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

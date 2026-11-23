@@ -154,8 +154,8 @@ feature_execution_graph:
     - test_import_with_missing_source_rejects_without_awards
     - test_import_log_story_happy
     gate:
-      command: pytest --ds=mimir.settings.acceptance tests/integration/test_karma_imports.py -k 'not stdio and not
-        acceptance' -x
+      command: pytest --ds=mimir.settings.acceptance tests/integration/test_karma_imports.py -k 'not stdio
+        and not acceptance' -x
       log_story_command: pytest --ds=mimir.settings.acceptance tests/integration/test_karma_imports.py -k log_story
         -x
     guidance_bundle:
@@ -239,3 +239,9 @@ PIN-04/05 owns concrete issue/handoff publication and GO. Later certification sl
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S44.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S44.json`, `docs/features/steps/experts_import_steps.py`, `docs/plans/iterations/experts/S44-karma-export-03.md`, `tests/integration/test_karma_imports.py`, `tests/support/experts_imports.py`
+
+Skeleton: `dd7fc7ca3956c4db536774cbb224e2f1f065adb9`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

@@ -246,3 +246,9 @@ Existing permission and self-consumption are separate decisions: creator-or-staf
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S40.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S40.json`, `docs/features/steps/experts_mcp_self_steps.py`, `docs/plans/iterations/experts/S40-karma-mcp-03.md`, `tests/integration/test_karma_mcp_self_fetch.py`, `tests/support/experts_mcp_self.py`
+
+Skeleton: `a40a1d0a34cbce76db9404f465a514d84086d20a`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

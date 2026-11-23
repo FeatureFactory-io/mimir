@@ -164,8 +164,8 @@ feature_execution_graph:
     - primary_nav_section:branch
     - primary_nav_section:exit
     gate:
-      command: pytest tests/unit/test_experts_navigation.py tests/integration/test_experts_navigation.py -k "not
-        shows_default_page" -x
+      command: pytest tests/unit/test_experts_navigation.py tests/integration/test_experts_navigation.py -k
+        "not shows_default_page" -x
       log_story_command: pytest tests/integration/test_experts_navigation.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -246,3 +246,9 @@ The existing sidebar is data-driven, so changing `base.html` would duplicate wor
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S01.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S01.json`, `docs/features/steps/experts_navigation_steps.py`, `docs/plans/iterations/experts/S01-experts-list-01.md`, `methodology/context_processors.py`, `tests/e2e/test_experts_navigation.py`, `tests/integration/test_experts_navigation.py`, `tests/unit/test_experts_navigation.py`
+
+Skeleton: `a9b9a2e145fde375a97e6013105372d3e890a42f`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

@@ -178,8 +178,8 @@ feature_execution_graph:
       rules:
       - do-test-first
       - do-not-mock-in-integration-tests
-    notes: 'Reuse baseline and Elena-open-path bindings; register only two S08 phrases. Explicit @experts and anchored
-      exact scenario selection. Require one executed scenario and four passing steps.
+    notes: 'Reuse baseline and Elena-open-path bindings; register only two S08 phrases. Explicit @experts and
+      anchored exact scenario selection. Require one executed scenario and four passing steps.
 
       '
   - id: S08-N3-browser
@@ -198,8 +198,8 @@ feature_execution_graph:
       rules:
       - do-test-first
       - do-semantic-versioning-on-ui-elements
-    notes: 'Reuse actual page/live_server_url and login fixtures/helpers. Keep browser settings separate from backend
-      test settings. Production route only; verify reload and visible vertical order.
+    notes: 'Reuse actual page/live_server_url and login fixtures/helpers. Keep browser settings separate from
+      backend test settings. Production route only; verify reload and visible vertical order.
 
       '
   - id: S08-N4-definition-of-done
@@ -240,3 +240,9 @@ No writes, commits, tests or implementation execution were performed.
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S08.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S08.json`, `docs/features/steps/experts_list_tie_steps.py`, `docs/plans/iterations/experts/S08-experts-list-08.md`, `tests/e2e/test_experts_list_tie.py`, `tests/integration/test_experts_list_tie.py`, `tests/support/experts_tie_data.py`
+
+Skeleton: `bac8f4d6b1c6097ea2ae949c45c91422049faa1d`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

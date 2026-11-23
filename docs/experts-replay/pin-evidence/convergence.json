@@ -17,5 +17,9 @@
     "steps": 410,
     "undefined": 0,
     "result": "dry-run only, all untested; no behavior pass claimed"
-  }
+  },
+  "backend_tests_collected": 620,
+  "browser_tests_collected": 124,
+  "declared_pytest_selections_positive": 116,
+  "make_targets_resolved": 133
 }

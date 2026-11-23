@@ -185,8 +185,8 @@ feature_execution_graph:
         -k 's29 and not interaction' -x
       log_story_command: pytest tests/integration/test_experts_summary_failure.py -k s29_summary_log_story_reject
         -x
-      agent_proof_command: pytest tests/integration/test_experts_summary_proofs.py -m agent_proof -k 's29 and not
-        interaction' -x
+      agent_proof_command: pytest tests/integration/test_experts_summary_proofs.py -m agent_proof -k 's29 and
+        not interaction' -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
       rules:
@@ -278,3 +278,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S29.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S29.json`, `docs/features/steps/experts_summary_steps.py`, `docs/plans/iterations/experts/S29-galdr-summary-07.md`, `tests/fixtures/llm_scripts/PRF-EXPERTS-02/s29_empty.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-02/s29_exhaustion.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-02/s29_markup.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-02/s29_overlong.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-02/s29_provider.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-02/s29_retry.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-02/s29_truncated.json`, `tests/fixtures/llm_scripts/PRF-OBS-01/s29_invalid_usage.json`, `tests/fixtures/llm_scripts/PRF-OBS-01/s29_unknown_rates.json`, `tests/fixtures/llm_scripts/PRF-OBS-01/s29_unknown_usage.json`, `tests/integration/test_experts_summary_failure.py`, `tests/integration/test_experts_summary_proofs.py`, `tests/support/experts_summary_failure_data.py`
+
+Skeleton: `8df00fe01593f773ca8f664be443f8f1eb077b2c`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

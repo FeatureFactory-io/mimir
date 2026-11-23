@@ -247,7 +247,8 @@ feature_execution_graph:
     gate:
       command: pytest tests/integration/test_experts_summary_submission.py tests/integration/test_experts_summary_proofs.py
         -k s23 -x
-      log_story_command: pytest tests/integration/test_experts_summary_submission.py -k 's23 and log_story' -x
+      log_story_command: pytest tests/integration/test_experts_summary_submission.py -k 's23 and log_story'
+        -x
       agent_proof_command: pytest tests/integration/test_experts_summary_proofs.py -m agent_proof -k s23 -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -264,6 +265,7 @@ feature_execution_graph:
     depends_on:
     - N2-summary-lifecycle
     footprint:
+    - docs/features/steps/experts_summary_submission_steps.py
     - tests/integration/test_experts_summary_submission.py
     tests:
     - test_s23_http_submission_with_request_id_uses_normal_lifecycle
@@ -293,7 +295,8 @@ feature_execution_graph:
     - E10
     gate:
       command: make test-experts-s23
-      log_story_command: pytest tests/integration/test_experts_summary_submission.py -k 's23 and log_story' -x
+      log_story_command: pytest tests/integration/test_experts_summary_submission.py -k 's23 and log_story'
+        -x
       agent_proof_command: pytest tests/integration/test_experts_summary_proofs.py -m agent_proof -k s23 -x
     guidance_bundle:
       activity: BPE/BPE-06-Check_Definition_of_Done.md
@@ -322,3 +325,9 @@ Suggested delivery commits after the separate plan/docs handoff: adapter/schema 
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S23.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`.env.example`, `docs/experts-replay/pin-evidence/S23.json`, `docs/features/steps/experts_summary_submission_steps.py`, `docs/plans/iterations/experts/S23-galdr-summary-01.md`, `methodology/llm/anthropic_adapter.py`, `methodology/migrations/0028_agent_interaction.py`, `methodology/models/__init__.py`, `methodology/models/agent_interaction.py`, `methodology/pip_views.py`, `methodology/services/contribution_summary_factory.py`, `methodology/services/contribution_summary_service.py`, `methodology/services/galdr_client.py`, `methodology/services/galdr_engine.py`, `methodology/services/pip_service.py`, `mimir.db`, `mimir/settings/base.py`, `tests/fixtures/llm_scripts/PRF-EXPERTS-01/happy.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-01/happy_per_change.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-02/reject_provider.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-03/submission_happy.json`, `tests/fixtures/llm_scripts/PRF-OBS-01/happy.json`, `tests/fixtures/llm_scripts/PRF-OBS-01/unknown_rates.json`, `tests/integration/test_experts_summary_proofs.py`, `tests/integration/test_experts_summary_submission.py`, `tests/support/experts_summary_data.py`, `tests/unit/test_contribution_summary_adapter.py`
+
+Skeleton: `7937a04b8d70ae75bba714ab0529ddb63cb5e7f5`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

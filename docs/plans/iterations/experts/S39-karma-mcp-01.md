@@ -186,8 +186,8 @@ feature_execution_graph:
     - test_consumption_receipt_with_retry_preserves_awards_and_timestamp
     - test_detail_rest_get_with_authorized_token_does_not_award
     gate:
-      command: pytest tests/integration/test_karma_mcp.py -k 'consumption_service or consumption_receipt or detail_rest_get'
-        -x
+      command: pytest tests/integration/test_karma_mcp.py -k 'consumption_service or consumption_receipt or
+        detail_rest_get' -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
       rules:
@@ -218,8 +218,8 @@ feature_execution_graph:
     - KarmaService.award_successful_consumption:branch
     - KarmaService.award_successful_consumption:exit
     gate:
-      command: pytest tests/integration/test_karma_mcp.py -k 'authorized_fixture or legacy_registration or history_options
-        or log_story' -x
+      command: pytest tests/integration/test_karma_mcp.py -k 'authorized_fixture or legacy_registration or
+        history_options or log_story' -x
       log_story_command: pytest tests/integration/test_karma_mcp.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -237,8 +237,8 @@ feature_execution_graph:
     - tests/integration/test_karma_mcp.py
     gate:
       command: make test-experts-s39-at
-    acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py behave --simple
-      --tags=@experts --name='KARMA-MCP-01' docs/features/act-18-experts/karma-accrual.feature
+    acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py behave
+      --simple --tags=@experts --name='KARMA-MCP-01' docs/features/act-18-experts/karma-accrual.feature
     required_examples: 9
     guidance_bundle:
       activity: BPE/BPE-04-Implement_Feature_Acceptance_Tests.md
@@ -292,3 +292,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S39.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S39.json`, `docs/features/steps/karma_mcp_steps.py`, `docs/plans/iterations/experts/S39-karma-mcp-01.md`, `mcp_integration/context.py`, `mcp_integration/facade/tools_http.py`, `mcp_integration/tools.py`, `methodology/api/consumption_views.py`, `methodology/services/phase_service.py`, `mimir/urls.py`, `tests/integration/test_karma_mcp.py`, `tests/support/karma_mcp.py`
+
+Skeleton: `2b1a5946b52ccbaf22c519b166f4dfe58f85054e`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

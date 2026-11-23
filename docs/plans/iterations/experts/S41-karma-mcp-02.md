@@ -123,8 +123,8 @@ feature_execution_graph:
     footprint:
     - tests/integration/test_karma_mcp_collections.py
     gate:
-      command: pytest tests/integration/test_karma_mcp_collections.py -k 'registered_tool or direct_service or plain_rest
-        or empty_or_denied or log_story' -x
+      command: pytest tests/integration/test_karma_mcp_collections.py -k 'registered_tool or direct_service
+        or plain_rest or empty_or_denied or log_story' -x
       log_story_command: pytest tests/integration/test_karma_mcp_collections.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -140,6 +140,7 @@ feature_execution_graph:
     - test_collection_with_stdio_entrypoint_preserves_protocol_and_state
     - test_collection_log_story_happy
     - test_collection_with_exact_acceptance_executes_one_contract
+    title: Prove native collection metadata and unchanged global state
   - id: S41-N2-acceptance
     bpe: BPE-04
     depends_on:
@@ -155,6 +156,7 @@ feature_execution_graph:
       - do-test-first
       - do-not-mock-in-integration-tests
       - pytest
+    title: Run exact award-free collection acceptance
   - id: S41-N3-protocol
     bpe: BPE-04
     depends_on:
@@ -169,6 +171,7 @@ feature_execution_graph:
       - do-not-mock-in-integration-tests
       - pytest
     browser_journey: not_applicable
+    title: Verify actual facade and legacy collection protocol
   - id: S41-N4-dod
     bpe: BPE-06
     depends_on:
@@ -190,6 +193,7 @@ feature_execution_graph:
     - exact_AT_1_scenario_3_steps
     - both_stdio_surfaces
     - log_story_pass
+    title: Certify the complete collection contract
   scenario_dependencies:
   - S03
   - S39
@@ -206,3 +210,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S41.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S41.json`, `docs/features/steps/karma_mcp_steps.py`, `docs/plans/iterations/experts/S41-karma-mcp-02.md`, `tests/integration/test_karma_mcp_collections.py`
+
+Skeleton: `428d5fe9f04bc16989e78033dd23b2a0ee64b7ba`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

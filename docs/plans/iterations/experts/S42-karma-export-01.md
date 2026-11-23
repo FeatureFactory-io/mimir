@@ -198,8 +198,8 @@ feature_execution_graph:
       - do-not-mock-in-integration-tests
       - do-write-concise-methods
       - do-assert-log-story
-    notes: 'Outer scenario prerequisites supply schema, persistence and shared consumption policy. Utility is pure
-      stdlib and ships in the facade image.
+    notes: 'Outer scenario prerequisites supply schema, persistence and shared consumption policy. Utility
+      is pure stdlib and ships in the facade image.
 
       '
   - id: S42-N2-facade-receipts
@@ -236,8 +236,9 @@ feature_execution_graph:
       - do-test-first
       - do-not-mock-in-integration-tests
       - do-assert-log-story
-    notes: 'Reuse S39 receipt endpoint/helper. Actual requested singular/plural ADE targets participate in preflight.
-      Partial file failure sends no receipt; receipt retry reuses the invocation UUID without repeating file writes.
+    notes: 'Reuse S39 receipt endpoint/helper. Actual requested singular/plural ADE targets participate in
+      preflight. Partial file failure sends no receipt; receipt retry reuses the invocation UUID without repeating
+      file writes.
 
       '
   - id: S42-N3-acceptance-and-stdio
@@ -262,8 +263,8 @@ feature_execution_graph:
       - do-not-mock-in-integration-tests
       - do-assert-log-story
     notes: 'Reuse S36''s exact shared total assertion binding. Scoped Make target runs manage.py behave --simple
-      with acceptance settings, @experts and the exact KARMA-EXPORT-01 scenario name. Zero selected/skipped contracts
-      do not pass.
+      with acceptance settings, @experts and the exact KARMA-EXPORT-01 scenario name. Zero selected/skipped
+      contracts do not pass.
 
       '
     mockup_graduation: not_applicable
@@ -294,8 +295,8 @@ feature_execution_graph:
       - do-test-first
       - do-not-mock-in-integration-tests
       - do-assert-log-story
-    notes: 'All tests use the real isolated DB with explicit transactional pytest marker. Verify no new public export
-      arguments, no nested detail receipts, one pair per complete invocation, confined files, and protocol-only
+    notes: 'All tests use the real isolated DB with explicit transactional pytest marker. Verify no new public
+      export arguments, no nested detail receipts, one pair per complete invocation, confined files, and protocol-only
       stdout. Image build/import must actually pass; unavailable Docker is recorded as an unmet packaging gate,
       never claimed as verified.
 
@@ -311,3 +312,9 @@ Existing export code already supplies the necessary real behavior, registration 
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S42.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S42.json`, `docs/features/steps/experts_export_steps.py`, `docs/plans/iterations/experts/S42-karma-export-01.md`, `mcp_integration/facade/export_paths.py`, `mcp_integration/facade/tools_http.py`, `methodology/services/playbook_export_service.py`, `methodology/services/workflow_export_service.py`, `tests/integration/test_karma_exports.py`
+
+Skeleton: `f16474cfae587db99d4845f2fa265dae24a597e6`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

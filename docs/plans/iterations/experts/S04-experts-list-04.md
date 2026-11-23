@@ -272,3 +272,9 @@ No source writes, commits, tests or browser runs were performed.
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S04.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S04.json`, `docs/features/steps/experts_card_steps.py`, `docs/plans/iterations/experts/S04-experts-list-04.md`, `docs/ux/experts-card-implementation-evidence.json`, `methodology/expert_views.py`, `methodology/services/expert_card_presentation.py`, `static/css/mimir-app.css`, `templates/experts/list.html`, `tests/e2e/test_expert_cards.py`, `tests/integration/test_expert_card_presentation.py`, `tests/integration/test_expert_card_visual_evidence.py`, `tests/integration/test_expert_cards.py`
+
+Skeleton: `8f8542607e41a4773c6403ddd15b0566f2399c73`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

@@ -224,7 +224,8 @@ feature_execution_graph:
     gate:
       command: pytest tests/integration/test_experts_summary_resubmission.py tests/integration/test_experts_summary_proofs.py
         -k s25 -x
-      log_story_command: pytest tests/integration/test_experts_summary_resubmission.py -k 's25 and log_story' -x
+      log_story_command: pytest tests/integration/test_experts_summary_resubmission.py -k 's25 and log_story'
+        -x
       agent_proof_command: pytest tests/integration/test_experts_summary_proofs.py -m agent_proof -k s25 -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
@@ -246,8 +247,8 @@ feature_execution_graph:
     - test_s25_http_withdraw_and_resubmit_uses_existing_post_routes
     gate:
       command: make test-experts-s25-at
-      acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance python manage.py behave --simple --tags=@experts
-        --name '^GALDR-SUMMARY-03 Refresh on normal withdrawal and resubmission$' docs/features/act-18-experts/galdr-contribution-summary.feature
+      acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance python manage.py behave --simple
+        --tags=@experts --name '^GALDR-SUMMARY-03 Refresh on normal withdrawal and resubmission$' docs/features/act-18-experts/galdr-contribution-summary.feature
     guidance_bundle:
       activity: BPE/BPE-04-Implement_Feature_Acceptance_Tests.md
       rules:
@@ -279,7 +280,8 @@ feature_execution_graph:
     footprint: []
     gate:
       command: make test-experts-s25
-      log_story_command: pytest tests/integration/test_experts_summary_resubmission.py -k 's25 and log_story' -x
+      log_story_command: pytest tests/integration/test_experts_summary_resubmission.py -k 's25 and log_story'
+        -x
       agent_proof_command: pytest tests/integration/test_experts_summary_proofs.py -m agent_proof -k s25 -x
     guidance_bundle:
       activity: BPE/BPE-06-Check_Definition_of_Done.md
@@ -311,3 +313,9 @@ No repository writes, mutations, tests, provider requests, commits or GitHub act
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S25.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S25.json`, `docs/features/steps/experts_summary_steps.py`, `docs/plans/iterations/experts/S25-galdr-summary-03.md`, `tests/e2e/test_experts_summary_resubmission.py`, `tests/fixtures/llm_scripts/PRF-EXPERTS-01/resubmission_happy.json`, `tests/fixtures/llm_scripts/PRF-EXPERTS-02/resubmission_reject_provider.json`, `tests/integration/test_experts_summary_proofs.py`, `tests/integration/test_experts_summary_resubmission.py`
+
+Skeleton: `7574bb1b73ed4003a3e151ace56d8f46eebc1faf`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

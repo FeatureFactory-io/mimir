@@ -168,8 +168,8 @@ feature_execution_graph:
     - shared-response-status
     gate:
       command: pytest tests/integration/test_experts_not_found.py -x
-      acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance python manage.py behave --simple --tags=@experts
-        --name='^EXPERTS-VIEW-05 Reject missing and ineligible profiles' docs/features/act-18-experts/experts-view.feature
+      acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance python manage.py behave --simple
+        --tags=@experts --name='^EXPERTS-VIEW-05 Reject missing and ineligible profiles' docs/features/act-18-experts/experts-view.feature
       harness_command: make test-at-harness
     guidance_bundle:
       activity: BPE/BPE-04-Implement_Feature_Acceptance_Tests.md
@@ -219,3 +219,9 @@ feature_execution_graph:
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S21.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S21.json`, `docs/plans/iterations/experts/S21-experts-view-05.md`, `tests/e2e/test_experts_not_found.py`, `tests/integration/test_experts_not_found.py`
+
+Skeleton: `3334180ff32d4e1595bf3fd44641f9178fb4f936`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.

@@ -269,3 +269,9 @@ After PIN-04 issue publication and PIN-05 GO: N1 behavior/log/agent proofs ship 
 ## Structural application evidence
 
 `docs/experts-replay/pin-evidence/S28.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
+
+## Actual structural footprint
+
+`docs/experts-replay/pin-evidence/S28.json`, `docs/features/steps/experts_summary_stability_steps.py`, `docs/plans/iterations/experts/S28-galdr-summary-06.md`, `tests/e2e/test_experts_summary_stability.py`, `tests/integration/test_experts_summary_proofs.py`, `tests/integration/test_experts_summary_stability.py`, `tests/support/experts_summary_stability.py`
+
+Skeleton: `8583579a7dae62770d922120811cdbeb0e9c128e`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.
