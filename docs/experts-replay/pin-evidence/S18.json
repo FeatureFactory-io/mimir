@@ -1,0 +1,26 @@
+{
+  "scenario": "S18",
+  "status": "structural_skeleton_only",
+  "new_unimplemented_callables": 9,
+  "checks": [
+    {
+      "gate": "test-experts-s18",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S18-checkpoint.cast"
+    },
+    {
+      "gate": "test-experts-s18-at",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S18-at.cast"
+    },
+    {
+      "gate": "browser collection only",
+      "result": "positive collection, exit 0",
+      "interaction_proven": false
+    }
+  ],
+  "behavior_implemented": false,
+  "existing_callable_AST": "unchanged"
+}

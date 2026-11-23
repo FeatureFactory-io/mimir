@@ -13,7 +13,7 @@ dependencies:
 - S12
 - S17
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - b09e2a7f3fef13518a4ff2a010d848468a2b0bee66f00ad9f6598135fd4f7247
 ```
@@ -362,3 +362,7 @@ feature_execution_graph:
 Source and category numbers are independent dimensions of the same ledger: Maria’s 1000 Development points must remain part of PIP=1600 and total=8200. Existing mockups illustrate this correctly but read JSON, so they cannot prove production behavior. Shared parser/helper ownership prevents several later profile scenarios from creating incompatible reconciliation logic.
 
 PIN-04/05 owns the combined issue/handoff/human GO gate. After GO, commit each graph slice with `Refs #N` and its authorized issue update; final verified slice uses `Closes #N`. No per-worker permission request, implementation, tests, commits or issue mutations were performed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S18.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

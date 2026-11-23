@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from behave import then
+
 from behave import given, then, when
 from behave.runner import Context
 
@@ -83,5 +85,42 @@ def maria_secondary_category_is_excluded(context: Context) -> None:
     :param context: Imported IDs and actual response. Example: Development HTML.
     :return: None. Example: None.
     :raises AssertionError: If Maria qualifies for the wrong leaderboard.
+    """
+    raise NotImplementedError()
+
+
+@then(
+    "score sources are Released playbooks 5000, PIP contributions 1600, Consumption 1200 and Learning 400"
+)
+def public_score_sources(context: Context) -> None:
+    """Check the four exact source labels and values in the real response.
+
+    :param context: Actual AT response context. Example: context.response.
+    :return: None. Example: None after shared source helper succeeds.
+    :raises AssertionError: If any source label/value is missing or duplicated.
+    """
+    raise NotImplementedError()
+
+
+@then("the source rows sum to the displayed total 8200")
+def public_score_source_sum(context: Context) -> None:
+    """Reconcile source tbody values with expert-karma-total.
+
+    :param context: Actual AT response context. Example: context.response.
+    :return: None. Example: None for sum=8200 and formatted total 8,200.
+    :raises AssertionError: If source sum and displayed total disagree.
+    """
+    raise NotImplementedError()
+
+
+@then(
+    "category subtotals Design 7200 and Development 1000 are not mislabeled as source rows"
+)
+def public_score_category_separation(context: Context) -> None:
+    """Check category values reside only in the independent category section.
+
+    :param context: Actual AT response context. Example: context.response.
+    :return: None. Example: None for the two correctly classified categories.
+    :raises AssertionError: If category/source sections overlap or values differ.
     """
     raise NotImplementedError()
