@@ -7,6 +7,7 @@ same semantic return shapes as the ORM-based tools.py (where applicable).
 
 No Django, no ORM — only the standard library + httpx.
 """
+
 import logging
 import os
 from pathlib import Path
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 # PLAYBOOK TOOLS (5)
 # ============================================================================
 
+
 def create_playbook(
     name: str,
     description: str,
@@ -43,23 +45,28 @@ def create_playbook(
     :return: Created playbook dict
     """
     logger.info(f'HTTP Tool: create_playbook name="{name}"')
-    r = get_client().post("/api/playbooks/", json={
-        "name": name,
-        "description": description,
-        "category": category,
-        "visibility": visibility,
-    })
+    r = get_client().post(
+        "/api/playbooks/",
+        json={
+            "name": name,
+            "description": description,
+            "category": category,
+            "visibility": visibility,
+        },
+    )
     return check_response(r, "create_playbook")
 
 
-def list_playbooks(status: Literal["draft", "released", "active", "all"] = "all") -> list:
+def list_playbooks(
+    status: Literal["draft", "released", "active", "all"] = "all",
+) -> list:
     """
     List playbooks filtered by status.
 
     :param status: Filter by status or "all". Example: "draft"
     :return: List of playbook dicts
     """
-    logger.info(f'HTTP Tool: list_playbooks status={status}')
+    logger.info(f"HTTP Tool: list_playbooks status={status}")
     params = {} if status == "all" else {"status": status}
     r = get_client().get("/api/playbooks/", params=params)
     data = check_response(r, "list_playbooks")
@@ -88,16 +95,25 @@ def get_playbook(
         ``snapshot_data``, no top-level ``workflows`` key).
     :raises ValueError: if the requested version does not exist.
     """
-    logger.info('HTTP Tool: get_playbook id=%s include_history=%s version=%s', playbook_id, include_history, version)
+    logger.info(
+        "HTTP Tool: get_playbook id=%s include_history=%s version=%s",
+        playbook_id,
+        include_history,
+        version,
+    )
     params: dict = {}
     if include_history:
-        params['include_history'] = 'true'
+        params["include_history"] = "true"
     if version is not None:
-        params['version'] = version
+        params["version"] = version
     r = get_client().get(f"/api/playbooks/{playbook_id}/", params=params)
     if version is not None and r.status_code == 404:
         data = r.json()
-        raise ValueError(data.get('detail', f'Version {version} not found for playbook {playbook_id}.'))
+        raise ValueError(
+            data.get(
+                "detail", f"Version {version} not found for playbook {playbook_id}."
+            )
+        )
     return check_response(r, "get_playbook")
 
 
@@ -118,11 +134,17 @@ def update_playbook(
     :param visibility: New visibility or None
     :return: Updated playbook dict
     """
-    logger.info(f'HTTP Tool: update_playbook id={playbook_id}')
-    payload = {k: v for k, v in {
-        "name": name, "description": description, "category": category,
-        "visibility": visibility,
-    }.items() if v is not None}
+    logger.info(f"HTTP Tool: update_playbook id={playbook_id}")
+    payload = {
+        k: v
+        for k, v in {
+            "name": name,
+            "description": description,
+            "category": category,
+            "visibility": visibility,
+        }.items()
+        if v is not None
+    }
     r = get_client().patch(f"/api/playbooks/{playbook_id}/", json=payload)
     return check_response(r, "update_playbook")
 
@@ -134,7 +156,7 @@ def delete_playbook(playbook_id: int) -> dict:
     :param playbook_id: Playbook ID. Example: 1
     :return: Confirmation dict
     """
-    logger.info(f'HTTP Tool: delete_playbook id={playbook_id}')
+    logger.info(f"HTTP Tool: delete_playbook id={playbook_id}")
     r = get_client().delete(f"/api/playbooks/{playbook_id}/")
     return check_response(r, "delete_playbook")
 
@@ -142,6 +164,7 @@ def delete_playbook(playbook_id: int) -> dict:
 # ============================================================================
 # WORKFLOW TOOLS (5)
 # ============================================================================
+
 
 def create_workflow(
     playbook_id: int,
@@ -181,7 +204,7 @@ def list_workflows(playbook_id: int) -> list:
     :param playbook_id: Parent playbook ID. Example: 1
     :return: List of workflow dicts
     """
-    logger.info(f'HTTP Tool: list_workflows playbook={playbook_id}')
+    logger.info(f"HTTP Tool: list_workflows playbook={playbook_id}")
     r = get_client().get("/api/workflows/", params={"playbook_id": playbook_id})
     data = check_response(r, "list_workflows")
     return data.get("results", data) if isinstance(data, dict) else data
@@ -194,7 +217,7 @@ def get_workflow(workflow_id: int) -> dict:
     :param workflow_id: Workflow ID. Example: 1
     :return: Workflow dict with nested activities
     """
-    logger.info(f'HTTP Tool: get_workflow id={workflow_id}')
+    logger.info(f"HTTP Tool: get_workflow id={workflow_id}")
     r = get_client().get(f"/api/workflows/{workflow_id}/")
     return check_response(r, "get_workflow")
 
@@ -216,13 +239,17 @@ def update_workflow(
     :param abbreviation: New 2–8 letter code or None. Example: "IDA"
     :return: Updated workflow dict
     """
-    logger.info(f'HTTP Tool: update_workflow id={workflow_id}')
-    payload = {k: v for k, v in {
-        "name": name,
-        "description": description,
-        "order": order,
-        "abbreviation": abbreviation,
-    }.items() if v is not None}
+    logger.info(f"HTTP Tool: update_workflow id={workflow_id}")
+    payload = {
+        k: v
+        for k, v in {
+            "name": name,
+            "description": description,
+            "order": order,
+            "abbreviation": abbreviation,
+        }.items()
+        if v is not None
+    }
     r = get_client().patch(f"/api/workflows/{workflow_id}/", json=payload)
     return check_response(r, "update_workflow")
 
@@ -234,7 +261,7 @@ def delete_workflow(workflow_id: int) -> dict:
     :param workflow_id: Workflow ID. Example: 1
     :return: Confirmation dict
     """
-    logger.info(f'HTTP Tool: delete_workflow id={workflow_id}')
+    logger.info(f"HTTP Tool: delete_workflow id={workflow_id}")
     r = get_client().delete(f"/api/workflows/{workflow_id}/")
     return check_response(r, "delete_workflow")
 
@@ -243,12 +270,13 @@ def delete_workflow(workflow_id: int) -> dict:
 # ACTIVITY TOOLS (6)
 # ============================================================================
 
+
 def create_activity(
     workflow_id: int,
     name: str,
     guidance: str = "",
     phase_id: int = None,
-    predecessor_id: int = None
+    predecessor_id: int = None,
 ) -> dict:
     """
     Create activity in workflow (DRAFT playbook).
@@ -261,9 +289,7 @@ def create_activity(
     :return: Created activity dict
     """
     logger.info(f'HTTP Tool: create_activity name="{name}" workflow={workflow_id}')
-    payload = {
-        "workflow_id": workflow_id, "name": name, "guidance": guidance
-    }
+    payload = {"workflow_id": workflow_id, "name": name, "guidance": guidance}
     if phase_id is not None:
         payload["phase_id"] = phase_id
     if predecessor_id is not None:
@@ -279,7 +305,7 @@ def list_activities(workflow_id: int) -> list:
     :param workflow_id: Parent workflow ID. Example: 1
     :return: List of activity dicts
     """
-    logger.info(f'HTTP Tool: list_activities workflow={workflow_id}')
+    logger.info(f"HTTP Tool: list_activities workflow={workflow_id}")
     r = get_client().get("/api/activities/", params={"workflow_id": workflow_id})
     data = check_response(r, "list_activities")
     return data.get("results", data) if isinstance(data, dict) else data
@@ -292,7 +318,7 @@ def get_activity(activity_id: int) -> dict:
     :param activity_id: Activity ID. Example: 1
     :return: Activity dict with predecessor/successor, agent, skill, artifacts
     """
-    logger.info(f'HTTP Tool: get_activity id={activity_id}')
+    logger.info(f"HTTP Tool: get_activity id={activity_id}")
     r = get_client().get(f"/api/activities/{activity_id}/")
     return check_response(r, "get_activity")
 
@@ -302,7 +328,7 @@ def update_activity(
     name: str = None,
     guidance: str = None,
     phase_id: int = None,
-    order: int = None
+    order: int = None,
 ) -> dict:
     """
     Update activity in DRAFT playbook.
@@ -314,10 +340,17 @@ def update_activity(
     :param order: New order or None
     :return: Updated activity dict
     """
-    logger.info(f'HTTP Tool: update_activity id={activity_id}')
-    payload = {k: v for k, v in {
-        "name": name, "guidance": guidance, "phase_id": phase_id, "order": order
-    }.items() if v is not None}
+    logger.info(f"HTTP Tool: update_activity id={activity_id}")
+    payload = {
+        k: v
+        for k, v in {
+            "name": name,
+            "guidance": guidance,
+            "phase_id": phase_id,
+            "order": order,
+        }.items()
+        if v is not None
+    }
     r = get_client().patch(f"/api/activities/{activity_id}/", json=payload)
     return check_response(r, "update_activity")
 
@@ -329,7 +362,7 @@ def delete_activity(activity_id: int) -> dict:
     :param activity_id: Activity ID. Example: 1
     :return: Confirmation dict
     """
-    logger.info(f'HTTP Tool: delete_activity id={activity_id}')
+    logger.info(f"HTTP Tool: delete_activity id={activity_id}")
     r = get_client().delete(f"/api/activities/{activity_id}/")
     return check_response(r, "delete_activity")
 
@@ -342,10 +375,13 @@ def set_predecessor(activity_id: int, predecessor_id: int) -> dict:
     :param predecessor_id: Predecessor activity ID. Example: 1
     :return: Updated activity dict
     """
-    logger.info(f'HTTP Tool: set_predecessor activity={activity_id} predecessor={predecessor_id}')
-    r = get_client().put(f"/api/activities/{activity_id}/predecessor/", json={
-        "predecessor_id": predecessor_id
-    })
+    logger.info(
+        f"HTTP Tool: set_predecessor activity={activity_id} predecessor={predecessor_id}"
+    )
+    r = get_client().put(
+        f"/api/activities/{activity_id}/predecessor/",
+        json={"predecessor_id": predecessor_id},
+    )
     return check_response(r, "set_predecessor")
 
 
@@ -353,7 +389,10 @@ def set_predecessor(activity_id: int, predecessor_id: int) -> dict:
 # WORKFLOW EXPORT / IMPORT TOOLS (4)
 # ============================================================================
 
-def _write_workflow_rule_files(resolved_target: Path, rule_files: list) -> tuple[Path | None, list[str]]:
+
+def _write_workflow_rule_files(
+    resolved_target: Path, rule_files: list
+) -> tuple[Path | None, list[str]]:
     """
     Write linked rule files next to the playbook/workflow export root.
 
@@ -389,7 +428,9 @@ def _find_cursor_rules_dir(resolved_target: Path) -> Path | None:
     return None
 
 
-def _copy_missing_cursor_rules(cursor_rules_dir: Path, rule_paths: list[str]) -> list[str]:
+def _copy_missing_cursor_rules(
+    cursor_rules_dir: Path, rule_paths: list[str]
+) -> list[str]:
     """
     Copy exported rules into ``.cursor/rules`` only when the file is absent.
 
@@ -410,7 +451,9 @@ def _copy_missing_cursor_rules(cursor_rules_dir: Path, rule_paths: list[str]) ->
     return copied
 
 
-def _cursor_rules_sync_report(cursor_rules_dir: Path | None, rule_paths: list[str]) -> dict:
+def _cursor_rules_sync_report(
+    cursor_rules_dir: Path | None, rule_paths: list[str]
+) -> dict:
     """
     Compare exported rule files against active ``.cursor/rules`` copies.
 
@@ -420,7 +463,9 @@ def _cursor_rules_sync_report(cursor_rules_dir: Path | None, rule_paths: list[st
     """
     if not rule_paths:
         return {
-            "active_cursor_rules_dir": str(cursor_rules_dir) if cursor_rules_dir else "",
+            "active_cursor_rules_dir": (
+                str(cursor_rules_dir) if cursor_rules_dir else ""
+            ),
             "active_cursor_rules_synchronized": None,
             "stale_or_missing_active_rules": [],
         }
@@ -434,7 +479,9 @@ def _cursor_rules_sync_report(cursor_rules_dir: Path | None, rule_paths: list[st
     for path in rule_paths:
         src = Path(path)
         dest = cursor_rules_dir / src.name
-        if not dest.exists() or dest.read_text(encoding="utf-8") != src.read_text(encoding="utf-8"):
+        if not dest.exists() or dest.read_text(encoding="utf-8") != src.read_text(
+            encoding="utf-8"
+        ):
             stale.append(src.name)
     return {
         "active_cursor_rules_dir": str(cursor_rules_dir),
@@ -457,7 +504,9 @@ def _workflow_export_message(
         )
     names = ", ".join(Path(path).name for path in rule_paths)
     dest = rules_dir or Path(rule_paths[0]).parent
-    active_dir = sync_report.get("active_cursor_rules_dir") or "(not a Cursor playbook tree)"
+    active_dir = (
+        sync_report.get("active_cursor_rules_dir") or "(not a Cursor playbook tree)"
+    )
     if sync_report.get("active_cursor_rules_synchronized") is True:
         sync_text = f"Active Cursor rules at {active_dir} are synchronized."
     else:
@@ -476,7 +525,7 @@ def _workflow_export_message(
 def export_workflow_to_local(
     workflow_id: int,
     target_directory: str = ".windsurf/workflows",
-    folder_name: str = None
+    folder_name: str = None,
 ) -> dict:
     """
     Export workflow to local AI workspace as markdown files.
@@ -495,7 +544,7 @@ def export_workflow_to_local(
     :return: Export result with file paths, rule paths, and Cursor sync status
     """
     logger.info(
-        'HTTP Tool: export_workflow_to_local workflow=%s target=%s folder=%s',
+        "HTTP Tool: export_workflow_to_local workflow=%s target=%s folder=%s",
         workflow_id,
         target_directory,
         folder_name,
@@ -517,7 +566,7 @@ def export_workflow_to_local(
             file_entry["content"], encoding="utf-8"
         )
     logger.info(
-        'HTTP Tool: wrote %s workflow files to %s',
+        "HTTP Tool: wrote %s workflow files to %s",
         len(data["workflow_files"]),
         wf_dir,
     )
@@ -540,9 +589,13 @@ def export_workflow_to_local(
         "rule_export_paths": rule_export_paths,
         "rules_export_path": str(rules_dir) if rules_dir else "",
         "active_cursor_rules_dir": sync_report["active_cursor_rules_dir"],
-        "active_cursor_rules_synchronized": sync_report["active_cursor_rules_synchronized"],
+        "active_cursor_rules_synchronized": sync_report[
+            "active_cursor_rules_synchronized"
+        ],
         "stale_or_missing_active_rules": sync_report["stale_or_missing_active_rules"],
-        "message": _workflow_export_message(wf_dir, rules_dir, rule_export_paths, sync_report),
+        "message": _workflow_export_message(
+            wf_dir, rules_dir, rule_export_paths, sync_report
+        ),
     }
 
 
@@ -590,7 +643,7 @@ def export_playbook_to_local(
         )
     """
     logger.info(
-        'HTTP Tool: export_playbook_to_local playbook=%s target=%s folder=%s ade_targets=%s',
+        "HTTP Tool: export_playbook_to_local playbook=%s target=%s folder=%s ade_targets=%s",
         playbook_id,
         target_directory,
         folder_name,
@@ -635,7 +688,10 @@ def export_playbook_to_local(
 
     extra_paths = []
     for extra in additional_targets or []:
-        extra_root = ensure_writable_workspace_path(extra, purpose="export") / data["folder_name"]
+        extra_root = (
+            ensure_writable_workspace_path(extra, purpose="export")
+            / data["folder_name"]
+        )
         extra_root.mkdir(parents=True, exist_ok=True)
         for rel in files_written:
             src = export_root / rel
@@ -675,9 +731,7 @@ def export_playbook_to_local(
 
 
 def import_workflow_from_local(
-    workflow_id: int,
-    source_directory: str,
-    auto_apply: bool = False
+    workflow_id: int, source_directory: str, auto_apply: bool = False
 ) -> dict:
     """
     Import workflow from local markdown files with change detection.
@@ -690,16 +744,19 @@ def import_workflow_from_local(
     :param auto_apply: Auto-apply for draft playbooks. Example: False
     :return: Change detection result with protocol path
     """
-    logger.info(f'HTTP Tool: import_workflow_from_local workflow={workflow_id}')
+    logger.info(f"HTTP Tool: import_workflow_from_local workflow={workflow_id}")
     ensure_import_supported_on_server(get_server_url(), purpose="import")
     resolved_source = ensure_readable_workspace_path(
         source_directory,
         purpose="import",
     )
-    r = get_client().post(f"/api/workflows/{workflow_id}/import_workflow/", json={
-        "source_directory": str(resolved_source),
-        "auto_apply": auto_apply,
-    })
+    r = get_client().post(
+        f"/api/workflows/{workflow_id}/import_workflow/",
+        json={
+            "source_directory": str(resolved_source),
+            "auto_apply": auto_apply,
+        },
+    )
     return check_response(r, "import_workflow_from_local")
 
 
@@ -713,15 +770,18 @@ def apply_upload_protocol(protocol_file: str) -> dict:
     :param protocol_file: Path to _Upload_Protocol.md
     :return: Application result with change counts
     """
-    logger.info(f'HTTP Tool: apply_upload_protocol protocol_file={protocol_file}')
+    logger.info(f"HTTP Tool: apply_upload_protocol protocol_file={protocol_file}")
     ensure_import_supported_on_server(get_server_url(), purpose="apply_upload_protocol")
     resolved_protocol = ensure_readable_workspace_path(
         protocol_file,
         purpose="apply_upload_protocol",
     )
-    r = get_client().post("/api/workflows/0/apply-protocol/", json={
-        "protocol_file": str(resolved_protocol),
-    })
+    r = get_client().post(
+        "/api/workflows/0/apply-protocol/",
+        json={
+            "protocol_file": str(resolved_protocol),
+        },
+    )
     return check_response(r, "apply_upload_protocol")
 
 
@@ -737,15 +797,20 @@ def create_pip_from_protocol(protocol_file: str, pip_title: str) -> dict:
     :return: Created PIP dict with ID and status
     """
     logger.info(f'HTTP Tool: create_pip_from_protocol title="{pip_title}"')
-    ensure_import_supported_on_server(get_server_url(), purpose="create_pip_from_protocol")
+    ensure_import_supported_on_server(
+        get_server_url(), purpose="create_pip_from_protocol"
+    )
     resolved_protocol = ensure_readable_workspace_path(
         protocol_file,
         purpose="create_pip_from_protocol",
     )
-    r = get_client().post("/api/workflows/0/create-pip/", json={
-        "protocol_file": str(resolved_protocol),
-        "pip_title": pip_title,
-    })
+    r = get_client().post(
+        "/api/workflows/0/create-pip/",
+        json={
+            "protocol_file": str(resolved_protocol),
+            "pip_title": pip_title,
+        },
+    )
     return check_response(r, "create_pip_from_protocol")
 
 
@@ -753,12 +818,13 @@ def create_pip_from_protocol(protocol_file: str, pip_title: str) -> dict:
 # SKILL TOOLS (7)
 # ============================================================================
 
+
 def create_skill(
     playbook_id: int,
     title: str,
     content: str = "",
     capability_domain: str = "",
-    technology_stack: str = ""
+    technology_stack: str = "",
 ) -> dict:
     """
     Create skill in draft playbook.
@@ -771,18 +837,21 @@ def create_skill(
     :return: Created skill dict
     """
     logger.info(f'HTTP Tool: create_skill title="{title}"')
-    r = get_client().post("/api/skills/", json={
-        "playbook_id": playbook_id, "title": title, "content": content,
-        "capability_domain": capability_domain, "technology_stack": technology_stack
-    })
+    r = get_client().post(
+        "/api/skills/",
+        json={
+            "playbook_id": playbook_id,
+            "title": title,
+            "content": content,
+            "capability_domain": capability_domain,
+            "technology_stack": technology_stack,
+        },
+    )
     return check_response(r, "create_skill")
 
 
 def list_skills(
-    playbook_id: int,
-    domain: str = "",
-    stack: str = "",
-    search: str = ""
+    playbook_id: int, domain: str = "", stack: str = "", search: str = ""
 ) -> list:
     """
     List skills for playbook with optional filters.
@@ -793,7 +862,7 @@ def list_skills(
     :param search: Free-text search. Example: "login"
     :return: List of skill dicts
     """
-    logger.info(f'HTTP Tool: list_skills playbook={playbook_id}')
+    logger.info(f"HTTP Tool: list_skills playbook={playbook_id}")
     params = {"playbook_id": playbook_id}
     if domain:
         params["domain"] = domain
@@ -813,7 +882,7 @@ def get_skill(skill_id: int) -> dict:
     :param skill_id: Skill ID. Example: 1
     :return: Skill dict with activity_count
     """
-    logger.info(f'HTTP Tool: get_skill id={skill_id}')
+    logger.info(f"HTTP Tool: get_skill id={skill_id}")
     r = get_client().get(f"/api/skills/{skill_id}/")
     return check_response(r, "get_skill")
 
@@ -823,7 +892,7 @@ def update_skill(
     title: str = None,
     content: str = None,
     capability_domain: str = None,
-    technology_stack: str = None
+    technology_stack: str = None,
 ) -> dict:
     """
     Update skill in draft playbook.
@@ -835,11 +904,17 @@ def update_skill(
     :param technology_stack: New stack (optional)
     :return: Updated skill dict
     """
-    logger.info(f'HTTP Tool: update_skill id={skill_id}')
-    payload = {k: v for k, v in {
-        "title": title, "content": content,
-        "capability_domain": capability_domain, "technology_stack": technology_stack
-    }.items() if v is not None}
+    logger.info(f"HTTP Tool: update_skill id={skill_id}")
+    payload = {
+        k: v
+        for k, v in {
+            "title": title,
+            "content": content,
+            "capability_domain": capability_domain,
+            "technology_stack": technology_stack,
+        }.items()
+        if v is not None
+    }
     r = get_client().patch(f"/api/skills/{skill_id}/", json=payload)
     return check_response(r, "update_skill")
 
@@ -851,7 +926,7 @@ def delete_skill(skill_id: int) -> dict:
     :param skill_id: Skill ID. Example: 1
     :return: Dict with deleted=True
     """
-    logger.info(f'HTTP Tool: delete_skill id={skill_id}')
+    logger.info(f"HTTP Tool: delete_skill id={skill_id}")
     r = get_client().delete(f"/api/skills/{skill_id}/")
     return check_response(r, "delete_skill")
 
@@ -864,10 +939,12 @@ def link_skill_to_activity(activity_id: int, skill_id: int) -> dict:
     :param skill_id: Skill ID. Example: 5
     :return: Dict with updated activity_id and skill_id
     """
-    logger.info(f'HTTP Tool: link_skill_to_activity activity={activity_id} skill={skill_id}')
-    r = get_client().put(f"/api/activities/{activity_id}/skill/", json={
-        "skill_id": skill_id
-    })
+    logger.info(
+        f"HTTP Tool: link_skill_to_activity activity={activity_id} skill={skill_id}"
+    )
+    r = get_client().put(
+        f"/api/activities/{activity_id}/skill/", json={"skill_id": skill_id}
+    )
     return check_response(r, "link_skill_to_activity")
 
 
@@ -880,7 +957,7 @@ def unlink_skill_from_activity(activity_id: int, skill_id: int) -> dict:
     :return: Dict with updated activity_id and remaining skill_ids
     """
     logger.info(
-        f'HTTP Tool: unlink_skill_from_activity activity={activity_id} skill={skill_id}'
+        f"HTTP Tool: unlink_skill_from_activity activity={activity_id} skill={skill_id}"
     )
     r = get_client().delete(
         f"/api/activities/{activity_id}/skill/",
@@ -898,7 +975,7 @@ def set_activity_skills(activity_id: int, skill_ids: list) -> dict:
     :return: Dict with activity_id and skill_ids
     """
     logger.info(
-        f'HTTP Tool: set_activity_skills activity={activity_id} skill_ids={skill_ids}'
+        f"HTTP Tool: set_activity_skills activity={activity_id} skill_ids={skill_ids}"
     )
     r = get_client().put(
         f"/api/activities/{activity_id}/skills/",
@@ -911,12 +988,13 @@ def set_activity_skills(activity_id: int, skill_ids: list) -> dict:
 # RULE TOOLS (6)
 # ============================================================================
 
+
 def create_rule(
     playbook_id: int,
     title: str,
     content: str = "",
     slug: str = "",
-    always_apply: bool = True
+    always_apply: bool = True,
 ) -> dict:
     """
     Create playbook rule (.mdc export).
@@ -929,18 +1007,20 @@ def create_rule(
     :return: Created rule dict
     """
     logger.info(f'HTTP Tool: create_rule title="{title}"')
-    r = get_client().post("/api/rules/", json={
-        "playbook_id": playbook_id, "title": title, "content": content,
-        "slug": slug, "always_apply": always_apply
-    })
+    r = get_client().post(
+        "/api/rules/",
+        json={
+            "playbook_id": playbook_id,
+            "title": title,
+            "content": content,
+            "slug": slug,
+            "always_apply": always_apply,
+        },
+    )
     return check_response(r, "create_rule")
 
 
-def list_rules(
-    playbook_id: int,
-    search: str = "",
-    unlinked_only: bool = False
-) -> list:
+def list_rules(playbook_id: int, search: str = "", unlinked_only: bool = False) -> list:
     """
     List rules for playbook.
 
@@ -949,7 +1029,7 @@ def list_rules(
     :param unlinked_only: Only return unlinked rules. Example: False
     :return: List of rule dicts
     """
-    logger.info(f'HTTP Tool: list_rules playbook={playbook_id}')
+    logger.info(f"HTTP Tool: list_rules playbook={playbook_id}")
     params = {"playbook_id": playbook_id}
     if search:
         params["search"] = search
@@ -967,7 +1047,7 @@ def get_rule(rule_id: int) -> dict:
     :param rule_id: Rule ID. Example: 1
     :return: Rule dict
     """
-    logger.info(f'HTTP Tool: get_rule id={rule_id}')
+    logger.info(f"HTTP Tool: get_rule id={rule_id}")
     r = get_client().get(f"/api/rules/{rule_id}/")
     return check_response(r, "get_rule")
 
@@ -977,7 +1057,7 @@ def update_rule(
     title: str = None,
     content: str = None,
     slug: str = None,
-    always_apply: bool = None
+    always_apply: bool = None,
 ) -> dict:
     """
     Update rule in draft playbook.
@@ -989,10 +1069,17 @@ def update_rule(
     :param always_apply: New always_apply (optional)
     :return: Updated rule dict
     """
-    logger.info(f'HTTP Tool: update_rule id={rule_id}')
-    payload = {k: v for k, v in {
-        "title": title, "content": content, "slug": slug, "always_apply": always_apply
-    }.items() if v is not None}
+    logger.info(f"HTTP Tool: update_rule id={rule_id}")
+    payload = {
+        k: v
+        for k, v in {
+            "title": title,
+            "content": content,
+            "slug": slug,
+            "always_apply": always_apply,
+        }.items()
+        if v is not None
+    }
     r = get_client().patch(f"/api/rules/{rule_id}/", json=payload)
     return check_response(r, "update_rule")
 
@@ -1004,7 +1091,7 @@ def delete_rule(rule_id: int) -> dict:
     :param rule_id: Rule ID. Example: 1
     :return: Dict with deleted=True
     """
-    logger.info(f'HTTP Tool: delete_rule id={rule_id}')
+    logger.info(f"HTTP Tool: delete_rule id={rule_id}")
     r = get_client().delete(f"/api/rules/{rule_id}/")
     return check_response(r, "delete_rule")
 
@@ -1017,16 +1104,19 @@ def set_activity_rules(activity_id: int, rule_ids: list) -> dict:
     :param rule_ids: List of rule IDs. Example: [1, 2, 3]
     :return: Dict with activity_id and rule_ids
     """
-    logger.info(f'HTTP Tool: set_activity_rules activity={activity_id} rules={rule_ids}')
-    r = get_client().put(f"/api/activities/{activity_id}/rules/", json={
-        "rule_ids": rule_ids
-    })
+    logger.info(
+        f"HTTP Tool: set_activity_rules activity={activity_id} rules={rule_ids}"
+    )
+    r = get_client().put(
+        f"/api/activities/{activity_id}/rules/", json={"rule_ids": rule_ids}
+    )
     return check_response(r, "set_activity_rules")
 
 
 # ============================================================================
 # AGENT TOOLS (7)
 # ============================================================================
+
 
 def create_agent(playbook_id: int, name: str, description: str = "") -> dict:
     """
@@ -1038,9 +1128,10 @@ def create_agent(playbook_id: int, name: str, description: str = "") -> dict:
     :return: Created agent dict
     """
     logger.info(f'HTTP Tool: create_agent name="{name}"')
-    r = get_client().post("/api/agents/", json={
-        "playbook_id": playbook_id, "name": name, "description": description
-    })
+    r = get_client().post(
+        "/api/agents/",
+        json={"playbook_id": playbook_id, "name": name, "description": description},
+    )
     return check_response(r, "create_agent")
 
 
@@ -1052,7 +1143,7 @@ def list_agents(playbook_id: int, search: str = "") -> list:
     :param search: Free-text search. Example: "reviewer"
     :return: List of agent dicts
     """
-    logger.info(f'HTTP Tool: list_agents playbook={playbook_id}')
+    logger.info(f"HTTP Tool: list_agents playbook={playbook_id}")
     params = {"playbook_id": playbook_id}
     if search:
         params["search"] = search
@@ -1068,7 +1159,7 @@ def get_agent(agent_id: int) -> dict:
     :param agent_id: Agent ID. Example: 1
     :return: Agent dict with activity_count
     """
-    logger.info(f'HTTP Tool: get_agent id={agent_id}')
+    logger.info(f"HTTP Tool: get_agent id={agent_id}")
     r = get_client().get(f"/api/agents/{agent_id}/")
     return check_response(r, "get_agent")
 
@@ -1082,10 +1173,12 @@ def update_agent(agent_id: int, name: str = None, description: str = None) -> di
     :param description: New description (optional)
     :return: Updated agent dict
     """
-    logger.info(f'HTTP Tool: update_agent id={agent_id}')
-    payload = {k: v for k, v in {
-        "name": name, "description": description
-    }.items() if v is not None}
+    logger.info(f"HTTP Tool: update_agent id={agent_id}")
+    payload = {
+        k: v
+        for k, v in {"name": name, "description": description}.items()
+        if v is not None
+    }
     r = get_client().patch(f"/api/agents/{agent_id}/", json=payload)
     return check_response(r, "update_agent")
 
@@ -1097,7 +1190,7 @@ def delete_agent(agent_id: int) -> dict:
     :param agent_id: Agent ID. Example: 1
     :return: Dict with deleted=True
     """
-    logger.info(f'HTTP Tool: delete_agent id={agent_id}')
+    logger.info(f"HTTP Tool: delete_agent id={agent_id}")
     r = get_client().delete(f"/api/agents/{agent_id}/")
     return check_response(r, "delete_agent")
 
@@ -1110,10 +1203,12 @@ def link_agent_to_activity(activity_id: int, agent_id: int) -> dict:
     :param agent_id: Agent ID. Example: 3
     :return: Dict with updated activity_id and agent_id
     """
-    logger.info(f'HTTP Tool: link_agent_to_activity activity={activity_id} agent={agent_id}')
-    r = get_client().put(f"/api/activities/{activity_id}/agent/", json={
-        "agent_id": agent_id
-    })
+    logger.info(
+        f"HTTP Tool: link_agent_to_activity activity={activity_id} agent={agent_id}"
+    )
+    r = get_client().put(
+        f"/api/activities/{activity_id}/agent/", json={"agent_id": agent_id}
+    )
     return check_response(r, "link_agent_to_activity")
 
 
@@ -1124,7 +1219,7 @@ def unlink_agent_from_activity(activity_id: int) -> dict:
     :param activity_id: Activity ID. Example: 1
     :return: Dict with updated activity_id and agent_id=None
     """
-    logger.info(f'HTTP Tool: unlink_agent_from_activity activity={activity_id}')
+    logger.info(f"HTTP Tool: unlink_agent_from_activity activity={activity_id}")
     r = get_client().delete(f"/api/activities/{activity_id}/agent/")
     return check_response(r, "unlink_agent_from_activity")
 
@@ -1133,13 +1228,14 @@ def unlink_agent_from_activity(activity_id: int) -> dict:
 # ARTIFACT TOOLS (7)
 # ============================================================================
 
+
 def create_artifact(
     playbook_id: int,
     produced_by_id: int,
     name: str,
     description: str = "",
     type: str = "Document",
-    is_required: bool = False
+    is_required: bool = False,
 ) -> dict:
     """
     Create artifact in draft playbook.
@@ -1153,18 +1249,22 @@ def create_artifact(
     :return: Created artifact dict
     """
     logger.info(f'HTTP Tool: create_artifact name="{name}"')
-    r = get_client().post("/api/artifacts/", json={
-        "playbook_id": playbook_id, "produced_by_id": produced_by_id,
-        "name": name, "description": description, "type": type, "is_required": is_required
-    })
+    r = get_client().post(
+        "/api/artifacts/",
+        json={
+            "playbook_id": playbook_id,
+            "produced_by_id": produced_by_id,
+            "name": name,
+            "description": description,
+            "type": type,
+            "is_required": is_required,
+        },
+    )
     return check_response(r, "create_artifact")
 
 
 def list_artifacts(
-    playbook_id: int,
-    search: str = "",
-    type_filter: str = "",
-    required_filter: str = ""
+    playbook_id: int, search: str = "", type_filter: str = "", required_filter: str = ""
 ) -> list:
     """
     List artifacts for playbook with optional filters.
@@ -1175,7 +1275,7 @@ def list_artifacts(
     :param required_filter: Filter by required ("true"/"false"). Example: "true"
     :return: List of artifact dicts
     """
-    logger.info(f'HTTP Tool: list_artifacts playbook={playbook_id}')
+    logger.info(f"HTTP Tool: list_artifacts playbook={playbook_id}")
     params = {"playbook_id": playbook_id}
     if search:
         params["search"] = search
@@ -1195,7 +1295,7 @@ def get_artifact(artifact_id: int) -> dict:
     :param artifact_id: Artifact ID. Example: 1
     :return: Artifact dict with consumer_count
     """
-    logger.info(f'HTTP Tool: get_artifact id={artifact_id}')
+    logger.info(f"HTTP Tool: get_artifact id={artifact_id}")
     r = get_client().get(f"/api/artifacts/{artifact_id}/")
     return check_response(r, "get_artifact")
 
@@ -1205,7 +1305,7 @@ def update_artifact(
     name: str = None,
     description: str = None,
     type: str = None,
-    is_required: bool = None
+    is_required: bool = None,
 ) -> dict:
     """
     Update artifact in DRAFT playbook.
@@ -1217,10 +1317,17 @@ def update_artifact(
     :param is_required: New required flag or None
     :return: Updated artifact dict
     """
-    logger.info(f'HTTP Tool: update_artifact id={artifact_id}')
-    payload = {k: v for k, v in {
-        "name": name, "description": description, "type": type, "is_required": is_required
-    }.items() if v is not None}
+    logger.info(f"HTTP Tool: update_artifact id={artifact_id}")
+    payload = {
+        k: v
+        for k, v in {
+            "name": name,
+            "description": description,
+            "type": type,
+            "is_required": is_required,
+        }.items()
+        if v is not None
+    }
     r = get_client().patch(f"/api/artifacts/{artifact_id}/", json=payload)
     return check_response(r, "update_artifact")
 
@@ -1232,15 +1339,13 @@ def delete_artifact(artifact_id: int) -> dict:
     :param artifact_id: Artifact ID. Example: 1
     :return: Confirmation dict with deleted=True
     """
-    logger.info(f'HTTP Tool: delete_artifact id={artifact_id}')
+    logger.info(f"HTTP Tool: delete_artifact id={artifact_id}")
     r = get_client().delete(f"/api/artifacts/{artifact_id}/")
     return check_response(r, "delete_artifact")
 
 
 def link_artifact_to_activity(
-    artifact_id: int,
-    activity_id: int,
-    is_required: bool = True
+    artifact_id: int, activity_id: int, is_required: bool = True
 ) -> dict:
     """
     Link artifact as input to a consumer activity.
@@ -1250,10 +1355,13 @@ def link_artifact_to_activity(
     :param is_required: Whether input is required. Example: True
     :return: Dict with id, artifact_id, activity_id, is_required
     """
-    logger.info(f'HTTP Tool: link_artifact_to_activity artifact={artifact_id} activity={activity_id}')
-    r = get_client().post(f"/api/artifacts/{artifact_id}/consumers/", json={
-        "activity_id": activity_id, "is_required": is_required
-    })
+    logger.info(
+        f"HTTP Tool: link_artifact_to_activity artifact={artifact_id} activity={activity_id}"
+    )
+    r = get_client().post(
+        f"/api/artifacts/{artifact_id}/consumers/",
+        json={"activity_id": activity_id, "is_required": is_required},
+    )
     return check_response(r, "link_artifact_to_activity")
 
 
@@ -1264,7 +1372,7 @@ def unlink_artifact_from_activity(artifact_input_id: int) -> dict:
     :param artifact_input_id: ArtifactInput ID. Example: 1
     :return: Dict with deleted=True
     """
-    logger.info(f'HTTP Tool: unlink_artifact_from_activity input={artifact_input_id}')
+    logger.info(f"HTTP Tool: unlink_artifact_from_activity input={artifact_input_id}")
     r = get_client().delete(f"/api/artifact-inputs/{artifact_input_id}/")
     return check_response(r, "unlink_artifact_from_activity")
 
@@ -1273,11 +1381,9 @@ def unlink_artifact_from_activity(artifact_input_id: int) -> dict:
 # PHASE TOOLS (6)
 # ============================================================================
 
+
 def create_phase(
-    playbook_id: int,
-    name: str,
-    description: str = "",
-    order: int = None
+    playbook_id: int, name: str, description: str = "", order: int = None
 ) -> dict:
     """
     Create phase in draft playbook.
@@ -1303,7 +1409,7 @@ def list_phases(playbook_id: int) -> list:
     :param playbook_id: Playbook ID. Example: 1
     :return: List of phase dicts with activity counts
     """
-    logger.info(f'HTTP Tool: list_phases playbook={playbook_id}')
+    logger.info(f"HTTP Tool: list_phases playbook={playbook_id}")
     r = get_client().get("/api/phases/", params={"playbook_id": playbook_id})
     data = check_response(r, "list_phases")
     return data.get("results", data) if isinstance(data, dict) else data
@@ -1316,16 +1422,13 @@ def get_phase(phase_id: int) -> dict:
     :param phase_id: Phase ID. Example: 1
     :return: Phase dict with activities list
     """
-    logger.info(f'HTTP Tool: get_phase id={phase_id}')
+    logger.info(f"HTTP Tool: get_phase id={phase_id}")
     r = get_client().get(f"/api/phases/{phase_id}/")
     return check_response(r, "get_phase")
 
 
 def update_phase(
-    phase_id: int,
-    name: str = None,
-    description: str = None,
-    order: int = None
+    phase_id: int, name: str = None, description: str = None, order: int = None
 ) -> dict:
     """
     Update phase in draft playbook.
@@ -1336,10 +1439,12 @@ def update_phase(
     :param order: New order (optional)
     :return: Updated phase dict
     """
-    logger.info(f'HTTP Tool: update_phase id={phase_id}')
-    payload = {k: v for k, v in {
-        "name": name, "description": description, "order": order
-    }.items() if v is not None}
+    logger.info(f"HTTP Tool: update_phase id={phase_id}")
+    payload = {
+        k: v
+        for k, v in {"name": name, "description": description, "order": order}.items()
+        if v is not None
+    }
     r = get_client().patch(f"/api/phases/{phase_id}/", json=payload)
     return check_response(r, "update_phase")
 
@@ -1351,7 +1456,7 @@ def delete_phase(phase_id: int) -> dict:
     :param phase_id: Phase ID. Example: 1
     :return: Dict with deleted=True
     """
-    logger.info(f'HTTP Tool: delete_phase id={phase_id}')
+    logger.info(f"HTTP Tool: delete_phase id={phase_id}")
     r = get_client().delete(f"/api/phases/{phase_id}/")
     return check_response(r, "delete_phase")
 
@@ -1364,16 +1469,18 @@ def reorder_phases(playbook_id: int, phase_order: list) -> dict:
     :param phase_order: List of phase IDs in desired order. Example: [3, 1, 2]
     :return: Dict with reordered=True and count
     """
-    logger.info(f'HTTP Tool: reorder_phases playbook={playbook_id}')
-    r = get_client().put(f"/api/playbooks/{playbook_id}/phases/reorder/", json={
-        "phase_order": phase_order
-    })
+    logger.info(f"HTTP Tool: reorder_phases playbook={playbook_id}")
+    r = get_client().put(
+        f"/api/playbooks/{playbook_id}/phases/reorder/",
+        json={"phase_order": phase_order},
+    )
     return check_response(r, "reorder_phases")
 
 
 # ============================================================================
 # PROCESS IMPROVEMENT PROPOSALS (PIP) — Act 9  (8 tools)
 # ============================================================================
+
 
 def list_pips(
     scope: str = "mine",
@@ -1388,7 +1495,7 @@ def list_pips(
     :param playbook_id: Optional playbook ID filter. Example: 1
     :return: List of PIP summary dicts
     """
-    logger.info(f'HTTP Tool: list_pips scope={scope} status_codes={status_codes}')
+    logger.info(f"HTTP Tool: list_pips scope={scope} status_codes={status_codes}")
     params: dict = {"scope": scope}
     if status_codes:
         params["status_codes"] = status_codes
@@ -1406,7 +1513,7 @@ def get_pip(pip_id: int) -> dict:
     :param pip_id: PIP ID. Example: 1
     :return: PIP dict with nested changes list
     """
-    logger.info(f'HTTP Tool: get_pip id={pip_id}')
+    logger.info(f"HTTP Tool: get_pip id={pip_id}")
     r = get_client().get(f"/api/pips/{pip_id}/")
     return check_response(r, "get_pip")
 
@@ -1421,9 +1528,10 @@ def create_pip(playbook_id: int, title: str, summary: str = "") -> dict:
     :return: Created PIP dict
     """
     logger.info(f'HTTP Tool: create_pip playbook={playbook_id} title="{title}"')
-    r = get_client().post("/api/pips/", json={
-        "playbook_id": playbook_id, "title": title, "summary": summary
-    })
+    r = get_client().post(
+        "/api/pips/",
+        json={"playbook_id": playbook_id, "title": title, "summary": summary},
+    )
     return check_response(r, "create_pip")
 
 
@@ -1502,7 +1610,9 @@ def add_pip_change(
     :param display_order: ALTER Activity/Workflow position, 1..32767; beyond end appends.
     :return: Dict with change_id
     """
-    logger.info(f'HTTP Tool: add_pip_change pip={pip_id} type={change_type} entity={entity_type}')
+    logger.info(
+        f"HTTP Tool: add_pip_change pip={pip_id} type={change_type} entity={entity_type}"
+    )
     payload: dict = {
         "change_type": change_type,
         "entity_type": entity_type,
@@ -1549,7 +1659,7 @@ def remove_pip_change(pip_id: int, change_id: int) -> dict:
     :param change_id: Change ID to remove. Example: 5
     :return: Dict with removed=True and change_id
     """
-    logger.info(f'HTTP Tool: remove_pip_change pip={pip_id} change={change_id}')
+    logger.info(f"HTTP Tool: remove_pip_change pip={pip_id} change={change_id}")
     r = get_client().delete(f"/api/pips/{pip_id}/changes/{change_id}/")
     return check_response(r, "remove_pip_change")
 
@@ -1561,7 +1671,7 @@ def submit_pip(pip_id: int) -> dict:
     :param pip_id: PIP ID. Example: 1
     :return: Updated PIP dict with new status
     """
-    logger.info(f'HTTP Tool: submit_pip id={pip_id}')
+    logger.info(f"HTTP Tool: submit_pip id={pip_id}")
     r = get_client().post(f"/api/pips/{pip_id}/submit/")
     return check_response(r, "submit_pip")
 
@@ -1577,7 +1687,7 @@ def cancel_pip(pip_id: int) -> dict:
     :param pip_id: PIP ID. Example: 1
     :return: Dict with cancelled=True and pip_id
     """
-    logger.info(f'HTTP Tool: cancel_pip id={pip_id}')
+    logger.info(f"HTTP Tool: cancel_pip id={pip_id}")
     r = get_client().post(f"/api/pips/{pip_id}/cancel/")
     return check_response(r, "cancel_pip")
 
@@ -1593,7 +1703,7 @@ def revert_pip_to_draft(pip_id: int) -> dict:
     :param pip_id: PIP ID. Example: 1
     :return: Dict with reverted=True and pip_id
     """
-    logger.info(f'HTTP Tool: revert_pip_to_draft id={pip_id}')
+    logger.info(f"HTTP Tool: revert_pip_to_draft id={pip_id}")
     r = get_client().post(f"/api/pips/{pip_id}/revert-to-draft/")
     return check_response(r, "revert_pip_to_draft")
 
@@ -1605,7 +1715,7 @@ def preview_pip_diff(pip_id: int) -> dict:
     :param pip_id: PIP ID. Example: 1
     :return: Dict with pip_id and rows list (section, change_type, snippet)
     """
-    logger.info(f'HTTP Tool: preview_pip_diff id={pip_id}')
+    logger.info(f"HTTP Tool: preview_pip_diff id={pip_id}")
     r = get_client().get(f"/api/pips/{pip_id}/preview/")
     return check_response(r, "preview_pip_diff")
 
@@ -1624,15 +1734,15 @@ def report_bug(
     :return: Dict with issue_url and issue_number
     """
     logger.info(
-        'HTTP Tool: report_bug desc_len=%s has_context=%s',
-        len(description or ''),
-        bool((page_context or '').strip()),
+        "HTTP Tool: report_bug desc_len=%s has_context=%s",
+        len(description or ""),
+        bool((page_context or "").strip()),
     )
     payload: dict = {
         "description": description,
         "page_context": page_context,
     }
-    if (reporter_email or '').strip():
+    if (reporter_email or "").strip():
         payload["reporter_email"] = reporter_email.strip()
     r = get_client().post("/api/feedback/report/", json=payload)
     return check_response(r, "report_bug")
@@ -1641,6 +1751,7 @@ def report_bug(
 # ============================================================================
 # TEAM TOOLS (7)
 # ============================================================================
+
 
 def list_teams() -> list:
     """
@@ -1671,8 +1782,12 @@ def create_team(
     name: str,
     description: str = "",
     visibility: Literal["Public", "Hidden"] = "Public",
-    join_policy: Literal["Auto-approve", "Requires Approval", "Invite Only"] = "Auto-approve",
-    category: Literal["Engineering", "Design", "Research", "Product", "Private", "Other"] = "Engineering",
+    join_policy: Literal[
+        "Auto-approve", "Requires Approval", "Invite Only"
+    ] = "Auto-approve",
+    category: Literal[
+        "Engineering", "Design", "Research", "Product", "Private", "Other"
+    ] = "Engineering",
 ) -> dict:
     """
     Create a new team. Caller becomes admin and first member.
@@ -1686,13 +1801,16 @@ def create_team(
     :raises ValueError: if name is empty or already taken
     """
     logger.info(f'HTTP Tool: create_team name="{name}"')
-    r = get_client().post("/api/teams/", json={
-        "name": name,
-        "description": description,
-        "visibility": visibility,
-        "join_policy": join_policy,
-        "category": category,
-    })
+    r = get_client().post(
+        "/api/teams/",
+        json={
+            "name": name,
+            "description": description,
+            "visibility": visibility,
+            "join_policy": join_policy,
+            "category": category,
+        },
+    )
     return check_response(r, "create_team")
 
 
@@ -1706,10 +1824,15 @@ def move_playbook_to_team(playbook_id: int, team_id: int) -> dict:
     :raises ValueError: if team or playbook not found
     :raises PermissionError: if user is not team admin
     """
-    logger.info(f"HTTP Tool: move_playbook_to_team playbook_id={playbook_id} team_id={team_id}")
-    r = get_client().post(f"/api/teams/{team_id}/move_playbook_to_team/", json={
-        "playbook_id": playbook_id,
-    })
+    logger.info(
+        f"HTTP Tool: move_playbook_to_team playbook_id={playbook_id} team_id={team_id}"
+    )
+    r = get_client().post(
+        f"/api/teams/{team_id}/move_playbook_to_team/",
+        json={
+            "playbook_id": playbook_id,
+        },
+    )
     return check_response(r, "move_playbook_to_team")
 
 
@@ -1723,10 +1846,15 @@ def move_playbook_from_team(playbook_id: int, team_id: int) -> dict:
     :raises ValueError: if team or playbook not found
     :raises PermissionError: if user is not team admin
     """
-    logger.info(f"HTTP Tool: move_playbook_from_team playbook_id={playbook_id} team_id={team_id}")
-    r = get_client().post(f"/api/teams/{team_id}/move_playbook_from_team/", json={
-        "playbook_id": playbook_id,
-    })
+    logger.info(
+        f"HTTP Tool: move_playbook_from_team playbook_id={playbook_id} team_id={team_id}"
+    )
+    r = get_client().post(
+        f"/api/teams/{team_id}/move_playbook_from_team/",
+        json={
+            "playbook_id": playbook_id,
+        },
+    )
     return check_response(r, "move_playbook_from_team")
 
 
@@ -1742,10 +1870,13 @@ def invite_to_team(team_id: int, emails: list[str], welcome_text: str = "") -> d
     :raises PermissionError: if user is not team admin
     """
     logger.info(f"HTTP Tool: invite_to_team team_id={team_id} emails={emails}")
-    r = get_client().post(f"/api/teams/{team_id}/invite/", json={
-        "emails": emails,
-        "welcome_text": welcome_text,
-    })
+    r = get_client().post(
+        f"/api/teams/{team_id}/invite/",
+        json={
+            "emails": emails,
+            "welcome_text": welcome_text,
+        },
+    )
     return check_response(r, "invite_to_team")
 
 
@@ -1762,9 +1893,90 @@ def manage_team_invite(
     :raises ValueError: if team or request not found, or invalid action
     :raises PermissionError: if user is not team admin
     """
-    logger.info(f"HTTP Tool: manage_team_invite team_id={team_id} request_id={request_id} action={action}")
-    r = get_client().post(f"/api/teams/{team_id}/manage_invite/", json={
-        "request_id": request_id,
-        "action": action,
-    })
+    logger.info(
+        f"HTTP Tool: manage_team_invite team_id={team_id} request_id={request_id} action={action}"
+    )
+    r = get_client().post(
+        f"/api/teams/{team_id}/manage_invite/",
+        json={
+            "request_id": request_id,
+            "action": action,
+        },
+    )
     return check_response(r, "manage_team_invite")
+
+
+def _resolve_consumption_event_identity(value: str | None) -> UUID:
+    """Validate a supplied UUID or allocate one for an intentional invocation.
+
+    :param value: Optional caller retry identity. Example: None.
+    :return: Stable invocation UUID. Example: UUID(int=1).
+    :raises ValueError: Malformed supplied identity.
+    """
+    raise NotImplementedError()
+
+
+def _complete_mcp_detail(
+    payload: dict,
+    *,
+    tool_name: str,
+    entity_type: str,
+    entity_id: int,
+    event_identity: UUID,
+) -> dict:
+    """Record consumption only after authorized retrieval and serialization.
+
+    :param payload: Decoded actual content. Example: {"id": 6203}.
+    :param tool_name: Existing registered tool. Example: "get_activity".
+    :param entity_type: Supported kind. Example: "activity".
+    :param entity_id: Actual entity ID. Example: 6203.
+    :param event_identity: Invocation UUID. Example: UUID(int=1).
+    :return: Original unchanged payload. Example: {"id": 6203}.
+    :raises RuntimeError: Receipt outcome cannot be confirmed.
+    :raises PermissionError: Receipt revalidation denies access.
+    """
+    raise NotImplementedError()
+
+
+def _post_consumption_receipt(
+    *,
+    entity_type: str,
+    entity_id: int,
+    event_identity: UUID,
+    channel: Literal["mcp_detail", "export"],
+) -> dict[str, object]:
+    """Forward one explicit receipt; reused by S42 after completed local writes.
+
+    :param entity_type: Supported kind. Example: "workflow".
+    :param entity_id: Actual entity ID. Example: 6202.
+    :param event_identity: UUID retained across retries. Example: UUID(int=1).
+    :param channel: Trusted operation channel. Example: "export".
+    :return: Safe Django result. Example: {"status": "replayed", "created_count": 0}.
+    :raises ValueError: Invalid reference, identity, channel or response.
+    :raises PermissionError: Current target access is denied.
+    :raises RuntimeError: Transport outcome remains uncertain.
+    """
+    raise NotImplementedError()
+
+
+def _request_consumption_receipt(payload: Mapping[str, object]) -> httpx.Response:
+    """Perform bounded real HTTP retries using the same immutable payload.
+
+    :param payload: Four approved receipt fields. Example: original action UUID.
+    :return: Actual HTTP response. Example: receipt HTTP 200.
+    :raises RuntimeError: Bounded transport/retryable-server attempts exhausted.
+    """
+    raise NotImplementedError()
+
+
+def _validate_consumption_receipt_response(
+    payload: object, event_identity: UUID
+) -> dict[str, object]:
+    """Validate the safe receipt envelope without deriving domain eligibility.
+
+    :param payload: Actual decoded receipt result. Example: applied/count=2.
+    :param event_identity: Expected original UUID. Example: UUID(int=1).
+    :return: Validated safe response. Example: skipped/self_consumption.
+    :raises ValueError: Unexpected status, count, identity or response shape.
+    """
+    raise NotImplementedError()

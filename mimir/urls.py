@@ -220,3 +220,6 @@ def _karma_copy_receipt_route() -> "URLPattern":
     :raises NotImplementedError: Until approved URL wiring.
     """
     raise NotImplementedError()
+
+
+# PIN S39: wire the reviewed KARMA-MCP-01 collaborators after PIN-05 GO; preserve current behavior.

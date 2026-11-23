@@ -1,0 +1,62 @@
+from __future__ import annotations
+
+"""S39-owned living-spec step skeletons."""
+from behave.runner import Context
+
+
+def eligible_mcp_reader(context: Context, consumer: str, entity: str) -> None:
+    """Prepare the exact independently restored authorized Cedar fixture.
+
+    :param context: AT context. Example: cedar_dataset already loaded.
+    :param consumer: Fictional actor name. Example: "Mike".
+    :param entity: Named imported fixture. Example: Maria's historical Design PIP.
+    :return: None. Example: real token and target reference available.
+    :raises AssertionError: Existing access or baseline differs.
+    """
+    raise NotImplementedError()
+
+
+def read_mcp_content(context: Context, tool: str) -> None:
+    """Execute the actual authorized detail and explicit receipt boundary.
+
+    :param context: Prepared real Django-client context. Example: Mike token.
+    :param tool: Existing detail tool name. Example: "get_pip".
+    :return: None. Example: actual response stored on context.
+    :raises AssertionError: Read or receipt fails.
+    """
+    raise NotImplementedError()
+
+
+def authorized_content_returned(context: Context) -> None:
+    """Compare returned content with the actual selected ORM fixture.
+
+    :param context: AT context with response. Example: historical PIP changes.
+    :return: None. Example: exact authorized content asserted.
+    :raises AssertionError: Wrong or fabricated payload.
+    """
+    raise NotImplementedError()
+
+
+def paired_totals(
+    context: Context, consumer_total: int, author: str, author_total: int
+) -> None:
+    """Check recipient totals and unchanged unrelated Cedar actors.
+
+    :param context: AT context. Example: Mike reading Hana-targeted PIP.
+    :param consumer_total: Expected learner total. Example: 12455.
+    :param author: Target playbook author. Example: "Hana".
+    :param author_total: Expected author total. Example: 5805.
+    :return: None. Example: Maria additionally remains at 8200.
+    :raises AssertionError: Wrong recipient, category, amount or pair count.
+    """
+    raise NotImplementedError()
+
+
+def private_access_preserved(context: Context) -> None:
+    """Exercise existing denied private/PIP paths with real requests.
+
+    :param context: Independently prepared AT context. Example: Maria token.
+    :return: None. Example: private denial and unchanged ledger asserted.
+    :raises AssertionError: Permission widened or denied read awards.
+    """
+    raise NotImplementedError()

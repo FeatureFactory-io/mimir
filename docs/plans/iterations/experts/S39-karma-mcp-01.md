@@ -14,7 +14,7 @@ dependencies:
 - S30
 - S36
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - ae4bbc99c0c7ae1f119a1a4323c2a80d9b51da710036b91a3ae729f557f91460
 - 3b0776f1d04d7da3ca7c3411cb22a88f2db7b0907d43fc7fe548045f9b58d2d9
@@ -288,3 +288,7 @@ feature_execution_graph:
 2. Existing PIP access is creator-or-staff, even when the target playbook is public. Mike’s existing staff flag supplies the eligible fixture without changing Maria.
 3. A successful payload decode and explicit receipt separate consumption from ordinary GETs. Retry identity must survive uncertain receipt delivery.
 4. Existing facade subprocess tests demonstrate useful protocol mechanics but select a development DB; S39 requires isolated real HTTP/DB proofs.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S39.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
