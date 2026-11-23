@@ -13,7 +13,7 @@ dependencies:
 - S01
 - S03
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 30c92e546175c89d8b3034119dd89763389e0febf68537424130294469b34589
 ```
@@ -205,3 +205,7 @@ feature_execution_graph:
 ## Lessons Learned
 
 Exact-name filtering does not isolate a scenario from an invalid legacy feature or its unrelated Background. Relocating the two owned navigation contracts preserves their meaning while enabling honest scoped execution. Collaborate is an existing labelled sidebar group, so inventing another toggle or menu would contradict both the implementation and ownership contract.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S48.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

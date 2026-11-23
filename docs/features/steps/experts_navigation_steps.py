@@ -82,3 +82,39 @@ def category_is_current(context: Context, category: str) -> None:
     :raises AssertionError: If the category lacks aria-current="page".
     """
     raise NotImplementedError()
+
+
+@when("she opens the Collaborate section of the app sidebar")
+def opens_collaborate_section(context: Context) -> None:
+    """Inspect the real labelled section in the server response.
+
+    :param context: Real AT context. Example: authenticated Elena client.
+    :return: None. Example: None.
+    :raises AssertionError: If sidebar or labelled Collaborate list is absent.
+    """
+    raise NotImplementedError()
+
+
+@then('Experts is a link to "{path}" with data-testid "{test_id}"')
+def experts_sidebar_link(context: Context, path: str, test_id: str) -> None:
+    """Check the unique anchor within the real Collaborate list.
+
+    :param context: AT context with response. Example: dashboard response.
+    :param path: Exact destination. Example: "/experts/".
+    :param test_id: Stable selector. Example: "nav-experts".
+    :return: None. Example: None.
+    :raises AssertionError: If destination, accessible name or grouping differs.
+    """
+    raise NotImplementedError()
+
+
+@then('"{test_id}" is present and Experts is the active navigation item')
+def experts_sidebar_is_current(context: Context, test_id: str) -> None:
+    """Prove the destination and scoped sidebar current state together.
+
+    :param context: AT context after actual href GET. Example: Experts response.
+    :param test_id: Required destination marker. Example: "experts-leaderboard".
+    :return: None. Example: None.
+    :raises AssertionError: If marker or exclusive semantic current state differs.
+    """
+    raise NotImplementedError()
