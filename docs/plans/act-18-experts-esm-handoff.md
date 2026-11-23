@@ -9,9 +9,9 @@ baseline, not by copying the reference branch's implementation.
 
 The six reference feature areas remain: leaderboard, public profile, contact,
 own profile, contribution-summary refresh and Karma accrual. Their specification
-now contains 46 scenarios; two existing-navigation additions bring AT scope to
-48. Five separate E2E contracts and four manual UAT contracts bring the current
-inventory to 57, before outline examples are expanded. This count describes
+now contains 47 scenario contracts; two existing-navigation additions bring AT scope to
+49. Five separate E2E contracts and four manual UAT contracts bring the current
+inventory to 58, before outline examples are expanded. This count describes
 requirements, not passing feature tests. New feature scenarios remain `@wip`.
 
 ## Artifact chain
@@ -26,21 +26,25 @@ requirements, not passing feature tests. New feature scenarios remain `@wip`.
 | Living AT specification | `docs/features/act-18-experts/*.feature`, navigation additions | Parsed; bindings and behavior still pending |
 | E2E extension | `tests/e2e/experts-journey.feature` | Browser-only jobs/geometry, separate from AT |
 | UAT extension | `tests/uat/e2e-uat-flow.feature`, UAT-18 | DO/SEE/RECORD/IF DIFFER; not executed as implemented product |
-| Existing TAF assets and gaps | `docs/ux/experts-test-assets.md` | Reuse mapped; missing harness/catalog explicitly identified |
+| TAF assets and gaps | `docs/ux/experts-test-assets.md`, `docs/features/CATALOG.md`, `tests/fixtures/CATALOG.md` | Existing reuse mapped; scoped harness bootstrapped; Cedar adapter/bindings pending |
 | Django prototypes | `/mockups/experts/`, `/mockups/experts/mrodriguez/`, `/mockups/experts/profile/`, `/mockups/experts/playbooks/6101/` | Fixture-only, shared shell/banner/inventory |
-| Responsive evidence | `docs/ux/experts-responsive-evidence.json` | 70 variant/viewport renders with interaction/geometry and visual review |
+| Responsive evidence | `docs/ux/experts-responsive-evidence.json` | 77 variant/viewport renders; changed profile variants visually re-reviewed |
 
 ## Verification performed
 
 - Gherkin parsed with the official parser, including the modified navigation,
   E2E and UAT files. Scenario IDs are unique in `scenario-index.json`.
-- All ten prototype variants rendered at all seven IA viewports. Category
+- All eleven prototype variants rendered at all seven IA viewports. Category
   ordering, primary color, Montserrat, overflow, contact restrictions, keyboard
   explanation, summary toggle and narrow detail stacking were checked.
 - Visual review found UX-01: a guest tooltip clipped left on phones despite a
   passing page-overflow check. The custom positioning was replaced by the
   existing Bootstrap tooltip and an explicit viewport-boundary assertion.
   Original and corrected evidence is retained in the session capture log.
+- Implementer review restored the complete accepted-change/get-detail awards
+  matrix, self-fetch exclusions, Mike's exact 47-copy fallback and category rows.
+  Submission refresh now explicitly excludes all unpublished PIP titles/content;
+  a public target does not turn a private proposal into public evidence.
 - Actual Django-client prototype rendering returned 200 with zero DB queries.
   A separate DEBUG=False process returned 404 for the mockup URL.
 - Existing mockup gating regression passed. Ruff passed for the new view module.
@@ -66,8 +70,8 @@ uses a male voice; the Daniel rehearsal is recorded.
 
 ## Next gates
 
-Complete the architecture/test-strategy delta and TFK harness/catalog bootstrap
-identified by the selected checkout. Run PIN readiness and orientation, then
+The architecture/test-strategy delta and scoped TFK harness/catalog bootstrap
+are recorded; their checks must pass before PIN readiness and orientation. Then
 contract each scenario with actual skeleton footprints and checkpoints. Publish
 the concrete issue/manifest package for PIN-05 human GO. Only then implement
 production behavior through BPE inside MIN, run AT/E2E/visual/UAT, and reach the
