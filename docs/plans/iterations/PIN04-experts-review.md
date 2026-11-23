@@ -6,7 +6,7 @@ commit footprints and the execution manifest. Implementation has not begun.
 
 Denis declined GitHub publication: “No, skip this part.” No milestone or issues
 were created. The 49 drafts and the complete manifest remain local. Any future
-execution uses this local contract; implementation GO has not been recorded.
+execution uses this local contract; Denis subsequently approved “GO — build using the local contract”; activation is recorded at 69552b4. Implementation is underway.
 
 ## Product and film result
 
