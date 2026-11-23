@@ -15,7 +15,7 @@ dependencies:
 - S42
 - S45
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 5bc070a56d050637c066e2a792901af48113ac05f039d45656d2378f7234c357
 ```
@@ -280,3 +280,7 @@ PIN-04 publishes the concrete A–H contract, graph, skeleton footprint/SHA and 
 4. Filesystem failure can leave useful partial files while correctly earning zero awards.
 5. Completed files plus failed receipt are recoverable delivery state; retrying the export itself risks creating another intentional event.
 6. Native clipboard denial is an execution obligation, not a conclusion established by protocol documentation.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S46.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
