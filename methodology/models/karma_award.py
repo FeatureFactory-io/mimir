@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+import logging
+from datetime import UTC, datetime
+from typing import Any, ClassVar
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, router
+from django.utils import timezone
+
 from methodology.models.playbook import Playbook
+
+logger = logging.getLogger(__name__)
+CATEGORY_SLUGS = tuple(value for value, _label in Playbook.CATEGORY_CHOICES)
 
 
 class EventChannel(models.TextChoices):
@@ -45,7 +54,7 @@ class KarmaAward(models.Model):
     occurred_at = models.DateTimeField()
 
     class Meta:
-        constraints = [
+        constraints: ClassVar[list[models.BaseConstraint]] = [
             models.UniqueConstraint(
                 fields=["event_identity", "recipient"],
                 name="karma_unique_event_recipient",
@@ -108,7 +117,7 @@ class KarmaAward(models.Model):
                 name="karma_channel_source_valid",
             ),
         ]
-        indexes = [
+        indexes: ClassVar[list[models.Index]] = [
             models.Index(
                 fields=["recipient", "category"], name="karma_recipient_category"
             ),
@@ -124,7 +133,30 @@ class KarmaAward(models.Model):
         :return: None. Example: None.
         :raises ValidationError: For invalid source, channel, amount or snapshots.
         """
-        raise NotImplementedError()
+        super().clean()
+        if not isinstance(self.event_identity, str) or not self.event_identity.strip():
+            raise ValidationError({"event_identity": "An event identity is required."})
+        if self.source_kind not in self.SourceKind.values:
+            raise ValidationError({"source_kind": "Unrecognized award source."})
+        if self.category not in CATEGORY_SLUGS:
+            raise ValidationError({"category": "Unrecognized playbook category."})
+
+        for field, value, optional in (
+            ("recipient", self.recipient_id, False),
+            ("points", self.points, False),
+            ("playbook_id_snapshot", self.playbook_id_snapshot, True),
+            ("change_id_snapshot", self.change_id_snapshot, True),
+        ):
+            if optional and value is None:
+                continue
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                raise ValidationError({field: "Enter a positive integer."})
+
+        self._validate_entity_snapshot_pair()
+        self._validate_channel_source()
+        self._validate_release_identity()
+        self._validate_occurred_at()
+        self._validate_persisted_snapshot()
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """Save a valid new award without altering an existing event snapshot.
@@ -134,7 +166,20 @@ class KarmaAward(models.Model):
         :return: None. Example: None.
         :raises ValidationError: For invalid data or changed persisted fields.
         """
-        raise NotImplementedError()
+        # Field conversion can coerce booleans into integers.
+        self.clean()
+        self.clean_fields()
+
+        using = (
+            args[2] if len(args) > 2 else kwargs.get("using")
+        ) or router.db_for_write(type(self), instance=self)
+        # A fresh ORM instance may have an explicit PK. It must never update a row.
+        if self._state.adding or using != self._state.db:
+            if args:
+                args = (True, *args[1:])
+            else:
+                kwargs["force_insert"] = True
+        super().save(*args, **kwargs)
 
     def _validate_entity_snapshot_pair(self) -> None:
         """Require both entity fields together with positive ID and nonblank kind.
@@ -142,7 +187,20 @@ class KarmaAward(models.Model):
         :return: None. Example: None.
         :raises ValidationError: If one field is missing or invalid.
         """
-        raise NotImplementedError()
+        entity_type = self.entity_type_snapshot
+        entity_id = self.entity_id_snapshot
+        if entity_type is None and entity_id is None:
+            return
+        if not isinstance(entity_type, str) or not entity_type.strip():
+            raise ValidationError(
+                {"entity_type_snapshot": "Enter a nonblank entity type."}
+            )
+        if (
+            not isinstance(entity_id, int)
+            or isinstance(entity_id, bool)
+            or entity_id <= 0
+        ):
+            raise ValidationError({"entity_id_snapshot": "Enter a positive entity ID."})
 
     def _validate_channel_source(self) -> None:
         """Validate explicit channel/source combinations independently of keys.
@@ -150,7 +208,24 @@ class KarmaAward(models.Model):
         :return: None. Example: None.
         :raises ValidationError: For an unsupported channel/source combination.
         """
-        raise NotImplementedError()
+        if self.event_channel == EventChannel.HISTORICAL:
+            return
+        content_channels = (
+            EventChannel.GUI_COPY,
+            EventChannel.MCP_DETAIL,
+            EventChannel.EXPORT,
+        )
+        allowed_channels = {
+            self.SourceKind.RELEASE: (EventChannel.RELEASE,),
+            self.SourceKind.MAJOR: (EventChannel.ACCEPTED_CHANGE,),
+            self.SourceKind.MINOR: (EventChannel.ACCEPTED_CHANGE,),
+            self.SourceKind.CONSUMPTION: content_channels,
+            self.SourceKind.LEARNING: content_channels,
+        }
+        if self.event_channel not in allowed_channels[self.source_kind]:
+            raise ValidationError(
+                {"event_channel": "Channel is incompatible with the award source."}
+            )
 
     def _validate_release_identity(self) -> None:
         """Require canonical identity for known books and live release references.
@@ -158,7 +233,18 @@ class KarmaAward(models.Model):
         :return: None. Example: None.
         :raises ValidationError: For a live missing book or mismatched known key.
         """
-        raise NotImplementedError()
+        if self.source_kind != self.SourceKind.RELEASE:
+            return
+        if self.playbook_id_snapshot is None:
+            if self.event_channel != EventChannel.HISTORICAL:
+                raise ValidationError(
+                    {"playbook_id_snapshot": "Live releases require a playbook ID."}
+                )
+            return
+        if self.event_identity != first_release_identity(self.playbook_id_snapshot):
+            raise ValidationError(
+                {"event_identity": "The release identity must match its playbook ID."}
+            )
 
     def _validate_occurred_at(self) -> None:
         """Require an explicit timezone-aware original event timestamp.
@@ -166,7 +252,12 @@ class KarmaAward(models.Model):
         :return: None. Example: None.
         :raises ValidationError: For a missing or naive event time.
         """
-        raise NotImplementedError()
+        if not isinstance(self.occurred_at, datetime) or timezone.is_naive(
+            self.occurred_at
+        ):
+            raise ValidationError(
+                {"occurred_at": "Enter the original event time with a time zone."}
+            )
 
     def _validate_persisted_snapshot(self) -> None:
         """Reject changes to stored event identity, time or logical award fields.
@@ -174,7 +265,33 @@ class KarmaAward(models.Model):
         :return: None. Example: None.
         :raises ValidationError: If an existing snapshot would change.
         """
-        raise NotImplementedError()
+        if self._state.adding or self.pk is None:
+            return
+
+        stored = (
+            type(self)
+            ._base_manager.using(self._state.db)
+            .filter(pk=self.pk)
+            .values()
+            .first()
+        )
+        if stored is None:
+            return
+        for field in self._meta.concrete_fields:
+            if field.primary_key:
+                continue
+            current = getattr(self, field.attname)
+            if field.name == "occurred_at":
+                current = current.astimezone(UTC)
+            if current != stored[field.attname]:
+                logger.debug(
+                    "KarmaAward.clean | validation | rejected=immutable_snapshot award_id=%s field=%s",
+                    self.pk,
+                    field.name,
+                )
+                raise ValidationError(
+                    {field.name: "A persisted award cannot be changed."}
+                )
 
 
 def first_release_identity(playbook_id: int) -> str:
@@ -184,4 +301,10 @@ def first_release_identity(playbook_id: int) -> str:
     :return: Canonical identity. Example: "first_release:6101".
     :raises ValueError: For a noninteger, boolean or nonpositive identifier.
     """
-    raise NotImplementedError()
+    if (
+        not isinstance(playbook_id, int)
+        or isinstance(playbook_id, bool)
+        or playbook_id <= 0
+    ):
+        raise ValueError("Playbook ID must be a positive integer.")
+    return f"first_release:{playbook_id}"
