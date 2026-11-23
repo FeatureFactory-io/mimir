@@ -3,6 +3,10 @@
 > Shared with Huginn (`../huginn/docs/ux/IA_guidelines.md`) — same `--hg-*` tokens and `.hg-*` component classes in `static/css/design-system.css`.
 > Companion to `docs/features/user_journey.md`. Last updated: July 2026 — unified with Huginn design system.
 
+> Act 18 replay extension: Experts inherits this design system. Its specific
+> recipe and responsive coverage contract are documented below; mockups must
+> render the actual shared assets, not reproduce them in a separate visual theme.
+
 ---
 
 ## Philosophy
@@ -1144,3 +1148,69 @@ Huginn extensions (established in `user_journey.md` §System Architecture Notes)
 | `VIEW` (no entity suffix) | SituationalAwareness, Variables | `VARIABLES-VIEW-1` |
 | `EDIT` (no entity suffix) | SituationalAwareness | `SITAWARENESS-EDIT-1` |
 | `CHAT` | Gjallarhorn | `CHAT-1` |
+
+## 11. Experts replay recipe and responsive coverage contract
+
+Experts extends the existing Bootstrap/Mimir shell and design tokens. It does
+not add a second design system. Use Montserrat body text at 16px, existing page
+title treatment (28px/600), `--hg-primary` slate blue and `--hg-accent` gold.
+Use existing button, card, badge, breadcrumb and table classes. Add feature CSS
+only for layout or controlled truncation; derive colors from existing variables.
+
+| Screen ID | Recipe | Main content and controls |
+| --- | --- | --- |
+| FOB-EXPERTS-LIST+FIND-1 | Full-width ranked cards | Existing page header; category pills; five vertically ordered cards; View profile and Reach out per card |
+| FOB-EXPERT-VIEW-1 | 8+4 read and context rail (§3.7) | Full public contribution body first; score-source breakdown and public released playbooks in rail; contact toolbar |
+| FOB-PROFILE-VIEW-1 | Existing account profile with contributions section | Existing account functions retained; Karma/source rows; four-line summary preview with accessible expansion |
+| FOB-EXPERTS-REACH-OUT-1 | Existing list/detail action cluster | Authenticated mailto; disabled guest button inside a keyboard-focusable explanatory wrapper |
+
+### Exact display contract
+
+- Title **Experts**, subtitle **Top contributors by playbook category**. Page
+  title has no rank/count pill. Categories are Product, Development, Research,
+  Design and Other. Use actual links with `aria-current`, preserving the query.
+- Each ranked card has a readable rank, initials/avatar, display name, formatted
+  total, primary playbook-category badge, hint and two named actions. The card
+  body does not truncate the person's name or numeric value. Only the hint may
+  use a two-line visual clamp; the full paragraph is available on View profile.
+- Desktop places identity/hint before score/actions; narrow layouts stack the
+  action cluster under the body. Rank order, reading order and keyboard order
+  agree. Actions wrap without overlapping text or becoming unreachable.
+- Public expert summary is always full text. Own-profile summary may collapse
+  after four lines; Show more/Show less updates `aria-expanded` and
+  `aria-controls`. Do not use cached summary prose for numeric totals.
+- Guest Reach out has no email-bearing href. Its focusable wrapper exposes the
+  exact text **You need to be logged in to reach out to the expert** through
+  `aria-describedby`, pointer hover and keyboard focus. Keep Sign In/Register
+  reachable. Never expose an account API token on a public expert screen.
+- Empty Other uses **No experts in Other yet — release a playbook to be the
+  first**. Empty evidence says **No public released playbooks to show**. The
+  missing/non-expert route is 404, not a success-shaped empty profile.
+- Stable hooks include `experts-leaderboard`, `experts-category-tabs`,
+  `experts-card-<username>`, `expert-contribution-summary`, `expert-karma-total`,
+  `profile-karma-card` and `profile-contribution-summary`. Interactive controls
+  receive their own stable `data-testid` and accessible names.
+
+### Target CSS viewports
+
+| Profile | Width | Height |
+| --- | --- | --- |
+| wide-low | 1280 | 800 |
+| large-desktop | 1920 | 1080 |
+| laptop | 1512 | 982 |
+| tablet-portrait | 768 | 1024 |
+| tablet-landscape | 1024 | 768 |
+| phone | 390 | 844 |
+| minimum-phone | 360 | 800 |
+
+Render every registered Experts mockup at all seven profiles. Check the same
+screen recipes: no page-level horizontal overflow, clipping or overlap; category
+links wrap; detail body precedes rail below `md`; sidebar becomes the existing
+offcanvas below `lg`; contact and profile actions remain reachable. At low
+height, scroll the document normally rather than shrinking the text. Tables may
+scroll inside `.table-responsive` only. No responsive exception is approved.
+
+Record Screen ID, variant, recipe, viewport, result, screenshot, reviewer and
+any defect in `docs/ux/experts-responsive-evidence.json`. Empty, guest, long text,
+initials, missing summary and missing public evidence are actual design states,
+not paragraphs standing in for unrendered screens. ESM-06 must inspect them.

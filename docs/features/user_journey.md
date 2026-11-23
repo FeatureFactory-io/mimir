@@ -8,6 +8,17 @@ Senior developer at a tech community. Maintains shared playbooks for common deve
 **Maria Rodriguez** - UX Consultant  
 Runs an independent UX consulting practice. Needs to organize her personal workflows, collaborate with her team, and leverage community methodologies.
 
+**Elena Svensson** - Competency Center Head, Meridian Methods (fictional Cedar case)
+Needs a defensible contributor nomination for Noor Ibrahim's bank onboarding RFP.
+Her job is to find a person, inspect relevant public contribution evidence and
+obtain a contact handoff before Tuesday noon. Rank is a discovery signal;
+availability and suitability require a conversation. See
+[the Cedar job](../experts-replay/cedar-job.md).
+
+**Bob** - Unregistered evaluator
+Wants to inspect public contribution evidence before registering. He can browse
+Experts and public profiles, while contact requires an authenticated session.
+
 ---
 
 ---
@@ -3064,6 +3075,163 @@ Entity-specific bodies: Activity → full `guidance`; Skill → `content` + meta
 **Feature files**: `docs/features/act-17-copy-prompt/` (`copy-prompt-service.feature`, `copy-prompt-view.feature`, `copy-prompt-list.feature`, `copy-prompt-guest.feature`)
 
 ---
+
+### Act 18: Experts and Karma — from contribution signal to public evidence
+
+**Status:** ESM design for the recorded replay; not yet implemented.
+
+**Job:** CEDAR 01. On Monday at 09:10 Noor asks Elena for an accessibility
+contributor for the Cedar onboarding response. By Tuesday noon Elena must supply
+a person, a reason and a published example. She starts with a category, then
+inspects the evidence and chooses whom to contact. A five-minute UAT attempt is
+the proposed completion criterion, to be measured on the actual implementation.
+
+**Data:** `test-data/experts/cedar-rfp-01.json` is the domain-data contract. Each
+independent event case restores its baseline. It is not a Django loaddata fixture.
+Fixture import must preserve historical awards rather than award them again.
+
+#### Screen: FOB-EXPERTS-LIST+FIND-1
+
+Elena opens **Experts** from Mimir's in-app navigation, under Collaborate. The
+existing realm navbar and app sidebar remain the shell; a new top-level web app
+or bespoke theme is not introduced. The route is `/experts/`. The page title is
+**Experts**, with subtitle **Top contributors by playbook category**.
+
+The category controls are links styled as Bootstrap pills: Product, Development,
+Research, Design and Other. Development is the default; the selected link has
+`aria-current="page"`. The URL retains `?category=design` so back navigation and
+refresh reproduce the same view. An unknown category falls back to Development.
+
+Elena selects **Design**. The page shows five ranked cards in this exact order:
+
+| Rank | Contributor | Total Karma | Primary playbook category | Evidence cue |
+| --- | --- | --- | --- | --- |
+| 1 | Sofia Reed | 15,400 | Design | Service blueprints and design operations |
+| 2 | Maria Rodriguez | 8,200 | Design | Keyboard focus and form-feedback review |
+| 3 | Priya Nair | 7,600 | Design | Inclusive discovery interviews |
+| 4 | Daniel Ortiz | 6,900 | Design | Design system review |
+| 5 | Hana Kim | 5,800 | Design | Accessible forms review |
+
+Each card shows rank, avatar or initials, display name, total Karma, primary
+playbook-category badge, a short contribution hint, **View profile** and
+**Reach out**. Names/hints wrap; they do not push actions outside the viewport.
+The hint is derived from stable public contribution prose, or a live numeric
+fallback when no prose exists. It does not claim availability, certification or
+that the highest-ranked contributor is recommended for this RFP.
+
+Theo Martin's 5,200 is sixth and omitted. Mike Chen's 12,450 belongs to
+Development and does not appear in Design. Maria's Design subtotal is only
+7,200; her total across categories is 8,200, which places her above Priya.
+
+An expert has positive total Karma. The primary category is the category with
+most awarded points; ties use the number of released playbooks in tied
+categories, then alphabetical category. Within a category, rank by **total**
+Karma descending, then username ascending for equal totals. The final tie rule
+is an explicit replay decision to prevent unstable ordering.
+
+Elena first inspects Sofia rather than assuming rank equals fit. Sofia's public
+evidence is credible but concerns service blueprints. Elena returns to the
+Design list, opens Maria and recognizes examples closer to Noor's brief.
+
+**States:** Other shows “No experts in Other yet — release a playbook to be the
+first” with zero cards. A missing avatar uses initials. Missing contribution
+prose uses live counts. Guest Bob sees a registration/sign-in explanation and
+the same public rankings. No private account/token controls appear here.
+
+#### Screen: FOB-EXPERT-VIEW-1
+
+`/experts/mrodriguez/` shows Maria Rodriguez, total **8,200**, Design badge and
+the full stored contribution paragraph. The paragraph is never line-clamped on
+the public detail screen. An 8+4 read/context layout places the contribution
+body first; related public playbooks and score-source context are visible in the
+rail, stacking below the body on narrow screens.
+
+The source rows are Released playbooks **5,000**, PIP contributions **1,600**,
+Consumption **1,200** and Learning **400**. They sum to 8,200. Category subtotals
+are Design 7,200 and Development 1,000; the page distinguishes categories from
+the source breakdown rather than silently using one in place of the other.
+
+Public released evidence includes **Accessibility Audit Playbook v1.0**. Elena
+opens its existing `/playbooks/6101/` page and finds **Lead an Accessibility
+Review**, including **Trace Keyboard Focus** and **Review Form Feedback**.
+Those examples establish the reason for her nomination. The public expert page
+does not display Cedar Bid Pricing, Internal staffing notes for Cedar, a profile
+API token or any unrelated private object.
+
+A username that does not exist, or Nora's zero-Karma account, returns 404 from
+the public expert route. It is not an empty expert profile. Sam's positive-Karma
+profile can have no released public playbook; its evidence section explicitly
+says there are no public released playbooks to show.
+
+#### Screen: FOB-EXPERTS-REACH-OUT-1
+
+This is an interaction on the list and detail surfaces, not a separate page.
+For authenticated Elena, Maria's **Reach out** is a `mailto:` link to
+`maria.rodriguez@example.com`. The film records the handoff destination without
+sending an email. Returning to the Design list preserves its category.
+
+For guest Bob, Reach out is disabled on both surfaces and has no `mailto:`
+destination. A focusable wrapper explains **You need to be logged in to reach
+out to the expert** on keyboard focus as well as pointer hover. Bob can still
+open the full public profile and public released evidence.
+
+Elena finishes an external nomination note: Maria, the Accessibility Audit
+Playbook, keyboard/form-feedback relevance, and an email discussion as the next
+action. Availability is unconfirmed. No RFP, shortlist or messaging screen is
+added to Mimir to manufacture that note.
+
+#### Screen: FOB-PROFILE-VIEW-1
+
+Maria's existing `/auth/user/profile/` gains a Karma/contributions section while
+retaining its current account functions. It shows **8,200**, primary category
+**Design**, the four reconciled source rows and the stored contribution summary.
+More than four lines is initially collapsed, with **Show more** and **Show less**
+exposing the real state through `aria-expanded` and `aria-controls`. Bob's request
+to this own-profile route redirects to sign-in.
+
+#### Cross-cutting: FOB-GALDR-CONTRIBUTION-SUMMARY-1
+
+Maria submits **Screen Reader Error Recovery**, an ADD Activity proposal for
+Hana's **Accessible Forms Review v2.0**. Normal PIP processing triggers a refresh
+of Maria's contribution summary. Submission/resubmission awards no points and
+does not describe the proposal as accepted. Acceptance of the ADD awards 500
+Design points, moves Maria to 8,700 and publishes Hana's v3.0. It captures the
+normal decision notification locally for this replay.
+
+Cached prose contains stable public facts and neutral proposal descriptions,
+not mutable Karma totals or category subtotals. Awards update numeric values
+without requiring another LLM call. Summary generation must not expose private
+playbooks, private proposals, tokens or email addresses. Failure preserves the
+last good summary and existing PIP lifecycle behavior; numeric fallback remains
+available. The eventual provider proof is distinct from deterministic fixtures.
+
+#### Cross-cutting: FOB-KARMA-ACCRUAL-1
+
+| Event | Exact observable change from an independently restored baseline |
+| --- | --- |
+| Nora first releases Accessible Workshop Starter in Product | 0 → 5,000; Product order Alex 5,400, Nora 5,000; later v2.0 grants no repeat first-release award |
+| Maria submits or resubmits a PIP | 8,200 stays 8,200; summary processing may refresh |
+| Admin accepts ADD | Maria 8,200 → 8,700, attributed to target Design category |
+| Admin accepts ALTER | Maria 8,200 → 8,300, independently of ADD case |
+| ADD accepted, ALTER rejected | Maria becomes 8,700, not 8,800 |
+| Signed-in Maria copies Mike's activity | Clipboard succeeds; Maria 8,205 and Mike 12,455, Development attribution |
+| Guest Bob copies public activity | Clipboard succeeds; no account/points created for Bob; Mike remains 12,450 |
+| Mike copies his own activity | Clipboard succeeds; Mike remains 12,450 |
+| Maria reads Mike's public released activity through MCP get_activity | Maria 8,205 and Mike 12,455; private reads remain denied |
+| Maria lists activities | Both totals unchanged |
+| Maria exports Mike's eligible public workflow to multiple local files | Maria 8,205 and Mike 12,455; one award per call, not per file |
+| Mike exports his own workflow, or Maria imports a workflow | Totals unchanged |
+
+Ordinary GUI views, empty/rejected drafts and failed/ineligible operations do
+not create awards. Historical seed import is not a new user event. Write retries
+of the same event must not double-award; a new intentional eligible consumption
+is a new event. Use the existing MCP facade/REST authorization boundary rather
+than broadening access to private content to make a points demonstration pass.
+
+**Traceability:** feature specifications live under `docs/features/act-18-experts/`;
+the dialogue map under `docs/ux/2_dialogue-maps/`; the existing UAT file is extended
+with a browser-only Cedar job and separate event cases. All affected screen IDs
+must appear in their mockups, specifications, implementation templates and tests.
 
 ## Journey Complete
 

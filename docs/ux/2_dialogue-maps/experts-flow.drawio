@@ -1,0 +1,89 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net">
+  <diagram id="experts-flow" name="Cedar contributor discovery">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="brief" value="Cedar brief — external prop" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="20" y="180" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="list" value="FOB-EXPERTS-LIST+FIND-1" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=3" vertex="1" parent="1">
+          <mxGeometry x="250" y="180" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="sofia" value="FOB-EXPERT-VIEW-1 — Sofia" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="490" y="30" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="maria" value="FOB-EXPERT-VIEW-1 — Maria" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="490" y="180" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="evidence" value="FOB-PLAYBOOKS-VIEW_PLAYBOOK-1" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="730" y="80" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="contact" value="FOB-EXPERTS-REACH-OUT-1 — signed in" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="730" y="250" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="nomination" value="Nomination — external prop" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="990" y="250" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="guest" value="Bob — guest public access" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="250" y="400" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="disabled" value="FOB-EXPERTS-REACH-OUT-1 — guest" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="490" y="400" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="own" value="FOB-PROFILE-VIEW-1" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="20" y="600" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="summary" value="FOB-GALDR-CONTRIBUTION-SUMMARY-1" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="300" y="600" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="karma" value="FOB-KARMA-ACCRUAL-1" style="rounded=1;whiteSpace=wrap;html=1;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="650" y="600" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-0" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="brief" target="list">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-1" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="list" target="sofia">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-2" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="sofia" target="list">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-3" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="list" target="maria">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-4" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="maria" target="evidence">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-5" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="evidence" target="maria">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-6" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="maria" target="contact">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-7" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="contact" target="nomination">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-8" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="guest" target="list">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-9" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="guest" target="maria">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-10" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="maria" target="disabled">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-11" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="own" target="summary">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-12" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="summary" target="karma">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-13" style="edgeStyle=orthogonalEdgeStyle;endArrow=block;" edge="1" parent="1" source="karma" target="own">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,31 @@
+digraph ExpertsFlow {
+  graph [rankdir=LR, bgcolor="white", label="Cedar job: find a person, inspect public evidence, obtain contact handoff", labelloc=t, fontname="Helvetica", fontsize=16];
+  node [shape=box, style="rounded", fontname="Helvetica", fontsize=11];
+  edge [fontname="Helvetica", fontsize=10];
+  brief [label="Noor's Cedar brief\nexternal case prop"];
+  list [label="FOB-EXPERTS-LIST+FIND-1\n/experts/?category=design\nSofia, Maria, Priya, Daniel, Hana", penwidth=3];
+  sofia [label="FOB-EXPERT-VIEW-1\nsreed\nservice-blueprint evidence"];
+  maria [label="FOB-EXPERT-VIEW-1\nmrodriguez\nfull summary + public evidence"];
+  evidence [label="FOB-PLAYBOOKS-VIEW_PLAYBOOK-1\nAccessibility Audit Playbook v1.0\nkeyboard focus + form feedback"];
+  contact [label="FOB-EXPERTS-REACH-OUT-1\nauthenticated mailto handoff\nno email sent in recording"];
+  nomination [label="Elena's nomination note\nexternal case prop"];
+  guest [label="Bob: public discovery\nno authenticated account"];
+  disabled [label="FOB-EXPERTS-REACH-OUT-1\nguest disabled + focus/hover explanation"];
+  own [label="FOB-PROFILE-VIEW-1\nMaria: 8200 + four source rows\nexpand/collapse summary"];
+  processing [label="FOB-GALDR-CONTRIBUTION-SUMMARY-1\nsubmit/resubmit refresh\nno acceptance points yet"];
+  points [label="FOB-KARMA-ACCRUAL-1\naccepted ADD: 8200 → 8700\nHana v2.0 → v3.0"];
+  brief -> list [label="JTD CEDAR 01"];
+  list -> sofia [label="inspect first place"];
+  sofia -> list [label="return; preserve Design"];
+  list -> maria [label="inspect relevant contribution"];
+  maria -> evidence [label="View public playbook"];
+  evidence -> maria [label="Back"];
+  maria -> contact [label="authenticated"];
+  contact -> nomination [label="name + reason + evidence + next action"];
+  guest -> list [label="public access"];
+  guest -> maria [label="public access"];
+  maria -> disabled [label="anonymous variant"];
+  own -> processing [label="submit proposal"];
+  processing -> points [label="Administrator accepts ADD"];
+  points -> own [label="numeric projection updates"];
+}
