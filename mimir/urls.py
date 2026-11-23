@@ -15,6 +15,9 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from __future__ import annotations
+from django.urls.resolvers import URLPattern
+
 from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
@@ -142,3 +145,13 @@ if settings.DEBUG:
     urlpatterns.append(
         path("mockups/", include("mockups.urls")),
     )
+
+
+def _experts_routes() -> list[URLPattern]:
+    """Construct the future production list route without registering it in PIN.
+
+    :return: List-route patterns. Example:
+        [path("experts/", expert_views.experts_list, name="experts_list")].
+    :raises NotImplementedError: Until approved BPE route wiring is implemented.
+    """
+    raise NotImplementedError()

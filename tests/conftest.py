@@ -1,5 +1,8 @@
 """Pytest configuration and fixtures for Mimir tests."""
 
+from __future__ import annotations
+from tests.support.experts_fixtures import cedar_baseline, cedar_dataset  # noqa: F401
+
 import pytest
 from django.core.management import call_command
 from methodology.models import Phase

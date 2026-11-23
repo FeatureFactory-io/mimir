@@ -40,3 +40,8 @@ __all__ = [
     'TeamPlaybook',
     'Notification',
 ]
+
+from .karma_award import EventChannel, KarmaAward
+from .expert_profile import ExpertProfile
+
+__all__ += ["EventChannel", "KarmaAward", "ExpertProfile"]

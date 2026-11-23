@@ -8,6 +8,8 @@ after Django setup is complete.
 
 from __future__ import annotations
 
+from tests.support.experts_fixtures import cedar_baseline, cedar_dataset  # noqa: F401
+
 import logging
 import os
 from collections.abc import Generator

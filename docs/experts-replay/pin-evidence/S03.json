@@ -1,0 +1,35 @@
+{
+  "scenario": "S03",
+  "status": "structural_skeleton_only",
+  "new_callable_bodies": 109,
+  "collection_count": 81,
+  "collection_exit": 0,
+  "behavior_checkpoint": "make test-experts-s03",
+  "behavior_result": "NotImplementedError, positive collection",
+  "log_result": "NotImplementedError in unimplemented Cedar fixture, 2 collected",
+  "exact_acceptance_result": "NotImplementedError, exactly S03 selected from 43",
+  "browser_result": "After fixing discovery wiring: 1 collected; NotImplementedError in shared unimplemented Cedar fixture.",
+  "seed": {
+    "seed_path": "/Users/denispetelin/GitHub/mimir-experts-replay/mimir.db",
+    "sha256": "0ac0b0483b9e3eb8f969029853c0cb04f159528c01e67d600a63199b39cc40b2",
+    "new_empty_tables": [
+      "methodology_expertprofile",
+      "methodology_karmaaward"
+    ],
+    "existing_table_count_deltas": {
+      "auth_permission": 8,
+      "django_content_type": 2,
+      "django_migrations": 1
+    },
+    "note": "Only migration and Django content-type/permission metadata added. No Cedar accounts/content/awards/profiles imported."
+  },
+  "constraints_review": "Paired snapshot check includes explicit ID IS NOT NULL to reject SQL UNKNOWN loophole. Generated DDL inspected before applying.",
+  "routes": "New Experts route constructor exists but is not registered.",
+  "templates": "Comment-only production placeholder.",
+  "implementation_ready": false,
+  "required_next_gate": "Complete all structural applications, PIN-04 records, actual PIN-05 human GO.",
+  "initial_scaffold_findings": [
+    "Browser config did not discover tests/conftest.py Cedar fixture; moved fixture definitions into tests/support/experts_fixtures.py and imported explicitly into both suites.",
+    "First import placement preceded an existing future import; corrected before final checkpoint."
+  ]
+}

@@ -11,7 +11,7 @@ primary_execution_layer: at
 expanded_case_count: 1
 dependencies: []
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 10fff3e8ff8aedf25adf29450bec209cc841ceabfd89c095d08f7358be3d97b3
 - 98551b6d4009438fee244e3d25b50c4a7e5303954efac19e1a6c87dc855ef5d0
@@ -240,6 +240,8 @@ feature_execution_graph:
     - methodology/services/expert_text.py
     - methodology/services/experts_service.py
     - tests/conftest.py
+  - tests/e2e/conftest.py
+  - tests/support/experts_fixtures.py
     - tests/fixtures/CATALOG.md
     - tests/integration/test_experts_acceptance_runner.py
     - tests/integration/test_experts_data.py
@@ -367,3 +369,7 @@ The JSON intentionally combines independent oracle totals with aggregate histori
 The broad feature-level `@wip` tag makes the existing `make test-at-experts` insufficient for one-scenario progress. A narrow explicit S03 gate avoids both zero-selection success and prematurely enabling other unimplemented contracts.
 
 Shared file ownership must be reconciled before skeleton application: S03 owns query/projection and ranking baseline data; S30 owns award persistence; S47 adds primary-category tie proofs without duplicating the resolver.
+
+## Structural application evidence
+
+See `docs/experts-replay/pin-evidence/S03.json`. All new callable bodies raise. Collection succeeded; behavior/log/AT/browser gates remain red with NotImplementedError. Real empty schema and tracked seed are committed together. No feature implementation is claimed.
