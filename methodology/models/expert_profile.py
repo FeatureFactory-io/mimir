@@ -9,6 +9,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
+_INVALID_SUMMARY = "Invalid last good summary."
+
 
 class ExpertProfile(models.Model):
     """Last good public paragraph and refresh metadata for one account."""
@@ -44,7 +46,6 @@ class ExpertProfile(models.Model):
         statuses = self.SummaryStatus
         if status not in statuses.values:
             raise ValidationError({"summary_status": "Unrecognized summary status."})
-
         updated_at = self.summary_updated_at
         if updated_at is None and status == statuses.SUCCESS:
             raise ValidationError({"summary_updated_at": "Missing success timestamp."})
@@ -58,9 +59,7 @@ class ExpertProfile(models.Model):
         if not isinstance(summary, str) or (
             updated_at is not None and not summary.strip()
         ):
-            raise ValidationError(
-                {"contribution_summary": "Invalid last good summary."}
-            )
+            raise ValidationError({"contribution_summary": _INVALID_SUMMARY})
 
         for field_name, required in (
             ("summary_error_code", status == statuses.FAILURE),
