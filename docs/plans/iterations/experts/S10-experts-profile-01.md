@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S03
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - f210f2fcc77513feaa51285ba5440d8c78b4585cf55ddccc9e8f99ae28ad65a1
 ```
@@ -317,3 +317,7 @@ Lessons Learned:
 - Existing browser defaults ignore E2E tests; explicit `-o addopts=` and collected-case counts are essential.
 - Cedar JSON is an oracle, not a fixture to read from production templates. Its adapter belongs in runner-owned test data.
 - S11/S12/S13 can remain dedicated certification scenarios because S10 declares their necessary core interfaces and markup architecture now.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S10.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

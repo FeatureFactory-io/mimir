@@ -1,4 +1,11 @@
 """Authentication views for user login and logout."""
+
+from __future__ import annotations
+from typing import TypedDict
+from django.core.exceptions import PermissionDenied
+from django.http import HttpRequest
+from methodology.models import ExpertProfile
+from methodology.services.experts_service import ExpertProjection, ExpertsService
 import logging
 from django.conf import settings
 from django.contrib.auth import authenticate, login as auth_login, logout
@@ -50,8 +57,9 @@ def _redirect_if_authenticated(request):
 def _profile_playbooks_for(user):
     """Return playbooks authored by user (newest first), capped for the profile page."""
     return list(
-        Playbook.objects.filter(author=user)
-        .order_by("-updated_at")[:_PROFILE_PLAYBOOKS_LIMIT]
+        Playbook.objects.filter(author=user).order_by("-updated_at")[
+            :_PROFILE_PLAYBOOKS_LIMIT
+        ]
     )
 
 
@@ -87,50 +95,54 @@ def _regenerate_api_token_for_user(user):
 def _validate_login_data(username, password):
     """
     Validate login form data.
-    
+
     Internal helper for login_view.
-    
+
     :param username: str - Username from form. Example: "maria"
     :param password: str - Password from form. Example: "test123"
     :return: dict - Validation errors. Example: {"username": ["This field is required."]}
-    
+
     Validation Rules:
         - Username: Required, non-empty
         - Password: Required, non-empty
     """
     errors = {}
-    
+
     if not username:
-        errors['username'] = ['This field is required.']
+        errors["username"] = ["This field is required."]
         logger.debug("Validation error: Username is empty")
-    
+
     if not password:
-        errors['password'] = ['This field is required.']
+        errors["password"] = ["This field is required."]
         logger.debug("Validation error: Password is empty")
-    
+
     return errors
 
 
 def _handle_remember_me(request, remember_me):
     """
     Configure session expiry based on remember me checkbox.
-    
+
     Internal helper for login_view.
-    
+
     :param request: Django request object with authenticated user
-    :param remember_me: bool - Remember me checkbox state. Example: True  
+    :param remember_me: bool - Remember me checkbox state. Example: True
     :return: None
-    
+
     Side Effects:
         - Sets request.session.set_expiry(2592000) if remember_me=True (30 days)
         - Sets request.session.set_expiry(1209600) if remember_me=False (2 weeks)
     """
     if remember_me:
         request.session.set_expiry(2592000)  # 30 days
-        logger.info(f"User {request.user.username} logged in with remember me (30 days session)")
+        logger.info(
+            f"User {request.user.username} logged in with remember me (30 days session)"
+        )
     else:
-        request.session.set_expiry(1209600)  # 2 weeks  
-        logger.info(f"User {request.user.username} logged in without remember me (2 weeks session)")
+        request.session.set_expiry(1209600)  # 2 weeks
+        logger.info(
+            f"User {request.user.username} logged in without remember me (2 weeks session)"
+        )
 
 
 def _user_bypasses_email_verification_gate(user: User) -> bool:
@@ -188,14 +200,14 @@ def _login_page_context(
 def login_view(request):
     """
     Display login form and handle authentication.
-    
+
     Custom implementation without Django Forms per SAO.md architecture.
-    
+
     Template: accounts/login.html
     Context:
         errors: dict - Field-specific and non-field errors
         username: str - Preserved username on error
-    
+
     :param request: Django request object
     :return: Rendered login template or redirect to dashboard
     """
@@ -204,9 +216,9 @@ def login_view(request):
     redirect_response = _redirect_if_authenticated(request)
     if redirect_response is not None:
         return redirect_response
-    
+
     # GET request - display form
-    if request.method == 'GET':
+    if request.method == "GET":
         logger.info("Displaying login form")
         resent = request.GET.get("resent") == "1"
         email_changed = request.GET.get("email_changed") == "1"
@@ -220,27 +232,29 @@ def login_view(request):
                 resend_email=pending_resend,
             ),
         )
-    
+
     # POST request - handle login
-    username = request.POST.get('username', '').strip()
-    password = request.POST.get('password', '')
-    remember_me = request.POST.get('remember_me') == 'on'
-    
+    username = request.POST.get("username", "").strip()
+    password = request.POST.get("password", "")
+    remember_me = request.POST.get("remember_me") == "on"
+
     logger.info(f"Login attempt for username: {username}, remember_me: {remember_me}")
-    
+
     # Validate input
     errors = _validate_login_data(username, password)
     if errors:
-        logger.warning(f"Login validation failed for username: {username}, errors: {list(errors.keys())}")
+        logger.warning(
+            f"Login validation failed for username: {username}, errors: {list(errors.keys())}"
+        )
         return render(
             request,
             "accounts/login.html",
             _login_page_context(errors=errors, username=username),
         )
-    
+
     # Authenticate
     user = authenticate(request, username=username, password=password)
-    
+
     if user is not None:
         block = _email_verification_login_block(request, user, username)
         if block is not None:
@@ -255,12 +269,12 @@ def login_view(request):
 
         # Redirect to dashboard
         logger.info(f"Redirecting user {username} to dashboard")
-        return redirect('/dashboard/')
+        return redirect("/dashboard/")
     else:
         # Authentication failed
         logger.warning(f"Authentication failed for username: {username}")
         errors = {
-            'non_field_errors': ['Invalid username or password. Please try again.']
+            "non_field_errors": ["Invalid username or password. Please try again."]
         }
         return render(
             request,
@@ -278,8 +292,8 @@ def custom_logout_view(request):
         logger.info(f"User {username} logged out successfully")
     else:
         logger.warning("Logout attempted by unauthenticated user")
-    
-    return redirect(reverse('login'))
+
+    return redirect(reverse("login"))
 
 
 @login_required
@@ -353,8 +367,7 @@ def _complete_email_change_reverification(request, user: User):
     )
     logout(request)
     login_url = (
-        f"{reverse('login')}?email_changed=1"
-        f"&resend_email={quote(user.email)}"
+        f"{reverse('login')}?email_changed=1" f"&resend_email={quote(user.email)}"
     )
     return redirect(login_url)
 
@@ -367,13 +380,17 @@ def profile_edit_view(request):
     logger.info("[PROFILE-EDIT] %s user_id=%s", request.method, user.pk)
 
     if request.method == "GET":
-        return render(request, "accounts/profile_edit.html", {
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
-            "username": user.username,
-            "errors": {},
-        })
+        return render(
+            request,
+            "accounts/profile_edit.html",
+            {
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "username": user.username,
+                "errors": {},
+            },
+        )
 
     first_name = (request.POST.get("first_name") or "").strip()
     last_name = (request.POST.get("last_name") or "").strip()
@@ -381,14 +398,22 @@ def profile_edit_view(request):
 
     errors = _validate_profile_edit(first_name, last_name, email, user)
     if errors:
-        logger.warning("[PROFILE-EDIT] validation failed user_id=%s errors=%s", user.pk, list(errors))
-        return render(request, "accounts/profile_edit.html", {
-            "first_name": first_name,
-            "last_name": last_name,
-            "email": email,
-            "username": user.username,
-            "errors": errors,
-        })
+        logger.warning(
+            "[PROFILE-EDIT] validation failed user_id=%s errors=%s",
+            user.pk,
+            list(errors),
+        )
+        return render(
+            request,
+            "accounts/profile_edit.html",
+            {
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "username": user.username,
+                "errors": errors,
+            },
+        )
 
     old_email = user.email
     email_changed = _profile_email_changed(old_email, email)
@@ -462,18 +487,18 @@ def profile_regenerate_token(request):
 def onboarding(request):
     """
     Onboarding stub page (FOB-ONBOARDING-1).
-    
+
     Placeholder view for first-time user onboarding. Full implementation
     tracked separately in onboarding.feature issues #12-16.
-    
+
     Template: onboarding/welcome.html
     Context: None
-    
+
     :param request: Django request object
     :return: Rendered onboarding stub template
     """
     logger.info(f"User {request.user.username} accessed onboarding stub")
-    return render(request, 'onboarding/welcome.html')
+    return render(request, "onboarding/welcome.html")
 
 
 @login_required
@@ -504,7 +529,7 @@ def skip_onboarding(request):
     )
 
     logger.info("[ONBOARD-04] Redirecting user %s to dashboard after skip", username)
-    return redirect('/dashboard/')
+    return redirect("/dashboard/")
 
 
 def _registration_public_base_url(request):
@@ -599,13 +624,13 @@ def verify_email(request, token: str):
             },
         )
     mark_email_verified(user)
-    
+
     # Activate user if currently inactive (e.g., from team invite auto-registration)
     if not user.is_active:
         user.is_active = True
         user.save(update_fields=["is_active"])
         logger.info("[VERIFY_EMAIL] Activated user_id=%s (was inactive)", user.pk)
-    
+
     messages.success(
         request,
         "Your email has been verified. You can sign in now.",
@@ -805,60 +830,64 @@ def password_reset_request(request):
     Display password reset request form and send reset email.
 
     Uses Django ``EMAIL_BACKEND`` (SES in dev/prod; locmem in tests).
-    
+
     Template: accounts/password_reset.html
     Context:
         errors: dict - Field-specific errors
         email: str - Preserved email on error
         success: bool - Email sent successfully
-    
+
     :param request: Django request object
     :return: Rendered password reset template
     """
     logger.info(f"Password reset page accessed via {request.method}")
-    
-    if request.method == 'GET':
+
+    if request.method == "GET":
         logger.info("Displaying password reset form")
-        return render(request, 'accounts/password_reset.html', {
-            'errors': {},
-            'email': '',
-            'success': False
-        })
-    
+        return render(
+            request,
+            "accounts/password_reset.html",
+            {"errors": {}, "email": "", "success": False},
+        )
+
     # POST request - send reset email
-    email = request.POST.get('email', '').strip()
-    
+    email = request.POST.get("email", "").strip()
+
     logger.info(f"Password reset request for email: {email}")
-    
+
     # Validate email
     if not email:
         logger.warning("Password reset: empty email")
-        return render(request, 'accounts/password_reset.html', {
-            'errors': {'email': ['This field is required.']},
-            'email': email,
-            'success': False
-        })
-    
+        return render(
+            request,
+            "accounts/password_reset.html",
+            {
+                "errors": {"email": ["This field is required."]},
+                "email": email,
+                "success": False,
+            },
+        )
+
     # Check if user exists (security: always show success to prevent enumeration)
     try:
         user = User.objects.get(email=email)
         logger.info(f"Password reset: user found for email {email}")
-        
+
         # Generate reset token (simplified - in production use django.contrib.auth.tokens)
         from django.utils.http import urlsafe_base64_encode
         from django.utils.encoding import force_bytes
         import secrets
-        
+
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = secrets.token_urlsafe(32)
-        
+
         # Store token in session (simplified - production should use proper token generator)
-        request.session[f'password_reset_{uid}'] = {
-            'token': token,
-            'user_id': user.pk,
-            'timestamp': str(__import__('datetime').datetime.now())
+        request.session[f"password_reset_{uid}"] = {
+            "token": token,
+            "user_id": user.pk,
+            "timestamp": str(__import__("datetime").datetime.now()),
         }
-        
+
         reset_url = request.build_absolute_uri(
             reverse("password_reset_confirm", kwargs={"uidb64": uid, "token": token})
         )
@@ -867,104 +896,185 @@ def password_reset_request(request):
     except User.DoesNotExist:
         # Security: Don't reveal if email exists
         logger.warning(f"Password reset requested for non-existent email: {email}")
-    
+
     # Always show success message (security best practice)
-    return render(request, 'accounts/password_reset.html', {
-        'errors': {},
-        'email': email,
-        'success': True
-    })
+    return render(
+        request,
+        "accounts/password_reset.html",
+        {"errors": {}, "email": email, "success": True},
+    )
 
 
 @require_http_methods(["GET", "POST"])
 def password_reset_confirm(request, uidb64, token):
     """
     Confirm password reset and set new password.
-    
+
     Template: accounts/password_reset_confirm.html
     Context:
         errors: dict - Field-specific errors
         valid_link: bool - Token is valid
         success: bool - Password reset successfully
-    
+
     :param request: Django request object
     :param uidb64: str - Base64 encoded user ID
     :param token: str - Reset token
     :return: Rendered password reset confirm template
     """
     from django.utils.http import urlsafe_base64_decode
-    
+
     logger.info(f"Password reset confirm accessed via {request.method}")
-    
+
     # Validate token
     try:
         uid = urlsafe_base64_decode(uidb64).decode()
-        session_data = request.session.get(f'password_reset_{uidb64}')
-        
-        if not session_data or session_data['token'] != token:
+        session_data = request.session.get(f"password_reset_{uidb64}")
+
+        if not session_data or session_data["token"] != token:
             logger.warning(f"Invalid password reset token for uid {uid}")
-            return render(request, 'accounts/password_reset_confirm.html', {
-                'valid_link': False,
-                'errors': {},
-                'success': False
-            })
-        
-        user = User.objects.get(pk=session_data['user_id'])
+            return render(
+                request,
+                "accounts/password_reset_confirm.html",
+                {"valid_link": False, "errors": {}, "success": False},
+            )
+
+        user = User.objects.get(pk=session_data["user_id"])
         logger.info(f"Valid password reset token for user {user.username}")
-        
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist, KeyError):
+
+    except TypeError, ValueError, OverflowError, User.DoesNotExist, KeyError:
         logger.error("Invalid password reset link")
-        return render(request, 'accounts/password_reset_confirm.html', {
-            'valid_link': False,
-            'errors': {},
-            'success': False
-        })
-    
-    if request.method == 'GET':
-        return render(request, 'accounts/password_reset_confirm.html', {
-            'valid_link': True,
-            'errors': {},
-            'success': False
-        })
-    
+        return render(
+            request,
+            "accounts/password_reset_confirm.html",
+            {"valid_link": False, "errors": {}, "success": False},
+        )
+
+    if request.method == "GET":
+        return render(
+            request,
+            "accounts/password_reset_confirm.html",
+            {"valid_link": True, "errors": {}, "success": False},
+        )
+
     # POST - set new password
-    password = request.POST.get('password', '')
-    password_confirm = request.POST.get('password_confirm', '')
-    
+    password = request.POST.get("password", "")
+    password_confirm = request.POST.get("password_confirm", "")
+
     # Validate passwords
     errors = {}
     if not password:
-        errors['password'] = ['This field is required.']
+        errors["password"] = ["This field is required."]
     elif len(password) < 8:
-        errors['password'] = ['Password must be at least 8 characters long.']
-    
+        errors["password"] = ["Password must be at least 8 characters long."]
+
     if not password_confirm:
-        errors['password_confirm'] = ['This field is required.']
+        errors["password_confirm"] = ["This field is required."]
     elif password and password_confirm and password != password_confirm:
-        errors['password_confirm'] = ['Passwords do not match.']
-    
+        errors["password_confirm"] = ["Passwords do not match."]
+
     if errors:
         logger.warning(f"Password reset validation failed for user {user.username}")
-        return render(request, 'accounts/password_reset_confirm.html', {
-            'valid_link': True,
-            'errors': errors,
-            'success': False
-        })
-    
+        return render(
+            request,
+            "accounts/password_reset_confirm.html",
+            {"valid_link": True, "errors": errors, "success": False},
+        )
+
     # Set new password
     user.set_password(password)
     user.save()
 
     mark_email_verified(user)
     logger.info("[PASSWORD_RESET] Marked email verified user_id=%s", user.pk)
-    
+
     # Clear session token
-    del request.session[f'password_reset_{uidb64}']
-    
+    del request.session[f"password_reset_{uidb64}"]
+
     logger.info(f"Password reset successful for user {user.username}")
-    
-    return render(request, 'accounts/password_reset_confirm.html', {
-        'valid_link': True,
-        'errors': {},
-        'success': True
-    })
+
+    return render(
+        request,
+        "accounts/password_reset_confirm.html",
+        {"valid_link": True, "errors": {}, "success": True},
+    )
+
+
+class ProfileContributionRow(TypedDict):
+    """Presentation-only source/category row; contains no domain aggregation."""
+
+    label: str
+    points: int
+    formatted_points: str
+
+
+class ProfileContributions(TypedDict):
+    """Owner contribution context consumed by the existing profile template."""
+
+    total_karma: int
+    formatted_karma: str
+    primary_category: str | None
+    summary: str
+    source_rows: tuple[ProfileContributionRow, ...]
+    category_rows: tuple[ProfileContributionRow, ...]
+
+
+def _validate_profile_contribution_request(request: HttpRequest) -> int:
+    """Resolve the authenticated persisted request owner.
+
+    :param request: Profile request; example: authenticated Maria GET.
+    :return: Owner primary key; example: 42.
+    :raises PermissionDenied: If anonymous; example: missing session.
+    :raises ValueError: If owner has no valid persisted ID; example: None.
+
+    Pseudocode: validate authentication and positive integer PK; log rejection;
+    return only request.user.pk, ignoring all subject query parameters.
+    """
+    raise NotImplementedError()
+
+
+def _profile_stored_summary_for(user_id: int) -> str:
+    """Read stored prose without creating a profile or requesting generation.
+
+    :param user_id: Persisted subject PK; example: 42.
+    :return: Stored paragraph or empty string; example: "Maria maintains...".
+    :raises ValueError: If ID is invalid; example: -1.
+
+    Pseudocode: validate ID; fetch ExpertProfile contribution_summary only;
+    return empty text for an absent row or blank stored value.
+    """
+    raise NotImplementedError()
+
+
+def _profile_contribution_display(
+    projection: ExpertProjection, summary: str
+) -> ProfileContributions:
+    """Format an immutable numeric projection for the profile template.
+
+    :param projection: S03 result; example: total_points=8200, category=Design.
+    :param summary: Stored escaped-at-render prose; example: "Maria maintains...".
+    :return: Presentation context; example: formatted_karma="8,200".
+    :raises ValueError: If numeric/source/category data is invalid.
+    :raises TypeError: If summary is not text; example: None.
+
+    Pseudocode: validate projection/text; format integers with grouping; map
+    source labels in Released/PIP/Consumption/Learning order; preserve category
+    projection and build immutable row tuples; never calculate domain totals.
+    """
+    raise NotImplementedError()
+
+
+def _profile_contribution_context(
+    request: HttpRequest,
+) -> dict[str, ProfileContributions]:
+    """Build namespaced contribution context for the authenticated owner.
+
+    :param request: Real profile request; example: Maria with X-Request-ID.
+    :return: One namespaced value; example: {"contributions": display_context}.
+    :raises PermissionDenied: If no authenticated owner is available.
+    :raises ValueError: If the owner ID or projection violates its contract.
+
+    Pseudocode: validate owner; log entry; project_user(owner_id); read stored
+    prose; log stored/missing branch; format display; log body-free exit;
+    return contributions. Never create a token, award, profile or model call.
+    """
+    raise NotImplementedError()
