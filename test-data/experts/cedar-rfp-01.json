@@ -1,0 +1,1047 @@
+{
+  "format": "experts-story-fixture-v2",
+  "notice": "Synthetic production story and proposed acceptance data; not real personal records and not yet a Django loaddata fixture.",
+  "case": {
+    "id": "CEDAR-RFP-01",
+    "organization": "Meridian Methods (fictional)",
+    "story_time": "Monday 23 November 2026, 09:10 America/New_York",
+    "requester": "Noor Ibrahim, bid manager (fictional)",
+    "decision_maker": "Elena Svensson, Competency Center Head",
+    "deadline": "Tuesday 24 November 2026, 12:00 America/New_York",
+    "client_context": "Project Cedar, a regional bank's digital-onboarding RFP",
+    "need": "A design contributor who can explain and review accessible form validation and keyboard recovery",
+    "job": "Identify one plausible contributor, read the full contribution summary, inspect one relevant released public playbook, and initiate the correct contact handoff.",
+    "target": "Complete the discovery path within five minutes in the scripted UAT; this is a proposed target, not a measured result.",
+    "not_promised": [
+      "Availability",
+      "Hiring suitability",
+      "Certification",
+      "Email delivery"
+    ]
+  },
+  "actors": [
+    {
+      "name": "Elena Svensson",
+      "username": "esvensson",
+      "email": "elena.svensson@example.com",
+      "authenticated": true,
+      "karma": 0
+    },
+    {
+      "name": "Bob Carter",
+      "username": null,
+      "email": null,
+      "authenticated": false,
+      "karma_account": null
+    },
+    {
+      "name": "Noor Ibrahim",
+      "application_account": false
+    }
+  ],
+  "people": [
+    {
+      "username": "sreed",
+      "name": "Sofia Reed",
+      "email": "sofia.reed@example.com",
+      "role": "Service design lead",
+      "primary_category": "Design",
+      "summary": "Sofia Reed maintains Service Blueprinting for Complex Portfolios and Design Operations Governance. Her published work focuses on service boundaries, operating models, and cross-team design coordination. Her examples address cross-team service design and operating-model decisions.",
+      "public_playbooks": [
+        {
+          "pk": 6102,
+          "title": "Service Blueprinting for Complex Portfolios",
+          "category": "Design",
+          "version": "1.0"
+        },
+        {
+          "pk": 6103,
+          "title": "Design Operations Governance",
+          "category": "Design",
+          "version": "1.0"
+        }
+      ],
+      "ledger": [
+        {
+          "category": "Design",
+          "event": "release",
+          "count": 2,
+          "points_each": 5000,
+          "points": 10000
+        },
+        {
+          "category": "Design",
+          "event": "major",
+          "count": 3,
+          "points_each": 500,
+          "points": 1500
+        },
+        {
+          "category": "Design",
+          "event": "consumption",
+          "count": 400,
+          "points_each": 5,
+          "points": 2000
+        },
+        {
+          "category": "Design",
+          "event": "learning",
+          "count": 80,
+          "points_each": 5,
+          "points": 400
+        },
+        {
+          "category": "Development",
+          "event": "major",
+          "count": 3,
+          "points_each": 500,
+          "points": 1500
+        }
+      ],
+      "total_karma": 15400,
+      "karma_by_category": {
+        "Design": 13900,
+        "Development": 1500
+      },
+      "karma_by_source": {
+        "Released": 10000,
+        "PIP": 3000,
+        "Consumption": 2000,
+        "Learning": 400
+      }
+    },
+    {
+      "username": "mrodriguez",
+      "name": "Maria Rodriguez",
+      "email": "maria.rodriguez@example.com",
+      "role": "UX consultant specializing in accessible forms",
+      "primary_category": "Design",
+      "summary": "Maria Rodriguez maintains Accessibility Audit Playbook, a released Design playbook for reviewing keyboard access, focus order, accessible names, and form feedback. Its Lead an Accessibility Review workflow begins with the user task and the relevant input data. The Trace Keyboard Focus activity records the order in which controls receive focus. Review Form Feedback checks that errors identify the field and explain recovery. Maria added Keyboard Navigation Audit to the public Accessible Forms Review playbook. She also revised Error Message Review to require a programmatic association between the field and its message. Two accepted Development additions cover accessible component fixtures and a focus regression checklist. Her examples distinguish an empty form, a partially completed form, and a rejected submission. This record describes published playbook contributions; availability and project fit still require a conversation.",
+      "public_playbooks": [
+        {
+          "pk": 6101,
+          "title": "Accessibility Audit Playbook",
+          "category": "Design",
+          "version": "1.0",
+          "workflow": "Lead an Accessibility Review",
+          "activities": [
+            "Trace Keyboard Focus",
+            "Review Form Feedback",
+            "Document Recovery Paths"
+          ]
+        }
+      ],
+      "private_playbooks": [
+        "Cedar Bid Pricing"
+      ],
+      "private_pip": "Internal staffing notes for Cedar",
+      "private_token": "DEMO_ONLY_NOT_A_REAL_TOKEN",
+      "ledger": [
+        {
+          "category": "Design",
+          "event": "release",
+          "count": 1,
+          "points_each": 5000,
+          "points": 5000
+        },
+        {
+          "category": "Design",
+          "event": "major",
+          "count": 1,
+          "points_each": 500,
+          "points": 500
+        },
+        {
+          "category": "Design",
+          "event": "minor",
+          "count": 1,
+          "points_each": 100,
+          "points": 100
+        },
+        {
+          "category": "Design",
+          "event": "consumption",
+          "count": 240,
+          "points_each": 5,
+          "points": 1200
+        },
+        {
+          "category": "Design",
+          "event": "learning",
+          "count": 80,
+          "points_each": 5,
+          "points": 400
+        },
+        {
+          "category": "Development",
+          "event": "major",
+          "count": 2,
+          "points_each": 500,
+          "points": 1000
+        }
+      ],
+      "total_karma": 8200,
+      "karma_by_category": {
+        "Design": 7200,
+        "Development": 1000
+      },
+      "karma_by_source": {
+        "Released": 5000,
+        "PIP": 1600,
+        "Consumption": 1200,
+        "Learning": 400
+      }
+    },
+    {
+      "username": "pnair",
+      "name": "Priya Nair",
+      "email": "priya.nair@example.com",
+      "role": "Design research and inclusive discovery consultant",
+      "primary_category": "Design",
+      "summary": "Priya Nair maintains Inclusive Discovery Interviews. Her published examples address recruitment, interview questions, and synthesis across discovery research.",
+      "public_playbooks": [
+        {
+          "pk": 6104,
+          "title": "Inclusive Discovery Interviews",
+          "category": "Design",
+          "version": "1.0"
+        }
+      ],
+      "ledger": [
+        {
+          "category": "Design",
+          "event": "release",
+          "count": 1,
+          "points_each": 5000,
+          "points": 5000
+        },
+        {
+          "category": "Design",
+          "event": "major",
+          "count": 2,
+          "points_each": 500,
+          "points": 1000
+        },
+        {
+          "category": "Design",
+          "event": "consumption",
+          "count": 260,
+          "points_each": 5,
+          "points": 1300
+        },
+        {
+          "category": "Design",
+          "event": "learning",
+          "count": 60,
+          "points_each": 5,
+          "points": 300
+        }
+      ],
+      "total_karma": 7600,
+      "karma_by_category": {
+        "Design": 7600
+      },
+      "karma_by_source": {
+        "Released": 5000,
+        "PIP": 1000,
+        "Consumption": 1300,
+        "Learning": 300
+      }
+    },
+    {
+      "username": "dortiz",
+      "name": "Daniel Ortiz",
+      "email": "daniel.ortiz@example.com",
+      "role": "Design systems contributor",
+      "primary_category": "Design",
+      "summary": "Daniel Ortiz maintains Design System Review. His recorded contributions concern component inventories, token documentation, and versioned component adoption.",
+      "public_playbooks": [
+        {
+          "pk": 6105,
+          "title": "Design System Review",
+          "category": "Design",
+          "version": "1.0"
+        }
+      ],
+      "ledger": [
+        {
+          "category": "Design",
+          "event": "release",
+          "count": 1,
+          "points_each": 5000,
+          "points": 5000
+        },
+        {
+          "category": "Design",
+          "event": "major",
+          "count": 2,
+          "points_each": 500,
+          "points": 1000
+        },
+        {
+          "category": "Design",
+          "event": "consumption",
+          "count": 140,
+          "points_each": 5,
+          "points": 700
+        },
+        {
+          "category": "Design",
+          "event": "learning",
+          "count": 40,
+          "points_each": 5,
+          "points": 200
+        }
+      ],
+      "total_karma": 6900,
+      "karma_by_category": {
+        "Design": 6900
+      },
+      "karma_by_source": {
+        "Released": 5000,
+        "PIP": 1000,
+        "Consumption": 700,
+        "Learning": 200
+      }
+    },
+    {
+      "username": "hkim",
+      "name": "Hana Kim",
+      "email": "hana.kim@example.com",
+      "role": "Form design reviewer",
+      "primary_category": "Design",
+      "summary": "Hana Kim maintains Accessible Forms Review, the public playbook to which Maria contributed Keyboard Navigation Audit and the Error Message Review revision.",
+      "public_playbooks": [
+        {
+          "pk": 6106,
+          "title": "Accessible Forms Review",
+          "category": "Design",
+          "version": "2.0"
+        }
+      ],
+      "ledger": [
+        {
+          "category": "Design",
+          "event": "release",
+          "count": 1,
+          "points_each": 5000,
+          "points": 5000
+        },
+        {
+          "category": "Design",
+          "event": "major",
+          "count": 1,
+          "points_each": 500,
+          "points": 500
+        },
+        {
+          "category": "Design",
+          "event": "consumption",
+          "count": 40,
+          "points_each": 5,
+          "points": 200
+        },
+        {
+          "category": "Design",
+          "event": "learning",
+          "count": 20,
+          "points_each": 5,
+          "points": 100
+        }
+      ],
+      "total_karma": 5800,
+      "karma_by_category": {
+        "Design": 5800
+      },
+      "karma_by_source": {
+        "Released": 5000,
+        "PIP": 500,
+        "Consumption": 200,
+        "Learning": 100
+      }
+    },
+    {
+      "username": "tmartin",
+      "name": "Theo Martin",
+      "email": "theo.martin@example.com",
+      "role": "Design workshop facilitator",
+      "primary_category": "Design",
+      "summary": "Theo Martin maintains Workshop Facilitation Basics. His contributions describe structured workshops, participant facilitation and collaborative synthesis.",
+      "public_playbooks": [
+        {
+          "pk": 6107,
+          "title": "Workshop Facilitation Basics",
+          "category": "Design",
+          "version": "1.0"
+        }
+      ],
+      "ledger": [
+        {
+          "category": "Design",
+          "event": "release",
+          "count": 1,
+          "points_each": 5000,
+          "points": 5000
+        },
+        {
+          "category": "Design",
+          "event": "minor",
+          "count": 1,
+          "points_each": 100,
+          "points": 100
+        },
+        {
+          "category": "Design",
+          "event": "consumption",
+          "count": 10,
+          "points_each": 5,
+          "points": 50
+        },
+        {
+          "category": "Design",
+          "event": "learning",
+          "count": 10,
+          "points_each": 5,
+          "points": 50
+        }
+      ],
+      "total_karma": 5200,
+      "karma_by_category": {
+        "Design": 5200
+      },
+      "karma_by_source": {
+        "Released": 5000,
+        "PIP": 100,
+        "Consumption": 50,
+        "Learning": 50
+      }
+    },
+    {
+      "username": "mchen",
+      "name": "Mike Chen",
+      "email": "mike.chen@example.com",
+      "role": "Development playbook author and FOB administrator",
+      "primary_category": "Development",
+      "summary": null,
+      "copy_count": 47,
+      "public_playbooks": [
+        {
+          "pk": 6201,
+          "title": "React Frontend Development",
+          "category": "Development",
+          "version": "2.0",
+          "workflow_pk": 6202,
+          "activity_pk": 6203,
+          "activity": "Setup component structure"
+        },
+        {
+          "pk": 6204,
+          "title": "Testing Patterns Guide",
+          "category": "Development",
+          "version": "1.0"
+        }
+      ],
+      "ledger": [
+        {
+          "category": "Development",
+          "event": "release",
+          "count": 2,
+          "points_each": 5000,
+          "points": 10000
+        },
+        {
+          "category": "Development",
+          "event": "consumption",
+          "count": 470,
+          "points_each": 5,
+          "points": 2350
+        },
+        {
+          "category": "Development",
+          "event": "learning",
+          "count": 20,
+          "points_each": 5,
+          "points": 100
+        }
+      ],
+      "total_karma": 12450,
+      "karma_by_category": {
+        "Development": 12450
+      },
+      "karma_by_source": {
+        "Released": 10000,
+        "PIP": 0,
+        "Consumption": 2350,
+        "Learning": 100
+      }
+    },
+    {
+      "username": "jlee",
+      "name": "Jordan Lee",
+      "email": "jordan.lee@example.com",
+      "role": "Component architecture contributor",
+      "primary_category": "Development",
+      "summary": "Jordan Lee maintains Component Architecture Patterns and contributes component dependency checklists.",
+      "public_playbooks": [
+        {
+          "pk": 6205,
+          "title": "Component Architecture Patterns",
+          "category": "Development",
+          "version": "1.0"
+        }
+      ],
+      "ledger": [
+        {
+          "category": "Development",
+          "event": "release",
+          "count": 1,
+          "points_each": 5000,
+          "points": 5000
+        },
+        {
+          "category": "Development",
+          "event": "major",
+          "count": 1,
+          "points_each": 500,
+          "points": 500
+        },
+        {
+          "category": "Development",
+          "event": "consumption",
+          "count": 100,
+          "points_each": 5,
+          "points": 500
+        },
+        {
+          "category": "Development",
+          "event": "learning",
+          "count": 20,
+          "points_each": 5,
+          "points": 100
+        }
+      ],
+      "total_karma": 6100,
+      "karma_by_category": {
+        "Development": 6100
+      },
+      "karma_by_source": {
+        "Released": 5000,
+        "PIP": 500,
+        "Consumption": 500,
+        "Learning": 100
+      }
+    },
+    {
+      "username": "apatel",
+      "name": "Alex Patel",
+      "email": "alex.patel@example.com",
+      "role": "Product discovery contributor",
+      "primary_category": "Product",
+      "summary": "Alex Patel maintains Product Discovery Playbook and contributes prioritization guidance.",
+      "public_playbooks": [
+        {
+          "pk": 6301,
+          "title": "Product Discovery Playbook",
+          "category": "Product",
+          "version": "1.0"
+        }
+      ],
+      "ledger": [
+        {
+          "category": "Product",
+          "event": "release",
+          "count": 1,
+          "points_each": 5000,
+          "points": 5000
+        },
+        {
+          "category": "Product",
+          "event": "minor",
+          "count": 1,
+          "points_each": 100,
+          "points": 100
+        },
+        {
+          "category": "Product",
+          "event": "consumption",
+          "count": 40,
+          "points_each": 5,
+          "points": 200
+        },
+        {
+          "category": "Product",
+          "event": "learning",
+          "count": 20,
+          "points_each": 5,
+          "points": 100
+        }
+      ],
+      "total_karma": 5400,
+      "karma_by_category": {
+        "Product": 5400
+      },
+      "karma_by_source": {
+        "Released": 5000,
+        "PIP": 100,
+        "Consumption": 200,
+        "Learning": 100
+      }
+    },
+    {
+      "username": "skim",
+      "name": "Sam Kim",
+      "email": "sam.kim@example.com",
+      "role": "Research contributor",
+      "primary_category": "Research",
+      "summary": "Sam Kim contributes interview and synthesis workflows to Research playbooks. His public contribution record includes accepted Research changes.",
+      "public_playbooks": [],
+      "ledger": [
+        {
+          "category": "Research",
+          "event": "major",
+          "count": 9,
+          "points_each": 500,
+          "points": 4500
+        },
+        {
+          "category": "Research",
+          "event": "minor",
+          "count": 1,
+          "points_each": 100,
+          "points": 100
+        },
+        {
+          "category": "Research",
+          "event": "learning",
+          "count": 40,
+          "points_each": 5,
+          "points": 200
+        }
+      ],
+      "total_karma": 4800,
+      "karma_by_category": {
+        "Research": 4800
+      },
+      "karma_by_source": {
+        "Released": 0,
+        "PIP": 4600,
+        "Consumption": 0,
+        "Learning": 200
+      }
+    },
+    {
+      "username": "nberg",
+      "name": "Nora Berg",
+      "email": "nora.berg@example.com",
+      "role": "First-time playbook author",
+      "primary_category": null,
+      "summary": null,
+      "public_playbooks": [],
+      "draft_playbook": {
+        "pk": 6302,
+        "title": "Accessible Workshop Starter",
+        "category": "Product",
+        "version": "0.1"
+      },
+      "ledger": [],
+      "total_karma": 0,
+      "karma_by_category": {},
+      "karma_by_source": {
+        "Released": 0,
+        "PIP": 0,
+        "Consumption": 0,
+        "Learning": 0
+      }
+    }
+  ],
+  "categories": [
+    "Product",
+    "Development",
+    "Research",
+    "Design",
+    "Other"
+  ],
+  "expected_design_order": [
+    "sreed",
+    "mrodriguez",
+    "pnair",
+    "dortiz",
+    "hkim"
+  ],
+  "expected_design_excluded": [
+    "tmartin",
+    "mchen",
+    "jlee",
+    "apatel",
+    "skim",
+    "nberg"
+  ],
+  "expected_development_order": [
+    "mchen",
+    "jlee"
+  ],
+  "expected_other_order": [],
+  "ranking_rule": "Select users with total_karma > 0 whose primary_category equals the tab. Sort by total_karma across all categories descending. Return at most five. Primary-category ties use released-playbook count in the tied categories, then alphabetical category; proposed replay addition for equal total Karma: username ascending, documented before PIN.",
+  "summary_after_submission_suffix": "Her latest submitted proposal addresses screen-reader error recovery in form validation.",
+  "events": [
+    {
+      "id": "EV01",
+      "reset": "baseline",
+      "actor": "mrodriguez",
+      "action": "Authenticated Copy Prompt on mchen activity 6203",
+      "before": {
+        "mrodriguez": 8200,
+        "mchen": 12450
+      },
+      "after": {
+        "mrodriguez": 8205,
+        "mchen": 12455
+      },
+      "category": "Development",
+      "visible": "Clipboard receives prompt; both parties gain 5."
+    },
+    {
+      "id": "EV02",
+      "reset": "baseline",
+      "actor": "guest Bob",
+      "action": "Copy Prompt on public mchen activity 6203",
+      "before": {
+        "mchen": 12450
+      },
+      "after": {
+        "mchen": 12450
+      },
+      "visible": "Clipboard receives prompt; no Karma account is created for Bob; no author award."
+    },
+    {
+      "id": "EV03",
+      "reset": "baseline",
+      "actor": "mchen",
+      "action": "Copy own activity 6203",
+      "before": {
+        "mchen": 12450
+      },
+      "after": {
+        "mchen": 12450
+      },
+      "visible": "Clipboard receives prompt; neither side earns points."
+    },
+    {
+      "id": "EV04",
+      "reset": "baseline",
+      "actor": "mrodriguez",
+      "action": "Submit ADD Activity proposal Screen Reader Error Recovery to Hana's Accessible Forms Review",
+      "before": {
+        "mrodriguez": 8200
+      },
+      "after_submission": {
+        "mrodriguez": 8200
+      },
+      "summary": "Base Maria paragraph plus neutral submission suffix; must not claim the new proposal is accepted.",
+      "after_acceptance": {
+        "mrodriguez": 8700
+      },
+      "category": "Design",
+      "target_version_before": "2.0",
+      "target_version_after_acceptance": "3.0"
+    },
+    {
+      "id": "EV05",
+      "reset": "baseline",
+      "actor": "mrodriguez",
+      "action": "Accept an ALTER change independently",
+      "before": {
+        "mrodriguez": 8200
+      },
+      "after": {
+        "mrodriguez": 8300
+      },
+      "category": "Design"
+    },
+    {
+      "id": "EV06",
+      "reset": "baseline",
+      "actor": "mrodriguez",
+      "action": "Partially accept one ADD and reject one ALTER",
+      "before": {
+        "mrodriguez": 8200
+      },
+      "after": {
+        "mrodriguez": 8700
+      },
+      "category": "Design"
+    },
+    {
+      "id": "EV07",
+      "reset": "baseline",
+      "actor": "nberg",
+      "action": "First release of Accessible Workshop Starter",
+      "before": {
+        "nberg": 0
+      },
+      "after": {
+        "nberg": 5000
+      },
+      "category": "Product",
+      "expected_product_order_after": [
+        "apatel",
+        "nberg"
+      ],
+      "followup": "A later release to v2.0 must not add another 5,000 first-release award."
+    },
+    {
+      "id": "EV08",
+      "reset": "baseline",
+      "actor": "mrodriguez",
+      "action": "MCP get_activity for Mike's activity 6203",
+      "before": {
+        "mrodriguez": 8200,
+        "mchen": 12450
+      },
+      "after": {
+        "mrodriguez": 8205,
+        "mchen": 12455
+      }
+    },
+    {
+      "id": "EV09",
+      "reset": "baseline",
+      "actor": "mrodriguez",
+      "action": "MCP list_activities",
+      "before": {
+        "mrodriguez": 8200,
+        "mchen": 12450
+      },
+      "after": {
+        "mrodriguez": 8200,
+        "mchen": 12450
+      }
+    },
+    {
+      "id": "EV10",
+      "reset": "baseline",
+      "actor": "mrodriguez",
+      "action": "Export Mike's workflow 6202 producing multiple files",
+      "before": {
+        "mrodriguez": 8200,
+        "mchen": 12450
+      },
+      "after": {
+        "mrodriguez": 8205,
+        "mchen": 12455
+      },
+      "rule": "One award per export call, not per generated file."
+    },
+    {
+      "id": "EV11",
+      "reset": "baseline",
+      "actor": "mchen",
+      "action": "Export own workflow 6202",
+      "before": {
+        "mchen": 12450
+      },
+      "after": {
+        "mchen": 12450
+      }
+    },
+    {
+      "id": "EV12",
+      "reset": "baseline",
+      "actor": "mrodriguez",
+      "action": "import_workflow_from_local",
+      "before": {
+        "mrodriguez": 8200,
+        "mchen": 12450
+      },
+      "after": {
+        "mrodriguez": 8200,
+        "mchen": 12450
+      }
+    }
+  ],
+  "viewports": [
+    {
+      "name": "wide-low",
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "name": "large-desktop",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "name": "laptop",
+      "width": 1512,
+      "height": 982
+    },
+    {
+      "name": "tablet-portrait",
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "name": "tablet-landscape",
+      "width": 1024,
+      "height": 768
+    },
+    {
+      "name": "phone",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "minimum-phone",
+      "width": 360,
+      "height": 800
+    }
+  ],
+  "style_reference": {
+    "font": "Montserrat",
+    "body_px": 16,
+    "page_title_px": 28,
+    "page_title_weight": 600,
+    "primary": "#1f3a5f",
+    "primary_hover": "#16294a",
+    "accent": "#c9a227",
+    "background": "#f5f7fa",
+    "surface": "#ffffff",
+    "ink": "#1a1f2e",
+    "muted": "#5a6478",
+    "border": "#e3e7ee",
+    "source": "Experts reference branch IA; compare against the baseline's actual shared stylesheet before contracting."
+  },
+  "tie_variants": [
+    {
+      "id": "TIE01",
+      "reset": "isolated variant",
+      "username": "arao",
+      "name": "Anika Rao",
+      "category_points": {
+        "Design": 5000,
+        "Development": 5000
+      },
+      "released_playbooks": {
+        "Design": 0,
+        "Development": 1
+      },
+      "expected_primary_category": "Development",
+      "reason": "Points tie; one released Development playbook beats zero Design releases."
+    },
+    {
+      "id": "TIE02",
+      "reset": "isolated variant",
+      "username": "bquinn",
+      "name": "Blair Quinn",
+      "category_points": {
+        "Design": 5000,
+        "Development": 5000
+      },
+      "released_playbooks": {
+        "Design": 1,
+        "Development": 1
+      },
+      "expected_primary_category": "Design",
+      "reason": "Points and released-playbook counts tie; alphabetical category decides."
+    },
+    {
+      "id": "TIE03",
+      "reset": "isolated variant",
+      "users": [
+        {
+          "username": "apark",
+          "name": "Alina Park",
+          "primary_category": "Design",
+          "total_karma": 15400
+        },
+        {
+          "username": "sreed",
+          "name": "Sofia Reed",
+          "primary_category": "Design",
+          "total_karma": 15400
+        }
+      ],
+      "expected_order": [
+        "apark",
+        "sreed"
+      ],
+      "rule": "Proposed replay addition: equal total Karma sorts by username ascending, documented before PIN. The reference branch does not define this tie."
+    }
+  ],
+  "historical_pips": [
+    {
+      "id": "HIST-MARIA-DESIGN-01",
+      "submitter": "mrodriguez",
+      "playbook_pk": 6106,
+      "playbook_title": "Accessible Forms Review",
+      "version_before": "1.0",
+      "version_after": "2.0",
+      "accepted_changes": [
+        {
+          "operation": "ADD",
+          "entity": "Activity",
+          "name": "Keyboard Navigation Audit",
+          "karma": 500
+        },
+        {
+          "operation": "ALTER",
+          "entity": "Activity",
+          "name": "Error Message Review",
+          "karma": 100
+        }
+      ],
+      "total_award": 600,
+      "category": "Design"
+    },
+    {
+      "id": "HIST-MARIA-DEV-01",
+      "submitter": "mrodriguez",
+      "playbook_pk": 6201,
+      "playbook_title": "React Frontend Development",
+      "version_before": "1.0",
+      "version_after": "2.0",
+      "accepted_changes": [
+        {
+          "operation": "ADD",
+          "entity": "Activity",
+          "name": "Accessible component fixture",
+          "karma": 500
+        },
+        {
+          "operation": "ADD",
+          "entity": "Activity",
+          "name": "Focus regression checklist",
+          "karma": 500
+        }
+      ],
+      "total_award": 1000,
+      "category": "Development"
+    }
+  ],
+  "summary_policy": {
+    "refresh_triggers": [
+      "PIP submission",
+      "PIP resubmission"
+    ],
+    "content": "Stable public contribution facts and neutral descriptions of newly submitted proposals.",
+    "excluded": [
+      "Karma totals",
+      "Playbook-category point subtotals",
+      "Changing numerical contribution counts",
+      "Unaccepted proposals described as accepted"
+    ],
+    "numeric_values": "Read live from the ledger/query projection in the numeric UI and numeric fallback, not from cached prose.",
+    "after_copy": "Stored summary unchanged; UI total becomes 8,205.",
+    "after_add_acceptance": "Stored summary unchanged until next submission; UI total becomes 8,700. Neutral submitted-proposal wording remains true.",
+    "fixed_display_fixture_sentence_count": 9
+  },
+  "environment": {
+    "demo_id": "mimir-experts-demo",
+    "base_url": "http://127.0.0.1:8018",
+    "mcp_url": "http://127.0.0.1:8019/sse",
+    "database": "SQLite /app/data/mimir.db on named Docker volume mimir_experts_demo_data",
+    "email": "django.core.mail.backends.filebased.EmailBackend -> /capture/mail",
+    "release": "Standard approved Mimir release and existing idle deployment; Cedar records run only in local isolated demo rebuilt from approved merge SHA or pulled exact approved artifact.",
+    "production_promotion": "Separate actual human decision through existing promote workflow; not required for the local Cedar recording."
+  }
+}
