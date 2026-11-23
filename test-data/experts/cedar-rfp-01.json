@@ -473,7 +473,8 @@
         "PIP": 0,
         "Consumption": 2350,
         "Learning": 100
-      }
+      },
+      "is_staff": true
     },
     {
       "username": "jlee",
@@ -682,7 +683,6 @@
   ],
   "expected_other_order": [],
   "ranking_rule": "Select users with total_karma > 0 whose primary_category equals the tab. Sort by total_karma across all categories descending. Return at most five. Primary-category ties use released-playbook count in the tied categories, then alphabetical category; proposed replay addition for equal total Karma: username ascending, documented before PIN.",
-  "summary_after_submission_suffix": "Her latest submitted proposal addresses screen-reader error recovery in form validation.",
   "events": [
     {
       "id": "EV01",
@@ -737,7 +737,7 @@
       "after_submission": {
         "mrodriguez": 8200
       },
-      "summary": "Base Maria paragraph plus neutral submission suffix; must not claim the new proposal is accepted.",
+      "summary": "Same nine-sentence Maria paragraph, regenerated from released public playbooks and already published accepted changes. The unpublished proposal title/content is not public evidence.",
       "after_acceptance": {
         "mrodriguez": 8700
       },
@@ -1023,16 +1023,17 @@
       "PIP submission",
       "PIP resubmission"
     ],
-    "content": "Stable public contribution facts and neutral descriptions of newly submitted proposals.",
+    "content": "Stable released public playbook facts and accepted changes already published in those playbooks. Submission is a refresh trigger, not permission to publish a PIP.",
     "excluded": [
       "Karma totals",
       "Playbook-category point subtotals",
       "Changing numerical contribution counts",
-      "Unaccepted proposals described as accepted"
+      "Unaccepted proposals described as accepted",
+      "Unpublished proposal titles and content, including proposals targeting public playbooks"
     ],
     "numeric_values": "Read live from the ledger/query projection in the numeric UI and numeric fallback, not from cached prose.",
     "after_copy": "Stored summary unchanged; UI total becomes 8,205.",
-    "after_add_acceptance": "Stored summary unchanged until next submission; UI total becomes 8,700. Neutral submitted-proposal wording remains true.",
+    "after_add_acceptance": "Stored summary unchanged until next submission; UI total becomes 8,700. A later refresh may include the accepted change only after it is published in a released public playbook.",
     "fixed_display_fixture_sentence_count": 9
   },
   "environment": {
@@ -1043,5 +1044,42 @@
     "email": "django.core.mail.backends.filebased.EmailBackend -> /capture/mail",
     "release": "Standard approved Mimir release and existing idle deployment; Cedar records run only in local isolated demo rebuilt from approved merge SHA or pulled exact approved artifact.",
     "production_promotion": "Separate actual human decision through existing promote workflow; not required for the local Cedar recording."
+  },
+  "summary_after_submission": "Same nine-sentence Maria paragraph, regenerated from released public playbooks and already published accepted changes. The unpublished proposal title/content is not public evidence.",
+  "pip_consumption_policy": {
+    "read_permission": "Existing PIP creator-or-staff check; no new permissions.",
+    "self_consumption": "Exclude if caller is PIP created_by OR target playbook author.",
+    "author_recipient": "Target playbook author; never credit PIP creator merely for a read.",
+    "eligible_case": {
+      "reader": "mchen",
+      "pip": "HIST-MARIA-DESIGN-01",
+      "target_author": "hkim",
+      "expected": {
+        "mchen": 12455,
+        "hkim": 5805,
+        "mrodriguez": 8200
+      }
+    },
+    "self_cases": [
+      {
+        "reader": "mrodriguez",
+        "pip": "HIST-MARIA-DESIGN-01",
+        "reason": "Own proposal",
+        "expected": {
+          "mrodriguez": 8200,
+          "hkim": 5800
+        }
+      },
+      {
+        "reader": "mchen",
+        "pip": "HIST-MARIA-DEV-01",
+        "reason": "Own target playbook, staff access already exists",
+        "expected": {
+          "mchen": 12450,
+          "mrodriguez": 8200
+        }
+      }
+    ],
+    "decision_status": "Explicit conservative self-consumption clarification for review with the PIN contract."
   }
 }

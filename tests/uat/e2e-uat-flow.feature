@@ -837,7 +837,8 @@ Feature: Mimir E2E UAT — browser-only flow (registration → GUI CRUDL → rel
     # C03 DO: Submit ADD Screen Reader Error Recovery against Hana's Accessible Forms Review v2.0 through the normal PIP UI.
     # C03 SEE: Normal processing/review; summary refresh requested; total stays 8,200; new proposal is not described as accepted.
     # C04 DO: As separate Administrator accept the ADD using the existing decision flow.
-    # C04 SEE: Maria 8,700; Design 7,700 and Development 1,000; Hana v3.0; a local decision-mail artifact.
+    # C04 SEE: Maria 8,700; Design 7,700 and Development 1,000; Hana v3.0.
+    # COMPANION EVIDENCE (outside browser steps): AT/evidence operator records the local PIP decision-mail artifact; no in-app mail viewer is added.
     # C05 DO: Reopen public and own profiles.
     # C05 SEE: Numeric total is current; stable cached prose remains valid without an additional refresh.
     # IF DIFFER: File UAT-18-03 + C-step with actual evidence.

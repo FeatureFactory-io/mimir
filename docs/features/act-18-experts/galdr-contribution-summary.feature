@@ -12,6 +12,7 @@ Feature: FOB-GALDR-CONTRIBUTION-SUMMARY-1 Refresh stable public contribution pro
     And Maria's total remains 8200
     And the new proposal is not described as accepted
     And the successful public summary is stored on her profile
+    And it contains at most 14 sentences
 
   Scenario: GALDR-SUMMARY-02 Present one stored summary consistently
     Given Maria's contribution summary has refreshed
@@ -28,14 +29,15 @@ Feature: FOB-GALDR-CONTRIBUTION-SUMMARY-1 Refresh stable public contribution pro
   Scenario: GALDR-SUMMARY-04 Use a live numeric fallback without summary prose
     Given Mike has no stored contribution summary
     When Elena opens the Development leaderboard
-    Then Mike's hint uses released-playbook and consumption counts from live data
+    Then Mike's hint is "2 released playbooks · 47 copies" from live released-playbook and GUI-copy counts
     And no public-summary paragraph is fabricated
 
   Scenario: GALDR-SUMMARY-05 Exclude private data and mutable scores from generated prose
     When a contribution-summary request is assembled for Maria
-    Then it includes only authorized public contribution evidence and neutral proposal facts
+    Then it includes only released public playbook evidence and changes already published by acceptance
     And it excludes private playbooks, private PIPs, API tokens and email addresses
     And it instructs the generator to omit Karma totals and category point subtotals
+    And submitting a PIP does not make its unpublished title or content public
 
   Scenario: GALDR-SUMMARY-06 Preserve stable prose when points change
     Given Maria's stored summary contains stable public facts and no aggregate scores

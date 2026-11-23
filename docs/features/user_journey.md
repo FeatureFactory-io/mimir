@@ -3198,8 +3198,11 @@ does not describe the proposal as accepted. Acceptance of the ADD awards 500
 Design points, moves Maria to 8,700 and publishes Hana's v3.0. It captures the
 normal decision notification locally for this replay.
 
-Cached prose contains stable public facts and neutral proposal descriptions,
-not mutable Karma totals or category subtotals. Awards update numeric values
+Cached prose contains stable released public playbook facts and accepted changes
+already published in those playbooks. Submission triggers the refresh but does
+not publish an unpublished PIP's title or content, even if its target is public.
+The refreshed paragraph may therefore retain the same facts. It excludes mutable
+Karma totals or category subtotals. Awards update numeric values
 without requiring another LLM call. Summary generation must not expose private
 playbooks, private proposals, tokens or email addresses. Failure preserves the
 last good summary and existing PIP lifecycle behavior; numeric fallback remains
@@ -3221,6 +3224,22 @@ available. The eventual provider proof is distinct from deterministic fixtures.
 | Maria lists activities | Both totals unchanged |
 | Maria exports Mike's eligible public workflow to multiple local files | Maria 8,205 and Mike 12,455; one award per call, not per file |
 | Mike exports his own workflow, or Maria imports a workflow | Totals unchanged |
+
+The complete award matrix retains the historical scope: accepted ADD Activity,
+Skill or Artifact earns 500; accepted ALTER, LINK, DROP, UNLINK and other supported
+minor changes earn 100. Accepted ADD Workflow, Phase, Agent or Rule is minor.
+Eligible MCP detail reads include playbook-backed Playbook, Workflow, Phase,
+Activity, Skill, Rule, Agent, Artifact and authorized PIP records. For PIP reads,
+self-consumption means the caller is the PIP creator or target playbook author;
+otherwise the author award goes to the target playbook author. Existing PIP
+permissions remain creator-or-staff. Mike is already the fixture administrator:
+his eligible read of Maria's historical Design PIP credits Mike 12,455 and
+Hana 5,805; Maria stays 8,200. Neither Maria reading her own PIP nor Mike reading
+a PIP against his own playbook earns points. This explicit self-consumption
+clarification is part of the replay contract for human review. Non-playbook
+account/team/configuration lookups have no playbook author and do not award
+consumption points. Existing authorization must pass first; no permission is
+broadened for scoring. Self-fetch, self-copy and self-export award nobody.
 
 Ordinary GUI views, empty/rejected drafts and failed/ineligible operations do
 not create awards. Historical seed import is not a new user event. Write retries

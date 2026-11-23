@@ -17,17 +17,44 @@ Feature: FOB-KARMA-ACCRUAL-1 Award contribution points for eligible events
     When an accepted PIP publishes its next major version
     Then its author receives no additional 5000 first-release points
 
-  Scenario: KARMA-PIP-01 Award an accepted ADD Activity
+  Scenario Outline: KARMA-PIP-01 Award an accepted major ADD
     Given Maria's new PIP targets Hana's Accessible Forms Review version 2.0
-    When an Administrator accepts its Screen Reader Error Recovery ADD Activity
+    When an Administrator accepts its eligible ADD <entity> change
     Then Maria's total becomes 8700 and Design subtotal becomes 7700
     And the target playbook is version 3.0
     And the normal decision notification is captured locally
+    Examples:
+      | entity   |
+      | Activity |
+      | Skill    |
+      | Artifact |
 
-  Scenario: KARMA-PIP-02 Award an accepted ALTER Activity
-    When an Administrator accepts Maria's independent ALTER Activity change
+  Scenario Outline: KARMA-PIP-02 Award an accepted minor change
+    When an Administrator accepts Maria's independent <operation> <entity> change
     Then Maria's total becomes 8300
     And 100 points are attributed to the target Design category
+    Examples:
+      | operation | entity                         |
+      | ALTER     | Activity                       |
+      | ALTER     | Skill                          |
+      | ALTER     | Artifact                       |
+      | ALTER     | Workflow                       |
+      | ALTER     | Phase                          |
+      | ALTER     | Agent                          |
+      | ALTER     | Rule                           |
+      | DROP      | Activity                       |
+      | DROP      | Skill                          |
+      | DROP      | Artifact                       |
+      | DROP      | Workflow                       |
+      | DROP      | Phase                          |
+      | DROP      | Agent                          |
+      | DROP      | Rule                           |
+      | LINK      | supported existing relationship |
+      | UNLINK    | supported existing relationship |
+      | ADD       | Workflow                       |
+      | ADD       | Phase                          |
+      | ADD       | Agent                          |
+      | ADD       | Rule                           |
 
   Scenario: KARMA-PIP-03 Award only accepted changes in a partial decision
     Given Maria's PIP contains one ADD Activity and one ALTER Activity
@@ -58,12 +85,45 @@ Feature: FOB-KARMA-ACCRUAL-1 Award contribution points for eligible events
     Then the clipboard receives the actual activity prompt
     And Mike remains at 12450
 
-  Scenario: KARMA-MCP-01 Credit an eligible authenticated content read
-    Given Maria has a valid MCP token
-    When she reads Mike's public released activity 6203 using get_activity
-    Then the real activity content is returned
-    And Maria's total becomes 8205 and Mike's becomes 12455
-    And private content remains protected by its access checks
+  Scenario Outline: KARMA-MCP-01 Credit eligible authenticated detail reads
+    Given <consumer> has a valid MCP token and existing permission to read the independent <entity> fixture
+    When the consumer reads that content using <tool>
+    Then the actual authorized entity content is returned
+    And the consumer total becomes <consumer_total> and target playbook author <author> becomes <author_total>
+    And private content remains protected by its existing access checks
+    Examples:
+      | consumer | entity                           | tool         | consumer_total | author | author_total |
+      | Maria    | Mike's Playbook                  | get_playbook | 8205           | Mike   | 12455        |
+      | Maria    | Mike's Workflow                  | get_workflow | 8205           | Mike   | 12455        |
+      | Maria    | Mike's Phase                     | get_phase    | 8205           | Mike   | 12455        |
+      | Maria    | Mike's Activity                  | get_activity | 8205           | Mike   | 12455        |
+      | Maria    | Mike's Skill                     | get_skill    | 8205           | Mike   | 12455        |
+      | Maria    | Mike's Rule                      | get_rule     | 8205           | Mike   | 12455        |
+      | Maria    | Mike's Agent                     | get_agent    | 8205           | Mike   | 12455        |
+      | Maria    | Mike's Artifact                  | get_artifact | 8205           | Mike   | 12455        |
+      | Mike     | Maria's historical Design PIP    | get_pip      | 12455          | Hana   | 5805         |
+    # Mike is already the fixture's FOB administrator. For get_pip he reads
+    # HIST-MARIA-DESIGN-01 as staff; Maria remains 8200. No permission is added.
+
+  Scenario Outline: KARMA-MCP-03 Do not award self-fetch
+    Given <consumer> has a valid MCP token and existing permission for <content>
+    When the consumer successfully uses <tool> on that content
+    Then the consumer total remains <total> and no paired author award is created
+    Examples:
+      | consumer | content                                         | tool         | total |
+      | Mike     | Mike's Playbook                                 | get_playbook | 12450 |
+      | Mike     | Mike's Workflow                                 | get_workflow | 12450 |
+      | Mike     | Mike's Phase                                    | get_phase    | 12450 |
+      | Mike     | Mike's Activity                                 | get_activity | 12450 |
+      | Mike     | Mike's Skill                                    | get_skill    | 12450 |
+      | Mike     | Mike's Rule                                     | get_rule     | 12450 |
+      | Mike     | Mike's Agent                                    | get_agent    | 12450 |
+      | Mike     | Mike's Artifact                                 | get_artifact | 12450 |
+      | Mike     | Maria's historical PIP targeting Mike's playbook | get_pip      | 12450 |
+      | Maria    | Maria's historical PIP targeting Hana's playbook | get_pip      | 8200  |
+    # A PIP fetch is self-consumption if the caller is its creator OR its
+    # target playbook's author. Otherwise the author award goes to the target
+    # playbook author, never to the PIP creator. Existing read permission gates it.
 
   Scenario: KARMA-MCP-02 Do not award collection listings
     Given Maria has a valid MCP token
@@ -90,7 +150,8 @@ Feature: FOB-KARMA-ACCRUAL-1 Award contribution points for eligible events
   Scenario: KARMA-EVENT-01 Do not double-apply an event on write retry
     Given one accepted eligible change or successful consumption has a stable event identity
     When recording that same event is retried
-    Then exactly one pair of applicable ledger awards exists
+    Then exactly one award exists per applicable recipient
+    And acceptance has one submitter award while eligible other-person consumption has consumer and author awards
     And a later intentional consumption is treated as a new event
 
   Scenario: KARMA-EVENT-02 Do not award failed or unauthorized consumption
