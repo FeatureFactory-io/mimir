@@ -1,6 +1,6 @@
 # S03: EXPERTS-LIST-03 Rank Design by total points and enforce the five-person boundary
 
-This plan uses [the consolidated contract](../pin-convergence-20261123-experts.md). Its shared interfaces, ownership decisions and verification-layer mapping govern this scenario. Commands in the graph below are the canonical execution gates; implementation and test bodies remain unimplemented.
+This plan uses [the consolidated contract](../pin-convergence-20261123-experts.md). Its shared interfaces, ownership decisions and verification-layer mapping govern this scenario. Commands in the graph below are the canonical execution gates; actual completion is recorded in the execution journal.
 
 ```yaml
 scenario: S03
@@ -11,7 +11,7 @@ primary_execution_layer: at
 expanded_case_count: 1
 dependencies: []
 system_dependencies: []
-status: skeleton_applied_unimplemented
+status: implementation_in_progress
 source_report_sha256:
 - 10fff3e8ff8aedf25adf29450bec209cc841ceabfd89c095d08f7358be3d97b3
 - 98551b6d4009438fee244e3d25b50c4a7e5303954efac19e1a6c87dc855ef5d0
@@ -235,22 +235,19 @@ feature_execution_graph:
     depends_on:
     - N1-schema
     footprint:
-    - Makefile
-    - docs/features/CATALOG.md
     - methodology/services/expert_text.py
     - methodology/services/experts_service.py
     - tests/conftest.py
     - tests/e2e/conftest.py
-    - tests/fixtures/CATALOG.md
-    - tests/integration/test_experts_acceptance_runner.py
     - tests/integration/test_experts_data.py
     - tests/integration/test_experts_list_s03.py
-    - tests/support/experts_acceptance.py
     - tests/support/experts_data.py
     - tests/support/experts_fixtures.py
     - tests/support/experts_html.py
     - tests/support/experts_logs.py
+    - tests/unit/test_experts_html.py
     - tests/unit/test_experts_projection.py
+    - tests/unit/test_experts_text.py
     tests:
     - test_load_cedar_baseline_with_historical_rows_reconciles_oracle
     - test_load_cedar_baseline_with_second_load_preserves_awards
@@ -265,6 +262,12 @@ feature_execution_graph:
     - test_list_leaders_with_invalid_category_rejects_service_input
     - test_list_leaders_with_positive_user_without_release_remains_eligible
     - test_list_leaders_with_invalid_category_log_story_reject
+    - test_format_numeric_fallback_with_zero_singular_and_plural_counts_matches_copy
+    - test_expert_text_with_invalid_values_rejects
+    - test_display_initials_with_real_cedar_names_returns_expected_letters
+    - test_find_by_test_id_with_matching_root_includes_root
+    - test_find_by_test_id_with_duplicate_selectors_rejects
+    - test_element_text_with_nested_elements_preserves_document_order
     log_story_rows:
     - ExpertsService.list_leaders:entry
     - ExpertsService.list_leaders:processing
@@ -272,10 +275,11 @@ feature_execution_graph:
     - ExpertsService.list_leaders:exit
     - ExpertsService.list_leaders:validation
     gate:
-      command: pytest tests/unit/test_experts_projection.py tests/integration/test_experts_data.py tests/integration/test_experts_list_s03.py
+      command: pytest tests/unit/test_experts_projection.py tests/unit/test_experts_text.py
+        tests/unit/test_experts_html.py tests/integration/test_experts_data.py tests/integration/test_experts_list_s03.py
         -k "not renders and not experts_list_with_design_log_story_happy" -x
-      log_story_command: pytest tests/integration/test_experts_list_s03.py -k "list_leaders and log_story"
-        -x
+      log_story_command: pytest tests/integration/test_experts_list_s03.py -k "design_uses_total
+        or (list_leaders and log_story)" -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
       rules:
@@ -313,7 +317,8 @@ feature_execution_graph:
     graduate_strategy: partial
     gate:
       command: pytest tests/integration/test_experts_list_s03.py -x
-      log_story_command: pytest tests/integration/test_experts_list_s03.py -k log_story -x
+      log_story_command: pytest tests/integration/test_experts_list_s03.py -k log_story
+        -x
     guidance_bundle:
       activity: BPE/BPE-03-Implement_Frontend.md
       rules:
@@ -326,7 +331,12 @@ feature_execution_graph:
     depends_on:
     - N3-direct-list-delivery
     footprint:
+    - Makefile
+    - docs/features/CATALOG.md
     - docs/features/steps/experts_steps.py
+    - tests/fixtures/CATALOG.md
+    - tests/integration/test_experts_acceptance_runner.py
+    - tests/support/experts_acceptance.py
     gate:
       command: make test-experts-s03-at
     guidance_bundle:
@@ -355,7 +365,8 @@ feature_execution_graph:
     footprint: []
     gate:
       command: make test-experts-s03
-      log_story_command: pytest tests/integration/test_experts_list_s03.py -k log_story -x
+      log_story_command: pytest tests/integration/test_experts_list_s03.py -k log_story
+        -x
     guidance_bundle:
       activity: BPE/BPE-06-Check_Definition_of_Done.md
       rules:

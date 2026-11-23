@@ -1,8 +1,10 @@
 # Experts replay: consolidated implementation contract
 
-Status: PIN-03 convergence. All 49 dedicated planning workers returned. No
-Experts implementation is authorized by this document. PIN-04 publication and
-Denis's PIN-05 GO must precede BPE-02 implementation.
+Status: active local implementation. All 49 dedicated planning workers returned.
+Denis declined GitHub publication, then explicitly approved “GO — build using
+the local contract”. The current iteration manifest and execution journal record
+activation and actual node results; remote publication requirements are waived
+by that decision. Main merge/release and production promotion retain human review.
 
 ## Scope and acceptance sources
 

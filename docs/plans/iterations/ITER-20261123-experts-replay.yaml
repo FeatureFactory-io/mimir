@@ -498,7 +498,7 @@ scenarios:
           - do-not-mock-in-integration-tests
       scenario_dependencies: []
     implementation_plan: docs/plans/iterations/experts/S03-experts-list-03.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies: []
     conflict_dependencies: []
