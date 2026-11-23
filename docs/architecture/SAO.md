@@ -3824,3 +3824,167 @@ python scripts/check_tool_api_parity.py
 # ...
 # ✓ 53/53 MCP tools have API endpoints
 ```
+
+## Experts & Karma delivery architecture — planned delta
+
+Status: ESM/PIN contract for the Experts replay. This section records design
+decisions; it does not claim implemented award, query or summary behavior.
+The existing architecture above remains governing. Exact acceptance cases and
+data live in `docs/features/act-18-experts/` and
+`test-data/experts/cedar-rfp-01.json`.
+
+### Awards, projections and transaction boundaries
+
+Use a persisted immutable award ledger with recipient, source kind, points,
+playbook category at the time of the event, related playbook/change identifiers,
+stable event identity and timestamp. Snapshot category attribution so later
+category edits do not rewrite historical awards. Positive amounts and recognized
+event kinds are validated at the service boundary. Database uniqueness on
+event identity plus applicable recipient prevents retry duplication; paired
+consumption awards are written atomically. A partial decision awards only its
+accepted eligible changes. Historical fixture import never invokes fresh hooks.
+
+The first release awards its author 5,000 once per playbook, including later
+release/revert/release cycles. Accepted ADD Activity/Skill/Artifact awards the
+submitter 500 per change; other supported accepted changes award 100. Submission,
+resubmission, rejection and summary generation award zero. Keep award writes in
+shared domain services reached by the existing release and PIP decision paths,
+inside their successful transaction boundaries. Existing versioning policy owns
+version increments; Karma must not introduce a second version bump.
+
+Successful authenticated consumption of another author's content credits learner
+and author 5 each. Guests and self-consumption award nothing; list/import calls
+award nothing. Detail `get_*` reads and workflow/playbook exports use the exact
+eligible playbook-backed entities in the contract. Existing authorization runs
+first, including stricter PIP permissions; points never grant visibility. A PIP
+fetch is self-consumption if the caller is its creator or target playbook author.
+An otherwise eligible staff reader credits the target playbook author, not the
+PIP creator. The fixture's existing administrator Mike can read Maria's Design
+PIP against Hana's playbook; Maria is not silently granted staff privileges.
+Account/team/configuration lookups have no playbook author and are ineligible.
+
+GUI copy is an explicit event following successful clipboard completion, not an
+award for rendering a GET. The client reuses its event identity on retry; the
+server revalidates the referenced entity, actor and access. This attests the
+browser-reported success; the server cannot independently inspect a clipboard.
+Successful exports count once per invocation, after files are written, regardless
+of file count. The facade forwards authenticated context and stable operation
+identity to Django; business rules and ledger persistence remain in the shared
+service layer. Repeated independent successful calls are distinct events.
+
+Query projections sum source/category totals from the ledger. Select positive
+total users by primary category, then sort overall total descending, username
+ascending; limit five. Primary category ties use released-playbook counts in
+the tied categories, then alphabetical category. The username tiebreak is an
+explicit replay decision. Public detail exposes approved contribution totals,
+stored public summary and currently public released playbooks, while preserving
+private titles/content. No availability or suitability score is inferred.
+
+### Web delivery and notification reuse
+
+Use Django views/templates and Bootstrap/HTMX, the existing shell and tokens.
+The `/mockups/` recipes are DEBUG-only design references. Production routes are
+`/experts/`, `/experts/<username>/` and the existing `/auth/user/profile/`.
+The public detail uses the established 8+4 read-column/context-rail recipe and
+stacks below 768px. Reuse standard tooltip/expansion components and stable
+`data-testid` values. Reach out is an authenticated mailto handoff; no messaging
+product or automatic contact send is added. Existing account editing remains.
+
+Reuse the real EmailService for existing decision notifications. Tests capture
+locmem mail; the isolated recording captures file mail. No new broker or mail
+provider is required for Experts. Preserve existing post-commit delivery/failure
+semantics and record mail failure separately from a committed award/decision.
+
+### Test strategy for this delta
+
+AT uses real Django services, views and database objects. The scoped Behave
+runner (`mimir.settings.acceptance`, `make test-at-harness`, `test-at-experts`)
+adds executable living-spec bindings without replacing pytest. It forces an
+in-memory SQLite test DB regardless of ambient DATABASE_URL. Catalogs distinguish
+three implemented HTTP primitives from pending Experts bindings. `@wip` remains
+until each contract runs against real feature behavior; zero selected tests or
+skipped tests cannot certify delivery.
+
+Playwright certifies actual browser journeys, clipboard, focus and responsive
+geometry separately. Seven exact viewports are defined in IA §11. Visual review
+compares actual rendered screenshots with the shared design system. UAT records
+Elena's nomination and elapsed time using the browser-only DO/SEE steps; a separate
+operator companion verifies local notification files. Stage evidence must name
+its deployed commit and environment; local prototype evidence is not staging
+evidence. Main merge, release and production promotion retain human gates.
+
+## 17. AI Agent Architecture — Experts contribution summary
+
+Status: bounded in-app completion planned; shared port and test helpers are the
+TFK prerequisite. Production adapter, evidence/prompt service, persistence and
+integration proofs belong to PIN/BPE. Reference: released Junior Edda AI Agent
+Reference Architecture, fetched during this replay (playbook 3).
+
+### Components, pattern and serving decisions
+
+| Component | Decision and reason |
+| --- | --- |
+| Infra/model | Reuse the existing server-side Anthropic configuration through a provider-neutral adapter; no credential in HTML, fixtures or recordings. Require configured model/rates for the actual provider rehearsal. |
+| Framework/assembly | T-00 custom bounded completion using Pattern 1 layered prompts. SC-01–05 are not selected: this path has one prose completion, no conversation, field extraction, planner, compiled task graph, event-agent loop or model-issued domain mutations. |
+| Trigger/serving | Existing normal PIP submission/resubmission processing requests one summary refresh after commit. Reuse the current Galdr scheduling mechanism; tests run eagerly. Do not add a queue/broker for this delta or call the model under a DB lock. |
+| Memory/vector | No vector store, semantic memory, blackboard or context cache. Build a fresh bounded snapshot of authorized released public contribution evidence; persist only the last good paragraph and refresh metadata. |
+| Identity/tools | Fixed role “public contribution summarizer”, configured execution model. No tools or tool registry; it cannot accept PIPs, award points, send mail or change permissions. CAP-121/122 tool-governed identities are not selected. |
+| Existing Galdr | Preserve assessment/validation/decision behavior and its failure recovery. This bounded summary is a separate collaborator, not a rewrite of the existing assessment engine. |
+
+### Capability selection and dependency wiring
+
+| CAP | Selection / project location | Proof |
+| --- | --- | --- |
+| CAP-001 LLM port | `methodology/llm/base.py`; production adapter depends on this protocol, only adapter imports vendor SDK | PRF-EXPERTS-01 real orchestration through injected port |
+| CAP-004 ScriptedLLM | `tests/support/scripted_llm.py`, finite ordered queue, explicit errors/exhaustion | TFK helper tests; PRF-EXPERTS-01/02 real integration still pending |
+| CAP-020 Layered prompt | Foundation safety, summarizer identity and dynamic public evidence in the planned summary prompt builder | PRF-EXPERTS-01/03 |
+| CAP-023 Validate before LLM | Validate subject, evidence visibility and bounded input before provider call; reject malformed generation before persistence | PRF-EXPERTS-02/03 |
+| CAP-101 Interaction trace | Planned persisted per-call record keyed by correlation_id with normalized usage/latency/cost/outcome, independent of log-story assertions | PRF-OBS-01 |
+
+Dependencies: public-evidence query → prompt builder → BaseLLM adapter → bounded
+output validator → summary store and trace. ScriptedLLM replaces only the model
+in integration proofs; all other collaborators and DB writes remain real. The
+composition helper injects the configured adapter and services explicitly.
+Unselected CAPs and SC-required infrastructure are not implicitly promised.
+
+### Privacy, bounds and failure policy
+
+Submission is a trigger, not a publication event. PIPs have no public visibility
+field. Exclude all unpublished proposal titles/content even when targeting a
+public playbook. Include only released public playbook content and accepted
+changes already published there. Never include private playbooks, tokens,
+emails, changing Karma totals/category subtotals or aggregate counts in prose.
+The regenerated paragraph may contain the same published facts as before.
+
+Treat evidence as data rather than instructions. Bound serialized evidence at
+24,000 characters and output at 1,024 tokens. Validate nonempty prose with at
+most 14 sentences, no unexpected markup or known sensitive sentinels, before
+storing. Preserve the last good paragraph on provider/validation failure and
+retain the existing PIP failure/retry lifecycle. Numeric totals/fallback read
+live projections and do not require another model call. No silent canned
+paragraph replaces a failed live provider call.
+
+### Observability and proof gates
+
+Use request `X-Request-ID` or a generated background correlation_id. Per call
+record model, input/output token usage when supplied, measured latency, outcome,
+subject identifier and estimated cost from configured model rates. Missing
+usage/rates produce unknown/null cost, not measured zero. Do not log prompt or
+response bodies, private data, email or credentials. A control trace records
+workflow `contribution_summary` with entry, public_evidence, llm_call,
+validation, domain_write or failure and exit beats. Log-story and agent-story
+assertions prove different planes.
+
+| Proof ID | Planned test location / concrete falsification |
+| --- | --- |
+| PRF-EXPERTS-01 | `tests/integration/test_experts_summary_proofs.py`: normal submit → real public query/prompt → queued model response → persisted summary, no acceptance award; fails if any collaborator is bypassed |
+| PRF-EXPERTS-02 | Same file: provider error, malformed or overlong output preserves last good prose; queue exhaustion must fail loudly, not return a default |
+| PRF-EXPERTS-03 | Same file: private/unpublished sentinels excluded before completion; real public facts retained, no point totals in prompt/prose |
+| PRF-OBS-01 | Same file: real trace rows share correlation_id; normalized usage, measured latency, unknown-rate behavior and failure outcome asserted |
+
+Use `assert_agent_story` plus existing `assert_log_story` in the integration
+proofs. Mark them `agent_proof` when added; run their exact file as a required
+DoD checkpoint. A missing file, no collection or skipped proof is not a pass.
+The proof bodies are not implemented during PIN skeleton planning. A separate
+opt-in live-provider rehearsal records actual provider/model and result after
+GO; deterministic proofs cannot substantiate live model quality or cost.

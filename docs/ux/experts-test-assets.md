@@ -23,11 +23,13 @@ baseline before UAT; do not combine the before/after numbers from separate cases
 
 ## TFK work required before executable acceptance coverage
 
-The selected checkout has no configured Behave runner or materialized step and
-fixture catalogs. Record this gap rather than claiming the new prose already
-runs. PIN must contract the harness/catalog work and the Cedar fixture adapter
-before dependent AT/E2E scenarios. Use `@wip` until a scenario's real binding and
-behavior pass. Existing pytest tests continue using their normal runner.
+The selected baseline had no configured Behave runner or materialized catalogs.
+The recorded TFK prerequisite now supplies a scoped Django-client harness,
+`docs/features/CATALOG.md` and `tests/fixtures/CATALOG.md`. One real health
+scenario proves that infrastructure. The Cedar ORM adapter and Experts domain
+bindings remain PIN/BPE work, with zero passing Experts contracts claimed.
+Use `@wip` until each scenario's real binding and behavior pass. Existing pytest
+and Playwright tests continue using their normal runners.
 
 The adapter must construct real users, released public and private playbooks,
 versions, historical PIPs and ledger events. Maria's Design PIP earns 600 and

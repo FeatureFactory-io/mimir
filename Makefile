@@ -114,6 +114,17 @@ test-e2e: export DJANGO_SETTINGS_MODULE := mimir.settings.test
 test-e2e: ## Run Playwright E2E tests (requires running server)
 	$(PYTEST) tests/e2e/
 
+.PHONY: test-at-harness test-at-experts
+test-at-harness: ## Prove the Django-client acceptance harness on its real test DB
+	DJANGO_SETTINGS_MODULE=mimir.settings.acceptance $(PYTHON) manage.py behave --simple --tags=@harness docs/features/act-0-auth/test-harness.feature
+
+test-at-experts: ## Run implemented Experts living specifications, excluding WIP
+	DJANGO_SETTINGS_MODULE=mimir.settings.acceptance $(PYTHON) manage.py behave --simple --tags='@experts and not @wip' docs/features/act-18-experts/ docs/features/act-0-auth/navigation.feature
+
+.PHONY: test-agent-experts
+test-agent-experts: ## Required Experts agent proofs after BPE; missing/empty suite fails
+	$(PYTEST) tests/integration/test_experts_summary_proofs.py -m agent_proof
+
 ##@ Code Quality
 
 .PHONY: lint
