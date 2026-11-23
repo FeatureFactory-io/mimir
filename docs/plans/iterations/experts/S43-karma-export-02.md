@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S42
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 40cdb4ef4bc3b986d72a874ed8a1e55ead7b438837368c27fd86b9481e3b5a22
 ```
@@ -230,3 +230,7 @@ feature_execution_graph:
 ## Lessons Learned
 
 A zero-award assertion is incomplete without first proving actual successful output. Whole-ledger equality catches accidental awards to other recipients. Timestamped metadata requires an explicit byte-verification strategy; repeated bundle generation is not a reliable byte oracle. S42’s complete-output receipt boundary and S36’s shared exclusion keep this scenario certification-only.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S43.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

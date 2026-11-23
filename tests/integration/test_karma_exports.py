@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+import pytest
+from pathlib import Path
+from django.contrib.auth.models import User
+from fastmcp import FastMCP
+from pytest import LogCaptureFixture
+from pytest_django.live_server_helper import LiveServer
+
+pytestmark = pytest.mark.django_db(transaction=True)
+
 
 def _configure_real_export_facade(live_server: LiveServer, actor: User) -> FastMCP:
     """Configure real token HTTP and return existing registered facade.
@@ -148,5 +157,89 @@ def test_karma_export_log_story_reject(
     :param caplog: Captured structured logs. Example: caplog.
     :return: None after reject-story assertions. Example: None.
     :raises AssertionError: If errors omit context or include false success.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.parametrize(
+    "tool_name", ["export_workflow_to_local", "export_playbook_to_local"]
+)
+def test_self_export_facade_t1_with_owned_content_writes_files_without_awards(
+    tool_name: str, live_server: LiveServer, tmp_path: Path
+) -> None:
+    """Certify real facade registration, HTTP/token and complete self-export.
+
+    :param tool_name: Registered tool. Example: 'export_workflow_to_local'.
+    :param live_server: Real isolated Django HTTP server. Example: localhost port.
+    :param tmp_path: Actual empty filesystem root. Example: /tmp/pytest/self.
+    :return: None. Example: all files verified before zero-award assertions.
+    :raises AssertionError: Registration, successful files or unchanged state fail.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.parametrize(
+    "tool_name", ["export_workflow_to_local", "export_playbook_to_local"]
+)
+def test_self_export_legacy_t1_with_owned_content_writes_files_without_awards(
+    tool_name: str, tmp_path: Path
+) -> None:
+    """Certify registered legacy tools with Mike's real user context.
+
+    :param tool_name: Existing tool. Example: 'export_playbook_to_local'.
+    :param tmp_path: Actual isolated filesystem root. Example: /tmp/pytest/legacy.
+    :return: None. Example: complete export and unchanged global ledger.
+    :raises AssertionError: Tool registration, user context or output differs.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.parametrize(
+    "tool_name", ["export_workflow_to_local", "export_playbook_to_local"]
+)
+def test_self_export_service_t2_with_owned_content_writes_files_without_awards(
+    tool_name: str, tmp_path: Path
+) -> None:
+    """Certify both real filesystem services and shared self-exclusion.
+
+    :param tool_name: Export kind selector. Example: 'export_workflow_to_local'.
+    :param tmp_path: Real filesystem root. Example: /tmp/pytest/service.
+    :return: None. Example: successful bytes and Mike12450/GUI47 unchanged.
+    :raises AssertionError: Output incomplete or any user's awards change.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.parametrize("entrypoint", ["facade", "legacy"])
+def test_self_export_log_story_happy(
+    entrypoint: str, live_server: LiveServer, tmp_path: Path, caplog: LogCaptureFixture
+) -> None:
+    """Prove successful files precede the self-consumption zero-award branch.
+
+    :param entrypoint: Actual server path. Example: 'facade'.
+    :param live_server: Real HTTP server. Example: localhost random port.
+    :param tmp_path: Real destination root. Example: /tmp/pytest/logs.
+    :param caplog: Actual captured records. Example: INFO export/receipt beats.
+    :return: None. Example: ordered shared identity and created_count=0.
+    :raises AssertionError: Missing beats, false failure or leaked credentials.
+    """
+    raise NotImplementedError()
+
+
+@pytest.mark.parametrize("entrypoint", ["facade", "legacy"])
+@pytest.mark.parametrize(
+    "tool_name", ["export_workflow_to_local", "export_playbook_to_local"]
+)
+def test_self_export_stdio_t3_with_owned_content_returns_clean_jsonrpc(
+    entrypoint: str, tool_name: str, live_server: LiveServer, tmp_path: Path
+) -> None:
+    """Certify real subprocess protocol, content, files and unchanged awards.
+
+    :param entrypoint: Real facade or legacy entrypoint. Example: 'legacy'.
+    :param tool_name: Existing export tool. Example: 'export_playbook_to_local'.
+    :param live_server: Isolated HTTP backend for facade. Example: localhost port.
+    :param tmp_path: Real export/legacy-DB root. Example: /tmp/pytest/stdio.
+    :return: None. Example: clean JSON-RPC and complete zero-award export.
+    :raises AssertionError: Protocol noise, tool error, missing file or new award.
     """
     raise NotImplementedError()

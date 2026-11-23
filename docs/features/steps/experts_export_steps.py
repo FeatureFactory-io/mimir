@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from behave import then, when
+from behave import given, then, when
 from behave.runner import Context
 
 
@@ -33,5 +33,38 @@ def assert_one_export_award_pair(context: Context) -> None:
     :param context: Baseline and actual completed export. Example: context.
     :return: None after pair/channel/count assertions. Example: None.
     :raises AssertionError: If files or nested content multiplied awards.
+    """
+    raise NotImplementedError()
+
+
+@given("Mike has a valid MCP token")
+def mike_has_valid_export_token(context: Context) -> None:
+    """Resolve real Cedar Mike and validate his actual token.
+
+    :param context: Isolated AT state. Example: context.cedar_dataset.
+    :return: None. Example: authenticated Mike and global baseline captured.
+    :raises AssertionError: Token, ownership or baseline totals are invalid.
+    """
+    raise NotImplementedError()
+
+
+@when("he exports his own workflow 6202")
+def export_own_workflow(context: Context) -> None:
+    """Execute actual own-workflow filesystem export with cleanup.
+
+    :param context: Real Mike/token/ORM state. Example: workflow6202.
+    :return: None. Example: real successful export result and files retained.
+    :raises AssertionError: Authorization, source ownership or export fails.
+    """
+    raise NotImplementedError()
+
+
+@then("his total remains 12450")
+def assert_own_export_changes_no_karma(context: Context) -> None:
+    """Verify complete bytes first, then all unchanged ledger projections.
+
+    :param context: Actual completed export state. Example: Mike/workflow6202.
+    :return: None. Example: Mike12450, GUI47 and global ledger unchanged.
+    :raises AssertionError: Incomplete output or any award/projection mutation.
     """
     raise NotImplementedError()
