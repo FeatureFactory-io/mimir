@@ -13,7 +13,7 @@ dependencies:
 - S03
 - S17
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 75ccd99b9e8cc7cab8e7c84fc1d4edf3ce411491e6ac6866c5c26326ef0790ec
 ```
@@ -285,3 +285,7 @@ feature_execution_graph:
 - The actual browser fixtures are `page` and `live_server_url`; browser pytest gates must override global `addopts`.
 - Cedar is domain data, not a loaddata fixture. Reuse S03’s real adapter and shared password; do not replay historical award hooks.
 - Missing target mailboxes need a disabled, honest state, without turning an email handoff into a messaging feature.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S14.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

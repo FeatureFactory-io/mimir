@@ -91,3 +91,20 @@ def _detail_context(
     :raises ValueError: For malformed projection values.
     """
     raise NotImplementedError()
+
+
+def _with_expert_contacts(
+    request: HttpRequest, people: Sequence[Mapping[str, object]]
+) -> list[dict[str, object]]:
+    """Attach contact presentation to copies of eligible public projections.
+
+    The list passes its projected people; detail passes a one-item sequence.
+    Both use the same request-scoped builder. Original payloads stay unchanged.
+
+    :param request: Actual Django request. Example: Elena's authenticated GET.
+    :param people: Eligible public projections. Example: [{"username": "mrodriguez"}].
+    :return: Copied render dictionaries with contact. Example: [Maria render row].
+    :raises TypeError: If a projection or username has the wrong type.
+    :raises ValueError: If a projection omits its validated public username.
+    """
+    raise NotImplementedError()
