@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S03
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 979062e023558cd3aea0b7fd687e3fbf346b3b2f1802a29c49e185f08aa240c7
 ```
@@ -242,3 +242,7 @@ feature_execution_graph:
 ## Lessons Learned
 
 The existing sidebar is data-driven, so changing `base.html` would duplicate working behavior. S03’s route/default-state ownership and S01’s navigation ownership must remain explicit to prevent circular dependencies. File-level inherited `@wip` also hides individually completed scenarios from the normal Experts AT target; exact-name evidence and tag graduation must be recorded separately.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S01.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

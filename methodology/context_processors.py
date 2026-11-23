@@ -169,14 +169,70 @@ def _methodology_items() -> list:
     :return: Link dicts. Example: [{"slug": "playbooks", "testid": "nav-playbooks"}]
     """
     return [
-        _link("playbooks", "Playbooks", "/playbooks/", "nav-playbooks", "fas fa-book-sparkles", "Browse and manage your engineering playbooks"),
-        _link("workflows", "Workflows", reverse("workflow_global_list"), "nav-workflows", "fas fa-diagram-project", "View all workflows across your playbooks"),
-        _link("phases", "Phases", reverse("phase_list_global"), "nav-phases", "fas fa-bars-progress", "View all phases across your playbooks"),
-        _link("activities", "Activities", reverse("activity_global_list"), "nav-activities", "fas fa-list-check", "View all activities across your playbooks and workflows"),
-        _link("artifacts", "Artifacts", reverse("artifact_list_global"), "nav-artifacts", "fas fa-gift", "View all artifacts across your playbooks"),
-        _link("agents", "Agents", reverse("agent_list"), "nav-agents", "fas fa-brain-circuit", "View all agents across your playbooks"),
-        _link("skills", "Skills", reverse("skill_list"), "nav-skills", "fas fa-hand-holding-magic", "View all skills across your playbooks"),
-        _link("rules", "Rules", reverse("rule_list"), "nav-rules", "fas fa-scale-balanced", "View all IDE rules across your playbooks"),
+        _link(
+            "playbooks",
+            "Playbooks",
+            "/playbooks/",
+            "nav-playbooks",
+            "fas fa-book-sparkles",
+            "Browse and manage your engineering playbooks",
+        ),
+        _link(
+            "workflows",
+            "Workflows",
+            reverse("workflow_global_list"),
+            "nav-workflows",
+            "fas fa-diagram-project",
+            "View all workflows across your playbooks",
+        ),
+        _link(
+            "phases",
+            "Phases",
+            reverse("phase_list_global"),
+            "nav-phases",
+            "fas fa-bars-progress",
+            "View all phases across your playbooks",
+        ),
+        _link(
+            "activities",
+            "Activities",
+            reverse("activity_global_list"),
+            "nav-activities",
+            "fas fa-list-check",
+            "View all activities across your playbooks and workflows",
+        ),
+        _link(
+            "artifacts",
+            "Artifacts",
+            reverse("artifact_list_global"),
+            "nav-artifacts",
+            "fas fa-gift",
+            "View all artifacts across your playbooks",
+        ),
+        _link(
+            "agents",
+            "Agents",
+            reverse("agent_list"),
+            "nav-agents",
+            "fas fa-brain-circuit",
+            "View all agents across your playbooks",
+        ),
+        _link(
+            "skills",
+            "Skills",
+            reverse("skill_list"),
+            "nav-skills",
+            "fas fa-hand-holding-magic",
+            "View all skills across your playbooks",
+        ),
+        _link(
+            "rules",
+            "Rules",
+            reverse("rule_list"),
+            "nav-rules",
+            "fas fa-scale-balanced",
+            "View all IDE rules across your playbooks",
+        ),
     ]
 
 
@@ -186,12 +242,28 @@ def _collaborate_items() -> list:
     :return: Link dicts. Example: [{"slug": "teams", "url": "/teams/"}]
     """
     return [
-        _link("teams", "Teams", "/teams/", "nav-teams", "fas fa-users", "Browse and manage teams"),
-        _link("pips", "PIPs", reverse("pip_list"), "nav-pips", "fas fa-lightbulb", "Playbook Improvement Proposals"),
+        _link(
+            "teams",
+            "Teams",
+            "/teams/",
+            "nav-teams",
+            "fas fa-users",
+            "Browse and manage teams",
+        ),
+        _link(
+            "pips",
+            "PIPs",
+            reverse("pip_list"),
+            "nav-pips",
+            "fas fa-lightbulb",
+            "Playbook Improvement Proposals",
+        ),
     ]
 
 
-def _link(slug: str, label: str, url: str, testid: str, icon: str, tooltip: str) -> dict:
+def _link(
+    slug: str, label: str, url: str, testid: str, icon: str, tooltip: str
+) -> dict:
     """Build one sidebar link.
 
     :param slug: Active-item key. Example: "playbooks"
@@ -265,3 +337,23 @@ def notification_count(request):
         count = NotificationService.get_unread_count(request.user)
         return {"unread_notification_count": count}
     return {"unread_notification_count": 0}
+
+
+def _experts_item() -> dict[str, str]:
+    """Describe the public Experts sidebar destination.
+
+    :return: Link mapping. Example: {"slug": "experts", "url": "/experts/",
+        "testid": "nav-experts", "label": "Experts"}.
+    :raises NoReverseMatch: If the S03 experts_list route is unavailable.
+    """
+    raise NotImplementedError()
+
+
+def _is_experts_path(path: str) -> bool:
+    """Recognize the Experts route family without matching similar prefixes.
+
+    :param path: Local request path. Example: "/experts/mrodriguez/".
+    :return: Whether Experts should be active. Example: True.
+    :raises ValueError: If path is not a nonempty local absolute string.
+    """
+    raise NotImplementedError()
