@@ -98,6 +98,14 @@ source display buckets are Released/PIP/Consumption/Learning. Public detail uses
 Public evidence explicitly requires both public visibility and released status.
 General `can_view` permission is broader and cannot replace that filter.
 
+Legacy compatibility found during S03 DoD: the real shared seed includes drafts
+with a blank category, and the existing release flow preserves that value.
+Unsupported current-book categories must not enter primary-category tie inputs.
+Keep explicit resolver/award validation strict, count distinct recognized private
+releases for valid ties, and preserve the independent count of all currently
+public released authored playbooks. A legacy book must not turn a valid positive
+contributor's leaderboard into HTTP 500. The real-DB regression belongs to S03.
+
 `expert_text.py` supplies four pure functions: `format_karma`, `category_label`,
 `display_initials`, and `format_numeric_fallback`. Card, own-profile and detail
 presenters share these; detail must not depend on cards. A zero-score own profile
