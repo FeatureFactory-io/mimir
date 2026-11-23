@@ -354,9 +354,7 @@ def playbook_detail(request, pk):
     from methodology.services.phase_service import PhaseService
 
     phases = PhaseService.list_phases(playbook.pk, request.user)
-    user_label = (
-        request.user.username if request.user.is_authenticated else "anonymous"
-    )
+    user_label = request.user.username if request.user.is_authenticated else "anonymous"
     logger.info(
         "User %s viewing playbook '%s' (id=%s)",
         user_label,
@@ -692,3 +690,40 @@ def playbook_toggle_status(request, pk):
 
 
 # ==================== PRIVATE HELPERS (none currently) ====================
+
+
+def _release_request_correlation_id(request: HttpRequest) -> str:
+    """Use a bounded safe request identifier or generate a new UUID.
+
+    :param request: Incoming release request. Example: POST with X-Request-ID.
+    :return: Safe trace identifier. Example: "release-01".
+    :raises ValueError: If a supplied identifier violates the shared safe format.
+    """
+    raise NotImplementedError()
+
+
+def _first_release_success_message(outcome: ReleaseOutcome) -> str | None:
+    """Format an earned message only for the newly created first-release award.
+
+    :param outcome: Successful domain result. Example: Nora's new 5000 award.
+    :return: Exact escaped-by-template text or None. Example:
+        "You earned 5,000 Karma for releasing Accessible Workshop Starter".
+    :raises ValueError: If an outcome claims a new award without a valid award row.
+    """
+    raise NotImplementedError()
+
+
+def _release_with_karma_message(request: HttpRequest, playbook_id: int) -> Playbook:
+    """Run publication and add its normal success/earned message after success.
+
+    The existing decorated endpoint delegates here after GO while preserving
+    its current permission/validation error handling and redirect destination.
+    Do not infer a fresh award from before/after queries in the view.
+
+    :param request: Authenticated POST request. Example: Nora's release.
+    :param playbook_id: Existing route target. Example: 6302.
+    :return: Published target. Example: released playbook 6302 at v1.0.
+    :raises PermissionError: If the actor is not the owner.
+    :raises ValidationError: If publication or award validation fails.
+    """
+    raise NotImplementedError()

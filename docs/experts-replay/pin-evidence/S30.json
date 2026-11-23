@@ -1,0 +1,32 @@
+{
+  "scenario": "S30",
+  "status": "structural_skeleton_only",
+  "new_unimplemented_callables": 39,
+  "checks": [
+    {
+      "gate": "test-experts-s30",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S30-checkpoint.cast"
+    },
+    {
+      "gate": "test-experts-s30-log",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S30-log.cast"
+    },
+    {
+      "gate": "test-experts-s30-at",
+      "process_exit": 2,
+      "result": "positive selection; NotImplementedError",
+      "cast": "/Users/denispetelin/Desktop/RIPL-Experts-Production/runs/session-01/cli/PIN03-S30-at.cast"
+    },
+    {
+      "gate": "browser collection only",
+      "result": "positive collection, exit 0",
+      "interaction_proven": false
+    }
+  ],
+  "behavior_implemented": false,
+  "existing_callable_AST": "unchanged"
+}

@@ -4,6 +4,10 @@ Playbook Service - Business logic for playbook operations.
 Generic service layer used by both UI views and MCP tools.
 """
 
+from __future__ import annotations
+from dataclasses import dataclass
+from methodology.services.karma_service import AwardOutcome
+
 import logging
 from decimal import Decimal
 from django.db import IntegrityError, transaction
@@ -259,7 +263,9 @@ class PlaybookService:
             .order_by("-updated_at")
         )
         rows = list(qs)
-        logger.info("Listed %s released public playbooks for anonymous guest", len(rows))
+        logger.info(
+            "Listed %s released public playbooks for anonymous guest", len(rows)
+        )
         return rows
 
     @staticmethod
@@ -619,3 +625,121 @@ class PlaybookService:
             hold_version,
         )
         return playbook
+
+    @staticmethod
+    def release_playbook_with_award(
+        playbook_id: int,
+        author: AbstractBaseUser,
+        *,
+        description: str,
+        correlation_id: str,
+    ) -> ReleaseOutcome:
+        """Publish and stage its eligible award in one atomic transaction.
+
+        Future wiring retains the existing release_playbook entrypoint as a
+        compatibility delegate returning this outcome's playbook. Reuse the
+        existing snapshot and version policy; do not add another version bump.
+
+        :param playbook_id: Target ID. Example: 6302.
+        :param author: Authenticated owner. Example: Nora.
+        :param description: Required release notes. Example: "Initial release".
+        :param correlation_id: Request/run ID. Example: "release-01".
+        :return: Publication outcome. Example: first award created for 5000 points.
+        :raises Playbook.DoesNotExist: If the target does not exist.
+        :raises PermissionError: If the actor does not own the target.
+        :raises ValidationError: If publication or award validation fails.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _validated_release_description(description: str) -> str:
+        """Validate and normalize notes with existing error semantics.
+
+        :param description: Candidate notes. Example: " Initial release ".
+        :return: Nonempty notes. Example: "Initial release".
+        :raises ValidationError: If notes are empty or invalid.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _locked_release_target(playbook_id: int, author: AbstractBaseUser) -> Playbook:
+        """Retrieve the target for publication and retain owner authorization.
+
+        :param playbook_id: Persisted target ID. Example: 6302.
+        :param author: Authenticated acting user. Example: Nora.
+        :return: Authorized target in the current transaction. Example: draft 6302.
+        :raises Playbook.DoesNotExist: If missing.
+        :raises PermissionError: If actor is not the owner.
+        :raises ValidationError: If the ID is malformed.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _validate_release_target(playbook: Playbook) -> None:
+        """Preserve allowed-status and required-workflow release guards.
+
+        :param playbook: Authorized publication target. Example: Nora's draft.
+        :return: None when publication prerequisites hold.
+        :raises ValidationError: If status or workflow prerequisites fail.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _is_first_publication(playbook: Playbook) -> bool:
+        """Inspect pre-release state without backfilling historical awards.
+
+        Check current status/version, prior released history and the canonical
+        first-release ledger marker. A reverted v1+ draft remains historical.
+        This decision is made before changing the target's version.
+
+        :param playbook: Locked pre-release target. Example: draft v0.2.
+        :return: First-publication eligibility. Example: True for Nora.
+        :raises ValidationError: If version/history state cannot be interpreted.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _publish_release_version(
+        playbook: Playbook, author: AbstractBaseUser, description: str
+    ) -> PlaybookVersion:
+        """Extract existing status/version/snapshot publication behavior.
+
+        Reuse compute_next_major_line_version and _playbook_release_snapshot.
+        Save one major release receipt with the current notes/source semantics.
+
+        :param playbook: Authorized validated target. Example: draft 6302.
+        :param author: Release actor. Example: Nora.
+        :param description: Clean required notes. Example: "Initial release".
+        :return: Saved release receipt. Example: PlaybookVersion(version_number=1.0).
+        :raises IntegrityError: If publication history cannot be persisted.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _first_publication_award_outcome(
+        playbook: Playbook,
+        release_version: PlaybookVersion,
+        author: AbstractBaseUser,
+        *,
+        first_publication: bool,
+        correlation_id: str,
+    ) -> AwardOutcome:
+        """Delegate eligible publication or return an explicit zero-award result.
+
+        :param playbook: Published target. Example: released 6302.
+        :param release_version: Receipt from this operation. Example: v1.0.
+        :param author: Authenticated owner. Example: Nora.
+        :param first_publication: Pre-release decision. Example: True.
+        :param correlation_id: Request/run ID. Example: "release-01".
+        :return: Award result. Example: AwardOutcome(row, True, "created").
+        :raises ValidationError: If eligible award validation fails.
+        """
+        raise NotImplementedError()
+
+
+@dataclass(frozen=True)
+class ReleaseOutcome:
+    """Publication result retaining the legacy Playbook-only entrypoint."""
+
+    playbook: Playbook
+    first_release_award: AwardOutcome

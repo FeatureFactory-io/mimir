@@ -12,7 +12,7 @@ expanded_case_count: 1
 dependencies:
 - S03
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - c43ab571d02477c71d1c50c056bd67e32d9232e363d8c9028ecb9a6eb559bb81
 ```
@@ -355,3 +355,7 @@ feature_execution_graph:
 - Existing released seed data may have no award ledger. Eligibility must inspect historical publication state rather than treating ledger absence as proof of a first release.
 - The current feature-level `@wip` tag prevents scenario-by-scenario inclusion through the standard filtered target. The orchestrator should reconcile tags and record a named living-spec execution before claiming acceptance.
 - Planning checks were read-only. No files were written, no checkpoints executed, no test passes claimed, and no implementation or external action performed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S30.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
