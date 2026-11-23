@@ -361,6 +361,132 @@ class KarmaService:
         """
         raise NotImplementedError()
 
+    @staticmethod
+    def _partition_event_specs(
+        specifications: tuple[AwardSpec, ...],
+    ) -> tuple[tuple[AwardSpec, ...], ...]:
+        """Group validated specs deterministically without losing input ordering.
+
+        :param specifications: Immutable batch. Example: (learner_spec, author_spec).
+        :return: Groups ordered by identity. Example: ((learner_spec, author_spec),).
+        :raises ValidationError: Invalid singleton/pair or duplicate recipient.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _existing_event_rows(event_identity: str) -> tuple[KarmaAward, ...]:
+        """Load every row for an identity, including imported historical rows.
+
+        :param event_identity: Canonical key. Example: "first_release:6302".
+        :return: Recipient-ordered real rows. Example: (stored_release_award,).
+        :raises ValidationError: Empty or malformed identity.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _logical_award_payload(specification: AwardSpec) -> tuple[object, ...]:
+        """Return immutable logical fields, excluding request-generated time.
+
+        :param specification: Validated input. Example: learning spec for Maria.
+        :return: Comparable field tuple. Example: (42, "learning", 5, ...).
+        :raises ValidationError: Invalid snapshot/source/channel values.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _assert_matching_event(
+        existing: tuple[KarmaAward, ...], requested: tuple[AwardSpec, ...]
+    ) -> tuple[AwardOutcome, ...]:
+        """Compare complete event shape and payload; retain stored timestamps.
+
+        Convert stored rows to existing AwardSpec values for logical comparison.
+        Compare recipient sets and every logical field. Reject partial events.
+        Never update rows or compare fresh request time with stored original time.
+
+        :param existing: Entire stored event. Example: learner/author pair.
+        :param requested: Complete requested event. Example: same pair at newer time.
+        :return: Existing outcomes in request order. Example: two created=False rows.
+        :raises ValidationError: Changed recipient, target, attribution or shape.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _insert_event_rows(
+        specifications: tuple[AwardSpec, ...],
+    ) -> tuple[AwardOutcome, ...]:
+        """Delegate row insertion to S30's writer, abandoning on any duplicate.
+
+        Caller owns an event savepoint. Reuse _insert_or_get_award; an existing
+        outcome raises EventInsertRace before proceeding to another recipient.
+
+        :param specifications: Complete validated event. Example: two five-point specs.
+        :return: All-created outcomes. Example: learner and author created=True.
+        :raises EventInsertRace: Another writer owns any event row.
+        :raises IntegrityError: Database constraint failure; caller handles savepoint.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _is_event_identity_collision(error: IntegrityError) -> bool:
+        """Recognize only expected ledger identity/first-release unique violations.
+
+        PostgreSQL uses SQLSTATE/constraint diagnostics; SQLite uses native unique
+        error category plus the exact affected ledger column signature. Do not
+        classify foreign-key, check or unrelated unique failures as replay.
+
+        :param error: Actual database error. Example: anchor unique violation.
+        :return: Whether race reconciliation applies. Example: True.
+        :raises TypeError: Unsupported input. Example: a ValueError.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _persist_event_atomic(
+        specifications: tuple[AwardSpec, ...], *, correlation_id: str
+    ) -> tuple[AwardOutcome, ...]:
+        """Preflight an event and insert/reconcile using a nested savepoint.
+
+        On expected collision or EventInsertRace, exit the failed savepoint before
+        rereading all rows. Empty reread or unrelated failure must propagate.
+
+        :param specifications: One complete event. Example: learner/author pair.
+        :param correlation_id: Safe trace ID. Example: "receipt-45".
+        :return: Entire created/replayed outcome. Example: two existing outcomes.
+        :raises ValidationError: Winner payload differs or stored event is partial.
+        :raises IntegrityError: Unrelated constraint or unexplained missing winner.
+        :raises OperationalError: Contention must escape to transaction owner.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _persist_batch_atomic(
+        groups: tuple[tuple[AwardSpec, ...], ...], *, correlation_id: str
+    ) -> tuple[AwardOutcome, ...]:
+        """Perform one whole-batch attempt inside an atomic transaction.
+
+        Preflight every existing group before writing missing groups; any later
+        conflict rolls back every new row from this attempt. Preserve input order
+        when existing persist_awards assembles its return value.
+
+        :param groups: Identity-ordered groups. Example: two accepted-change events.
+        :param correlation_id: Safe trace ID. Example: "decision-45".
+        :return: Complete batch outcomes. Example: two singleton awards.
+        :raises ValidationError: Any group conflicts.
+        :raises IntegrityError: Database invariant violation.
+        :raises OperationalError: Database contention or failure.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _is_retryable_database_busy(error: OperationalError) -> bool:
+        """Classify SQLite native busy/locked codes without masking other errors.
+
+        :param error: Actual driver-wrapped exception. Example: SQLITE_BUSY_SNAPSHOT.
+        :return: Recognized transient SQLite contention. Example: True.
+        :raises TypeError: Input is not an OperationalError.
+        """
+        raise NotImplementedError()
+
 
 ConsumptionChannel = Literal["gui_copy", "mcp_detail", "export"]
 
@@ -373,3 +499,7 @@ class ConsumptionTarget:
     entity_id: int
     playbook: Playbook
     pip_creator_id: int | None = None
+
+
+class EventInsertRace(RuntimeError):
+    """Internal signal: abandon this savepoint and inspect the winning event."""

@@ -13,7 +13,7 @@ dependencies:
 - S30
 - S36
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - e9d1054470f8ddacf4942b39247d62080b22cf0553ddb86c40b813f10f728001
 ```
@@ -324,3 +324,7 @@ feature_execution_graph:
 6. The accepted unique-anchor design and entity snapshots need a concise SAO addition and S03 convergence before implementation, rather than a late migration owned by S45.
 
 No files, tests, database state, issues or commits were changed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S45.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
