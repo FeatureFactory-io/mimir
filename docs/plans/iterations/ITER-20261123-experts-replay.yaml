@@ -7,7 +7,7 @@ iteration:
   branch: iteration/experts-replay
   baseline_commit: 333c36ded6bf58bdef94049ca0f5bf98c9ce3124
   milestone_number: null
-  human_go: false
+  human_go: true
   scope: all 49 original acceptance contracts; 5 additional browser and 4 manual UAT obligations
   convergence_contract: docs/plans/iterations/pin-convergence-20261123-experts.md
   publication:
@@ -16,7 +16,14 @@ iteration:
     milestone_created: false
     issues_created: false
     operational_contract: local manifest and 49 local drafts
-    implementation_go: false
+    implementation_go: true
+  activation:
+    mode: local_contract
+    approved_by: Denis
+    decision: "GO \u2014 build using the local contract"
+    recorded_at: '2026-11-23T21:48:25.790050+00:00'
+    external_issue_publication: explicitly skipped by user
+    progress_record: docs/plans/iterations/experts/execution-journal.md
 conflict_map:
   docs/features/steps/experts_category_steps.py:
   - S47

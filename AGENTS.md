@@ -49,3 +49,16 @@ existing fixture/E2E helpers; track missing catalog/step support as TFK work.
 UAT and visual inspection run on the iteration branch before merge. Follow the
 repository's drift/escalation rules. Human review remains required for main
 merge and release. Production promotion is a separate explicit decision.
+
+## Local execution override authorized by Denis
+
+Denis declined GitHub publication (“No, skip this part”), then explicitly
+approved “GO — build using the local contract”. The local
+`docs/plans/iterations/ITER-20261123-experts-replay.yaml` replaces the published
+milestone as operational ground truth. Do not create GitHub issues/comments.
+Use `docs/plans/iterations/experts/execution-journal.md` for commit-linked node
+progress and next steps. This explicit user instruction supersedes remote-issue
+handoff/traceability requirements for this replay; it does not waive tests,
+footprints, fresh node agents or later merge/release review gates.
+BPE-02+ implementation and real test bodies are now authorized within that
+contract. Record observed results; narration remains male.
