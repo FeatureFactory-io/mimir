@@ -130,3 +130,13 @@ def test_s25_resubmission_agent_story_reject() -> None:
     :raises AssertionError: For swallowed failure or successful replacement.
     """
     raise NotImplementedError()
+
+
+@pytest.mark.agent_proof
+@pytest.mark.django_db(transaction=True)
+def test_s28_points_change_agent_story_happy() -> None:
+    """Generate through real S23 lifecycle, then prove copy makes no model call.
+    :return: None. Example: baseline two calls stay two; totals become 8205/12455.
+    :raises AssertionError: For bypassed orchestration or changed calls/state.
+    """
+    raise NotImplementedError()

@@ -16,7 +16,7 @@ dependencies:
 - S12
 - S36
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 122e4260d174417f539fd3149571a51c8072f0d9ad61418675070a11a9ce1730
 ```
@@ -265,3 +265,7 @@ The same public paragraph can remain valid while Development learning points and
 Existing clipboard and lifecycle code provide the required boundaries; this scenario needs focused cross-boundary certification rather than new production machinery.
 
 After PIN-04 issue publication and PIN-05 GO: N1 behavior/log/agent proofs ship together, then N2 acceptance and N3 browser certification, then N4 evidence review. Use `Refs #N` on each slice and `Closes #N` only on the final successful slice, with required commit-linked issue updates. No writes, tests or commits were performed by this worker.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S28.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
