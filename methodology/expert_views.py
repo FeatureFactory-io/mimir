@@ -2,19 +2,39 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
-from methodology.services.expert_card_presentation import (
-    ExpertCardPresentation,
-    ExpertCardPresentationService,
-)
-from methodology.services.experts_service import ExpertProjection
-
+from urllib.parse import urlencode
 from uuid import uuid4
-from methodology.services.experts_service import PublicExpertDetail
 
 from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render
+from django.urls import reverse
+from django.views.decorators.http import require_safe
+
+from methodology.services.expert_card_presentation import (
+    ExpertCardPresentation,
+)
+from methodology.services.expert_text import (
+    CATEGORY_LABELS,
+    category_label,
+    display_initials,
+    format_karma,
+    format_numeric_fallback,
+)
+from methodology.services.experts_service import (
+    _CORRELATION_ID,
+    ExpertProjection,
+    ExpertsService,
+    PublicExpertDetail,
+)
+
+logger = logging.getLogger(__name__)
+_DEFAULT_CATEGORY = "development"
+_LIST_LOG = "experts_list"
 
 
+@require_safe
 def experts_list(request: HttpRequest) -> HttpResponse:
     """Render real ranked contributors for the requested category.
 
@@ -22,7 +42,27 @@ def experts_list(request: HttpRequest) -> HttpResponse:
     :return: Production list HTML. Example: HTTP 200 with five Design cards.
     :raises ValueError: For invalid internal context construction.
     """
-    raise NotImplementedError()
+    correlation_id = _request_correlation_id(request)
+    request.request_id = correlation_id
+    category = _selected_category(request)
+    logger.info(
+        "%s | entry | category=%s actor=%s correlation_id=%s",
+        _LIST_LOG,
+        category,
+        request.user.pk if request.user.is_authenticated else "guest",
+        correlation_id,
+    )
+    context = _ranked_people_context(category, correlation_id)
+    response = render(request, "experts/list.html", context)
+    logger.info(
+        "%s | exit | category=%s status=%s count=%s correlation_id=%s",
+        _LIST_LOG,
+        category,
+        response.status_code,
+        context["count"],
+        correlation_id,
+    )
+    return response
 
 
 def _selected_category(request: HttpRequest) -> str:
@@ -32,17 +72,38 @@ def _selected_category(request: HttpRequest) -> str:
     :return: Canonical slug. Example: "design".
     :raises ValueError: For an invalid request object.
     """
-    raise NotImplementedError()
+    if not isinstance(request, HttpRequest):
+        raise ValueError("An Experts HTTP request is required.")  # noqa: TRY004
+    category = request.GET.get("category")
+    if category in CATEGORY_LABELS:
+        return category
+    if category is not None:
+        logger.info(
+            "_selected_category | branch | reason=invalid_category category=%s correlation_id=%s",
+            _DEFAULT_CATEGORY,
+            _request_correlation_id(request),
+        )
+    return _DEFAULT_CATEGORY
 
 
 def _category_links(selected_category: str) -> tuple[dict[str, object], ...]:
     """Build existing category labels, canonical URLs and selected-state flags.
 
     :param selected_category: Recognized category. Example: "design".
-    :return: Five ordered link dictionaries. Example: ().
+    :return: Five ordered links. Example: ({"slug": "product", ...}, ...).
     :raises ValueError: For an unsupported category.
     """
-    raise NotImplementedError()
+    category_label(selected_category)
+    list_path = reverse("experts_list")
+    return tuple(
+        {
+            "slug": slug,
+            "label": label,
+            "url": f"{list_path}?{urlencode({'category': slug})}",
+            "current": slug == selected_category,
+        }
+        for slug, label in CATEGORY_LABELS.items()
+    )
 
 
 def _request_correlation_id(request: HttpRequest) -> str:
@@ -52,7 +113,14 @@ def _request_correlation_id(request: HttpRequest) -> str:
     :return: Safe nonblank identity. Example: "cedar-s03".
     :raises ValueError: For an invalid request object.
     """
-    raise NotImplementedError()
+    if not isinstance(request, HttpRequest):
+        raise ValueError("An Experts HTTP request is required.")  # noqa: TRY004
+    request_id = getattr(request, "request_id", None) or request.headers.get(
+        "X-Request-ID"
+    )
+    if isinstance(request_id, str) and _CORRELATION_ID.fullmatch(request_id):
+        return request_id
+    return str(uuid4())
 
 
 def _ranked_people_context(category: str, correlation_id: str) -> dict[str, object]:
@@ -63,7 +131,31 @@ def _ranked_people_context(category: str, correlation_id: str) -> dict[str, obje
     :return: Numeric/public identity context. Example: {"people": ()}.
     :raises ValueError: For invalid service inputs.
     """
-    raise NotImplementedError()
+    projections = ExpertsService().list_leaders(category, correlation_id=correlation_id)
+    label = category_label(category)
+    people = tuple(
+        {
+            "username": person.username,
+            "name": person.display_name,
+            "initials": display_initials(person.display_name),
+            "total_points": person.total_points,
+            "category_subtotal": dict(person.category_points)[category],
+            "formatted_karma": format_karma(person.total_points),
+            "primary_category": label,
+            "hint": format_numeric_fallback(
+                person.released_public_playbook_count, person.successful_gui_copy_count
+            ),
+        }
+        for person in projections
+    )
+    return {
+        "nav_section": "experts",
+        "selected_category": category,
+        "selected_category_label": label,
+        "categories": _category_links(category),
+        "count": len(people),
+        "people": people,
+    }
 
 
 def expert_detail(request: HttpRequest, username: str) -> HttpResponse:

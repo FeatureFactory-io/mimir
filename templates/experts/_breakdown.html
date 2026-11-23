@@ -1,3 +1,31 @@
-{# PIN S03: shared four-source score breakdown, graduated from the approved #}
-{# Experts profile/detail Bootstrap recipes after GO. Real ledger totals only. #}
-{# No production markup or data binding is implemented by this placeholder. #}
+<div class="card hg-card">
+  <div class="card-body">
+    <h2 class="h5">Karma by source</h2>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0" data-testid="karma-source-breakdown">
+        <caption class="visually-hidden">Contribution sources sum to {{ person.formatted_karma }}</caption>
+        <thead>
+          <tr><th scope="col">Source</th><th scope="col" class="text-end">Karma</th></tr>
+        </thead>
+        <tbody>
+          {% for row in person.source_rows %}
+          <tr><th scope="row" class="fw-normal">{{ row.label }}</th><td class="text-end">{{ row.points }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr><th scope="row">Total</th><td class="text-end fw-semibold">{{ person.formatted_karma }}</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="card hg-card mt-3">
+  <div class="card-body">
+    <h2 class="h5">Karma by playbook category</h2>
+    <dl class="row mb-0" data-testid="karma-category-breakdown">
+      {% for row in person.category_rows %}
+      <dt class="col-7 fw-normal">{{ row.label }}</dt><dd class="col-5 text-end">{{ row.points }}</dd>
+      {% endfor %}
+    </dl>
+  </div>
+</div>

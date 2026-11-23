@@ -16,11 +16,11 @@ Including another URLconf
 """
 
 from __future__ import annotations
-from django.urls.resolvers import URLPattern
 
 from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
+from django.urls.resolvers import URLPattern
 from rest_framework.authtoken.views import obtain_auth_token
 from rest_framework.routers import DefaultRouter
 
@@ -29,6 +29,7 @@ from methodology import (
     activity_views,
     agent_views,
     artifact_views,
+    expert_views,
     feedback_views,
     phase_views,
     pip_views,
@@ -195,13 +196,12 @@ if settings.DEBUG:
 
 
 def _experts_routes() -> list[URLPattern]:
-    """Construct the future production list route without registering it in PIN.
+    """Construct the public Experts list route.
 
     :return: List-route patterns. Example:
         [path("experts/", expert_views.experts_list, name="experts_list")].
-    :raises NotImplementedError: Until approved BPE route wiring is implemented.
     """
-    raise NotImplementedError()
+    return [path("experts/", expert_views.experts_list, name="experts_list")]
 
 
 def _expert_detail_urlpatterns() -> list[URLPattern]:
@@ -223,3 +223,5 @@ def _karma_copy_receipt_route() -> "URLPattern":
 
 
 # PIN S39: wire the reviewed KARMA-MCP-01 collaborators after PIN-05 GO; preserve current behavior.
+
+urlpatterns.extend(_experts_routes())
