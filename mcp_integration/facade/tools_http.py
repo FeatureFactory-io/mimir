@@ -1980,3 +1980,71 @@ def _validate_consumption_receipt_response(
     :raises ValueError: Unexpected status, count, identity or response shape.
     """
     raise NotImplementedError()
+
+
+def _preflight_workflow_export(
+    *, bundle: dict[str, object], resolved_target: Path
+) -> tuple[Path, ...]:
+    """Validate workflow, sibling rule and applicable Cursor destinations.
+
+    Retain existing workspace guards for every root; call shared path guard.
+    Revalidate destinations in existing writers immediately before each write.
+
+    :param bundle: Authorized REST bundle. Example: {"folder_name": "BPE"}.
+    :param resolved_target: Guarded target. Example: Path("/repo/playbooks").
+    :return: Complete resolved destination tuple. Example: (Path("/repo/a.md"),).
+    :raises ValueError: If bundle paths are invalid or escape approved roots.
+    """
+    raise NotImplementedError()
+
+
+def _record_completed_export(
+    *,
+    entity_type: Literal["workflow", "playbook"],
+    entity_id: int,
+    event_identity: UUID,
+    files_written: int,
+) -> None:
+    """Post S39's export receipt after the entire local invocation succeeds.
+
+    Forward only identity/type/ID/channel; no business decisions here.
+    Receipt transport retries retain this UUID and never repeat file writes.
+
+    :param entity_type: Exported entity type. Example: "workflow".
+    :param entity_id: Source primary key. Example: 6202.
+    :param event_identity: Invocation UUID. Example: UUID(int=42).
+    :param files_written: Successful write count for logs. Example: 4.
+    :return: None after acknowledged receipt. Example: None.
+    :raises ValueError: If arguments or receipt payload are invalid.
+    :raises PermissionError: If receipt revalidation denies access.
+    :raises RuntimeError: If receipt remains unavailable after allowed retry.
+    """
+    raise NotImplementedError()
+
+
+def _preflight_playbook_export(
+    *,
+    bundle: dict[str, object],
+    resolved_target: Path,
+    additional_targets: list[str] | None,
+    sync_root_rules: bool,
+    ade_targets: list[str] | None,
+    ade_target: str | None,
+) -> tuple[Path, ...]:
+    """Validate canonical, mirror and explicitly requested ADE destinations.
+
+    Merge the actual singular/plural ADE requests and validate returned file
+    destinations against those requested target roots. Retain existing
+    workspace guards and use the shared standard-library confinement utility.
+    Complete preflight before the first canonical write.
+
+    :param bundle: Authorized REST bundle. Example: {"folder_name": "Edda"}.
+    :param resolved_target: Guarded canonical root. Example: Path("/repo/playbooks").
+    :param additional_targets: Explicit mirror roots. Example: ["/repo/mirror"].
+    :param sync_root_rules: Whether ADE writes are requested. Example: True.
+    :param ade_targets: Actual requested ADE keys. Example: ["cursor"].
+    :param ade_target: Actual singular alias. Example: "devin".
+    :return: Complete confined destination tuple. Example: (Path("/repo/a.md"),).
+    :raises ValueError: If a root, child path or returned ADE destination is invalid.
+    """
+    raise NotImplementedError()

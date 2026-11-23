@@ -341,9 +341,10 @@ class PlaybookExportService:
     @staticmethod
     def _generate_playbook_md(playbook, workflows, activity_count: int) -> str:
         export_date = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        wf_lines = "\n".join(
-            f"- **{wf.name}** (order {wf.order})" for wf in workflows
-        ) or "- _(no workflows)_"
+        wf_lines = (
+            "\n".join(f"- **{wf.name}** (order {wf.order})" for wf in workflows)
+            or "- _(no workflows)_"
+        )
         return f"""# {playbook.name}
 
 **Playbook ID**: {playbook.id}
@@ -399,3 +400,39 @@ class PlaybookExportService:
         slug = re.sub(r"[^\w\-]", "", text.replace(" ", "_"))
         slug = re.sub(r"_+", "_", slug).strip("_")
         return slug or "item"
+
+    @staticmethod
+    def _validate_export_destinations(
+        *,
+        bundle: dict[str, object],
+        target_directory: str,
+        additional_targets: list[str] | None,
+        sync_root_rules: bool,
+    ) -> tuple[Path, ...]:
+        """Preflight canonical, mirror and ADE paths for a legacy export.
+
+        :param bundle: Existing generated bundle. Example: {"folder_name": "Edda"}.
+        :param target_directory: Explicit base. Example: "/tmp/playbooks".
+        :param additional_targets: Extra approved roots. Example: ["/tmp/mirror"].
+        :param sync_root_rules: Include ADE copies. Example: True.
+        :return: All confined destinations. Example: (Path("/tmp/Edda/a.md"),).
+        :raises ValueError: If any requested destination escapes its root.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _record_completed_export(
+        *, user: User | None, playbook_id: int, event_identity: UUID
+    ) -> None:
+        """Delegate one fully successful authenticated playbook export to S36.
+
+        Nested workflows, canonical files and mirrors share this one event.
+
+        :param user: Existing service actor. Example: Maria, or None.
+        :param playbook_id: Source playbook ID. Example: 6201.
+        :param event_identity: Single invocation UUID. Example: UUID(int=42).
+        :return: None after shared domain decision. Example: None.
+        :raises PermissionError: If domain revalidation rejects the actor.
+        :raises ValueError: If event identity or entity is invalid.
+        """
+        raise NotImplementedError()

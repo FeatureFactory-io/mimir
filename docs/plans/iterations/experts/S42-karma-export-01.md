@@ -15,7 +15,7 @@ dependencies:
 - S36
 - S39
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 4bbad290cf291971993aff13526842c6dba17e6bbd66461c386d173935df2afc
 - e0854e62c9c888090c790ef580850422b5568f8c90fc1e0e2060516061901cc0
@@ -307,3 +307,7 @@ feature_execution_graph:
 ## Lessons Learned
 
 Existing export code already supplies the necessary real behavior, registration and authenticated bundles; adding another export endpoint would duplicate responsibility. Its top-level workspace guard does not establish confinement of every generated child, so confinement must be explicit in this slice. Filesystem completion and remote receipt persistence cannot be one transaction: partial writes award nothing, and receipt retries preserve identity without repeating the export. Existing facade subprocess tests’ real-database configuration is unsuitable for the isolated Cedar contract.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S42.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
