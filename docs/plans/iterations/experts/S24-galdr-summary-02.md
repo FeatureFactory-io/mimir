@@ -16,7 +16,7 @@ dependencies:
 - S11
 - S17
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - bf87fd12ac9fbab82cc0c3dd72a307a621dbea4a53a77a209db0cfe921a53ba8
 ```
@@ -234,3 +234,7 @@ feature_execution_graph:
 - Maria’s real nine-sentence fixture supplies long text naturally; synthetic filler and simulated clamps would weaken the proof.
 - Shared parser, actor/path steps and established browser lifecycle prevent duplicate infrastructure.
 - Planned gates were not executed; no passing behavior is claimed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S24.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
