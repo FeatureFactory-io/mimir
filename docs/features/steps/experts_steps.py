@@ -1,9 +1,23 @@
 """Experts domain bindings using the real Django-client acceptance lifecycle."""
 
 from __future__ import annotations
-from behave import then
-from behave import given, when
+
+import logging
+from urllib.parse import unquote, urlsplit
+
+from behave import given, then, when
 from behave.runner import Context
+from django.http import HttpResponse
+from django.test.html import Element
+
+from methodology.services.experts_service import ExpertsService
+from tests.support.experts_data import load_cedar_baseline
+from tests.support.experts_html import element_text, find_by_test_id
+
+logger = logging.getLogger(__name__)
+_CARD_PREFIX = "experts-card-"
+_DEVELOPMENT_TAB = "experts-category-development"
+_DEVELOPMENT_PATH = "/experts/?category=development"
 
 
 @given("the CEDAR-RFP-01 baseline dataset")
@@ -14,21 +28,27 @@ def cedar_baseline_dataset(context: Context) -> None:
     :return: None. Example: None.
     :raises ValueError: If isolation or oracle validation fails.
     """
-    raise NotImplementedError()
+    context.cedar_dataset = load_cedar_baseline()
 
 
 @when('Elena opens "{path}"')
 @when('he opens "{path}"')
 @when('Bob opens "{path}"')
 def elena_opens_experts(context: Context, path: str) -> None:
-    """Request the local production route using the real client.
+    """Request a local production route with the client's existing session.
 
     :param context: Prepared AT context. Example: context.client.
     :param path: Local absolute path. Example: "/experts/?category=design".
     :return: None. Example: None.
     :raises ValueError: For a nonlocal path.
     """
-    raise NotImplementedError()
+    local_path = _validated_local_path(path)
+    context.response = context.client.get(path)
+    logger.info(
+        "Experts AT GET | exit | path=%s status=%s",
+        local_path,
+        context.response.status_code,
+    )
 
 
 @then("the ranked usernames are:")
@@ -39,7 +59,27 @@ def ranked_usernames_match_table(context: Context) -> None:
     :return: None. Example: None.
     :raises AssertionError: For any identity, ordering or arithmetic mismatch.
     """
-    raise NotImplementedError()
+    assert context.table.headings == ["username", "total", "design_subtotal"]
+    expected = [
+        (row["username"], int(row["total"]), int(row["design_subtotal"]))
+        for row in context.table
+    ]
+    response = context.response
+    cards = _leaderboard_cards(response)
+    assert [username for username, _ in cards] == [
+        username for username, _, _ in expected
+    ]
+    rendered = [(username, *_card_points(card)) for username, card in cards]
+    assert rendered == expected
+    for rank, (_, card) in enumerate(cards, start=1):
+        rank_display = find_by_test_id(str(card), "expert-card-rank")
+        assert element_text(rank_display) == str(rank)
+        assert dict(rank_display.attributes)["aria-label"] == f"Rank {rank}"
+    assert response.context["selected_category"] == "design"
+    assert [
+        (person["username"], person["total_points"], person["category_subtotal"])
+        for person in response.context["people"]
+    ] == expected
 
 
 @then('sixth eligible Design contributor "{username}" is absent')
@@ -53,7 +93,9 @@ def contributor_is_absent(context: Context, username: str) -> None:
     :return: None. Example: None.
     :raises AssertionError: If that contributor card exists.
     """
-    raise NotImplementedError()
+    assert username not in dict(
+        _leaderboard_cards(context.response)
+    ), f"{username} has a ranked card."
 
 
 @when("Elena selects Development")
@@ -64,7 +106,16 @@ def elena_selects_development(context: Context) -> None:
     :return: None. Example: None.
     :raises AssertionError: If the expected accessible link is missing.
     """
-    raise NotImplementedError()
+    assert context.response.status_code == 200
+    tabs = find_by_test_id(context.response.content, "experts-category-tabs")
+    link = find_by_test_id(str(tabs), _DEVELOPMENT_TAB)
+    assert link.name == "a" and element_text(link) == "Development"
+    href = dict(link.attributes).get("href")
+    assert href == _DEVELOPMENT_PATH
+    elena_opens_experts(context, href)
+    assert context.response.status_code == 200
+    current = find_by_test_id(context.response.content, _DEVELOPMENT_TAB)
+    assert dict(current.attributes).get("aria-current") == "page"
 
 
 @then("Mike Chen 12450 precedes Jordan Lee 6100")
@@ -75,7 +126,16 @@ def development_order_matches_contract(context: Context) -> None:
     :return: None. Example: None.
     :raises AssertionError: If either score or ordering differs.
     """
-    raise NotImplementedError()
+    cards = dict(_leaderboard_cards(context.response))
+    usernames = tuple(cards)
+    for username, name, points in (
+        ("mchen", "Mike Chen", 12450),
+        ("jlee", "Jordan Lee", 6100),
+    ):
+        assert username in cards, f"Missing ranked card for {username}"
+        assert name in element_text(cards[username])
+        assert _card_points(cards[username])[0] == points
+    assert usernames.index("mchen") < usernames.index("jlee")
 
 
 @then("Maria is absent because her primary playbook category is Design")
@@ -86,7 +146,63 @@ def maria_secondary_category_is_excluded(context: Context) -> None:
     :return: None. Example: None.
     :raises AssertionError: If Maria qualifies for the wrong leaderboard.
     """
-    raise NotImplementedError()
+    assert context.response.context["selected_category"] == "development"
+    maria_id = context.cedar_dataset.user_ids["mrodriguez"]
+    maria = ExpertsService().project_user(maria_id)
+    assert maria.primary_category == "design"
+    assert dict(maria.category_points).get("development", 0) > 0
+    contributor_is_absent(context, maria.username)
+
+
+def _validated_local_path(path: str) -> str:
+    """Return the request path for logging after checking it is safe and local."""
+    if (
+        not isinstance(path, str)
+        or not path.startswith("/")
+        or "#" in path
+        or "\\" in path
+        or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in path)
+    ):
+        raise ValueError("Experts AT requests require a local absolute URL path.")
+    parts = urlsplit(path)
+    decoded_path = unquote(parts.path)
+    if (
+        parts.scheme
+        or parts.netloc
+        or path.startswith("//")
+        or decoded_path.startswith("//")
+        or "\\" in decoded_path
+        or any(ord(char) < 32 or ord(char) == 127 for char in decoded_path)
+    ):
+        raise ValueError("Experts AT requests require a local absolute URL path.")
+    return parts.path
+
+
+def _leaderboard_cards(response: HttpResponse) -> tuple[tuple[str, Element], ...]:
+    """Read each rendered card's username in actual leaderboard order."""
+    assert response.status_code == 200
+    leaderboard = find_by_test_id(response.content, "experts-leaderboard")
+    cards = []
+    for child in leaderboard.children:
+        if not isinstance(child, Element) or child.name != "article":
+            continue
+        test_id = dict(child.attributes).get("data-testid", "")
+        assert test_id.startswith(_CARD_PREFIX) and test_id != _CARD_PREFIX
+        cards.append((test_id.removeprefix(_CARD_PREFIX), child))
+    assert len({username for username, _ in cards}) == len(
+        cards
+    ), "Duplicate ranked card."
+    return tuple(cards)
+
+
+def _card_points(card: Element) -> tuple[int, int]:
+    """Read raw total and subtotal and check the displayed Karma value."""
+    attributes = dict(card.attributes)
+    total = int(attributes["data-total-points"])
+    subtotal = int(attributes["data-category-points"])
+    karma = find_by_test_id(str(card), "expert-card-karma")
+    assert element_text(karma) == f"{total:,}"
+    return total, subtotal
 
 
 @then(

@@ -1,8 +1,8 @@
 # Acceptance step catalog
 
-This catalog distinguishes working test infrastructure from the Experts contract.
-The living specification is not passing coverage until its binding and real
-behavior run. All Experts contracts remain `@wip` during PIN planning.
+This catalog tracks reusable acceptance bindings and executed Experts contracts.
+`EXPERTS-LIST-03` passed through the exact runner. Its feature-level `@wip`
+tag still protects unfinished scenarios from the broad acceptance command.
 
 ## Implemented reusable primitives
 
@@ -24,6 +24,22 @@ extensions. A run selecting zero implemented contracts must be reported as zero
 coverage. Some unrelated historical feature prose is not parser-ready; a broad
 `manage.py behave docs/features` run is not the acceptance command for this work.
 
+## Executed Experts bindings
+
+`make test-experts-s03-at` runs exactly `EXPERTS-LIST-03` from
+`act-18-experts/experts-list.feature` through `manage.py behave --simple` and
+`mimir.settings.acceptance`. The runner opts this exact name into execution
+despite its inherited `@wip` tag. It requires one passed case and nine passed
+steps, including the background. Selection checks reject a matching skipped
+case and tolerate unrelated cases reported as skipped by the name filter.
+
+| Phrase family | Binding in `steps/experts_steps.py` | Real collaborator |
+| --- | --- | --- |
+| CEDAR-RFP-01 baseline | `cedar_baseline_dataset` | Isolated ORM fixture importer |
+| Elena, he or Bob opens a path | `elena_opens_experts` | Local Django-client GET with the current session |
+| Ranked usernames and Design exclusions | `ranked_usernames_match_table`, `contributor_is_absent` | Rendered ordered cards and live view scores |
+| Switch to Development, rank Mike before Jordan, exclude Maria | `elena_selects_development`, `development_order_matches_contract`, `maria_secondary_category_is_excluded` | Rendered category link, cards and live primary-category projection |
+
 ## Pending Experts bindings
 
 `../experts-replay/scenario-index.json` inventories 49 acceptance contracts and
@@ -33,8 +49,8 @@ the corresponding scenario loses `@wip`.
 
 | Phrase family | Planned real collaborators | Binding state |
 | --- | --- | --- |
-| CEDAR-RFP-01 baseline and independent event reset | Cedar adapter, users/playbooks/PIPs/award ledger | Pending PIN/BPE |
-| Category, ranking, ties and boundary people | Experts query service, Django client | Pending PIN/BPE |
+| Independent event resets | Cedar adapter, users/playbooks/PIPs/award ledger | Pending BPE |
+| Other category interactions, ties and boundary cases | Experts query service, Django client | Pending BPE |
 | Public detail, private exclusions, guest access | Existing permission services, real views | Pending PIN/BPE |
 | Own-profile summary and contribution rows | Existing profile view, summary/ledger projection | Pending PIN/BPE |
 | Contact destination/restriction | Real rendered HTML; browser focus in E2E | Pending PIN/BPE |
@@ -49,7 +65,8 @@ Django-client step library. Manual DO/SEE/RECORD belongs to UAT.
 
 ## Experts replay planning registration
 
-Status: planned, unimplemented. No green acceptance or fixture import is claimed.
+The table inventories the planned contracts. Only the S03 server acceptance
+case has passed through the exact runner.
 
 | PIN | Contract | Authoritative source | Primary layer | Cases | Gate |
 |---|---|---|---|---:|---|

@@ -3,8 +3,22 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import pytest
-from tests.support.experts_acceptance import run_exact_acceptance
+
+from tests.support.experts_acceptance import (
+    _validate_acceptance_selection,
+    run_exact_acceptance,
+)
+
+_RANKING_FEATURE = Path("docs/features/act-18-experts/experts-list.feature")
+_RANKING_ID = "EXPERTS-LIST-03"
+_PASSING_CASE = {
+    "type": "scenario",
+    "name": f"{_RANKING_ID} Ranks contributors",
+    "status": "passed",
+    "steps": [{"result": {"status": "passed"}}],
+}
 
 
 @pytest.mark.parametrize(
@@ -327,4 +341,90 @@ def test_exact_experts_acceptance_with_declared_contract_runs_all_examples(
     :return: None on actual complete acceptance. Example: None.
     :raises AssertionError: Any failed, skipped, undefined or absent selected case/step.
     """
-    raise NotImplementedError()
+    result = run_exact_acceptance(Path(feature_path), acceptance_id, expected_cases)
+
+    assert result.scenario_count == expected_cases, scenario
+    assert result.step_count >= expected_cases, scenario
+    assert result.skipped_count == result.undefined_count == 0, scenario
+    if acceptance_id == _RANKING_ID:
+        assert result.step_count == 9, scenario
+
+
+@pytest.mark.parametrize(
+    "path,acceptance_id,count",
+    [
+        (Path("/tmp/experts-list.feature"), _RANKING_ID, 1),
+        (Path("docs/features/absent.feature"), _RANKING_ID, 1),
+        (Path("Makefile"), _RANKING_ID, 1),
+        (_RANKING_FEATURE, "EXPERTS-LIST-03|.*", 1),
+        (_RANKING_FEATURE, " EXPERTS-LIST-03", 1),
+        (_RANKING_FEATURE, _RANKING_ID, 0),
+        (_RANKING_FEATURE, _RANKING_ID, True),
+    ],
+    ids=["outside", "missing", "suffix", "regex", "whitespace", "zero", "boolean"],
+)
+def test_run_exact_acceptance_with_invalid_contract_rejects(
+    path: Path, acceptance_id: str, count: int
+) -> None:
+    """Reject malformed arguments before attempting to execute Behave."""
+    with pytest.raises(ValueError):
+        run_exact_acceptance(path, acceptance_id, count)
+
+
+def test_validate_acceptance_selection_with_outline_and_filtered_neighbors_counts_cases() -> (
+    None
+):
+    """Accept unique passed outline cases and ignore name-filtered JSON entries."""
+    elements = [
+        {"type": "background", "steps": [{}]},
+        {**_PASSING_CASE, "name": f"{_RANKING_ID} Ranks @1.1"},
+        {**_PASSING_CASE, "name": f"{_RANKING_ID} Ranks @1.2"},
+        {
+            **_PASSING_CASE,
+            "name": f"{_RANKING_ID}0 Different ID",
+            "status": "skipped",
+            "steps": [{}],
+        },
+    ]
+
+    result = _validate_acceptance_selection([{"elements": elements}], _RANKING_ID, 2)
+
+    assert result.scenario_count == result.step_count == 2
+    assert result.skipped_count == result.undefined_count == 0
+
+
+@pytest.mark.parametrize(
+    "elements,count",
+    [
+        ([], 1),
+        ([_PASSING_CASE], 2),
+        ([_PASSING_CASE, _PASSING_CASE], 2),
+        ([{**_PASSING_CASE, "status": "skipped"}], 1),
+        ([{**_PASSING_CASE, "status": "failed"}], 1),
+        ([{**_PASSING_CASE, "steps": []}], 1),
+        ([{**_PASSING_CASE, "steps": [{}]}], 1),
+        ([{**_PASSING_CASE, "steps": [{"result": {"status": "undefined"}}]}], 1),
+        ([{**_PASSING_CASE, "steps": [{"result": {"status": "skipped"}}]}], 1),
+        ([{**_PASSING_CASE, "name": f"{_RANKING_ID}0 Different ID"}], 1),
+        ([_PASSING_CASE, {**_PASSING_CASE, "name": f"{_RANKING_ID}0 Different ID"}], 1),
+    ],
+    ids=[
+        "empty",
+        "wrong-count",
+        "duplicate",
+        "skipped-case",
+        "failed-case",
+        "empty-steps",
+        "missing-step-result",
+        "undefined-step",
+        "skipped-step",
+        "wrong-id",
+        "unexpected-extra-case",
+    ],
+)
+def test_validate_acceptance_selection_with_incomplete_execution_rejects(
+    elements: list[dict[str, object]], count: int
+) -> None:
+    """Require positive passing results for every selected case and step."""
+    with pytest.raises(AssertionError):
+        _validate_acceptance_selection([{"elements": elements}], _RANKING_ID, count)
