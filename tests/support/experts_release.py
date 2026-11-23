@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from methodology.models import Playbook, ProcessImprovementProposal
+
 """Real Cedar release-case construction for pytest and AT."""
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -34,5 +36,20 @@ def build_nora_release_case() -> NoraReleaseCase:
 
     :return: Isolated real case. Example: Nora, draft 6302 and authenticated client.
     :raises ValueError: If baseline records or totals do not match the contract.
+    """
+    raise NotImplementedError()
+
+
+def prepare_reviewed_next_major_pip(
+    playbook: Playbook, submitter: AbstractBaseUser
+) -> ProcessImprovementProposal:
+    """Prepare real reviewed ADD Activity fixture without invoking Galdr.
+
+    Use real draft/change builders; set reviewed metadata only as explicit test
+    setup. Do not finalize, publish, award, reset Cedar or set numeric versions.
+    :param playbook: Released target as Playbook. Example: Nora's 6302 at v1.0.
+    :param submitter: Existing actor. Example: Cedar Maria.
+    :return: Undecided reviewed PIP. Example: one ADD Activity under target workflow.
+    :raises ValueError: If the target lacks valid released/workflow prerequisites.
     """
     raise NotImplementedError()

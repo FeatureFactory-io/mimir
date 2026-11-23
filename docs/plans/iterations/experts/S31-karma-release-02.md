@@ -13,7 +13,7 @@ dependencies:
 - S30
 - S32
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 76b67b72b598a26f46c1a68900b6b6ba792822d422d89ac67b991dfae4570821
 ```
@@ -228,3 +228,7 @@ feature_execution_graph:
 - Reviewed-state fixture setup isolates finalization certification without introducing provider, summary or S32 dependencies.
 - Root pytest excludes E2E; browser certification requires its own configuration and function-scoped live server.
 - Read-only planning only: no files written, tests executed, commits made, issues posted or implementation success claimed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S31.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
