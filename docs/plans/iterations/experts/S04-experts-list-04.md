@@ -14,7 +14,7 @@ dependencies:
 - S17
 - S14
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 194b49d1f30a67dcd642c8fa1423970cfc46d4a60db03fe4067a8a9958028ce7
 ```
@@ -268,3 +268,7 @@ No infrastructure or scope-removal proposal. Parent must normalize S03’s DTO i
 The prototype’s numeric fallback is a design recipe, not a permissible production data source. GUI-copy channel separation is necessary to preserve Mike’s 47-copy meaning. CSS-only truncation keeps public prose stable while making cards readable. Shared contact policy prevents public presentation from accidentally leaking email. Existing global pytest configuration ignores `tests/e2e`, so explicit `-o addopts=` is essential to collect the browser gate.
 
 No source writes, commits, tests or browser runs were performed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S04.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from methodology.services.expert_card_presentation import (
+    ExpertCardPresentation,
+    ExpertCardPresentationService,
+)
+from methodology.services.experts_service import ExpertProjection
+
 from uuid import uuid4
 from methodology.services.experts_service import PublicExpertDetail
 
@@ -106,5 +113,32 @@ def _with_expert_contacts(
     :return: Copied render dictionaries with contact. Example: [Maria render row].
     :raises TypeError: If a projection or username has the wrong type.
     :raises ValueError: If a projection omits its validated public username.
+    """
+    raise NotImplementedError()
+
+
+def _stored_expert_card_summaries(user_ids: Sequence[int]) -> Mapping[int, str | None]:
+    """Read only stored public contribution paragraphs for the selected users.
+
+    :param user_ids: Ranked subject IDs. Example: (12, 13).
+    :return: User-ID-to-summary mapping. Example: {13: "Maria maintains…"}.
+    :raises ValueError: If IDs are not positive integers.
+    """
+    raise NotImplementedError()
+
+
+def _build_expert_card_presentations(
+    projections: Sequence[ExpertProjection],
+    summaries_by_user_id: Mapping[int, str | None],
+    *,
+    correlation_id: str,
+) -> tuple[ExpertCardPresentation, ...]:
+    """Preserve S03 ordering while presenting each public card.
+
+    :param projections: Ranked allowlisted projections. Example: Sofia then Maria.
+    :param summaries_by_user_id: Stored public prose. Example: {13: "Maria maintains…"}.
+    :param correlation_id: Request identifier. Example: "cedar-s04".
+    :return: Presentations in unchanged order. Example: (sofia_card, maria_card).
+    :raises ValueError: If an input projection violates the public contract.
     """
     raise NotImplementedError()
