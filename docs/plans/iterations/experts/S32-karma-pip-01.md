@@ -16,7 +16,7 @@ dependencies:
 - S11
 - S12
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - 0a62bea571ea2ea1421cfb19edcaa3cd29dd7bbc27c2a61308735e542a5e9410
 ```
@@ -288,3 +288,7 @@ Lessons learned:
 - Feature-level `@wip` would silently exclude this exact contract without an explicit scoped selection. Zero selected cases cannot certify it.
 
 No files were changed, no tests were run, and no mutations were performed.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S32.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.

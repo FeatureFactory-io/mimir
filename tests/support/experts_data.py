@@ -362,3 +362,29 @@ def seed_s27_summary_privacy_variant() -> Mapping[str, Any]:
     :raises ValueError: If baseline/publication receipt invariants do not reconcile.
     """
     raise NotImplementedError()
+
+
+def create_reviewed_major_add_pip(
+    dataset: CedarDataset, entity_type: str
+) -> ProcessImprovementProposal:
+    """Create an independent real reviewed Maria proposal targeting Hana's v2.0.
+
+    :param dataset: Independently restored Cedar data. Example: load_cedar_baseline().
+    :param entity_type: Major ADD entity. Example: "Artifact".
+    :return: Real reviewed proposal with one undecided change. Example: ADD Artifact PIP.
+    :raises ValueError: For unsupported entity or missing target structure.
+    """
+    raise NotImplementedError()
+
+
+def _major_add_change_payload(
+    dataset: CedarDataset, entity_type: str
+) -> dict[str, object]:
+    """Supply real service fields, including parent and producer references.
+
+    :param dataset: Restored Cedar relationships. Example: playbook 6106 and its workflow.
+    :param entity_type: Eligible ADD entity. Example: "Activity".
+    :return: Existing PIPService.add_change keyword payload. Example: parent_workflow_id.
+    :raises ValueError: If a required workflow or producer cannot be resolved.
+    """
+    raise NotImplementedError()

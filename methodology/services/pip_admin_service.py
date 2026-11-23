@@ -23,7 +23,9 @@ class PIPAdminService:
 
     @staticmethod
     @transaction.atomic
-    def finalize_pip(pip: ProcessImprovementProposal, actor) -> ProcessImprovementProposal:
+    def finalize_pip(
+        pip: ProcessImprovementProposal, actor
+    ) -> ProcessImprovementProposal:
         """
         Validate choices, mutate playbook rows, bump major version when needed, notify.
 
@@ -36,9 +38,11 @@ class PIPAdminService:
         if actor is None or not actor.is_staff:
             raise ValidationError("Only staff administrators can finalise PIPs.")
 
-        locked = ProcessImprovementProposal.objects.select_for_update(of=("self",)).select_related(
-            "playbook", "created_by"
-        ).get(pk=pip.pk)
+        locked = (
+            ProcessImprovementProposal.objects.select_for_update(of=("self",))
+            .select_related("playbook", "created_by")
+            .get(pk=pip.pk)
+        )
 
         if locked.status != ProcessImprovementProposal.STATUS_REVIEWED:
             raise ValidationError("PIP must be in Reviewed state before finalising.")
@@ -58,11 +62,7 @@ class PIPAdminService:
                     "Each change must have an explicit Accept/Reject decision."
                 )
 
-        accepted = [
-            ch
-            for ch in changes
-            if ch.admin_decision == PipChange.ADMIN_ACCEPT
-        ]
+        accepted = [ch for ch in changes if ch.admin_decision == PipChange.ADMIN_ACCEPT]
         rejected_cnt = sum(
             1 for ch in changes if ch.admin_decision == PipChange.ADMIN_REJECT
         )
@@ -145,3 +145,16 @@ class PIPAdminService:
 
         pip_locked.decided_at = decided
         pip_locked.save(update_fields=["status", "decided_at", "updated_at"])
+
+    @staticmethod
+    def _award_finalized_pip(
+        *, pip: ProcessImprovementProposal, actor: AbstractBaseUser
+    ) -> tuple[AwardOutcome, ...]:
+        """Delegate finalized changes to Karma without changing publication or email.
+
+        :param pip: Terminal proposal in the current atomic transaction. Example: PIP 42.
+        :param actor: Existing authorized administrator. Example: staff account mchen.
+        :return: Award outcomes. Example: one Maria 500-point outcome.
+        :raises ValidationError: For invalid award attribution or immutable event conflict.
+        """
+        raise NotImplementedError()

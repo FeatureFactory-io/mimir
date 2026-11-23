@@ -286,6 +286,81 @@ class KarmaService:
         """
         raise NotImplementedError()
 
+    @staticmethod
+    def award_accepted_changes(
+        *, pip: ProcessImprovementProposal, correlation_id: str
+    ) -> tuple[AwardOutcome, ...]:
+        """Award persisted accepted changes inside the finalization transaction.
+
+        :param pip: Persisted proposal. Example: reviewed PIP targeting playbook 6106.
+        :param correlation_id: Safe operation identifier. Example: "pip_finalize:42".
+        :return: Immutable persistence outcomes. Example: one created 500-point outcome.
+        :raises ValueError: For an unsaved proposal or invalid correlation identifier.
+        :raises ValidationError: For contradictory immutable event data.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _load_awardable_accepted_pip(
+        pip: ProcessImprovementProposal,
+    ) -> ProcessImprovementProposal | None:
+        """Reload and lock an eligible successfully published terminal proposal.
+
+        :param pip: Persisted input proposal. Example: PIP 42.
+        :return: Locked accepted/partial proposal or None. Example: accepted PIP 42.
+        :raises ValueError: If the input is unsaved or malformed.
+        :raises ProcessImprovementProposal.DoesNotExist: If the proposal was deleted.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _accepted_change_specs(
+        pip: ProcessImprovementProposal,
+    ) -> tuple[AwardSpec, ...]:
+        """Build specifications only for this proposal's persisted ACCEPT changes.
+
+        :param pip: Reloaded eligible proposal. Example: accepted PIP 42.
+        :return: Immutable complete batch. Example: (Activity ADD specification,).
+        :raises ValidationError: If decision timestamp or attribution is invalid.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _accepted_change_spec(
+        pip: ProcessImprovementProposal, change: PipChange
+    ) -> AwardSpec | None:
+        """Reuse an existing event or snapshot a newly eligible accepted change.
+
+        :param pip: Eligible parent proposal. Example: PIP 42 submitted by Maria.
+        :param change: Persisted accepted child. Example: ADD Activity change 81.
+        :return: Immutable accepted_change specification or None. Example: 500 Design points.
+        :raises ValidationError: If the child belongs to another proposal or lacks a timestamp.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _accepted_change_policy(change: PipChange) -> tuple[str, int] | None:
+        """Classify the complete supported operation/entity/relationship matrix.
+
+        :param change: Persisted typed change. Example: ADD Activity change 81.
+        :return: Source and points or None. Example: ("major", 500).
+        :raises ValueError: If change is not a PipChange.
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def _recorded_accepted_change_spec(
+        *, event_identity: str, recipient_id: int
+    ) -> AwardSpec | None:
+        """Recover the original immutable payload for a retry.
+
+        :param event_identity: Stable change event. Example: "accepted_change:81".
+        :param recipient_id: Submitter account identifier. Example: Maria's actual user pk.
+        :return: Original specification or None. Example: original Design event and timestamp.
+        :raises ValidationError: For contradictory source/channel/snapshot data.
+        """
+        raise NotImplementedError()
+
 
 ConsumptionChannel = Literal["gui_copy", "mcp_detail", "export"]
 
