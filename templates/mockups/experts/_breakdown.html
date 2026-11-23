@@ -1,0 +1,4 @@
+<div class="card hg-card"><div class="card-body"><h2 class="h5">Karma by source</h2>
+<div class="table-responsive"><table class="table table-sm mb-0" data-testid="karma-source-breakdown"><caption class="visually-hidden">Contribution sources sum to {{ person.formatted_karma }}</caption><thead><tr><th>Source</th><th class="text-end">Karma</th></tr></thead><tbody>
+{% for row in person.source_rows %}<tr><th scope="row" class="fw-normal">{{ row.label }}</th><td class="text-end">{{ row.points }}</td></tr>{% endfor %}
+</tbody><tfoot><tr><th>Total</th><td class="text-end fw-semibold">{{ person.formatted_karma }}</td></tr></tfoot></table></div></div></div>

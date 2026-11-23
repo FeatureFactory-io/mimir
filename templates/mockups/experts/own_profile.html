@@ -1,0 +1,15 @@
+{% extends "mockups/experts/base.html" %}
+{% block title %}My profile{% endblock %}
+{% block experts_content %}
+<header class="hg-page-header mb-4"><h1 class="hg-page-title">My profile</h1><p class="text-muted mb-0">Your account and contribution record</p></header>
+<div data-testid="profile-page" class="row g-4"><section class="col-md-8"><div class="card hg-card mb-3"><div class="card-body"><h2 class="h5">Account</h2><dl class="row mb-0"><dt class="col-sm-4">Name</dt><dd class="col-sm-8">{{ person.name }}</dd><dt class="col-sm-4">Email</dt><dd class="col-sm-8 text-break">{{ person.email }}</dd></dl><a class="btn btn-outline-secondary btn-sm" href="{% url 'mockup_profile_edit' %}" data-testid="profile-edit-btn"><i class="fa-solid fa-pen me-1" aria-hidden="true"></i>Edit profile</a></div></div>
+<div class="card hg-card" data-testid="profile-karma-card"><div class="card-body"><h2 class="h5">Your contributions</h2><p><span class="h3 text-primary" data-testid="profile-karma-total">{{ person.formatted_karma }}</span> Karma · <span class="badge text-bg-light border">{{ person.primary_category }}</span></p><p id="own-contribution-summary" class="expert-summary-collapsed" data-testid="profile-contribution-summary">{{ person.summary }}</p><button type="button" class="btn btn-outline-secondary btn-sm" aria-expanded="false" aria-controls="own-contribution-summary" data-testid="profile-summary-toggle"><i class="fa-solid fa-chevron-down me-1" aria-hidden="true"></i><span>Show more</span></button></div></div></section><aside class="col-md-4">{% include 'mockups/experts/_breakdown.html' %}</aside></div>
+<script>
+document.querySelector('[data-testid="profile-summary-toggle"]').addEventListener('click', function () {
+  const expanded = this.getAttribute('aria-expanded') !== 'true';
+  this.setAttribute('aria-expanded', String(expanded));
+  document.getElementById('own-contribution-summary').classList.toggle('expert-summary-collapsed', !expanded);
+  this.querySelector('span').textContent = expanded ? 'Show less' : 'Show more';
+});
+</script>
+{% endblock %}

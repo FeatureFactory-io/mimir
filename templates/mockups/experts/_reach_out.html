@@ -1,0 +1,9 @@
+<!-- Screen interaction: FOB-EXPERTS-REACH-OUT-1 -->
+{% if mock_authenticated %}
+<a class="btn btn-outline-primary" href="mailto:{{ person.email }}" data-testid="experts-reach-out-{{ person.username }}" data-bs-toggle="tooltip" title="Start an email discussion with {{ person.name }}"><i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>Reach out</a>
+{% else %}
+<span tabindex="0" class="d-inline-block" aria-describedby="reach-explanation-{{ person.username }}" data-testid="experts-reach-out-guest-tooltip" data-bs-toggle="tooltip" data-bs-placement="bottom" title="You need to be logged in to reach out to the expert">
+  <button class="btn btn-outline-primary" type="button" disabled aria-label="Reach out to {{ person.name }}"><i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>Reach out</button>
+  <span id="reach-explanation-{{ person.username }}" class="visually-hidden">You need to be logged in to reach out to the expert</span>
+</span>
+{% endif %}

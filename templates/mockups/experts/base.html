@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block extra_css %}
+<style>
+  body { padding-top: 3.5rem; }
+  .experts-category-pills { --bs-nav-pills-link-active-bg: var(--hg-primary); }
+  .mm-realm-navbar { top: 3.5rem; }
+  .experts-mockup-banner { height: 3.5rem; z-index: 1060; }
+  .expert-avatar { width: 3rem; height: 3rem; flex: 0 0 3rem; background: var(--hg-primary-100); color: var(--hg-primary); }
+  .expert-hint { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .expert-identity { min-width: 0; flex: 1 1 15rem; overflow-wrap: anywhere; }
+  .expert-rank { flex: 0 0 1.5rem; }
+  .expert-summary-collapsed { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+</style>
+{% endblock %}
+{% block content %}
+<!-- Screen: {{ screen_id }} -->
+<div class="fixed-top alert alert-warning rounded-0 mb-0 py-2 d-flex align-items-center justify-content-center text-center small experts-mockup-banner" data-testid="mockup-banner">Design reference · fictional fixture data · no live account</div>
+<div data-testid="screen-id" class="visually-hidden">{{ screen_id }}</div>
+{% block experts_content %}{% endblock %}
+<footer class="border-top mt-5 pt-3 small" data-testid="mockup-screen-inventory">
+  <h2 class="h6">Design reference screens</h2>
+  <p><a href="{% url 'mockup_experts_list' %}?category=design">Design</a> · <a href="{% url 'mockup_experts_list' %}?category=other">Empty Other</a> · <a href="{% url 'mockup_experts_list' %}?category=design&amp;guest=1">Guest</a> · <a href="{% url 'mockup_experts_list' %}?state=loading">Loading</a> · <a href="{% url 'mockup_experts_list' %}?state=error">Error</a> · <a href="{% url 'mockup_expert_detail' 'skim' %}">No public evidence</a></p>
+  {% for group in mockup_inventory %}<div class="mb-2"><strong>{{ group.title }}:</strong> {% for screen in group.screens %}<a class="me-2" href="{{ screen.href }}">{{ screen.label }}</a>{% endfor %}</div>{% endfor %}
+</footer>
+{% endblock %}

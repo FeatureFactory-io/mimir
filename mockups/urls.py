@@ -1,7 +1,12 @@
 from django.urls import path
 from . import views
+from . import experts_views
 
 urlpatterns = [
+    path('experts/', experts_views.experts_list, name='mockup_experts_list'),
+    path('experts/profile/', experts_views.expert_own_profile, name='mockup_experts_own_profile'),
+    path('experts/playbooks/<int:pk>/', experts_views.expert_playbook, name='mockup_experts_playbook'),
+    path('experts/<str:username>/', experts_views.expert_detail, name='mockup_expert_detail'),
     path("", views.mockup_index, name="mockup_index"),
     # ── Use cases (public landing) ────────────────────────────────────────
     path("use-cases/", views.use_cases, name="mockup_use_cases"),

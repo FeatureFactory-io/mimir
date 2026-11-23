@@ -1,0 +1,7 @@
+{% extends "mockups/experts/base.html" %}
+{% block title %}{{ book.title }}{% endblock %}
+{% block experts_content %}
+<nav aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="{% url 'mockup_expert_detail' 'mrodriguez' %}{{ guest_query }}">Maria Rodriguez</a></li><li class="breadcrumb-item active" aria-current="page">{{ book.title }}</li></ol></nav>
+<header class="hg-page-header mb-4"><h1 class="hg-page-title">{{ book.title }}</h1><p class="text-muted mb-0">{{ book.category }} · Released v{{ book.version }} · Public</p></header>
+<section class="card hg-card"><div class="card-body"><h2 class="h4">{{ book.workflow|default:'Published workflow' }}</h2><ol class="mb-0">{% for activity in book.activities %}<li class="mb-3"><h3 class="h6">{{ activity }}</h3>{% if activity == 'Trace Keyboard Focus' %}<p class="text-muted">Record focus order against the user task using an empty form and a partially completed form. Verify every control is reachable without a pointer.</p>{% elif activity == 'Review Form Feedback' %}<p class="text-muted">Reject a form submission and inspect the field association, error explanation and recovery path. Keep the user's valid entries.</p>{% endif %}</li>{% endfor %}</ol></div></section>
+{% endblock %}

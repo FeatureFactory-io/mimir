@@ -10,6 +10,15 @@ logger = logging.getLogger(__name__)
 
 MOCK_INDEX_GROUPS = [
     {
+        'title': 'Experts and public contribution evidence',
+        'screens': [
+            {'label': 'Experts', 'url_name': 'mockup_experts_list'},
+            {'label': 'Maria public profile', 'url_name': 'mockup_expert_detail', 'kwargs': {'username': 'mrodriguez'}},
+            {'label': 'My contributions', 'url_name': 'mockup_experts_own_profile'},
+            {'label': 'Accessibility Audit Playbook', 'url_name': 'mockup_experts_playbook', 'kwargs': {'pk': 6101}},
+        ],
+    },
+    {
         "title": "Realm nav + app sidebar",
         "screens": [
             {"label": "Authenticated Home", "url_name": "mockup_nav_dashboard"},
