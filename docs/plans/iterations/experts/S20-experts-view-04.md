@@ -14,7 +14,7 @@ dependencies:
 - S17
 - S14
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - bf47ae52b0f3d7601abb23348e8a07bf3fde0c22705440ab31c2938dc28759d1
 ```
@@ -195,3 +195,7 @@ feature_execution_graph:
 The prototype copies all fictional person fields, so visual resemblance cannot establish a safe production projection. Existing `can_view` intentionally grants broader authenticated access than public expert evidence permits. Privacy tests must prove sensitive records exist, inspect the designated DTO, and distinguish guest email exclusion from legitimate authenticated contact.
 
 No files changed, tests executed, commits made or external actions taken.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S20.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
