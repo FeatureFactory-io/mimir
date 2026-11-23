@@ -12,7 +12,7 @@ expanded_case_count: 2
 dependencies:
 - S03
 system_dependencies: []
-status: converged_plan_unapplied
+status: skeleton_applied_unimplemented
 source_report_sha256:
 - bfd83f7863833cc86593939a91e5cd8e5ef2e01f1b95e7566440b5779cd114a8
 ```
@@ -397,3 +397,7 @@ feature_execution_graph:
 Prototype sorting consumes declared categories and cannot certify category derivation. Distinguish current released counts from public fallback counts and immutable award attribution. Keep the two category examples separate from TIE03/S08. Empty/WIP-filtered runs are structural evidence only.
 
 After PIN-04 issue/handoff and PIN-05 GO: one backend-plus-log slice, one AT slice, one browser slice, then policy/DoD evidence; each commit references the issue and receives its required approved issue update. No writes, tests, commits or external mutations were performed by this worker.
+
+## Structural application evidence
+
+`docs/experts-replay/pin-evidence/S47.json` records positive scaffold selection and deliberate NotImplementedError. Existing callable ASTs were preserved. Browser collection is not interaction certification.
