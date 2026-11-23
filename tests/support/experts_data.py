@@ -7,7 +7,7 @@ import os
 import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -19,21 +19,32 @@ from django.contrib.auth.models import User
 from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.core.exceptions import MultipleObjectsReturned, ValidationError
 from django.core.validators import validate_email
-from django.db import IntegrityError, connection, transaction
+from django.db import IntegrityError, connection, models, transaction
 from django.db.backends.base.creation import TEST_DATABASE_PREFIX
+from django.db.models import Prefetch, Q, prefetch_related_objects
+from rest_framework.authtoken.models import Token
 
+from accounts.models import get_or_create_email_verification, mark_email_verified
 from methodology.models import (
     Activity,
+    EventChannel,
+    ExpertProfile,
     KarmaAward,
     PipChange,
     Playbook,
     PlaybookVersion,
     ProcessImprovementProposal,
+    VersionSource,
     Workflow,
 )
+from methodology.models.karma_award import first_release_identity
 from methodology.services.experts_service import (
     SOURCE_BUCKET_BY_KIND,
     SOURCE_BUCKETS,
+    AwardTotals,
+    ExpertsService,
+    LiveContributionCounts,
+    resolve_primary_category,
 )
 
 CEDAR_PASSWORD = "Cedar-fictional-tests-only-2026"
@@ -696,7 +707,34 @@ def _create_cedar_users(document: Mapping[str, object]) -> dict[str, User]:
     :return: Actual users keyed by username. Example: {"mchen": a User}.
     :raises ValueError: For conflicting unrelated account ownership.
     """
-    raise NotImplementedError()
+    users: dict[str, User] = {}
+    records = [*_rows(document, "people"), *_authenticated_actors(document)]
+    for record in records:
+        first_name, _, last_name = record["name"].partition(" ")
+        username = record["username"]
+        email = record["email"]
+        matched = User.objects.filter(username=username).first()
+        if User.objects.filter(email__iexact=email).exclude(username=username).exists():
+            raise ValueError("Cedar account email conflicts with a different account.")
+        values = {
+            "email": email,
+            "first_name": first_name,
+            "last_name": last_name,
+            "is_staff": record.get("is_staff", False),
+            "is_active": True,
+            "is_superuser": False,
+        }
+        if matched is None:
+            matched = User.objects.create_user(
+                username=username, password=CEDAR_PASSWORD, **values
+            )
+        elif not _matches(matched, values) or not matched.check_password(
+            CEDAR_PASSWORD
+        ):
+            raise ValueError("Cedar username conflicts with an existing account.")
+        _verify_cedar_user_email(matched)
+        users[username] = matched
+    return users
 
 
 def _verify_cedar_user_email(user: User) -> None:
@@ -706,7 +744,15 @@ def _verify_cedar_user_email(user: User) -> None:
     :return: None. Example: None.
     :raises ValueError: If the user is unsaved or not fixture-owned.
     """
-    raise NotImplementedError()
+    if not user.pk or not user.check_password(CEDAR_PASSWORD):
+        raise ValueError("Email verification requires a saved Cedar account.")
+    state = get_or_create_email_verification(user)
+    if (
+        not state.is_verified
+        or state.verification_token
+        or state.token_created_at is not None
+    ):
+        mark_email_verified(user)
 
 
 def _create_cedar_playbooks(
@@ -719,7 +765,44 @@ def _create_cedar_playbooks(
     :return: Oracle-PK keyed real books. Example: {6201: a Playbook}.
     :raises ValueError: For conflicting identities or missing authors.
     """
-    raise NotImplementedError()
+    people = _rows(document, "people")
+    books: dict[int, Playbook] = {}
+    for person, book in _book_declarations(people):
+        released = book is not person.get("draft_playbook")
+        stored = _match_or_create(
+            Playbook,
+            {"pk": book["pk"]},
+            {
+                "author_id": users[person["username"]].pk,
+                "name": book["title"],
+                "category": _category(book["category"]),
+                "version": Decimal(book["version"]),
+                "visibility": "public" if released else "private",
+                "status": "released" if released else "draft",
+                "description": "",
+                "source": "owned",
+            },
+        )
+        books[book["pk"]] = stored
+    for person in people:
+        for title in person.get("private_playbooks", []):
+            stored = _match_or_create(
+                Playbook,
+                {
+                    "author_id": users[person["username"]].pk,
+                    "name": title,
+                },
+                {
+                    "category": "other",
+                    "version": Decimal("0.1"),
+                    "visibility": "private",
+                    "status": "draft",
+                    "description": "",
+                    "source": "owned",
+                },
+            )
+            books[stored.pk] = stored
+    return books
 
 
 def _create_cedar_public_content(
@@ -727,11 +810,42 @@ def _create_cedar_public_content(
 ) -> tuple[dict[int, Workflow], dict[int, Activity]]:
     """Create the explicitly declared public workflows/activities from the contract.
 
+    A current published Activity needs a parent. If the oracle gives only a
+    workflow PK (Mike) or the published Activity names (Hana), use the declared
+    book title as the minimal current workflow label. No v1 content is inferred.
+
     :param dataset: Imported users/books and oracle. Example: a CedarDataset.
     :return: Actual workflow/activity maps. Example: ({6202: workflow}, {6203: activity}).
     :raises ValueError: For missing parents or conflicting content identities.
     """
-    raise NotImplementedError()
+    workflows: dict[int, Workflow] = {}
+    activities: dict[int, Activity] = {}
+    revisions = {
+        pip["playbook_pk"]: _rows(pip, "accepted_changes")
+        for pip in _rows(dataset.oracle, "historical_pips")
+    }
+    public_books = [
+        book
+        for person in _rows(dataset.oracle, "people")
+        for book in _rows(person, "public_playbooks")
+    ]
+    # Reserve declared IDs before any auto-generated parents or activities.
+    public_books.sort(key=lambda book: "workflow_pk" not in book)
+    for book in public_books:
+        changes = revisions.get(book["pk"], [])
+        if not changes and not ("workflow" in book or "workflow_pk" in book):
+            continue
+        workflow = _store_cedar_workflow(book)
+        workflows[workflow.pk] = workflow
+        named_activities = dict.fromkeys(book.get("activities", []))
+        if "activity_pk" in book:
+            named_activities[book["activity"]] = book["activity_pk"]
+        for change in changes:
+            named_activities.setdefault(change["name"], None)
+        for order, (name, activity_id) in enumerate(named_activities.items(), start=1):
+            activity = _store_cedar_activity(workflow.pk, name, order, activity_id)
+            activities[activity.pk] = activity
+    return workflows, activities
 
 
 def _create_cedar_private_boundaries(dataset: CedarDataset) -> None:
@@ -741,7 +855,24 @@ def _create_cedar_private_boundaries(dataset: CedarDataset) -> None:
     :return: None. Example: None.
     :raises ValueError: For conflicting sentinel ownership or missing parents.
     """
-    raise NotImplementedError()
+    for person in _rows(dataset.oracle, "people"):
+        user = dataset.users_by_username[person["username"]]
+        if "private_pip" in person:
+            book = dataset.playbooks_by_pk[person["public_playbooks"][0]["pk"]]
+            _match_or_create(
+                ProcessImprovementProposal,
+                {"title": person["private_pip"]},
+                {
+                    "playbook_id": book.pk,
+                    "created_by_id": user.pk,
+                    "status": ProcessImprovementProposal.STATUS_DRAFT,
+                    "summary": "",
+                },
+            )
+        if "private_token" in person:
+            _match_or_create(
+                Token, {"user_id": user.pk}, {"key": person["private_token"]}
+            )
 
 
 def _create_cedar_historical_pips(
@@ -753,7 +884,23 @@ def _create_cedar_historical_pips(
     :return: PIPs keyed by historical ID. Example: {"HIST-MARIA-DESIGN-01": a PIP}.
     :raises ValueError: For mismatched authors, changes or published version facts.
     """
-    raise NotImplementedError()
+    pips: dict[str, ProcessImprovementProposal] = {}
+    timestamp = _baseline_time()
+    for record in _rows(dataset.oracle, "historical_pips"):
+        key = record["id"]
+        pips[key] = _match_or_create(
+            ProcessImprovementProposal,
+            {"title": key},
+            {
+                "playbook_id": dataset.playbooks_by_pk[record["playbook_pk"]].pk,
+                "created_by_id": dataset.user_ids[record["submitter"]],
+                "status": ProcessImprovementProposal.STATUS_ACCEPTED,
+                "summary": "",
+                "decided_at": timestamp,
+                "status_changed_at": timestamp,
+            },
+        )
+    return pips
 
 
 def _publish_cedar_historical_changes(dataset: CedarDataset) -> None:
@@ -763,7 +910,36 @@ def _publish_cedar_historical_changes(dataset: CedarDataset) -> None:
     :return: None. Example: None.
     :raises ValueError: For inconsistent accepted/publication relationships.
     """
-    raise NotImplementedError()
+    workflows = {
+        workflow.playbook_id: workflow for workflow in dataset.workflows_by_pk.values()
+    }
+    activities = {
+        (activity.workflow_id, activity.name): activity
+        for activity in dataset.activities_by_pk.values()
+    }
+    for record in _rows(dataset.oracle, "historical_pips"):
+        pip = dataset.pips_by_key[record["id"]]
+        workflow = workflows[pip.playbook_id]
+        for order, fact in enumerate(_rows(record, "accepted_changes"), start=1):
+            activity = activities[(workflow.pk, fact["name"])]
+            _match_or_create(
+                PipChange,
+                {"pip_id": pip.pk, "order": order},
+                {
+                    "name": activity.name,
+                    "parent_workflow_id": workflow.pk,
+                    "target_id": activity.pk,
+                    "target_name_snapshot": activity.name,
+                    "change_type": fact["operation"],
+                    "entity_type": fact["entity"],
+                    "admin_decision": PipChange.ADMIN_ACCEPT,
+                    "content": "",
+                },
+            )
+    prefetch_related_objects(
+        tuple(dataset.pips_by_key.values()),
+        Prefetch("changes", queryset=PipChange.objects.order_by("order")),
+    )
 
 
 def _import_cedar_versions(dataset: CedarDataset) -> None:
@@ -773,7 +949,32 @@ def _import_cedar_versions(dataset: CedarDataset) -> None:
     :return: None. Example: None.
     :raises ValueError: For conflicting version source, number or PIP linkage.
     """
-    raise NotImplementedError()
+    historical = {
+        record["playbook_pk"]: record
+        for record in _rows(dataset.oracle, "historical_pips")
+    }
+    for book in dataset.playbooks_by_pk.values():
+        if book.status != "released":
+            continue
+        revision = historical.get(book.pk)
+        baseline = _version_snapshot(book, include_current_content=revision is None)
+        _store_cedar_version(
+            book, _INITIAL_RELEASE, VersionSource.RELEASE, None, baseline
+        )
+        if revision is not None:
+            pip = dataset.pips_by_key[revision["id"]]
+            snapshot = _version_snapshot(book, include_current_content=True)
+            snapshot.update(
+                {
+                    "pip_id": pip.pk,
+                    "version_before": revision["version_before"],
+                    "version_after": revision["version_after"],
+                    "accepted_change_ids": [change.pk for change in pip.changes.all()],
+                }
+            )
+            _store_cedar_version(
+                book, revision["version_after"], VersionSource.PIP_SOURCE, pip, snapshot
+            )
 
 
 def _version_snapshot(
@@ -787,7 +988,32 @@ def _version_snapshot(
     :return: Explicitly supported snapshot fields. Example: {"name": "Accessible Forms Review"}.
     :raises ValueError: For an unsaved book or unsupported historical reconstruction.
     """
-    raise NotImplementedError()
+    if not playbook.pk:
+        raise ValueError("Cedar version snapshots require a persisted book.")
+    if not include_current_content:
+        return {"version": _INITIAL_RELEASE}
+    workflows = playbook.workflows.order_by("order", "pk").prefetch_related(
+        Prefetch("activities", queryset=Activity.objects.order_by("order", "pk"))
+    )
+    return {
+        "name": playbook.name,
+        "category": playbook.category,
+        "status": playbook.status,
+        "version": str(playbook.version),
+        "workflows": [
+            {
+                "id": workflow.pk,
+                "name": workflow.name,
+                "order": workflow.order,
+                "abbreviation": workflow.abbreviation,
+                "activities": [
+                    {"id": activity.pk, "name": activity.name, "order": activity.order}
+                    for activity in workflow.activities.all()
+                ],
+            }
+            for workflow in workflows
+        ],
+    }
 
 
 def _store_cedar_version(
@@ -807,7 +1033,28 @@ def _store_cedar_version(
     :return: Persisted matching version. Example: PlaybookVersion(version_number=2).
     :raises ValueError: For conflicting or unsupported history.
     """
-    raise NotImplementedError()
+    if (
+        source not in (VersionSource.RELEASE, VersionSource.PIP_SOURCE)
+        or ((source == VersionSource.PIP_SOURCE) != (pip is not None))
+        or (pip is not None and pip.playbook_id != playbook.pk)
+    ):
+        raise ValueError("Cedar version source and publication relationship conflict.")
+    lookup = {"playbook_id": playbook.pk, "version_number": Decimal(version_number)}
+    fields = {
+        "source": source,
+        "pip_id": pip.pk if pip is not None else None,
+        "snapshot_data": dict(snapshot),
+        "is_major": True,
+        "created_by_id": playbook.author_id if pip is None else None,
+    }
+    version, created = PlaybookVersion.objects.get_or_create(**lookup, defaults=fields)
+    timestamp = _baseline_time()
+    if created:
+        PlaybookVersion.objects.filter(pk=version.pk).update(created_at=timestamp)
+        version.created_at = timestamp
+    elif not _matches(version, fields) or version.created_at != timestamp:
+        raise ValueError("Cedar playbook version conflicts with an existing receipt.")
+    return version
 
 
 def _import_cedar_profiles(dataset: CedarDataset) -> None:
@@ -817,7 +1064,19 @@ def _import_cedar_profiles(dataset: CedarDataset) -> None:
     :return: None. Example: None.
     :raises ValueError: For conflicting profile ownership or malformed prose.
     """
-    raise NotImplementedError()
+    for person in _rows(dataset.oracle, "people"):
+        user = dataset.users_by_username[person["username"]]
+        _match_or_create(
+            ExpertProfile,
+            {"user_id": user.pk},
+            {
+                "contribution_summary": person.get("summary") or "",
+                "summary_status": ExpertProfile.SummaryStatus.NEVER,
+                "summary_updated_at": None,
+                "summary_error_code": "",
+                "last_summary_correlation_id": "",
+            },
+        )
 
 
 def _normalize_cedar_awards(dataset: CedarDataset) -> tuple[HistoricalAward, ...]:
@@ -827,7 +1086,19 @@ def _normalize_cedar_awards(dataset: CedarDataset) -> tuple[HistoricalAward, ...
     :return: Deterministic direct-import awards. Example: ().
     :raises ValueError: For inconsistent totals, channels or known references.
     """
-    raise NotImplementedError()
+    awards: list[HistoricalAward] = []
+    for person in _rows(dataset.oracle, "people"):
+        for index, row in enumerate(_rows(person, "ledger")):
+            normalize = (
+                _historical_release_rows
+                if row["event"] == KarmaAward.SourceKind.RELEASE
+                else _historical_nonrelease_rows
+            )
+            awards.extend(normalize(dataset, person["username"], row, index))
+    _require_unique(
+        [award.event_identity for award in awards], "Cedar award identities"
+    )
+    return tuple(awards)
 
 
 def _historical_release_rows(
@@ -845,7 +1116,38 @@ def _historical_release_rows(
     :return: One award per historical release. Example: ().
     :raises ValueError: For incompatible known release bindings or arithmetic.
     """
-    raise NotImplementedError()
+    category = _category(ledger_row["category"])
+    recipient_id = dataset.users_by_username[username].pk
+    books = sorted(
+        book.pk
+        for book in dataset.playbooks_by_pk.values()
+        if book.author_id == recipient_id
+        and book.category == category
+        and book.status == "released"
+    )
+    if len(books) > ledger_row["count"]:
+        raise ValueError("Cedar ledger does not cover its known release receipts.")
+    timestamp = _baseline_time()
+    return tuple(
+        HistoricalAward(
+            recipient_id=recipient_id,
+            event_identity=(
+                first_release_identity(books[index])
+                if index < len(books)
+                else _historical_event_id(username, row_index, index)
+            ),
+            source_kind=KarmaAward.SourceKind.RELEASE,
+            event_channel=EventChannel.HISTORICAL,
+            points=ledger_row["points_each"],
+            category=category,
+            playbook_id_snapshot=books[index] if index < len(books) else None,
+            change_id_snapshot=None,
+            entity_type_snapshot=None,
+            entity_id_snapshot=None,
+            occurred_at=timestamp,
+        )
+        for index in range(ledger_row["count"])
+    )
 
 
 def _historical_nonrelease_rows(
@@ -863,7 +1165,45 @@ def _historical_nonrelease_rows(
     :return: Historical awards with exact channel attribution. Example: ().
     :raises ValueError: If declared GUI subset exceeds eligible author events.
     """
-    raise NotImplementedError()
+    source = ledger_row["event"]
+    category = _category(ledger_row["category"])
+    recipient_id = dataset.users_by_username[username].pk
+    changes = _cedar_change_receipts(dataset, recipient_id, category, source)
+    copies = 0
+    if source == KarmaAward.SourceKind.CONSUMPTION:
+        person = next(
+            person
+            for person in _rows(dataset.oracle, "people")
+            if person["username"] == username
+        )
+        copies = person.get("copy_count", 0)
+    if max(copies, len(changes)) > ledger_row["count"]:
+        raise ValueError("Known Cedar history exceeds the aggregate ledger count.")
+    timestamp = _baseline_time()
+    return tuple(
+        (
+            HistoricalAward(
+                recipient_id=recipient_id,
+                event_identity=_historical_event_id(username, row_index, ordinal),
+                source_kind=source,
+                event_channel=(
+                    EventChannel.GUI_COPY
+                    if ordinal < copies
+                    else EventChannel.HISTORICAL
+                ),
+                points=ledger_row["points_each"],
+                category=category,
+                playbook_id_snapshot=None,
+                change_id_snapshot=None,
+                entity_type_snapshot=None,
+                entity_id_snapshot=None,
+                occurred_at=timestamp,
+            )
+            if ordinal >= len(changes)
+            else changes[ordinal]
+        )
+        for ordinal in range(ledger_row["count"])
+    )
 
 
 def _historical_event_id(username: str, row_index: int, ordinal: int) -> str:
@@ -875,7 +1215,10 @@ def _historical_event_id(username: str, row_index: int, ordinal: int) -> str:
     :return: Stable identity. Example: "cedar:baseline:mrodriguez:1:0".
     :raises ValueError: For invalid username or negative indices.
     """
-    raise NotImplementedError()
+    _text(username, "historical award recipient", 150)
+    _nonnegative_int(row_index, "historical row index")
+    _nonnegative_int(ordinal, "historical item index")
+    return f"cedar:baseline:{username}:{row_index}:{ordinal}"
 
 
 def _persist_cedar_awards(awards: Sequence[HistoricalAward]) -> None:
@@ -885,17 +1228,180 @@ def _persist_cedar_awards(awards: Sequence[HistoricalAward]) -> None:
     :return: None. Example: None.
     :raises ValueError: For conflicting existing logical rows or timestamps.
     """
-    raise NotImplementedError()
+    expected = {award.event_identity: asdict(award) for award in awards}
+    release_ids = {
+        award.playbook_id_snapshot
+        for award in awards
+        if award.source_kind == KarmaAward.SourceKind.RELEASE
+        and award.playbook_id_snapshot is not None
+    }
+    change_ids = {
+        award.change_id_snapshot
+        for award in awards
+        if award.change_id_snapshot is not None
+    }
+    candidates = KarmaAward.objects.filter(
+        Q(recipient_id__in={award.recipient_id for award in awards})
+        | Q(
+            source_kind=KarmaAward.SourceKind.RELEASE,
+            playbook_id_snapshot__in=release_ids,
+        )
+        | Q(change_id_snapshot__in=change_ids)
+    )
+    history = set()
+    for existing in candidates.values(*HistoricalAward.__dataclass_fields__):
+        identity = existing["event_identity"]
+        if identity in expected:
+            if existing != expected[identity]:
+                raise ValueError(
+                    "Cedar award conflicts with an existing event snapshot."
+                )
+            history.add(identity)
+        elif existing["change_id_snapshot"] in change_ids or (
+            existing["source_kind"] == KarmaAward.SourceKind.RELEASE
+            and existing["playbook_id_snapshot"] in release_ids
+        ):
+            raise ValueError(
+                "Cedar receipt conflicts with a different existing event identity."
+            )
+    pending = [
+        KarmaAward(**payload) for key, payload in expected.items() if key not in history
+    ]
+    for award in pending:
+        award.clean()
+    KarmaAward.objects.bulk_create(pending)
 
 
 def _verify_cedar_projection(dataset: CedarDataset) -> None:
-    """Independently reconcile real totals, counts, known history and sentinels.
+    """Independently reconcile actual persisted contribution totals and counts.
 
     :param dataset: Complete actual baseline and independent oracle. Example: dataset.
     :return: None. Example: None.
-    :raises AssertionError: For any persisted/oracle mismatch.
+    :raises ValueError: For any persisted/oracle mismatch.
     """
-    raise NotImplementedError()
+    service = ExpertsService()
+    ids = dataset.user_ids
+    totals = service._load_award_totals(tuple(ids.values()))
+    live = service._load_live_counts(tuple(ids.values()))
+    released = service._load_released_counts(tuple(ids.values()))
+    from_oracle = {
+        person["username"]: person for person in _rows(dataset.oracle, "people")
+    }
+    for name, user_id in ids.items():
+        person = from_oracle.get(name)
+        if person is None:
+            if user_id in totals:
+                raise ValueError("Cedar actor has conflicting award history.")
+            continue
+        _reconcile_cedar_person(
+            person, totals.get(user_id), live[user_id], released.get(user_id, {})
+        )
+
+
+def _matches(row: models.Model, fields: Mapping[str, object]) -> bool:
+    """Compare declared database fields without overwriting a preexisting row."""
+    return all(getattr(row, name) == expected for name, expected in fields.items())
+
+
+def _match_or_create[Model: models.Model](
+    model: type[Model], key: dict[str, Any], fields: dict[str, Any]
+) -> Model:
+    """Persist deterministic fixture data or verify the full declared payload."""
+    row, created = model._default_manager.get_or_create(**key, defaults=fields)
+    if not created and not _matches(row, fields):
+        raise ValueError(
+            f"Cedar {model.__name__} import conflicts with an existing row."
+        )
+    return row
+
+
+def _store_cedar_workflow(book: _Record) -> Workflow:
+    """Persist a declared workflow or the minimum parent for published activities."""
+    parent = {
+        "playbook_id": book["pk"],
+        "name": book.get("workflow", book["title"]),
+    }
+    key = {"pk": book["workflow_pk"]} if "workflow_pk" in book else parent
+    return _match_or_create(Workflow, key, {**parent, "order": 1, "description": ""})
+
+
+def _store_cedar_activity(
+    workflow_id: int, name: str, order: int, activity_id: int | None
+) -> Activity:
+    """Persist only a declared current Activity and its known order."""
+    identity = {"workflow_id": workflow_id, "name": name}
+    lookup = {"pk": activity_id} if activity_id is not None else identity
+    return _match_or_create(
+        Activity, lookup, {**identity, "order": order, "guidance": ""}
+    )
+
+
+def _cedar_change_receipts(
+    dataset: CedarDataset, recipient_id: int, category: str, source: str
+) -> tuple[HistoricalAward, ...]:
+    """Bind known PIP awards to the actual published change and entity identities."""
+    if source not in (KarmaAward.SourceKind.MAJOR, KarmaAward.SourceKind.MINOR):
+        return ()
+    receipts: list[HistoricalAward] = []
+    operation = (
+        PipChange.CHANGE_ADD
+        if source == KarmaAward.SourceKind.MAJOR
+        else PipChange.CHANGE_ALTER
+    )
+    for pip in dataset.pips_by_key.values():
+        book = dataset.playbooks_by_pk[pip.playbook_id]
+        if pip.created_by_id != recipient_id or book.category != category:
+            continue
+        for change in pip.changes.all():
+            if change.change_type != operation:
+                continue
+            receipts.append(
+                HistoricalAward(
+                    recipient_id=recipient_id,
+                    event_identity=f"accepted_change:{change.pk}",
+                    source_kind=source,
+                    event_channel=EventChannel.ACCEPTED_CHANGE,
+                    points=_AWARD_UNITS[source],
+                    category=category,
+                    playbook_id_snapshot=book.pk,
+                    change_id_snapshot=change.pk,
+                    entity_type_snapshot=change.entity_type,
+                    entity_id_snapshot=change.target_id,
+                    occurred_at=pip.decided_at,
+                )
+            )
+    return tuple(receipts)
+
+
+def _reconcile_cedar_person(
+    person: _Record,
+    awarded: AwardTotals | None,
+    live: LiveContributionCounts,
+    released: Mapping[str, int],
+) -> None:
+    """Verify source/category totals and visible counts against the independent oracle."""
+    categories = dict(awarded.category_points) if awarded else {}
+    sources = (
+        dict(awarded.source_points) if awarded else dict.fromkeys(SOURCE_BUCKETS, 0)
+    )
+    primary = person.get("primary_category")
+    total = awarded.total_points if awarded else 0
+    if (
+        total != person["total_karma"]
+        or categories
+        != {
+            _category(label): points
+            for label, points in person["karma_by_category"].items()
+        }
+        or sources != person["karma_by_source"]
+        or resolve_primary_category(categories, released)
+        != (_category(primary) if primary else None)
+        or live.released_public_playbook_count != len(person["public_playbooks"])
+        or live.successful_gui_copy_count != person.get("copy_count", 0)
+    ):
+        raise ValueError(
+            "Persisted Cedar contribution projection conflicts with its independent oracle."
+        )
 
 
 def seed_s27_summary_privacy_variant() -> Mapping[str, Any]:
