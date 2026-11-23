@@ -3844,6 +3844,14 @@ event identity plus applicable recipient prevents retry duplication; paired
 consumption awards are written atomically. A partial decision awards only its
 accepted eligible changes. Historical fixture import never invokes fresh hooks.
 
+Store source playbook/change identifiers as durable integer snapshots rather
+than PROTECT relationships that would disable existing content deletion. Preserve
+current account-deletion semantics. A distinct event_channel identifies GUI copy,
+MCP detail, export, release, accepted change or unattributed historical activity;
+do not infer channels by parsing event identities. Retry preserves the original
+event timestamp and logical payload. First-release uniqueness is additionally
+per playbook snapshot independently of recipient/author changes.
+
 The first release awards its author 5,000 once per playbook, including later
 release/revert/release cycles. Accepted ADD Activity/Skill/Artifact awards the
 submitter 500 per change; other supported accepted changes award 100. Submission,
@@ -3879,6 +3887,12 @@ the tied categories, then alphabetical category. The username tiebreak is an
 explicit replay decision. Public detail exposes approved contribution totals,
 stored public summary and currently public released playbooks, while preserving
 private titles/content. No availability or suitability score is inferred.
+
+Numeric fallback counts currently public released authored playbooks and eligible
+GUI copies credited to the author (consumption source plus gui_copy channel).
+It does not count MCP reads/exports or guest/self copies as GUI awards. Mike's
+47 copies are a subset of his 470 author-consumption events. Presentation consumes
+these independent live counts; it does not read the fixture's declared counts.
 
 ### Web delivery and notification reuse
 
@@ -3946,6 +3960,21 @@ output validator → summary store and trace. ScriptedLLM replaces only the mode
 in integration proofs; all other collaborators and DB writes remain real. The
 composition helper injects the configured adapter and services explicitly.
 Unselected CAPs and SC-required infrastructure are not implicitly promised.
+
+PIN planning refinement: the read-only `PublicContributionSummaryBoundary`
+composes evidence, prompt, one completion and validation, returning immutable
+text/normalized response/body-free trace or a typed sanitized failure with its
+partial trace. `ContributionSummaryService` delegates once, then appends the
+domain-write outcome and persists the summary/interaction. This makes the
+public-input boundary independently provable without duplicating a provider path
+or manufacturing control traces in tests.
+
+For the full normal-submission proof, an optional explicit BaseLLM port is passed
+through the existing PIP scheduler and Galdr client provider boundary as well.
+Existing callers, assessment parsing and retry policy stay compatible. A single
+finite ScriptedLLM queue supplies the summary response and the existing private
+assessment response; legacy StubGaldrClient is not substituted for that proof.
+This is bounded provider injection, not a replacement assessment engine.
 
 ### Privacy, bounds and failure policy
 

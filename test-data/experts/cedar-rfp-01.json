@@ -952,7 +952,26 @@
           "username": "apark",
           "name": "Alina Park",
           "primary_category": "Design",
-          "total_karma": 15400
+          "total_karma": 15400,
+          "historical_ledger_fixture": [
+            {
+              "category": "Design",
+              "event": "major",
+              "event_channel": "historical",
+              "count": 30,
+              "points_each": 500,
+              "points": 15000
+            },
+            {
+              "category": "Design",
+              "event": "minor",
+              "event_channel": "historical",
+              "count": 4,
+              "points_each": 100,
+              "points": 400
+            }
+          ],
+          "fixture_note": "Explicit tie-only historical decomposition; unknown source references remain null, with no invented public PIP evidence or live hooks."
         },
         {
           "username": "sreed",
@@ -1081,5 +1100,16 @@
       }
     ],
     "decision_status": "Explicit conservative self-consumption clarification for review with the PIN contract."
+  },
+  "copy_count_policy": {
+    "definition": "Successful eligible authenticated other-person GUI copies credited to the author, counted independently of MCP reads/exports.",
+    "ledger_filter": {
+      "source_kind": "consumption",
+      "event_channel": "gui_copy"
+    },
+    "baseline_mchen": 47,
+    "baseline_mchen_all_author_consumption_events": 470,
+    "guest_and_self": "No award rows; do not inflate this eligible-copy count.",
+    "public_released_count": "Fallback counts currently public released authored playbooks; primary-category tie uses the separate governing released-count rule."
   }
 }
