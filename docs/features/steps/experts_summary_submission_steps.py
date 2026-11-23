@@ -47,10 +47,10 @@ def summary_refresh_occurs_during_processing(context: Context) -> None:
 def maria_summary_total_remains(context: Context, total: int) -> None:
     """Reconcile actual ledger total and unchanged original award snapshots across submission or resubmission.
 
-    :param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
-    :return: None when the described real observation holds. Example: None.
-    :raises AssertionError: Actual domain, response or recorded boundary differs.
-    """
+:param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
+:param total: Expected actual ledger total. Example: 8200.
+:return: None when the described real observation holds. Example: None.
+:raises AssertionError: Actual domain, response or recorded boundary differs."""
     raise NotImplementedError()
 
 @then('the new proposal is not described as accepted')
@@ -77,9 +77,8 @@ def summary_success_persists_validated_prose(context: Context) -> None:
 def summary_obeys_sentence_bound(context: Context, limit: int) -> None:
     """Count the actual stored plain-prose sentences using the real shared validator, including the full final sentence.
 
-    :param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
-    :return: None when the described real observation holds. Example: None.
-    :raises AssertionError: Actual domain, response or recorded boundary differs.
-    """
+:param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
+:param limit: Maximum allowed stored sentence count. Example: 14.
+:return: None when the described real observation holds. Example: None.
+:raises AssertionError: Actual domain, response or recorded boundary differs."""
     raise NotImplementedError()
-
