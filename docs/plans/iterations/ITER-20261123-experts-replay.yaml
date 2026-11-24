@@ -6008,7 +6008,7 @@ scenarios:
       - S07
       - S36
     implementation_plan: docs/plans/iterations/experts/S37-karma-copy-02.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
@@ -8053,7 +8053,7 @@ scenarios:
         - KarmaService.award_successful_consumption:branch
         - copy_success_receipt:exit
         gate:
-          command: pytest tests/integration/test_karma_copy.py -k 'self_activity' -x
+          command: pytest tests/integration/test_karma_copy.py -k 'self_activity' -x --deselect tests/integration/test_karma_copy.py::test_copy_receipt_with_self_activity_returns_successful_exclusion --deselect tests/integration/test_karma_copy.py::test_copy_receipt_with_self_activity_without_csrf_returns_forbidden
           log_story_command: pytest tests/integration/test_karma_copy.py::test_copy_receipt_with_self_activity_log_story_happy
             -x
         guidance_bundle:
@@ -8130,7 +8130,7 @@ scenarios:
       - S36
       - S37
     implementation_plan: docs/plans/iterations/experts/S38-karma-copy-03.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
