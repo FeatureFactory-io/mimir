@@ -1697,11 +1697,37 @@ scenarios:
         - _redact_public_text
         - _contains_restricted_summary_text
         proposal: /Users/denispetelin/Desktop/RIPL-Experts-Production/review/S27-complete-shared-policy.patch
+      - id: R3-legacy-policy-union
+        title: Complete the user-authorized S27 correction through independent acceptance
+        bpe: BPE-02
+        depends_on:
+        - R2-complete-shared-policy
+        footprint:
+        - methodology/services/public_contribution_evidence.py
+        - methodology/services/contribution_summary_prompts.py
+        - tests/integration/test_experts_public_evidence.py
+        - Makefile
+        approved_additional_helpers:
+        - _redact_public_text_pass
+        gate:
+          command: make test-experts-s27
+          log_story_command: pytest tests/integration/test_experts_public_evidence.py -k log_story -x
+          agent_proof_command: pytest tests/integration/test_experts_summary_proofs.py -m agent_proof -k s27_summary -x
+        guidance_bundle:
+          activity: BPE/BPE-02-Implement_Backend.md
+          rules:
+          - do-test-first
+          - do-not-mock-in-integration-tests
+          - do-assert-log-story
+          - do-assert-agent-story
+          - do-write-concise-methods
+        human_approval: FUCKING FIX S27. DO IT, STOP ASKING IN THE LOOP
+        retry_authority: Continued fixes and independent rechecks within S27 are explicitly authorized without further retry-approval questions.
       - id: S27-N5-dod
         title: Certify privacy, log and agent gates together
         bpe: BPE-06
         depends_on:
-        - R2-complete-shared-policy
+        - R3-legacy-policy-union
         footprint: []
         gate:
           command: make test-experts-s27
@@ -1716,7 +1742,7 @@ scenarios:
       scenario_dependencies:
       - S03
     implementation_plan: docs/plans/iterations/experts/S27-galdr-summary-05.md
-    status: drift_escalated
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
