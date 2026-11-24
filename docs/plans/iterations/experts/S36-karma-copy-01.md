@@ -185,8 +185,8 @@ feature_execution_graph:
     - copy_success_receipt:branch
     - KarmaService.award_successful_consumption:branch
     gate:
-      command: pytest tests/integration/test_karma_copy.py -x
-      log_story_command: pytest tests/integration/test_karma_copy.py -k log_story -x
+      command: make test-experts-s36-backend
+      log_story_command: make test-experts-s36-log
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md
       rules:
@@ -280,7 +280,7 @@ feature_execution_graph:
     - copy_success_receipt:branch
     gate:
       command: make test-experts-s36
-      log_story_command: pytest tests/integration/test_karma_copy.py -k log_story -x
+      log_story_command: make test-experts-s36-log
     guidance_bundle:
       activity: BPE/BPE-06-Check_Definition_of_Done.md
       rules:
