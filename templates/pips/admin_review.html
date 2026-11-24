@@ -154,7 +154,11 @@
                                 {% endif %}
                             </td>
                             <td>
+                                <label class="visually-hidden" for="admin-decision-change-{{ ch.pk }}">
+                                    Decision for change {{ ch.order }}
+                                </label>
                                 <select class="form-select form-select-sm decision-select"
+                                        id="admin-decision-change-{{ ch.pk }}"
                                         name="decision_{{ ch.pk }}"
                                         data-testid="admin-decision-{{ ch.order }}"
                                         {% if is_decided %}disabled{% endif %}>
@@ -248,12 +252,14 @@
 </div>
 
 <!-- Finalize confirmation modal -->
-<div class="modal fade" id="finalizeModal" tabindex="-1" data-testid="finalize-confirm-modal">
+<div class="modal fade" id="finalizeModal" tabindex="-1" aria-labelledby="finalizeModalTitle"
+     data-testid="finalize-confirm-modal">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Confirm Finalize</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="finalizeModalTitle">Confirm Finalize</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
+                        data-testid="finalize-modal-close"></button>
             </div>
             <div class="modal-body">
                 <p>You are <span id="modal-accept-verb">accepting</span> <strong id="modal-accepted-count">0</strong> of <strong>{{ changes|length }}</strong> changes.</p>

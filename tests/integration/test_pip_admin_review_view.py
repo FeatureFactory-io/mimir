@@ -5,8 +5,11 @@ from decimal import Decimal
 import pytest
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import PermissionDenied
+from django.http import HttpResponse
 from django.test import Client
+from django.test.html import parse_html
 from django.urls import reverse
 
 from methodology.models import (
@@ -18,6 +21,7 @@ from methodology.models import (
 )
 from methodology.services.pip_admin_service import PIPAdminService
 from methodology.services.pip_service import PIPService
+from tests.support.experts_html import find_by_test_id
 
 User = get_user_model()
 
@@ -175,6 +179,96 @@ def test_admin_05_galdr_output_shown(bob_staff, reviewed_pip_all_accept):
     content = response.content.decode()
     assert "ACCEPT" in content
     assert "Looks good" in content
+
+
+@pytest.fixture
+def admin_review_response(
+    client: Client,
+    bob_staff: AbstractUser,
+    reviewed_pip_all_accept: ProcessImprovementProposal,
+) -> HttpResponse:
+    """Open the review form as staff for the two-change PIP.
+
+    :param client: Real Django client.
+    :param bob_staff: Reviewer account authorized to open the PIP.
+    :param reviewed_pip_all_accept: Reviewed PIP holding two proposed changes.
+    :return: Successful review response. Example: the staff review page.
+    :raises AssertionError: If the review page cannot be opened.
+    """
+    client.force_login(bob_staff)
+    url = reverse("pip_admin_review", kwargs={"pk": reviewed_pip_all_accept.pk})
+    response = client.get(url)
+    assert response.status_code == 200
+    return response
+
+
+@pytest.mark.django_db
+def test_admin_review_with_two_changes_labels_each_decision(
+    admin_review_response: HttpResponse,
+    reviewed_pip_all_accept: ProcessImprovementProposal,
+) -> None:
+    """Verify each decision has a distinct native label linked to its select.
+
+    :param admin_review_response: Actual staff review HTML response.
+    :param reviewed_pip_all_accept: Reviewed PIP holding two proposed changes.
+    :return: None when both native label associations are unique.
+    :raises AssertionError: If a decision is missing its matching label or ID.
+    """
+    html = admin_review_response.content.decode()
+    changes = list(reviewed_pip_all_accept.changes.order_by("order"))
+    assert [change.order for change in changes] == [1, 2]
+    for change in changes:
+        row = find_by_test_id(html, f"admin-change-row-{change.order}")
+        decision = find_by_test_id(str(row), f"admin-decision-{change.order}")
+        assert decision.name == "select"
+        assert ("name", f"decision_{change.pk}") in decision.attributes
+        decision_id = dict(decision.attributes).get("id")
+        assert decision_id, f"Change {change.order} decision needs a label target"
+        assert html.count(f' id="{decision_id}"') == 1
+        label = parse_html(
+            f'<label class="visually-hidden" for="{decision_id}">'
+            f"Decision for change {change.order}</label>"
+        )
+        assert row.count(label) == 1
+
+
+@pytest.mark.django_db
+def test_admin_review_with_finalize_dialog_associates_visible_title(
+    admin_review_response: HttpResponse,
+) -> None:
+    """Verify the existing heading names the finalization dialog.
+
+    :param admin_review_response: Actual staff review HTML response.
+    :return: None when the dialog points to its unique confirmation heading.
+    :raises AssertionError: If the rendered dialog has no linked heading.
+    """
+    html = admin_review_response.content.decode()
+    modal = find_by_test_id(html, "finalize-confirm-modal")
+    title_id = dict(modal.attributes).get("aria-labelledby")
+    assert title_id, "The confirmation dialog needs a title association"
+    assert html.count(f' id="{title_id}"') == 1
+    heading = parse_html(
+        f'<h5 class="modal-title" id="{title_id}">Confirm Finalize</h5>'
+    )
+    assert modal.count(heading) == 1
+
+
+@pytest.mark.django_db
+def test_admin_review_with_finalize_dialog_names_close_button(
+    admin_review_response: HttpResponse,
+) -> None:
+    """Verify the icon-only dismiss button has an explicit action name.
+
+    :param admin_review_response: Actual staff review HTML response.
+    :return: None when the icon button is named Close and still dismisses.
+    :raises AssertionError: If the named dismiss button is absent.
+    """
+    modal = find_by_test_id(admin_review_response.content, "finalize-confirm-modal")
+    button = parse_html(
+        '<button type="button" class="btn-close" data-bs-dismiss="modal" '
+        'aria-label="Close" data-testid="finalize-modal-close"></button>'
+    )
+    assert modal.count(button) == 1, "The icon-only dismiss control must be named Close"
 
 
 @pytest.mark.django_db
