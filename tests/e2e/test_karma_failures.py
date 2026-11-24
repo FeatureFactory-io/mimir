@@ -214,6 +214,8 @@ def _assert_native_error_feedback(page: Page, errors: list[str]) -> None:
     """
     error = page.get_by_test_id("copy-prompt-error-toast")
     expect(error).to_be_visible()
+    expect(error).to_have_css("opacity", "1")
+    expect(error).to_be_in_viewport()
     expect(error).to_contain_text(_ERROR_MESSAGE)
     expect(page.get_by_test_id("copy-prompt-toast")).to_be_hidden()
     expect(page.locator(".mm-copy-prompt-success-icon")).to_be_hidden()
