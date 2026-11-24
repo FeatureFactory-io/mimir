@@ -5,17 +5,23 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
+from importlib import import_module
 from uuid import UUID
 
 import pytest
 from asgiref.sync import sync_to_async
-from fastmcp.exceptions import ToolError
 from django.contrib.auth.models import User
+from django.core.exceptions import SynchronousOnlyOperation
 from django.db.models import Model, Sum
 from django.http import HttpResponse
 from django.test import Client
 from django.urls import reverse
+from fastmcp import Client as RegisteredMCPClient
+from fastmcp.exceptions import ToolError
+from httpx import Client as HTTPClient
 from pytest import LogCaptureFixture
 from pytest_django.live_server_helper import LiveServer
 from rest_framework.authtoken.models import Token
@@ -26,6 +32,7 @@ from mcp_integration.context import (
     get_current_user,
     set_current_user,
 )
+from mcp_integration.facade import client as facade_client
 from methodology.api.consumption_views import ReceiptChannel
 from methodology.models import Agent, Artifact, KarmaAward, Phase, Playbook, Rule, Skill
 from methodology.services.karma_service import KarmaService
@@ -37,10 +44,18 @@ from tests.support.karma_mcp import (
     MCPClientFactory,
     MCPDataset,
     MCPEntrypoint,
+    MCPRuntimeState,
+    _capture_mcp_runtime,
     decode_tool_payload,
     detail_case,
+)
+from tests.support.karma_mcp import (
     mcp_client_factory as _mcp_client_factory,  # noqa: F401 — pytest fixture
+)
+from tests.support.karma_mcp import (
     mcp_dataset as _mcp_dataset,  # noqa: F401 — pytest fixture
+)
+from tests.support.karma_mcp import (
     mcp_request_paths as _mcp_request_paths,  # noqa: F401 — pytest fixture dependency
 )
 from tests.support.log_story import assert_log_story
@@ -1029,18 +1044,198 @@ async def test_mcp_detail_log_story_reject(
     )
 
 
+@contextmanager
+def _configured_mcp_runtime(
+    server_url: str, actor: User, token_key: str
+) -> Iterator[None]:
+    """Provide a borrowed real HTTP singleton and unrelated legacy user.
+
+    :param server_url: Actual live server, with a distinct borrowed base path.
+    :param actor: Persisted prior user for the caller's context.
+    :param token_key: Actual DRF key against the borrowed HTTP client.
+    :return: Scoped configuration that restores the original runtime on exit.
+    """
+    previous_facade = _capture_mcp_runtime().facade
+    previous_user = _current_user.set(actor)
+    try:
+        facade_client.configure(server_url, token_key)
+        with facade_client.get_client(), pytest.MonkeyPatch.context() as environment:
+            environment.setenv(UNSAFE_ORM_FLAG, "s39-prior-test-value")
+            yield
+    finally:
+        _current_user.reset(previous_user)
+        facade_client._server_url = previous_facade.server_url
+        facade_client._token = previous_facade.token
+        facade_client._http_client = previous_facade.client
+
+
+def _assert_mcp_runtime_restored(previous: MCPRuntimeState) -> None:
+    """Require exact client/config identity, caller context and prior environment."""
+    current = _capture_mcp_runtime()
+    assert current.facade.client is previous.facade.client
+    if current.facade != previous.facade:
+        raise AssertionError("Facade connection settings were not restored.")
+    assert current.legacy_user is previous.legacy_user
+    assert current.unsafe_environment_value == previous.unsafe_environment_value
+    if previous.facade.client is not None:
+        assert not previous.facade.client.is_closed
+
+
+async def _assert_factory_session_auth(
+    factory: MCPClientFactory,
+    case: MCPCase,
+    entrypoint: MCPEntrypoint,
+    previous: MCPRuntimeState,
+) -> HTTPClient | None:
+    """Prove actor binding while the actual session is still connected."""
+    actor = factory.dataset.cedar.users_by_username[case.actor_username]
+    if entrypoint == "legacy":
+        assert get_current_user() is actor
+        assert _capture_mcp_runtime().facade.client is previous.facade.client
+        assert UNSAFE_ORM_FLAG not in os.environ
+        return None
+    assert _current_user.get() is previous.legacy_user
+    assert facade_client.get_server_url() == factory.server_url
+    owned_http = facade_client.get_client()
+    assert owned_http is not previous.facade.client
+    assert not owned_http.is_closed
+    token = await Token.objects.aget(user_id=actor.pk)
+    if owned_http.headers.get("Authorization") != f"Token {token.key}":
+        raise AssertionError("Facade client used a token from a different actor.")
+    return owned_http
+
+
+async def _assert_factory_actor_case(
+    factory: MCPClientFactory,
+    actor_username: str,
+    entrypoint: MCPEntrypoint,
+    *,
+    is_authorized: bool,
+) -> None:
+    """Exercise a successful or denied real call and require resource teardown."""
+    case = detail_case(
+        "get_pip",
+        factory.dataset,
+        actor_username=actor_username,
+        fixture_key="maria_design_pip",
+    )
+    previous = _capture_mcp_runtime()
+    connected_client = None
+    owned_http = None
+    expected_result = (
+        nullcontext()
+        if is_authorized
+        else pytest.raises(ToolError, match="Not allowed to view this PIP")
+    )
+    with expected_result:
+        async with factory.open(
+            actor_username=actor_username, entrypoint=entrypoint
+        ) as session:
+            assert session.actor_username == actor_username
+            connected_client = session.client
+            assert connected_client.is_connected()
+            owned_http = await _assert_factory_session_auth(
+                factory, case, entrypoint, previous
+            )
+            result = await connected_client.call_tool(
+                case.tool_name, dict(case.arguments)
+            )
+            _assert_mcp_content(case, decode_tool_payload(result), entrypoint)
+    assert connected_client is not None and not connected_client.is_connected()
+    if entrypoint == "facade":
+        assert owned_http is not None and owned_http.is_closed
+    _assert_mcp_runtime_restored(previous)
+
+
+@contextmanager
+def _legacy_orm_guard_enabled() -> Iterator[None]:
+    """Clear the unsafe override after actual legacy registration import."""
+    previous = os.environ.get(UNSAFE_ORM_FLAG)
+    try:
+        import_module("mcp_integration.tools")
+        os.environ.pop(UNSAFE_ORM_FLAG, None)
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop(UNSAFE_ORM_FLAG, None)
+        else:
+            os.environ[UNSAFE_ORM_FLAG] = previous
+
+
+async def _assert_legacy_collections(
+    client: RegisteredMCPClient, dataset: MCPDataset
+) -> None:
+    """Read real rows for all nine collections with original lightweight schemas."""
+    book = {"playbook_id": dataset.entity_ids["mike_playbook"]}
+    workflow = {"workflow_id": dataset.entity_ids["mike_workflow"]}
+    arguments = (
+        ("list_playbooks", {}, "mike_playbook", "name", "workflows"),
+        ("list_workflows", book, "mike_workflow", "name", "activities"),
+        ("list_activities", workflow, "mike_activity", "name", "guidance"),
+        ("list_phases", book, "mike_phase", "name", "activities"),
+        ("list_skills", book, "mike_skill", "title", "content"),
+        ("list_rules", book, "mike_rule", "title", "content"),
+        ("list_agents", book, "mike_agent", "name", "system_prompt"),
+        ("list_artifacts", book, "mike_artifact", "name", "content"),
+        ("list_pips", {"scope": "mine"}, "maria_design_pip", "title", "changes"),
+    )
+    for tool, params, fixture_key, display_field, omitted_field in arguments:
+        result = decode_tool_payload(await client.call_tool(tool, params))
+        assert isinstance(result, dict) and isinstance(result["result"], list), tool
+        row = next(
+            row
+            for row in result["result"]
+            if row["id"] == dataset.entity_ids[fixture_key]
+        )
+        assert (
+            row[display_field] == dataset.expected_content[fixture_key][display_field]
+        ), tool
+        assert omitted_field not in row, tool
+        if tool == "list_pips":
+            assert row["submitted_by_username"] == "mrodriguez"
+            assert row["changes_count"] == 2
+
+
 @pytest.mark.django_db(transaction=True)
 async def test_mcp_client_factory_with_different_actors_restores_context_and_auth(
     mcp_client_factory: MCPClientFactory, mcp_dataset: MCPDataset
 ) -> None:
     """Prove actor selection and teardown using actual registered calls.
 
-    :param mcp_client_factory: Explicit actor/entrypoint factory. Example: Mike then Maria.
-    :param mcp_dataset: Real actor/target fixtures. Example: both PIP self cases.
+    :param mcp_client_factory: Explicit actor/entrypoint factory. Example: Mike then Hana.
+    :param mcp_dataset: Real actor/target fixtures. Example: Cedar historical Design PIP.
     :return: None. Example: no token/context/client crossover.
     :raises AssertionError: Wrong actor, leaked singleton/context or unclosed owned client.
     """
-    raise NotImplementedError()
+    users = mcp_dataset.cedar.users_by_username
+    prior_actor = users["mrodriguez"]
+    token, _ = await Token.objects.aget_or_create(user=prior_actor)
+    original_context = _current_user.set(None)
+    clean = _capture_mcp_runtime()
+    try:
+        with _configured_mcp_runtime(
+            f"{mcp_client_factory.server_url}/api", prior_actor, token.key
+        ):
+            for entrypoint in ("facade", "legacy"):
+                await _assert_factory_actor_case(
+                    mcp_client_factory, "mchen", entrypoint, is_authorized=True
+                )
+                await _assert_factory_actor_case(
+                    mcp_client_factory, "hkim", entrypoint, is_authorized=False
+                )
+        with pytest.raises(ValueError, match="does not exist"):
+            async with mcp_client_factory.open(
+                actor_username="unknown-cedar-actor", entrypoint="facade"
+            ):
+                pytest.fail("A missing actor entered a real MCP session.")
+        await _assert_factory_actor_case(
+            mcp_client_factory, "mrodriguez", "legacy", is_authorized=True
+        )
+        _assert_mcp_runtime_restored(clean)
+        with pytest.raises(ValueError, match="No user context"):
+            get_current_user()
+    finally:
+        _current_user.reset(original_context)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -1054,7 +1249,28 @@ async def test_legacy_detail_and_collections_with_async_guard_use_safe_orm(
     :return: None. Example: all real calls succeed without async ORM bypass.
     :raises AssertionError: Unsafe flag survives or any touched serialization fails.
     """
-    raise NotImplementedError()
+    case = _eligible_mcp_case("get_phase", mcp_dataset)
+    all_awards = KarmaAward.objects.order_by("pk").values()
+    environment = os.environ.get(UNSAFE_ORM_FLAG)
+    with _legacy_orm_guard_enabled():
+        with pytest.raises(SynchronousOnlyOperation):
+            all_awards.count()
+        async with mcp_client_factory.open(
+            actor_username=case.actor_username, entrypoint="legacy"
+        ) as session:
+            assert UNSAFE_ORM_FLAG not in os.environ
+            before = [row async for row in all_awards]
+            await _assert_legacy_collections(session.client, mcp_dataset)
+            assert [row async for row in all_awards.all()] == before
+            result = await session.client.call_tool(
+                case.tool_name, {**case.arguments, "event_identity": str(RECEIPT_UUID)}
+            )
+            assert UNSAFE_ORM_FLAG not in os.environ
+            assert not session.request_paths
+        assert UNSAFE_ORM_FLAG not in os.environ
+    assert os.environ.get(UNSAFE_ORM_FLAG) == environment
+    _assert_mcp_content(case, decode_tool_payload(result), "legacy")
+    await sync_to_async(_assert_mcp_pair)(case, mcp_dataset, len(before))
 
 
 @pytest.mark.django_db
