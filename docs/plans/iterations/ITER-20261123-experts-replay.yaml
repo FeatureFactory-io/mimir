@@ -32,6 +32,10 @@ iteration:
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
     exact-AT runner implementation is N4. No product or scenario footprint expanded.
 conflict_map:
+  tests/integration/test_pip_admin_integrity.py:
+  - S32
+  methodology/admin.py:
+  - S32
   methodology/pip_views.py:
   - S32
   methodology/services/copy_prompt_service.py:
@@ -5582,6 +5586,8 @@ scenarios:
     skeleton_commit: 12f17b598a1c758b6c55d6b8acd879b9c8fbcd94
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/integration/test_pip_admin_integrity.py
+    - methodology/admin.py
     - methodology/pip_views.py
     - Makefile
     - tests/integration/test_pip_admin_review_view.py
@@ -5806,11 +5812,30 @@ scenarios:
           - do-test-first
           - do-not-mock-in-integration-tests
         notes: Real separate-connection stale Finalize and Save Decisions requests overwrite terminal child decisions after publication and awards. Keep services authoritative; serialize and revalidate current parent state before any child decision/note write, and finalize in the same atomic boundary. Preserve callers, permissions and GET rendering. Require deterministic real two-connection stale requests, rollback and PostgreSQL verification, without another user question.
+      - id: N4b-admin-terminal-readonly
+        title: Preserve published decisions through the registered admin forms
+        bpe: BPE-02
+        depends_on:
+        - N4a-staff-decision-serialization
+        footprint:
+        - methodology/admin.py
+        - methodology/services/pip_admin_service.py
+        - tests/integration/test_pip_admin_integrity.py
+        - Makefile
+        gate:
+          command: make test-experts-s32
+          focused_command: pytest tests/integration/test_pip_admin_integrity.py -x
+        guidance_bundle:
+          activity: BPE/BPE-02-Implement_Backend.md
+          rules:
+          - do-test-first
+          - do-not-mock-in-integration-tests
+        notes: The documented registered Django Admin child form remains editable after a normal accepted publication, changing its decision/note and invalidating replay. Enforce the existing Act9 terminal read-only rule through parent, inline and standalone forms using current parent state, preserving ordinary undecided review and current-state serialization. Keep services authoritative, no new roles or grants. Root owns Make integration for the new real HTTP regression module; necessary helpers inside owned files are reconciled.
       - id: N5-definition-of-done
         title: Roll up behavior, log, three-example AT and browser evidence
         bpe: BPE-06
         depends_on:
-        - N4a-staff-decision-serialization
+        - N4b-admin-terminal-readonly
         footprint: []
         gate:
           command: make test-experts-s32
@@ -8746,7 +8771,7 @@ scenarios:
         mockup_graduation: not_applicable
         agent_proofs: []
     implementation_plan: docs/plans/iterations/experts/S42-karma-export-01.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
@@ -9286,7 +9311,7 @@ scenarios:
         mockup_graduation: not_applicable
         agent_proofs: []
     implementation_plan: docs/plans/iterations/experts/S43-karma-export-02.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S42
