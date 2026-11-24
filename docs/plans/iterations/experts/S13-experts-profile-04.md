@@ -80,7 +80,7 @@ E2E_LIVE_SERVER_SCOPE=function pytest -c tests/e2e/pytest.ini -o addopts= -p no:
 make test-at-harness
 ```
 
-The explicit `--tags=@experts` overrides configured `not @wip` selection for this exact contract. Require one executed scenario/four successful steps; zero, undefined or skipped steps fail completion. Aggregate `make test-at-experts` remains a later whole-feature gate.
+The explicit `--tags=@experts` overrides configured `not @wip` selection for this exact contract. Require one executed scenario/five successful steps including Background; zero, undefined or skipped steps fail completion. Aggregate `make test-at-experts` remains a later whole-feature gate.
 
 ### E — Log story
 
@@ -275,7 +275,7 @@ feature_execution_graph:
       - do-test-first
       - do-not-mock-in-integration-tests
       - pytest
-    notes: Require one executed scenario and four successful steps; reuse S03/S07 bindings.
+    notes: Require one executed scenario and five successful steps including Background; reuse S03/S07 bindings.
   - id: S13-N3-browser
     title: Certify anonymous browser redirect and absent controls
     bpe: BPE-05

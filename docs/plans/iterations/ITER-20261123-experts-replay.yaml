@@ -3206,7 +3206,7 @@ scenarios:
           - do-test-first
           - do-not-mock-in-integration-tests
           - pytest
-        notes: Require one executed scenario and four successful steps; reuse S03/S07 bindings.
+        notes: Require one executed scenario and five successful steps including Background; reuse S03/S07 bindings.
       - id: S13-N3-browser
         title: Certify anonymous browser redirect and absent controls
         bpe: BPE-05
