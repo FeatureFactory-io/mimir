@@ -21,6 +21,7 @@ from methodology.models import Agent, Artifact, Playbook, Rule, Skill, Workflow
 from methodology.services.karma_service import KarmaService
 from methodology.services.playbook_service import PlaybookService
 from methodology.services.rule_export_formatters import (
+    ade_root_relative_path,
     build_ade_rule_files,
     build_inline_rules_markdown,
     normalize_ade_targets,
@@ -341,6 +342,8 @@ class PlaybookExportService:
                 if confined_export_path(root, relative) != path:
                     raise ValueError("Export destination changed after validation.")
                 path.parent.mkdir(parents=True, exist_ok=True)
+                if confined_export_path(root, relative) != path:
+                    raise ValueError("Export destination changed after validation.")
                 path.write_text(content, encoding="utf-8")
                 completed += 1
                 if summary_name is not None:
@@ -468,7 +471,7 @@ class PlaybookExportService:
         """
         folder = bundle["folder_name"]
         files = tuple(PlaybookExportService._bundle_files(bundle))
-        writes = []
+        writes: list[tuple[Path, str, str, str | None]] = []
         for target in targets:
             export_root = confined_export_path(target, folder)
             for directory, entry in files:
@@ -489,8 +492,9 @@ class PlaybookExportService:
         if sync_root_rules and bundle["ade_rule_files"]:
             dev_root = PlaybookExportService._resolve_dev_root(targets[0])
             writes.extend(
-                (dev_root, entry["path"], entry["content"], None)
-                for entry in bundle["ade_rule_files"]
+                PlaybookExportService._ade_rule_writes(
+                    dev_root, bundle["ade_rule_files"]
+                )
             )
         approved = validate_export_destinations(
             [(root, relative) for root, relative, _, _ in writes]
@@ -498,6 +502,31 @@ class PlaybookExportService:
         return tuple(
             (*write, path) for write, path in zip(writes, approved, strict=True)
         )
+
+    @staticmethod
+    def _ade_rule_writes(
+        dev_root: Path, entries: list[dict[str, str]]
+    ) -> Iterator[tuple[Path, str, str, None]]:
+        """Plan ADE writes beneath each IDE's own approved rules directory.
+
+        :param dev_root: Resolved workspace root. Example: Path("/tmp/repo").
+        :param entries: Generated entries. Example: a Cursor rule with a .mdc filename.
+        :return: Active directory, leaf, content and absent canonical summary name.
+        :raises ValueError: If a rules directory is redirected or an entry is misplaced.
+        """
+        for entry in entries:
+            rules_directory = Path(
+                ade_root_relative_path(entry["ade_target"], "")
+            ).parent
+            filename = entry["filename"]
+            if Path(entry["path"]) != rules_directory / filename:
+                raise ValueError("The ADE file must use its active rules directory.")
+            rules_root = dev_root / rules_directory
+            if confined_export_path(dev_root, str(rules_directory)) != rules_root:
+                raise ValueError(
+                    "The ADE rules directory must remain in its approved location."
+                )
+            yield rules_root, filename, entry["content"], None
 
     @staticmethod
     def _record_completed_export(

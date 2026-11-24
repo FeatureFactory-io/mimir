@@ -4,8 +4,11 @@ import json
 import logging
 import re
 import socket
-from collections.abc import Callable
+import sys
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from types import FrameType
 from uuid import UUID
 
 import httpx
@@ -429,13 +432,23 @@ def test_karma_export_service_t2_with_mirror_and_ade_copies_credits_one_pair(
     actor, author, rule = cedar_export_rule
     before = set(KarmaAward.objects.values_list("pk", flat=True))
     canonical, mirror = tmp_path / ".cursor/playbooks", tmp_path / "mirror"
+    exported = f"rules/{rule.slug}.mdc"
+    existing_outputs = (
+        canonical / _EXPORT_FOLDER / exported,
+        mirror / _EXPORT_FOLDER / exported,
+        tmp_path / ".cursor" / exported,
+        tmp_path / ".windsurf/rules" / f"{rule.slug}.md",
+    )
+    for output in existing_outputs:
+        output.parent.mkdir(parents=True)
+        output.write_text("Previous export.", encoding="utf-8")
+        output.with_name("unrelated.md").write_text("Keep me.", encoding="utf-8")
     result = _legacy_playbook_with_copies(
         canonical, mirror, actor, ade_targets=["devin"]
     )
     assert result["export_paths"] == [
         str(base / _EXPORT_FOLDER) for base in (canonical, mirror)
     ]
-    exported = f"rules/{rule.slug}.mdc"
     definition = (canonical / _EXPORT_FOLDER / exported).read_text(encoding="utf-8")
     assert "alwaysApply: false" in definition
     assert (mirror / _EXPORT_FOLDER / exported).read_text(
@@ -450,6 +463,11 @@ def test_karma_export_service_t2_with_mirror_and_ade_copies_credits_one_pair(
         "cursor",
         "devin",
     }
+    for output in existing_outputs:
+        assert output.read_text(encoding="utf-8") != "Previous export."
+        assert (
+            output.with_name("unrelated.md").read_text(encoding="utf-8") == "Keep me."
+        )
     _assert_cedar_export_pair("playbook", actor, author, before)
 
 
@@ -481,6 +499,147 @@ def test_karma_export_service_t2_with_secondary_root_escape_prevents_all_writes(
     assert tuple(outside.iterdir()) == (sentinel,)
     assert sentinel.read_text(encoding="utf-8") == "unchanged"
     assert KarmaAward.objects.count() == before
+
+
+@pytest.mark.parametrize(
+    ("destination", "alias_directory"),
+    (
+        ("cursor", False),
+        ("devin", False),
+        ("cursor", True),
+        ("devin", True),
+        ("mirror", False),
+    ),
+)
+def test_legacy_playbook_with_workspace_sibling_alias_rejects_before_all_writes(
+    destination: str,
+    alias_directory: bool,
+    cedar_export_rule: tuple[User, User, Rule],
+    tmp_path: Path,
+) -> None:
+    """A workspace-local alias must still stay inside its approved output tree.
+
+    :param destination: Requested mirror or file-based ADE. Example: "devin".
+    :param alias_directory: Alias the IDE rules directory instead of its leaf.
+    :param cedar_export_rule: Actual Cedar rule and export actor.
+    :param tmp_path: Real isolated work area.
+    """
+    actor, _, rule = cedar_export_rule
+    canonical, mirror = tmp_path / ".cursor/playbooks", tmp_path / "mirror"
+    output = {
+        "cursor": tmp_path / ".cursor/rules" / f"{rule.slug}.mdc",
+        "devin": tmp_path / ".windsurf/rules" / f"{rule.slug}.md",
+        "mirror": mirror / _EXPORT_FOLDER / "playbook.md",
+    }[destination]
+    sibling = output.parent.parent / "unrelated"
+    sibling.mkdir(parents=True)
+    sentinel = sibling / output.name
+    sentinel.write_text("Keep me.", encoding="utf-8")
+    alias = output.parent if alias_directory else output
+    alias.parent.mkdir(parents=True, exist_ok=True)
+    alias.symlink_to(
+        sibling if alias_directory else sentinel, target_is_directory=alias_directory
+    )
+    before = set(tmp_path.rglob("*")), _current_award_ids()
+    with pytest.raises(ValueError):
+        _legacy_playbook_with_copies(canonical, mirror, actor, ade_targets=["devin"])
+    assert alias.is_symlink()
+    assert (set(tmp_path.rglob("*")), _current_award_ids()) == before
+    assert sentinel.read_text(encoding="utf-8") == "Keep me."
+
+
+@contextmanager
+def _observe_parent_creation(
+    parent: Path, on_created: Callable[[], None]
+) -> Iterator[None]:
+    """Run a real filesystem mutation when the selected real mkdir returns.
+
+    :param parent: Absolute parent created by the writer. Example: /tmp/cedar.
+    :param on_created: Callback to exercise the next path recheck.
+    :return: Context observing the calling thread without replacing I/O methods.
+    """
+    previous_profile = sys.getprofile()
+
+    def observe(frame: FrameType, event: str, _result: object) -> None:
+        if (
+            event == "return"
+            and frame.f_code is Path.mkdir.__code__
+            and frame.f_locals["self"] == parent
+            and parent.is_dir()
+        ):
+            sys.setprofile(previous_profile)
+            on_created()
+
+    sys.setprofile(observe)
+    try:
+        yield
+    finally:
+        sys.setprofile(previous_profile)
+
+
+@pytest.mark.parametrize(
+    ("entity", "placement", "alias_directory"),
+    (
+        ("workflow", "canonical", False),
+        ("workflow", "rules", True),
+        ("playbook", "canonical", False),
+        ("playbook", "mirror", False),
+        ("playbook", "rules", True),
+    ),
+)
+def test_legacy_export_with_alias_inserted_after_mkdir_rejects_before_write(
+    entity: str,
+    placement: str,
+    alias_directory: bool,
+    cedar_export_rule: tuple[User, User, Rule],
+    tmp_path: Path,
+) -> None:
+    """Reject a changed destination even when the new leaf resolves in-tree.
+
+    :param entity: Existing shared export service. Example: "workflow".
+    :param placement: File whose real parent creation triggers a swap.
+    :param alias_directory: Replace the parent, or alias an in-tree leaf.
+    :param cedar_export_rule: Actual Cedar rule and export actor.
+    :param tmp_path: Real isolated work area.
+    """
+    actor, _, rule = cedar_export_rule
+    project = tmp_path.resolve()
+    canonical, mirror = project / ".cursor/playbooks", project / "mirror"
+    name = "_workflow.md" if entity == "workflow" else "playbook.md"
+    output = {
+        "canonical": canonical / _EXPORT_FOLDER / name,
+        "mirror": mirror / _EXPORT_FOLDER / name,
+        "rules": project / ".cursor/rules" / f"{rule.slug}.mdc",
+    }[placement]
+    sentinel = (
+        project / "unrelated" / output.name
+        if alias_directory
+        else output.parent / "unrelated.md"
+    )
+    alias = output.parent if alias_directory else output
+
+    def change_destination() -> None:
+        if alias_directory:
+            output.parent.rmdir()
+            sentinel.parent.mkdir()
+        sentinel.write_text("Keep me.", encoding="utf-8")
+        alias.symlink_to(
+            sentinel.parent if alias_directory else sentinel,
+            target_is_directory=alias_directory,
+        )
+
+    before = _current_award_ids()
+    with (
+        _observe_parent_creation(output.parent, change_destination),
+        pytest.raises(ValueError),
+    ):
+        if entity == "workflow":
+            _legacy_export(entity, canonical, actor)
+        else:
+            _legacy_playbook_with_copies(canonical, mirror, actor)
+    assert alias.is_symlink()
+    assert sentinel.read_text(encoding="utf-8") == "Keep me."
+    assert _current_award_ids() == before
 
 
 def _expected_export_requests(entity: str, receipts: int = 1) -> list[tuple[str, str]]:

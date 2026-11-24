@@ -114,6 +114,8 @@ class WorkflowExportService:
                     raise PermissionError(
                         f"Cannot create directory {path.parent}: {exc}"
                     ) from exc
+                if confined_export_path(root, relative) != path:
+                    raise ValueError("Export destination changed after validation.")
                 path.write_text(content, encoding="utf-8")
                 completed += 1
         except (ValueError, OSError) as exc:
