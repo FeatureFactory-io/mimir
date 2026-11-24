@@ -1748,6 +1748,9 @@ scenarios:
         - methodology/services/contribution_summary_boundary.py
         - tests/integration/test_experts_public_evidence.py
         - Makefile
+        approved_additional_helpers:
+        - _public_evidence_event
+        - _accepted_result
         gate:
           command: make test-experts-s27
         authority: Existing S27 boundary ownership and explicit continuing fix/recheck instruction
@@ -4277,6 +4280,22 @@ scenarios:
           - do-test-first
           - do-assert-log-story
           - do-not-mock-in-integration-tests
+      - id: R1-shared-consumption-log-contract
+        title: Complete original service branch and retained-timestamp exit beats for MCP reuse
+        bpe: BPE-02
+        depends_on:
+        - N5-copy-definition-of-done
+        footprint:
+        - methodology/services/karma_service.py
+        - tests/integration/test_karma_copy.py
+        gate:
+          command: make test-experts-s36
+          log_story_command: make test-experts-s36-log
+        authority: Existing S36 shared-service ownership; S39 section E explicitly delegates these logs to S36
+        constraints:
+        - Preserve successful clipboard and receipt semantics and original public signatures.
+        - Use the persisted award timestamp on replay rather than the newly proposed timestamp.
+        - Retain original processing logs; add no new writer or unapproved helper.
       scenario_dependencies:
       - S03
       - S30
