@@ -7,6 +7,7 @@ import socket
 import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
@@ -32,6 +33,7 @@ from methodology.services.playbook_export_service import PlaybookExportService
 from methodology.services.workflow_export_service import WorkflowExportService
 from tests.support.experts_data import CedarDataset, load_cedar_baseline
 from tests.support.experts_exports import (
+    _EXPORT_DATE,
     assert_complete_self_export,
     assert_owned_export_source,
     assert_self_export_karma_unchanged,
@@ -42,8 +44,10 @@ from tests.support.karma_mcp import (
     MCPCase,
     MCPClientFactory,
     MCPDataset,
+    MCPEntrypoint,
     StdioMCPClient,
     decode_tool_payload,
+    karma_snapshot,
 )
 from tests.support.karma_mcp import (
     mcp_dataset as _mcp_dataset,  # noqa: F401 — pytest fixture
@@ -1688,15 +1692,175 @@ def _assert_no_self_export_award_or_error(
     "tool_name", ["export_workflow_to_local", "export_playbook_to_local"]
 )
 def test_self_export_stdio_t3_with_owned_content_returns_clean_jsonrpc(
-    entrypoint: str, tool_name: str, live_server: LiveServer, tmp_path: Path
+    entrypoint: MCPEntrypoint,
+    tool_name: str,
+    live_server: LiveServer,
+    tmp_path: Path,
+    self_export_dataset: MCPDataset,
 ) -> None:
     """Certify real subprocess protocol, content, files and unchanged awards.
 
     :param entrypoint: Real facade or legacy entrypoint. Example: 'legacy'.
     :param tool_name: Existing export tool. Example: 'export_playbook_to_local'.
     :param live_server: Isolated HTTP backend for facade. Example: localhost port.
-    :param tmp_path: Real export/legacy-DB root. Example: /tmp/pytest/stdio.
+    :param tmp_path: Real export root. Example: /tmp/pytest/stdio.
+    :param self_export_dataset: Real Cedar rows with a linked rule and full tree.
     :return: None. Example: clean JSON-RPC and complete zero-award export.
     :raises AssertionError: Protocol noise, tool error, missing file or new award.
     """
-    raise NotImplementedError()
+    mike = assert_owned_export_source(self_export_dataset.cedar)
+    entity = tool_name.split("_")[1]
+    workspace = tmp_path.resolve()
+    targets = _self_export_targets(entity, workspace)
+    case = _stdio_self_export_case(entity, workspace, targets)
+    bundle = _self_export_bundle(entity, mike)
+    original_state = capture_export_karma_state()
+    baseline = karma_snapshot(include_summaries=True)
+    with StdioMCPClient(
+        entrypoint=entrypoint,
+        actor_username=mike.username,
+        dataset=self_export_dataset,
+        server_url=live_server.url if entrypoint == "facade" else "",
+        root=workspace,
+        include_summaries=True,
+    ) as wire:
+        before = wire.snapshot()
+        _run_stdio_self_export(wire, case, entity, targets, bundle)
+        assert wire.snapshot() == before == baseline
+    wire.assert_protocol_clean()
+    assert [message["id"] for message in wire.stdout_messages] == [1, 2, 3]
+    assert_self_export_karma_unchanged(original_state)
+    _assert_stdio_self_export_receipt(wire, case, mike)
+
+
+def _stdio_self_export_case(
+    entity: str, workspace: Path, targets: tuple[Path, ...]
+) -> MCPCase:
+    """Build the registered export call for Mike and the requested outputs.
+
+    :param entity: Source kind. Example: "playbook".
+    :param workspace: Owned child working directory. Example: tmp_path.
+    :param targets: Ordered primary and optional mirror roots. Example: (primary, mirror).
+    :return: A tool call for Mike's Cedar source. Example: playbook 6201.
+    :raises KeyError: The export kind is unsupported.
+    """
+    case = _stdio_export_case(entity, workspace)
+    arguments = {**case.arguments, "target_directory": str(targets[0])}
+    if entity == "playbook":
+        arguments.update(_self_export_playbook_options(targets[1]))
+    return replace(case, actor_username=_AUTHOR, arguments=arguments)
+
+
+def _run_stdio_self_export(
+    wire: StdioMCPClient,
+    case: MCPCase,
+    entity: str,
+    targets: tuple[Path, ...],
+    bundle: dict,
+) -> None:
+    """Verify the registered schema and complete output before persisted state.
+
+    :param wire: Initialized real stdio client. Example: connected legacy server.
+    :param case: Existing export invocation. Example: export workflow 6202.
+    :param entity: Shape of the export result. Example: "workflow".
+    :param targets: Ordered approved destination roots. Example: (workflows,).
+    :param bundle: Source-generated expected file bundle. Example: Cedar metadata.
+    :return: None after verifying the real tool response and every output file.
+    :raises AssertionError: The registered schema, result or exported bytes differ.
+    """
+    [schema] = [
+        tool["inputSchema"]
+        for tool in wire.list_tools()
+        if tool["name"] == case.tool_name
+    ]
+    assert set(schema["properties"]) == _EXPORT_PARAMETERS[entity]
+    assert schema["required"] == [f"{entity}_id"]
+    started = datetime.now(UTC)
+    result = wire.call(case)
+    finished = datetime.now(UTC)
+    assert isinstance(result, dict)
+    _bind_stdio_bundle_timestamps(bundle, targets)
+    assert_complete_self_export(
+        result=result,
+        bundle=bundle,
+        workspace=wire.root,
+        started_at=started,
+        finished_at=finished,
+        targets=targets,
+        facade=wire.entrypoint == "facade",
+        sync_root_rules=entity == "playbook",
+    )
+
+
+def _bind_stdio_bundle_timestamps(bundle: dict, targets: tuple[Path, ...]) -> None:
+    """Reconstruct only timestamp fields and require the same in every mirror.
+
+    The complete-file assertion also checks these timestamps against the call bounds.
+
+    :param bundle: Source-generated bundle, updated only in metadata timestamp fields.
+    :param targets: Ordered approved writes. Example: (primary, mirror).
+    :return: None after matching timestamps and identical mirror metadata.
+    :raises AssertionError: A root, mirror or expected metadata field differs.
+    """
+    canonical_root, *mirror_roots = (target / _EXPORT_FOLDER for target in targets)
+    assert all(root.resolve() == root for root in (canonical_root, *mirror_roots))
+    if "workflow_id" in bundle:
+        workflows, metadata = (bundle,), []
+    else:
+        workflows = bundle["workflows"]
+        metadata = [(canonical_root, bundle["playbook_md"])]
+    for workflow in workflows:
+        [entry] = [
+            item
+            for item in workflow["workflow_files"]
+            if item["filename"] == "_workflow.md"
+        ]
+        directory = canonical_root
+        if workflow is not bundle:
+            directory = confined_export_path(canonical_root, workflow["folder_name"])
+        metadata.append((directory, entry))
+    for directory, entry in metadata:
+        path = confined_export_path(directory, entry["filename"])
+        actual = path.read_bytes()
+        relative = str(path.relative_to(canonical_root))
+        assert all(
+            confined_export_path(mirror, relative).read_bytes() == actual
+            for mirror in mirror_roots
+        )
+        [stamp] = _EXPORT_DATE.findall(actual.decode("utf-8"))
+        entry["content"], count = _EXPORT_DATE.subn(
+            f"**Export Date**: {stamp}", entry["content"]
+        )
+        assert count == 1
+
+
+def _assert_stdio_self_export_receipt(
+    wire: StdioMCPClient, case: MCPCase, mike: User
+) -> None:
+    """Confirm the real receipt reached authenticated self-exclusion.
+
+    :param wire: Closed real stdio client with safe diagnostics. Example: facade.
+    :param case: Completed registered export. Example: export workflow 6202.
+    :param mike: Actual authorized author. Example: the imported Cedar user.
+    :return: None after verifying the self-consumption outcome.
+    :raises AssertionError: The receipt did not follow the expected authenticated path.
+    """
+    if wire.entrypoint == "facade":
+        assert re.findall(r"HTTP Request: (.+)", wire.stderr) == [
+            f'POST {wire.server_url}{route} "HTTP/1.1 200 OK"'
+            for route in (case.route, _RECEIPT_PATH)
+        ]
+        [receipt] = re.findall(r"export_receipt \| exit \| (.+)", wire.stderr)
+        assert receipt.endswith("receipt_status=skipped created_count=0")
+        return
+    [branch] = re.findall(
+        rf"{re.escape(_SELF_CONSUMPTION_LOG)} \| branch \| (.+)", wire.stderr
+    )
+    assert {
+        "channel=export",
+        f"actor_id={mike.pk}",
+        f"playbook_id={_CEDAR_PLAYBOOK_ID}",
+        f"author_id={mike.pk}",
+        "reason=self_consumption",
+        "awards=0",
+    } <= set(branch.split())

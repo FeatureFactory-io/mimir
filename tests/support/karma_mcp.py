@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
+import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from contextlib import (
@@ -11,14 +13,15 @@ from contextlib import (
     AbstractContextManager,
     AsyncExitStack,
     ExitStack,
+    closing,
 )
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from functools import partial
 from importlib import import_module
 from pathlib import Path
 from select import select
 from subprocess import PIPE, CompletedProcess, Popen, TimeoutExpired
-from tempfile import TemporaryFile
+from tempfile import TemporaryDirectory, TemporaryFile
 from threading import Lock
 from time import monotonic
 from types import TracebackType
@@ -28,7 +31,10 @@ from urllib.parse import urlsplit
 import httpx
 import pytest
 from asgiref.sync import sync_to_async
+from django.apps import apps
 from django.contrib.auth.models import User
+from django.core.management import call_command
+from django.db import connection
 from fastmcp import Client, FastMCP
 from fastmcp.client.client import CallToolResult
 from mcp.types import (
@@ -45,8 +51,13 @@ from rest_framework.authtoken.models import Token
 from mcp_integration.context import _current_user, set_current_user
 from mcp_integration.facade import client as facade_client
 from mcp_integration.facade.server import _build_mcp
-from methodology.models import Agent, Artifact, Phase, Rule, Skill
-from tests.support.experts_data import CedarDataset, _resolve_database_scope
+from methodology.models import Activity, Agent, Artifact, Phase, Rule, Skill
+from methodology.services.experts_service import ExpertsService
+from tests.support.experts_data import (
+    CedarDataset,
+    _resolve_database_scope,
+    _verify_sqlite_target,
+)
 
 MCPEntrypoint = Literal["facade", "legacy"]
 _UNSAFE_ORM_FLAG = "DJANGO_ALLOW_ASYNC_UNSAFE"
@@ -56,6 +67,8 @@ _STDIO_TIMEOUT_SECONDS = 30.0
 _STDIO_EXIT_TIMEOUT_SECONDS = 5.0
 _STDIO_READ_SIZE = 65536
 _STDIO_STDERR_LIMIT = 65536
+_LEGACY_SETTINGS = "karma_mcp_subprocess_settings"
+_LEGACY_DATABASE_FILENAME = "mimir.sqlite3"
 
 
 @dataclass(frozen=True)
@@ -572,7 +585,24 @@ def karma_snapshot(*, include_summaries: bool = False) -> MCPInvariantSnapshot:
     :return: Canonical immutable state. Example: every award field ordered by PK.
     :raises AssertionError: Requested schema/projection unavailable.
     """
-    raise NotImplementedError()
+    activity_access = Activity.objects.order_by("pk").values_list(
+        "pk", "last_accessed_at"
+    )
+    return MCPInvariantSnapshot(
+        awards_json=_canonical_model_rows("methodology.KarmaAward"),
+        projections_json=_canonical_karma_projections(),
+        activity_access_json=json.dumps(list(activity_access), default=str),
+        summaries_json=(
+            _canonical_model_rows("methodology.ExpertProfile")
+            if include_summaries
+            else None
+        ),
+        interactions_json=(
+            _canonical_model_rows("methodology.AgentInteraction")
+            if include_summaries
+            else None
+        ),
+    )
 
 
 def _canonical_model_rows(model_label: str) -> str:
@@ -582,7 +612,8 @@ def _canonical_model_rows(model_label: str) -> str:
     :return: Canonical JSON string. Example: all ledger snapshots/timestamps.
     :raises LookupError: Required model/schema unavailable.
     """
-    raise NotImplementedError()
+    rows = apps.get_model(model_label).objects.order_by("pk").values_list()
+    return json.dumps(list(rows), default=str, sort_keys=True)
 
 
 def _canonical_karma_projections() -> str:
@@ -591,7 +622,9 @@ def _canonical_karma_projections() -> str:
     :return: Canonical projection JSON. Example: all recipients including Hana.
     :raises AssertionError: Projection cannot be computed from the actual ledger.
     """
-    raise NotImplementedError()
+    service = ExpertsService()
+    users = User.objects.order_by("pk").values_list("pk", flat=True)
+    return json.dumps([asdict(service.project_user(user)) for user in users])
 
 
 def collection_snapshot() -> MCPInvariantSnapshot:
@@ -622,14 +655,23 @@ def assert_collection_result(
 
 
 def _write_subprocess_settings(root: Path, database_path: Path) -> str:
-    """Write temporary test settings with explicit SQLite, locmem mail and local logs.
+    """Write test settings with explicit SQLite, locmem mail and receipt diagnostics.
 
     :param root: Pytest-owned directory. Example: tmp_path/"legacy".
     :param database_path: Explicit temporary DB. Example: root/"mimir.sqlite3".
     :return: Importable temporary settings name. Example: "karma_mcp_subprocess_settings".
     :raises OSError: Temporary settings cannot be written.
     """
-    raise NotImplementedError()
+    settings = root / f"{_LEGACY_SETTINGS}.py"
+    with settings.open("x", encoding="utf-8") as stream:
+        stream.write(
+            "from mimir.settings.test import *\n"
+            f"DATABASES['default']['NAME'] = {str(database_path)!r}\n"
+            "LOGGING['handlers']['karma_stderr'] = {'class': 'logging.StreamHandler'}\n"
+            "LOGGING['loggers'] = {'methodology.services.karma_service': "
+            "{'handlers': ['karma_stderr'], 'level': 'INFO', 'propagate': False}}\n"
+        )
+    return _LEGACY_SETTINGS
 
 
 def _subprocess_environment(
@@ -643,7 +685,16 @@ def _subprocess_environment(
     :return: Explicit subprocess environment. Example: local PYTHONPATH/test settings.
     :raises ValueError: Paths/settings escape temporary ownership.
     """
-    raise NotImplementedError()
+    if database_path.parent != root or settings_module != _LEGACY_SETTINGS:
+        raise ValueError("Legacy settings and database must share the owned root.")
+    return {
+        "PATH": os.defpath,
+        "PYTHONPATH": os.pathsep.join((str(root), str(_PROJECT_ROOT))),
+        "PYTHONIOENCODING": "utf-8",
+        "DJANGO_SETTINGS_MODULE": settings_module,
+        "MIMIR_ENV": "test",
+        "MIMIR_MCP_MODE": "1",
+    }
 
 
 def _run_management(
@@ -656,17 +707,77 @@ def _run_management(
     :return: Actual captured process result. Example: successful migration.
     :raises RuntimeError: Nonzero exit; diagnostics are credential-safe.
     """
-    raise NotImplementedError()
+    try:
+        result = subprocess.run(
+            (sys.executable, str(_PROJECT_ROOT / "manage.py"), *arguments),
+            env=database.environment,
+            cwd=database.root,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=_STDIO_TIMEOUT_SECONDS,
+        )
+    except TimeoutExpired:
+        raise RuntimeError("Isolated legacy management command timed out.") from None
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Isolated legacy {arguments[0]} command exited {result.returncode}."
+        )
+    return result
 
 
 def provision_mcp_subprocess_database(root: Path) -> MCPSubprocessDatabase:
-    """Create real isolated schema and bootstrap Cedar/supplementary fixtures.
+    """Copy a migrated, Cedar-populated runner database into an owned SQLite file.
 
     :param root: Pytest-owned directory. Example: tmp_path/"legacy".
-    :return: Migrated backend and private manifest location.
+    :return: Isolated backend and reserved private manifest location.
     :raises RuntimeError: Migration/bootstrap or isolation verification fails.
     """
-    raise NotImplementedError()
+    _resolve_database_scope(None)
+    if not root.is_absolute() or root.resolve() != root or any(root.iterdir()):
+        raise ValueError("Legacy database requires an empty owned directory.")
+    if not connection.get_autocommit() or connection.in_atomic_block:
+        raise RuntimeError(
+            "Commit the runner fixture before copying it for legacy MCP."
+        )
+    path = root / _LEGACY_DATABASE_FILENAME
+    settings = _write_subprocess_settings(root, path)
+    database = MCPSubprocessDatabase(
+        root,
+        path,
+        root / "fixtures.json",
+        settings,
+        _subprocess_environment(root, path, settings),
+    )
+    if connection.vendor == "sqlite":
+        with closing(sqlite3.connect(path)) as target:
+            connection.connection.backup(target)
+    else:
+        _copy_runner_rows_to_sqlite(database)
+    return database
+
+
+def _copy_runner_rows_to_sqlite(database: MCPSubprocessDatabase) -> None:
+    """Transfer test rows through Django fixtures on PostgreSQL CI.
+
+    :param database: Fresh owned SQLite destination. Example: provisioned MCP DB.
+    :return: None after migrating and loading the private fixture.
+    :raises RuntimeError: Migration or fixture loading failed.
+    """
+    fixture = database.root / "runner-rows.xml"
+    try:
+        _run_management(database, ("migrate", "--noinput"))
+        call_command(
+            "dumpdata",
+            all=True,
+            format="xml",  # Django's JSON fixture encoder truncates microseconds.
+            use_natural_foreign_keys=True,
+            exclude=("contenttypes", "auth.permission"),
+            output=str(fixture),
+        )
+        _run_management(database, ("loaddata", str(fixture)))
+    finally:
+        fixture.unlink(missing_ok=True)
 
 
 def bootstrap_mcp_subprocess_dataset(manifest_path: Path) -> None:
@@ -689,7 +800,19 @@ def write_mcp_subprocess_snapshot(
     :return: None. Example: canonical snapshot written without token fields.
     :raises AssertionError: Isolation/schema/projection failure.
     """
-    raise NotImplementedError()
+    database = Path(connection.settings_dict["NAME"])
+    if (
+        connection.vendor != "sqlite"
+        or os.environ.get("DJANGO_SETTINGS_MODULE") != _LEGACY_SETTINGS
+        or database != destination.parent / _LEGACY_DATABASE_FILENAME
+        or database.resolve() != database
+        or not database.is_file()
+    ):
+        raise ValueError("Legacy snapshot requires the owned SQLite database.")
+    _verify_sqlite_target(str(database))
+    snapshot = karma_snapshot(include_summaries=include_summaries)
+    with destination.open("x", encoding="utf-8") as stream:
+        json.dump(asdict(snapshot), stream)
 
 
 def _read_subprocess_manifest(database: MCPSubprocessDatabase) -> Mapping[str, object]:
@@ -717,17 +840,51 @@ def _stdio_command(entrypoint: MCPEntrypoint, actor_username: str) -> tuple[str,
     """Select the existing executable using the current test interpreter.
 
     :param entrypoint: Existing server owned by this proof. Example: "facade".
-    :param actor_username: Explicit facade token actor. Example: "mchen".
+    :param actor_username: Explicit existing actor. Example: "mchen".
     :return: Argument vector. Example: python -m mcp_integration.facade.server --transport=stdio.
     :raises ValueError: Unsupported entrypoint or actor identifier.
     """
-    if entrypoint != "facade" or not actor_username:
-        raise ValueError("Facade stdio requires an explicit actor.")
-    return (sys.executable, "-m", "mcp_integration.facade.server", "--transport=stdio")
+    if actor_username and entrypoint == "facade":
+        return (
+            sys.executable,
+            "-m",
+            "mcp_integration.facade.server",
+            "--transport=stdio",
+        )
+    if actor_username and entrypoint == "legacy":
+        return (
+            sys.executable,
+            str(_PROJECT_ROOT / "manage.py"),
+            "mcp_server",
+            f"--user={actor_username}",
+        )
+    raise ValueError("Stdio requires a supported entrypoint and explicit actor.")
+
+
+def _valid_stdio_server(entrypoint: MCPEntrypoint, server_url: str) -> bool:
+    """Require a loopback listener for the facade and an empty URL for legacy.
+
+    :param entrypoint: Intended MCP executable. Example: "facade".
+    :param server_url: Candidate listener. Example: "http://127.0.0.1:8000".
+    :return: True for the entrypoint's expected backend configuration.
+    :raises ValueError: The URL is invalid.
+    """
+    if entrypoint == "legacy":
+        return not server_url
+    url = urlsplit(server_url)
+    return (
+        entrypoint == "facade"
+        and url.scheme == "http"
+        and url.hostname in {"localhost", "127.0.0.1"}
+        and bool(url.port)
+        and url.netloc == f"{url.hostname}:{url.port}"
+        and url.path in {"", "/"}
+        and not (url.query or url.fragment)
+    )
 
 
 class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
-    """Real protocol client over the existing facade subprocess."""
+    """Real protocol client over either existing stdio subprocess."""
 
     def __init__(
         self,
@@ -744,33 +901,26 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :param entrypoint: Actual executable surface. Example: "facade".
         :param actor_username: Explicit actor. Example: "mchen".
         :param dataset: In-process HTTP-backend fixture references. Example: Cedar.
-        :param server_url: Real facade backend. Example: live_server.url.
+        :param server_url: Real facade backend, or empty for legacy. Example: live_server.url.
         :param root: Pytest-owned subprocess directory. Example: tmp_path.
         :param include_summaries: Complete S23 invariants required. Example: True.
         :return: None. Example: unopened protocol client.
         :raises ValueError: Invalid dependencies/ownership.
         """
-        url = urlsplit(server_url)
         if (
-            entrypoint != "facade"
-            or actor_username not in dataset.cedar.users_by_username
-            or url.scheme != "http"
-            or url.hostname not in {"localhost", "127.0.0.1"}
-            or not url.port
-            or url.netloc != f"{url.hostname}:{url.port}"
-            or url.path not in {"", "/"}
-            or url.query
-            or url.fragment
+            actor_username not in dataset.cedar.users_by_username
+            or not _valid_stdio_server(entrypoint, server_url)
             or not root.is_dir()
             or root.is_symlink()
         ):
             raise ValueError(
-                "Facade stdio requires a fixture actor, loopback server and owned directory."
+                "Stdio requires a fixture actor, an isolated backend and an owned directory."
             )
         self.entrypoint, self.actor_username = entrypoint, actor_username
         self.dataset, self.server_url, self.root = dataset, server_url, root
         self.include_summaries = include_summaries
         self._process: Popen[bytes] | None = None
+        self._database: MCPSubprocessDatabase | None = None
         self._resources = ExitStack()
         self._stderr_file: BinaryIO | None = None
         self._token = ""
@@ -878,7 +1028,25 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :return: Actual canonical state. Example: complete award pair after fetch.
         :raises AssertionError: Backend isolation or required state unavailable.
         """
-        raise NotImplementedError()
+        if self.entrypoint == "facade":
+            return karma_snapshot(include_summaries=self.include_summaries)
+        database = self._database
+        if database is None or not database.database_path.is_file():
+            raise RuntimeError("An active legacy database is required for a snapshot.")
+        destination = database.root / "snapshot.json"
+        try:
+            script = (
+                "from pathlib import Path\n"
+                "from tests.support.karma_mcp import write_mcp_subprocess_snapshot\n"
+                f"write_mcp_subprocess_snapshot(Path({str(destination)!r}), "
+                f"include_summaries={self.include_summaries!r})"
+            )
+            _run_management(database, ("shell", "--no-imports", "-c", script))
+            return MCPInvariantSnapshot(
+                **json.loads(destination.read_text(encoding="utf-8"))
+            )
+        finally:
+            destination.unlink(missing_ok=True)
 
     def assert_protocol_clean(self) -> None:
         """Require every observed stdout message to be valid protocol JSON.
@@ -896,18 +1064,24 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         assert response_ids == list(range(1, self._request_id + 1))
 
     def _prepare_backend(self) -> None:
-        """Verify the runner-owned HTTP backend and load the fixture actor's token.
+        """Prepare isolated legacy state or a real token against the HTTP backend.
 
         :return: None. Example: actor token placed in private facade environment.
         :raises RuntimeError: Actor/backend/ownership preparation fails.
         """
-        # The HTTP facade uses no database. Verify Django's actual ORM target before
-        # creating its token and keep all database/provider settings out of the child.
+        if self.entrypoint == "legacy":
+            directory = self._resources.enter_context(
+                TemporaryDirectory(prefix="mimir-mcp-legacy-")
+            )
+            self._database = provision_mcp_subprocess_database(
+                Path(directory).resolve()
+            )
+            return
         _resolve_database_scope(None)
         _, self._token = _load_actor_and_token(self.dataset, self.actor_username)
 
     def _start_process(self) -> None:
-        """Launch the facade with protocol pipes and a separate temporary stderr stream.
+        """Launch the real entrypoint with protocol pipes and separate temporary stderr.
 
         :return: None. Example: live child process with owned streams.
         :raises RuntimeError: Child exits or cannot start.
@@ -919,17 +1093,26 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         self._process = Popen(
             command,
             cwd=self.root,
-            env={
-                "PATH": os.defpath,
-                "PYTHONPATH": str(_PROJECT_ROOT),
-                "PYTHONIOENCODING": "utf-8",
-                "MIMIR_SERVER_URL": self.server_url,
-                "MIMIR_TOKEN": self._token,
-            },
+            env=self._stdio_environment(),
             stdin=PIPE,
             stdout=PIPE,
             stderr=self._stderr_file,
         )
+
+    def _stdio_environment(self) -> Mapping[str, str]:
+        """Expose only the environment required by this MCP child.
+
+        :return: An allowlisted environment. Example: private URL and token for facade.
+        """
+        if self._database is not None:
+            return self._database.environment
+        return {
+            "PATH": os.defpath,
+            "PYTHONPATH": str(_PROJECT_ROOT),
+            "PYTHONIOENCODING": "utf-8",
+            "MIMIR_SERVER_URL": self.server_url,
+            "MIMIR_TOKEN": self._token,
+        }
 
     def _request(
         self, method: str, parameters: Mapping[str, object]
@@ -1015,7 +1198,7 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
                 self._pending_stdout += chunk
                 continue
             self._pending_stdout = tail
-            if self._token.encode("utf-8") in line:
+            if self._token and self._token.encode("utf-8") in line:
                 raise AssertionError("Facade stdout exposed its test credential.")
             message = JSONRPCMessage.model_validate_json(line).root
             envelope = message.model_dump(mode="json", exclude_unset=True)
@@ -1039,7 +1222,7 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         stderr = self._stderr_file.read(_STDIO_STDERR_LIMIT + 1)
         if len(stderr) > _STDIO_STDERR_LIMIT:
             raise AssertionError("Facade emitted excessive diagnostic output.")
-        if self._token.encode("utf-8") in stderr:
+        if self._token and self._token.encode("utf-8") in stderr:
             raise AssertionError("Facade stderr exposed its test credential.")
         self.stderr = stderr.decode("utf-8", errors="replace")
 
@@ -1063,7 +1246,10 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
                     raise RuntimeError(
                         "Facade stdio process failed to stop on EOF."
                     ) from None
-                self._pending_stdout += stdout
+                trailing = self._pending_stdout + stdout
+                if self._token and self._token.encode("utf-8") in trailing:
+                    raise AssertionError("Facade stdout exposed its test credential.")
+                self._pending_stdout = trailing
             self._drain_stderr()
         finally:
             self._resources.close()
