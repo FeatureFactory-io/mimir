@@ -417,6 +417,9 @@ test-experts-s09-log:
 test-experts-s09-at:
 	$(PYTHON) -m pytest tests/integration/test_experts_acceptance_runner.py -k S09 -x
 
+.PHONY: test-at-experts-list-09
+test-at-experts-list-09: test-experts-s09-at
+
 .PHONY: test-experts-s09
 test-experts-s09:
 	+$(MAKE) test-experts-s09-backend
@@ -1164,6 +1167,9 @@ test-experts-s44-log:
 .PHONY: test-experts-s44-at
 test-experts-s44-at:
 	$(PYTHON) -m pytest tests/integration/test_experts_acceptance_runner.py -k S44 -x
+
+.PHONY: test-at-karma-import
+test-at-karma-import: test-experts-s44-at
 
 .PHONY: test-experts-s44
 test-experts-s44:

@@ -2635,6 +2635,7 @@ scenarios:
     skeleton_commit: 41449cecfd54f7bca74616f7d01a26bd002b7cef
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - Makefile
     - docs/experts-replay/pin-evidence/S09.json
     - docs/features/steps/experts_fallback_steps.py
     - docs/plans/iterations/experts/S09-experts-list-09.md
@@ -9407,6 +9408,7 @@ scenarios:
     skeleton_commit: dd7fc7ca3956c4db536774cbb224e2f1f065adb9
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - Makefile
     - docs/experts-replay/pin-evidence/S44.json
     - docs/features/steps/experts_import_steps.py
     - docs/plans/iterations/experts/S44-karma-export-03.md
