@@ -106,7 +106,10 @@ def _assert_visible_sam(page: Page, summary: str, dataset: CedarDataset) -> None
     expect(
         evidence.get_by_role("heading", name="Public released playbooks")
     ).to_be_visible()
-    expect(evidence.get_by_text(_EMPTY_EVIDENCE, exact=True)).to_be_visible()
+    explanation = evidence.get_by_text(_EMPTY_EVIDENCE, exact=True)
+    explanation.scroll_into_view_if_needed()
+    expect(explanation).to_be_visible()
+    expect(explanation).to_be_in_viewport()
     expect(evidence).to_have_text("Public released playbooks " + _EMPTY_EVIDENCE)
     expect(evidence.get_by_role("link")).to_have_count(0)
     contact = page.get_by_test_id("experts-reach-out-skim")
