@@ -1,4 +1,4 @@
-@wip @experts @karma
+ @experts @karma
 Feature: FOB-EXPERTS-LIST+FIND-1 Discover contributors by playbook category
   Elena needs public contribution evidence for the Cedar accessibility nomination.
   Ranking helps discovery; it does not certify availability or project suitability.

@@ -1,4 +1,4 @@
-@wip @experts @karma
+ @experts @karma
 Feature: FOB-EXPERT-VIEW-1 Inspect public contribution evidence
   Elena needs a published example that explains why Maria fits Noor's brief.
 

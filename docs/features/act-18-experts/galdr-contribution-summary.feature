@@ -1,4 +1,4 @@
-@wip @experts @karma @pips
+ @experts @karma @pips
 Feature: FOB-GALDR-CONTRIBUTION-SUMMARY-1 Refresh stable public contribution prose
 
   Background:

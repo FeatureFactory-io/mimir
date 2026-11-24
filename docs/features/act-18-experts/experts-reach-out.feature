@@ -1,4 +1,4 @@
-@wip @experts @guest_access
+ @experts @guest_access
 Feature: FOB-EXPERTS-REACH-OUT-1 Hand off contact with an expert
   Contact is an email handoff; the Cedar replay does not send an external email.
 

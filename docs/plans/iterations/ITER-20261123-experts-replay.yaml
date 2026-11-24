@@ -38,15 +38,31 @@ iteration:
       default_compatibility: Published releases and default manual dispatch retain existing deployment behavior.
       verification: YAML parsed and typed Boolean job guard checked against official GitHub documentation; live Actions run remains pending.
     read_only_ci_preflight:
-      status: prepared_not_dispatched
+      status: completed_existing_idle_online
+      wake_run_id: 45502266783
+      existing_idle_instance: i-0f9603f1b45a08879
       footprint:
       - .github/workflows/build-and-deploy.yml
-      inputs: preflight_only=true and deploy_to_idle=false
+      inputs: preflight_only=true, deploy_to_idle=false, wake_idle=true
       authority: Existing deployment connection; only AWS identity/environment/host reads plus an allowlisted SSM capacity query, no app environment or database access.
       unchanged_defaults: preflight_only=false preserves release/default manual test/build/deployment behavior.
-      source_validation: YAML typed defaults, job guards and six inline Python blocks parsed; live dispatch still pending.
-    ambient_database_identity: Unverified. CDK can supply the same database URL to both environments; default idle migration must not be assumed isolated.
+      source_validation: Existing CI wake and read-only capacity preflight passed; app test/build/deploy jobs skipped. No candidate deployed.
+    ambient_database_identity: SAO declares shared huginn-db/logical mimir for both physical environments. Ambient secret URLs were not read; no default migration or Cedar seed is authorized by staging preparation.
     staging_arrangement: Exact candidate image in an owned isolated companion/database, with no ambient migrations or fixture seed.
+    candidate_deployment_status: Held pending SAO compatibility review and owned PostgreSQL scope proof.
+    owned_postgres_scope_followup:
+      owner_scenario: S45
+      status: implementation_in_progress
+      purpose: Explicit verified disposable PostgreSQL test data scope; existing SQLite and pytest/ambient denial guards preserved.
+      footprint:
+      - tests/support/experts_data.py
+      - tests/unit/test_experts_staging_scope.py
+      - tests/integration/test_experts_staging_scope_postgres.py
+      required_proof: Real private PostgreSQL positive import and negative ownership checks through CI; unit-only or skipped selection is insufficient.
+      settings_module: experts_staging_settings
+      database_role_pattern: experts_cedar_<32-lowerhex-nonce>
+      ownership: Private matching file marker plus live database/session user, database owner/comment and nonprivileged role verification before fixture writes.
+      authorization: Necessary bounded data-isolation prerequisite inside approved S45 footprint under user autonomy; no product feature, visibility, ambient database or cloud platform change.
   required_iteration_final_gates:
   - make test-at-harness
   - make test-at-experts
@@ -4680,7 +4696,7 @@ scenarios:
           - do-small-increments
           - do-github-issues
     implementation_plan: docs/plans/iterations/experts/S48-fob-nav-experts-01.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S01
@@ -6347,6 +6363,8 @@ scenarios:
     skeleton_commit: 923582242ec3446be65478594ac67b54ed913278
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/unit/test_experts_staging_scope.py
+    - tests/integration/test_experts_staging_scope_postgres.py
     - tests/integration/test_experts_release_log_story.py
     - tests/integration/test_karma_mcp.py
     - tests/integration/test_karma_exports.py
@@ -6769,7 +6787,7 @@ scenarios:
       - S01
       - S07
     implementation_plan: docs/plans/iterations/experts/S49-fob-nav-experts-02.md
-    status: skeleton_unimplemented
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S01
@@ -9316,7 +9334,7 @@ scenarios:
       - S32
       - S33
     implementation_plan: docs/plans/iterations/experts/S34-karma-pip-03.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S32
@@ -9695,7 +9713,7 @@ scenarios:
         agent_proofs: []
         mockup_graduation: not_applicable
     implementation_plan: docs/plans/iterations/experts/S44-karma-export-03.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03

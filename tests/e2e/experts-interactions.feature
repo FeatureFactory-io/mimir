@@ -1,4 +1,4 @@
-@wip @experts @e2e
+ @experts @e2e
 Feature: Experts browser-backed acceptance contracts
   Actual clipboard, focus and visual layout are certified through real Playwright.
 

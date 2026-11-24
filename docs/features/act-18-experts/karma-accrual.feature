@@ -1,4 +1,4 @@
-@wip @experts @karma
+ @experts @karma
 Feature: FOB-KARMA-ACCRUAL-1 Award contribution points for eligible events
   Each case restores CEDAR-RFP-01 independently. Historical import is not a user event.
 

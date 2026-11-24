@@ -1,4 +1,4 @@
-@wip @experts @karma
+ @experts @karma
 Feature: FOB-PROFILE-VIEW-1 Understand my contribution record
 
   Background:
