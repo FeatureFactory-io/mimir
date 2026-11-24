@@ -28,7 +28,7 @@ iteration:
     user_clarification: the point of having the storyboard to stop asking about content, and having playbook to stop asking about engineering workflow
     authority: Necessary content alignment and engineering repairs, verification, retries and shared-file reconciliation inside the approved 49 contracts proceed without repeated confirmations.
     retained_review: Material feature/scope changes and main merge, release and production promotion decisions.
-    explicit_pause_preserved: S04 remains paused until explicit resume; independent work continues.
+    user_correction: Denis explicitly stated he never paused S04; the attributed recorded pause and derived status are withdrawn. S04 and independent approved work are active.
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
     exact-AT runner implementation is N4. No product or scenario footprint expanded.
 conflict_map:
@@ -4758,23 +4758,44 @@ scenarios:
         gate:
           command: make test-experts-s04
           log_story_command: pytest tests/integration/test_expert_card_presentation.py -k log_story -x
+      - id: R3-recorded-acquisition-revisions
+        title: Bind copied recapture revision files to their actual recorded manifest values
+        bpe: BPE-05
+        depends_on:
+        - R2-portable-and-strict-visual-gates
+        triggered_by_failed_review: N6-portability-and-card-review
+        footprint:
+        - docs/ux/experts-card-implementation-evidence.json
+        - tests/integration/test_expert_card_visual_evidence.py
+        gate:
+          command: make test-experts-s04-evidence
+          portable_command: pytest tests/integration/test_expert_card_visual_evidence.py -x
+        authority: Latest approved-scope autonomy clarification and explicit correction of the attributed S04 pause
+        prepared_patch_sha256: 15f013e39be0484fa690c33388743405aec455ff42a50e10f736348c96d314f9
+      - id: N7-recorded-provenance-review
+        title: Independently certify exact acquisition provenance and complete card contract
+        bpe: BPE-06
+        depends_on:
+        - R3-recorded-acquisition-revisions
+        footprint: []
+        gate:
+          command: make test-experts-s04
+          log_story_command: pytest tests/integration/test_expert_card_presentation.py -k log_story -x
       scenario_dependencies:
       - S03
       - S17
       - S14
     implementation_plan: docs/plans/iterations/experts/S04-experts-list-04.md
-    status: paused_by_user
-    user_pause:
-      decision: Pause S04
-      scope: S04 and its dependent scenario readiness; independent approved work continues
-      proposed_correction_applied: false
-    pending_repair_decision:
+    status: implementation_in_progress
+    user_correction:
+      statement: I never did it
+      interpretation: The attributed S04 pause was not a user instruction; withdraw the derived pause and continue the approved engineering work.
+    prepared_repair:
       finding: Strict validator accepts a false recapture acquisition revision in copied evidence.
       review: /Users/denispetelin/Desktop/RIPL-Experts-Production/review/S04-recapture-provenance.md
       patch: /Users/denispetelin/Desktop/RIPL-Experts-Production/review/S04-recapture-provenance.patch
       sha256: 15f013e39be0484fa690c33388743405aec455ff42a50e10f736348c96d314f9
-      source_untouched_pending_decision: true
-      question: Approve the two-file fix and continued necessary repairs inside all 49 contracts, retaining main merge, release and production promotion review.
+      status: execution_authorized_under_approved_scope_autonomy
     github_issue: null
     semantic_dependencies:
     - S03

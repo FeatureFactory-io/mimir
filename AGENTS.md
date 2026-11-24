@@ -78,7 +78,8 @@ for this replay over repeated human-decision stops for those routine repairs.
 Return to Denis for a material change to the intended feature/scope or for the
 existing main merge, release and production promotion review decisions.
 
-Denis separately answered “Pause S04”. That scenario stays paused, with its
-prepared provenance patch unapplied and its dependent scenarios waiting, until
-an explicit resume. The autonomy correction does not infer a resume or drop any
-of the 49 contracts. Independent approved work continues.
+Denis explicitly corrected the attributed S04 pause: “I never did it”. The
+recorded pause reply and the derived paused status were not his instruction.
+S04 remains active in the approved 49-contract scope. Proceed with its prepared
+engineering repair under the autonomy correction above, without another
+confirmation. Do not attribute a pause to Denis or hold dependent work for it.
