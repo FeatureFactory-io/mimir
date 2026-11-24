@@ -140,3 +140,20 @@ await_human_decision: true
 - Actual fixture/ORM behavior: 13 cases passed. Strict log tests found no resolver-decision records, while the four existing list-level logs were correctly captured. Test edits remain unstaged. Repeated unchanged failing selectors were diagnostic observations; no source repair has yet been attempted.
 - The required trace needs real numeric account/correlation, two tied candidates/10,000 total, released-count vs alphabetical reason, selected category and unchanged total. No mocked/synthetic log or weakened assertion is accepted.
 - A fresh bounded S03/N2 follow-up owns the already approved experts_service.py path, preserves the pure resolver/signatures and adds the agreed decision trace in query orchestration. This is the first targeted source fix for the missing planned instrumentation, not a S47 production footprint expansion. A fresh S47 worker will finish its test gate after that repair.
+
+## Human decisions received — both repairs authorized
+
+Denis answered the two pending questions explicitly:
+
+- “Approve the shared style fix” — add static/css/mimir-app.css to a bounded S17 repair and apply the prepared one-line normal-flow placement. No further approval is needed for that exact change.
+- “Fix and retry S27” — apply the prepared shared mutable-metric policy repair, add the common regression matrix and include those cases in the checkpoint. This supersedes the second-review stop for that bounded fix-and-retry.
+
+The manifest now has fresh repair nodes R1-analytics-layout and R1-shared-metric-policy before their independent certification retries. S17's original browser assertions remain preserved; a source-only repair worker will not take ownership of the test-node commit. S27's new repair covers the two existing service modules, its existing test module and Make checkpoint configuration. Source APIs/schema remain unchanged. All 49 contracts stay in scope; there is no remote milestone/issue publication.
+
+## Latest completed certification and repairs
+
+- S01 N5 independently passed: 32 backend, one exact AT/seven steps, one signed-in Chromium journey, one targeted and separate log case. S01 is COMPLETE. Production has one canonical Experts link; the separately recorded DEBUG prototype append duplication remains reference maintenance.
+- S47 N5 independently passed: 14 backend-gate checks, two expanded AT examples/eight steps, two Chromium cases and two strict log cases. Full backend predecessor passed all 15. S47 is COMPLETE after the bounded S03 instrumentation follow-up e8f1f9. Guest desktop scope is explicit; shared-control and full responsive review remain later gates.
+- S27 repairs 9d60e961 (numeric input claims), 4d6f4c75 (output claim grammar) and 5ee0a9e (29-line completion body) passed their own gates. The second final review still proved the same written-out category score reached a real ORM→ScriptedLLM request. Its authoritative manual-orm recording and all passing automated gates are retained; the new explicit human fix-and-retry authorizes the shared-policy repair rather than narrowing the contract.
+- S06 backend 50534928 (three cases), AT 5f36ac17 (one case/four steps) and browser 6e59c5fe (seven IA viewports) passed. Signed-in Feedback touches only an empty alert border at phone widths, not text/actions; no general shared-shell clearance claim. Its final DoD is pending.
+- S08 backend 4e94d210 passed seven cases against the actual independent tie oracle: Alina apark and Sofia sreed both have 15,400; apark comes first, Maria remains 8,200. The helper imports exactly 30 major and four minor historical Alina awards with unknown references null, no invented public books. Root's initial dispatch shorthand about the tie subjects was corrected before code; the actual oracle governs.
