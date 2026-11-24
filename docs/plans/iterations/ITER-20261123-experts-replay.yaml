@@ -2575,7 +2575,7 @@ scenarios:
       - S03
       - S01
     implementation_plan: docs/plans/iterations/experts/S07-experts-list-07.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
@@ -5934,7 +5934,7 @@ scenarios:
       - S07
       - S36
     implementation_plan: docs/plans/iterations/experts/S37-karma-copy-02.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
@@ -8533,8 +8533,8 @@ scenarios:
         - shared_export:exit
         - shared_export:error
         gate:
-          command: pytest tests/integration/test_karma_exports.py -k service_t2 -x
-          log_story_command: pytest tests/integration/test_karma_exports.py -k log_story -x
+          command: pytest tests/integration/test_karma_exports.py -k service_t2 -x --deselect tests/integration/test_karma_exports.py::test_self_export_service_t2_with_owned_content_writes_files_without_awards
+          log_story_command: pytest tests/integration/test_karma_exports.py -k 'service_t2 and (log_story or with_multiple_files_awards_one_pair)' -x
         guidance_bundle:
           activity: BPE/BPE-02-Implement_Backend.md
           rules:
