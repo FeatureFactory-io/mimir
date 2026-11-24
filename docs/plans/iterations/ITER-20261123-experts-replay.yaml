@@ -111,6 +111,7 @@ conflict_map:
   - S03
   - S17
   methodology/services/karma_service.py:
+  - S43
   - S30
   - S36
   - S32
@@ -9151,6 +9152,7 @@ scenarios:
     skeleton_commit: b4ecca6a499524fdfbad94bc47d023c50ad93587
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - methodology/services/karma_service.py
     - docs/experts-replay/pin-evidence/S43.json
     - docs/features/steps/experts_export_steps.py
     - docs/plans/iterations/experts/S43-karma-export-02.md
@@ -9227,6 +9229,7 @@ scenarios:
         bpe: BPE-02
         depends_on: []
         footprint:
+        - methodology/services/karma_service.py
         - tests/integration/test_karma_exports.py
         - tests/support/experts_exports.py
         tests:
@@ -9249,7 +9252,7 @@ scenarios:
           - do-not-mock-in-integration-tests
           - do-assert-log-story
           - do-write-concise-methods
-        notes: Certification only; no new production writer.
+        notes: Certification plus a metadata-only self_consumption log correction adding already-loaded author_id without extra queries, policy, writer or API changes.
       - id: S43-N2-acceptance
         title: Execute exact self-export living specification
         bpe: BPE-04
