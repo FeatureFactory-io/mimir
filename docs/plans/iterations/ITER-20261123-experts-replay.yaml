@@ -3609,6 +3609,8 @@ scenarios:
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
     - docs/experts-replay/pin-evidence/S21.json
+    - docs/features/steps/experts_detail_steps.py
+    - tests/integration/test_experts_response_status_steps.py
     - docs/plans/iterations/experts/S21-experts-view-05.md
     - tests/e2e/test_experts_not_found.py
     - tests/integration/test_experts_not_found.py
@@ -3715,11 +3717,25 @@ scenarios:
           - pytest
           - do-test-first
           - do-not-mock-in-integration-tests
+      - id: S21-N2a-shared-status
+        title: Complete existing shared response-status binding and rerun exact outline
+        bpe: BPE-04
+        depends_on:
+        - S21-N1
+        footprint:
+        - docs/features/steps/experts_detail_steps.py
+        - tests/integration/test_experts_response_status_steps.py
+        gate:
+          command: make test-experts-s21-at
+          additional_commands:
+          - pytest tests/integration/test_experts_response_status_steps.py -x
+          - make test-at-harness
+        authorization: Actual N2 red found the existing shared status stub; necessary bounded approved-scope repair without new product behavior.
       - id: S21-N3
         title: Certify anonymous browser rejection
         bpe: BPE-05
         depends_on:
-        - S21-N2
+        - S21-N2a-shared-status
         footprint:
         - tests/e2e/test_experts_not_found.py
         gate:

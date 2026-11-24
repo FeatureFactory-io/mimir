@@ -647,7 +647,7 @@ test-experts-s20:
 
 .PHONY: test-experts-s21-backend
 test-experts-s21-backend:
-	$(PYTHON) -m pytest tests/integration/test_experts_not_found.py::test_expert_detail_with_missing_or_zero_karma_subject_returns_404 tests/integration/test_experts_not_found.py::test_expert_detail_with_ineligible_subject_hides_account_existence tests/integration/test_experts_not_found.py::test_expert_detail_with_rejected_subject_log_story_reject -x
+	$(PYTHON) -m pytest tests/integration/test_experts_not_found.py tests/integration/test_experts_response_status_steps.py -x
 
 .PHONY: test-experts-s21-browser
 test-experts-s21-browser:
