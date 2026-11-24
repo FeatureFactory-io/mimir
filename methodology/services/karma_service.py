@@ -573,7 +573,8 @@ class KarmaService:
             raise ValidationError("Event conflict.", code="award_payload_conflict")
         if is_self:
             logger.info(
-                f"{operation} | branch | {trace} reason=self_consumption awards=0"
+                f"{operation} | branch | {trace} author_id={book.author_id} "
+                "reason=self_consumption awards=0"
             )
             return "self_consumption"
         attribution = f"author_id={book.author_id} category={book.category}"

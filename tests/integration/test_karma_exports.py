@@ -7,8 +7,11 @@ import socket
 import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from types import FrameType
+from typing import Literal
 from uuid import UUID
 
 import httpx
@@ -24,10 +27,16 @@ from rest_framework.test import APIClient
 
 from mcp_integration.facade.client import get_client
 from mcp_integration.facade.export_paths import confined_export_path
-from methodology.models import KarmaAward, Playbook, Rule
+from methodology.models import Activity, KarmaAward, Playbook, Rule
 from methodology.services.playbook_export_service import PlaybookExportService
 from methodology.services.workflow_export_service import WorkflowExportService
 from tests.support.experts_data import CedarDataset, load_cedar_baseline
+from tests.support.experts_exports import (
+    assert_complete_self_export,
+    assert_owned_export_source,
+    assert_self_export_karma_unchanged,
+    capture_export_karma_state,
+)
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.karma_mcp import (
     MCPCase,
@@ -35,6 +44,9 @@ from tests.support.karma_mcp import (
     MCPDataset,
     StdioMCPClient,
     decode_tool_payload,
+)
+from tests.support.karma_mcp import (
+    mcp_dataset as _mcp_dataset,  # noqa: F401 — pytest fixture
 )
 from tests.support.log_story import assert_log_story
 
@@ -73,6 +85,12 @@ _EXPORT_LOG = {
     "workflow": "WorkflowExportService.export_workflow_to_markdown",
     "playbook": "PlaybookExportService.export_playbook_to_local",
 }
+_SELF_CONSUMPTION_LOG = "KarmaService.award_successful_consumption"
+_SELF_EXPORT_LOGGERS = (
+    *_FACADE_LOGGERS,
+    "methodology.services.workflow_export_service",
+    "methodology.services.karma_service",
+)
 
 
 @pytest.fixture(name="export_facade")
@@ -1299,58 +1317,234 @@ def _assert_receipt_outage_story(
     assert metadata.stat().st_mtime_ns == written_at
 
 
+@pytest.fixture(name="self_export_dataset")
+def _self_export_dataset(mcp_dataset: MCPDataset) -> MCPDataset:
+    """Link a real non-apply-on rule to Mike's existing Cedar activity."""
+    rule = Rule.objects.get(pk=mcp_dataset.entity_ids["mike_rule"])
+    rule.always_apply = False
+    rule.save(update_fields=["always_apply"])
+    mcp_dataset.cedar.activities_by_pk[_CEDAR_ACTIVITY_ID].rules.add(rule)
+    return mcp_dataset
+
+
+def _self_export_targets(entity: str, workspace: Path) -> tuple[Path, ...]:
+    """Define the exact requested canonical and mirror destinations."""
+    if entity == "playbook":
+        return workspace / ".cursor/playbooks", workspace / "mirror"
+    return (workspace / "workflows",)
+
+
+def _self_export_playbook_options(mirror: Path) -> dict[str, object]:
+    """Exercise both file ADEs and both inline ADEs in one real export."""
+    return {
+        **_playbook_copy_options(mirror),
+        "ade_targets": ["devin", "claude", "copilot"],
+    }
+
+
+def _self_export_bundle(entity: str, mike: User) -> dict:
+    """Read the real bundle without writing files, for legacy/service comparison."""
+    if entity == "workflow":
+        return WorkflowExportService.generate_workflow_files(
+            _CEDAR_WORKFLOW_ID, _EXPORT_FOLDER
+        )
+    return PlaybookExportService.generate_playbook_export_bundle(
+        _CEDAR_PLAYBOOK_ID,
+        _EXPORT_FOLDER,
+        ade_targets=["devin", "claude", "copilot"],
+        ade_target="Cursor",
+        force_apply=True,
+        sync_root_rules=True,
+        user=mike,
+    )
+
+
+def _observe_self_export_response(
+    responses: dict[str, dict], entity: str, response: httpx.Response
+) -> None:
+    """Read the exact successful real payload before the facade handles it."""
+    path = response.request.url.path
+    if path in (_BUNDLE_ROUTES[entity], _RECEIPT_PATH):
+        assert path not in responses
+        response.raise_for_status()
+        response.read()
+        responses[path] = response.json()
+
+
+@async_to_sync
+async def _registered_self_export(
+    factory: MCPClientFactory,
+    entrypoint: Literal["facade", "legacy"],
+    tool_name: str,
+    entity: str,
+    targets: tuple[Path, ...],
+) -> tuple[dict, dict[str, dict]]:
+    """Discover and call the real registered tool as Mike, returning HTTP observations."""
+    responses: dict[str, dict] = {}
+    arguments = {
+        f"{entity}_id": _ENTITY_IDS[entity],
+        "target_directory": str(targets[0]),
+        "folder_name": _EXPORT_FOLDER,
+    }
+    if entity == "playbook":
+        arguments.update(_self_export_playbook_options(targets[1]))
+    async with factory.open(actor_username=_AUTHOR, entrypoint=entrypoint) as session:
+        if entrypoint == "facade":
+            hook = partial(_observe_self_export_response, responses, entity)
+            get_client().event_hooks["response"].append(hook)
+        [schema] = [
+            tool.inputSchema
+            for tool in await session.client.list_tools()
+            if tool.name == tool_name
+        ]
+        assert set(schema["properties"]) == _EXPORT_PARAMETERS[entity]
+        assert schema["required"] == [f"{entity}_id"]
+        result = decode_tool_payload(
+            await session.client.call_tool(tool_name, arguments)
+        )
+    assert isinstance(result, dict)
+    return result, responses
+
+
+def _verify_registered_self_export(
+    factory: MCPClientFactory,
+    entrypoint: Literal["facade", "legacy"],
+    tool_name: str,
+    workspace: Path,
+) -> None:
+    """Run one registered self-export and verify every output before persisted state."""
+    entity = tool_name.split("_")[1]
+    mike = assert_owned_export_source(factory.dataset.cedar)
+    before = capture_export_karma_state()
+    targets = _self_export_targets(entity, workspace)
+    facade = entrypoint == "facade"
+    bundle = {} if facade else _self_export_bundle(entity, mike)
+    started = datetime.now(UTC)
+    result, responses = _registered_self_export(
+        factory, entrypoint, tool_name, entity, targets
+    )
+    finished = datetime.now(UTC)
+    if facade:
+        bundle = responses[_BUNDLE_ROUTES[entity]]
+    assert_complete_self_export(
+        result=result,
+        bundle=bundle,
+        workspace=workspace,
+        started_at=started,
+        finished_at=finished,
+        targets=targets,
+        facade=facade,
+        sync_root_rules=entity == "playbook",
+    )
+    assert_self_export_karma_unchanged(before)
+    if facade:
+        assert factory.request_paths == _expected_export_requests(entity)
+        _assert_self_export_receipt(responses[_RECEIPT_PATH])
+    else:
+        assert not factory.request_paths and not responses
+
+
+def _assert_self_export_receipt(receipt: dict[str, object]) -> None:
+    """Verify the newly completed action received the shared exclusion outcome."""
+    identity = UUID(str(receipt["event_identity"]))
+    assert receipt == {
+        "event_identity": str(identity),
+        "status": "skipped",
+        "created_count": 0,
+        "reason": "self_consumption",
+    }
+
+
 @pytest.mark.parametrize(
     "tool_name", ["export_workflow_to_local", "export_playbook_to_local"]
 )
 def test_self_export_facade_t1_with_owned_content_writes_files_without_awards(
-    tool_name: str, live_server: LiveServer, tmp_path: Path
+    tool_name: str,
+    live_server: LiveServer,
+    tmp_path: Path,
+    self_export_dataset: MCPDataset,
 ) -> None:
     """Certify real facade registration, HTTP/token and complete self-export.
 
     :param tool_name: Registered tool. Example: 'export_workflow_to_local'.
     :param live_server: Real isolated Django HTTP server. Example: localhost port.
     :param tmp_path: Actual empty filesystem root. Example: /tmp/pytest/self.
+    :param self_export_dataset: Real Cedar plus linked rule and nonempty export collections.
     :return: None. Example: all files verified before zero-award assertions.
     :raises AssertionError: Registration, successful files or unchanged state fail.
     """
-    raise NotImplementedError()
+    factory = MCPClientFactory(self_export_dataset, live_server.url, [])
+    _verify_registered_self_export(factory, "facade", tool_name, tmp_path.resolve())
 
 
 @pytest.mark.parametrize(
     "tool_name", ["export_workflow_to_local", "export_playbook_to_local"]
 )
 def test_self_export_legacy_t1_with_owned_content_writes_files_without_awards(
-    tool_name: str, tmp_path: Path
+    tool_name: str, tmp_path: Path, self_export_dataset: MCPDataset
 ) -> None:
     """Certify registered legacy tools with Mike's real user context.
 
     :param tool_name: Existing tool. Example: 'export_playbook_to_local'.
     :param tmp_path: Actual isolated filesystem root. Example: /tmp/pytest/legacy.
+    :param self_export_dataset: Real Cedar including Mike's linked rule. Example: playbook 6201.
     :return: None. Example: complete export and unchanged global ledger.
     :raises AssertionError: Tool registration, user context or output differs.
     """
-    raise NotImplementedError()
+    factory = MCPClientFactory(self_export_dataset, "", [])
+    _verify_registered_self_export(factory, "legacy", tool_name, tmp_path.resolve())
 
 
 @pytest.mark.parametrize(
     "tool_name", ["export_workflow_to_local", "export_playbook_to_local"]
 )
 def test_self_export_service_t2_with_owned_content_writes_files_without_awards(
-    tool_name: str, tmp_path: Path
+    tool_name: str, tmp_path: Path, self_export_dataset: MCPDataset
 ) -> None:
     """Certify both real filesystem services and shared self-exclusion.
 
     :param tool_name: Export kind selector. Example: 'export_workflow_to_local'.
     :param tmp_path: Real filesystem root. Example: /tmp/pytest/service.
+    :param self_export_dataset: Real Cedar plus nonempty playbook export collections.
     :return: None. Example: successful bytes and Mike12450/GUI47 unchanged.
     :raises AssertionError: Output incomplete or any user's awards change.
     """
-    raise NotImplementedError()
+    entity = tool_name.split("_")[1]
+    mike = assert_owned_export_source(self_export_dataset.cedar)
+    before = capture_export_karma_state()
+    workspace = tmp_path.resolve()
+    targets = _self_export_targets(entity, workspace)
+    bundle = _self_export_bundle(entity, mike)
+    started = datetime.now(UTC)
+    if entity == "playbook":
+        result = PlaybookExportService.export_playbook_to_local(
+            _CEDAR_PLAYBOOK_ID,
+            str(targets[0]),
+            folder_name=_EXPORT_FOLDER,
+            user=mike,
+            **_self_export_playbook_options(targets[1]),
+        )
+    else:
+        result = _legacy_export(entity, targets[0], mike)
+    assert_complete_self_export(
+        result=result,
+        bundle=bundle,
+        workspace=workspace,
+        started_at=started,
+        finished_at=datetime.now(UTC),
+        targets=targets,
+        sync_root_rules=entity == "playbook",
+    )
+    assert_self_export_karma_unchanged(before)
 
 
 @pytest.mark.parametrize("entrypoint", ["facade", "legacy"])
 def test_self_export_log_story_happy(
-    entrypoint: str, live_server: LiveServer, tmp_path: Path, caplog: LogCaptureFixture
+    entrypoint: Literal["facade", "legacy"],
+    live_server: LiveServer,
+    tmp_path: Path,
+    caplog: LogCaptureFixture,
+    self_export_dataset: MCPDataset,
 ) -> None:
     """Prove successful files precede the self-consumption zero-award branch.
 
@@ -1358,10 +1552,135 @@ def test_self_export_log_story_happy(
     :param live_server: Real HTTP server. Example: localhost random port.
     :param tmp_path: Real destination root. Example: /tmp/pytest/logs.
     :param caplog: Actual captured records. Example: INFO export/receipt beats.
+    :param self_export_dataset: Actual Cedar entities. Example: Mike owns workflow 6202.
     :return: None. Example: ordered shared identity and created_count=0.
     :raises AssertionError: Missing beats, false failure or leaked credentials.
     """
-    raise NotImplementedError()
+    factory = MCPClientFactory(self_export_dataset, live_server.url, [])
+    workspace = tmp_path.resolve()
+    with capture_experts_logs(caplog, _SELF_EXPORT_LOGGERS):
+        _verify_registered_self_export(
+            factory, entrypoint, "export_workflow_to_local", workspace
+        )
+    mike = self_export_dataset.cedar.users_by_username[_AUTHOR]
+    count = sum(path.is_file() for path in workspace.rglob("*"))
+    _assert_self_export_log_story(caplog, entrypoint, mike, count)
+    _assert_self_export_logs_safe(caplog, mike, workspace)
+
+
+def _assert_self_export_logs_safe(
+    caplog: LogCaptureFixture, mike: User, workspace: Path
+) -> None:
+    """Check correlated export/receipt logs omit credentials, paths and prose."""
+    relevant = (
+        "facade_export",
+        "export_receipt",
+        _EXPORT_LOG["workflow"],
+        _SELF_CONSUMPTION_LOG,
+        "ConsumptionReceiptView.post",
+    )
+    messages = "\n".join(
+        record.message
+        for record in caplog.records
+        if record.message.startswith(relevant)
+    )
+    activity = Activity.objects.select_related("workflow").get(pk=_CEDAR_ACTIVITY_ID)
+    sensitive = (
+        str(workspace),
+        Token.objects.get(user=mike).key,
+        mike.email,
+        activity.workflow.name,
+        activity.guidance,
+        activity.rules.get().content,
+    )
+    assert all(secret not in messages for secret in sensitive if secret)
+
+
+def _assert_self_export_log_story(
+    caplog: LogCaptureFixture,
+    entrypoint: Literal["facade", "legacy"],
+    mike: User,
+    file_count: int,
+) -> None:
+    """Prove correlated file completion, self-exclusion and zero-created exit in order."""
+    facade = entrypoint == "facade"
+    operation = "facade_export" if facade else _EXPORT_LOG["workflow"]
+    identity_key = "event_identity" if facade else "operation_uuid"
+    identity = _self_export_processing_identity(caplog, operation, identity_key)
+    source = (
+        f"{identity_key}={identity}",
+        "entity_type=workflow",
+        f"entity_id={_CEDAR_WORKFLOW_ID}",
+    )
+    assert file_count > 0
+    processing = (*source, f"file_count={file_count}", "files_written=true")
+    branch = (
+        f"action_uuid={identity}",
+        "channel=export",
+        f"actor_id={mike.pk}",
+        f"playbook_id={_CEDAR_PLAYBOOK_ID}",
+        f"author_id={mike.pk}",
+        "reason=self_consumption",
+        "awards=0",
+    )
+    exit_owner = "export_receipt" if facade else operation
+    outcome = "receipt_status=skipped" if facade else "outcome=ineligible"
+    exited = (*source, "channel=export", outcome, "created_count=0")
+    beats = (
+        (operation, "processing", processing),
+        (_SELF_CONSUMPTION_LOG, "branch", branch),
+        (exit_owner, "exit", exited),
+    )
+    _assert_ordered_self_export_beats(caplog, beats)
+    _assert_no_self_export_award_or_error(caplog, identity)
+
+
+def _self_export_processing_identity(
+    caplog: LogCaptureFixture, operation: str, identity_key: str
+) -> UUID:
+    """Read the unique invocation UUID from its actual file-completion log."""
+    prefix = f"{operation} | processing |"
+    [message] = [
+        record.message for record in caplog.records if record.message.startswith(prefix)
+    ]
+    match = re.search(rf"\b{identity_key}=([\w-]+)", message)
+    assert match
+    return UUID(match[1])
+
+
+def _assert_ordered_self_export_beats(
+    caplog: LogCaptureFixture, beats: tuple[tuple[str, str, tuple[str, ...]], ...]
+) -> None:
+    """Require one exact, ordered INFO record for each declared beat."""
+    indices = []
+    for owner, beat, fragments in beats:
+        prefix = f"{owner} | {beat} |"
+        assert_log_story(caplog, where=owner, beats={beat: (prefix, *fragments)})
+        [index] = [
+            index
+            for index, record in enumerate(caplog.records)
+            if record.levelno >= logging.INFO
+            and record.message.startswith(prefix)
+            and set(fragments).issubset(record.message.split())
+        ]
+        indices.append(index)
+    assert indices == sorted(set(indices))
+
+
+def _assert_no_self_export_award_or_error(
+    caplog: LogCaptureFixture, identity: UUID
+) -> None:
+    """Check the correlated action has no award-created or failure beat."""
+    related = [
+        record.message for record in caplog.records if str(identity) in record.message
+    ]
+    assert not any(
+        "| error |" in message
+        or "reason=eligible" in message
+        or "outcome=awarded" in message
+        or "status=applied" in message
+        for message in related
+    )
 
 
 @pytest.mark.parametrize("entrypoint", ["facade", "legacy"])
