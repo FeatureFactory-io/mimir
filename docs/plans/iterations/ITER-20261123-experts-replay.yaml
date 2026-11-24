@@ -1418,6 +1418,13 @@ scenarios:
     skeleton_commit: 2fa4ee24e826e5e286a675452fbfc67800706116
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/integration/test_experts_summary_submission.py
+    - tests/unit/test_request_id_privacy.py
+    - methodology/pip_views.py
+    - methodology/models/agent_interaction.py
+    - mimir/request_local.py
+    - mimir/logging_filters.py
+    - mimir/middleware.py
     - Makefile
     - docs/experts-replay/pin-evidence/S27.json
     - docs/features/steps/experts_summary_steps.py
@@ -1761,6 +1768,33 @@ scenarios:
         - Preserve the complete privacy policy and read-only public completion API.
         - Derive metadata from the actual frozen evidence and accepted output without requerying or model-body logging.
         - S23 owns summary_proofs.py and lifecycle persistence; coordinate rather than duplicate edits.
+      - id: R5-shared-request-log-privacy
+        title: Apply safe correlation policy before real request logging and response propagation
+        bpe: BPE-02
+        depends_on:
+        - R4-safe-lifecycle-trace
+        triggered_by_failed_review: S23/N5-independent-retry-review
+        footprint:
+        - mimir/middleware.py
+        - mimir/logging_filters.py
+        - mimir/request_local.py
+        - methodology/models/agent_interaction.py
+        - methodology/pip_views.py
+        - tests/unit/test_request_id_privacy.py
+        - tests/integration/test_experts_summary_submission.py
+        approved_additional_helpers:
+        - normalize_request_id
+        gate:
+          command: make test-experts-s27
+          integration_command: make test-experts-s23
+          shared_policy_command: pytest tests/unit/test_request_id_privacy.py -x
+        human_approval: FUCKING FIX S27. DO IT, STOP ASKING IN THE LOOP
+        authority_scope: Necessary shared request-entry privacy correction for the same public-summary metadata flow under the explicit continuing S27 fix instruction
+        constraints:
+        - Preserve exact existing credential recognition and safe normal request identifiers.
+        - Normalize before thread-local storage and actual production-formatted logs; propagate the same safe ID into response and persisted interaction.
+        - Keep logging startup free of premature Django model/service imports.
+        - Do not mutate raw transport headers to evade ownership; read validated request.request_id in the existing PIP view helper.
       scenario_dependencies:
       - S03
     implementation_plan: docs/plans/iterations/experts/S27-galdr-summary-05.md
@@ -4056,6 +4090,16 @@ scenarios:
           command: make test-experts-s23
           log_story_command: make test-experts-s23-log
           agent_proof_command: make test-experts-s23-agent
+      - id: N6-production-log-privacy-review
+        title: Independently recheck real formatted logs and complete summary contract
+        bpe: BPE-06
+        depends_on:
+        - R1-lifecycle-boundary-compatibility
+        required_component_followup: S27/R5-shared-request-log-privacy
+        footprint: []
+        gate:
+          command: make test-experts-s23
+          privacy_command: pytest tests/unit/test_request_id_privacy.py -x
       scenario_dependencies:
       - S03
       - S27
@@ -5960,6 +6004,7 @@ scenarios:
         - S39-N3-at
         footprint:
         - tests/integration/test_karma_mcp.py
+        - tests/support/karma_mcp.py
         tests:
         - test_mcp_detail_with_stdio_transport_returns_clean_jsonrpc
         gate:
