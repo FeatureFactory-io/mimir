@@ -306,6 +306,7 @@
 
     const collapsedClass = 'profile-summary-collapsed';
     const label = toggle.querySelector('span');
+    const header = document.querySelector('.mm-realm-navbar');
 
     function updatePreview() {
         if (toggle.getAttribute('aria-expanded') === 'true') return;
@@ -316,6 +317,23 @@
         toggle.hidden = !overflows;
     }
 
+    function revealCollapsedPreview() {
+        if (toggle.hidden || toggle.getAttribute('aria-expanded') === 'true') return;
+
+        const visibleTop = Math.max(0, header?.getBoundingClientRect().bottom ?? 0);
+        const visibleBottom = document.documentElement.clientHeight;
+        const summaryTop = summary.getBoundingClientRect().top;
+        const button = toggle.getBoundingClientRect();
+        // At extreme zoom the preview may not fit. Keep its focused control visible.
+        const previewFits = button.bottom - summaryTop <= visibleBottom - visibleTop;
+        const topOffset = (previewFits ? summaryTop : button.top) - visibleTop;
+        const bottomOffset = button.bottom - visibleBottom;
+        if (topOffset >= 0 && bottomOffset <= 0) return;
+
+        const scrollOffset = topOffset < 0 ? Math.floor(topOffset) : Math.ceil(bottomOffset);
+        window.scrollBy({ top: scrollOffset, behavior: 'instant' });
+    }
+
     toggle.addEventListener('click', function () {
         const expanded = toggle.getAttribute('aria-expanded') !== 'true';
         toggle.setAttribute('aria-expanded', String(expanded));
@@ -324,6 +342,8 @@
             summary.classList.remove(collapsedClass);
         } else {
             updatePreview();
+            // Measure after the collapsed layout and the browser's scroll anchoring settle.
+            requestAnimationFrame(revealCollapsedPreview);
         }
     });
 
