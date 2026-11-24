@@ -15,6 +15,7 @@ from django.views.decorators.http import require_safe
 from methodology.services.expert_card_presentation import (
     ExpertCardPresentation,
 )
+from methodology.services.expert_contact_context import build_expert_contact_context
 from methodology.services.expert_text import (
     CATEGORY_LABELS,
     category_label,
@@ -54,7 +55,7 @@ def experts_list(request: HttpRequest) -> HttpResponse:
         request.user.pk if request.user.is_authenticated else "guest",
         correlation_id,
     )
-    context = _ranked_people_context(category, correlation_id)
+    context = _ranked_people_context(request, category, correlation_id)
     response = render(request, "experts/list.html", context)
     logger.info(
         "%s | exit | category=%s status=%s count=%s correlation_id=%s",
@@ -125,9 +126,12 @@ def _request_correlation_id(request: HttpRequest) -> str:
     return str(uuid4())
 
 
-def _ranked_people_context(category: str, correlation_id: str) -> dict[str, object]:
-    """Build ordered numeric list context without detail/contact dependencies.
+def _ranked_people_context(
+    request: HttpRequest, category: str, correlation_id: str
+) -> dict[str, object]:
+    """Build ordered numeric list context and request-local contact presentation.
 
+    :param request: Actual request/session. Example: Elena with category=design.
     :param category: Resolved canonical slug. Example: "design".
     :param correlation_id: Request identity. Example: "cedar-s03".
     :return: Numeric/public identity context. Example: {"people": ()}.
@@ -156,7 +160,7 @@ def _ranked_people_context(category: str, correlation_id: str) -> dict[str, obje
         "selected_category_label": label,
         "categories": _category_links(category),
         "count": len(people),
-        "people": people,
+        "people": tuple(_with_expert_contacts(request, people)),
     }
 
 
@@ -231,8 +235,10 @@ def _detail_context(
         )
     if category is None:
         raise ValueError("Public expert breadcrumb requires a recognized category.")
+    [contact_person] = _with_expert_contacts(request, [detail])
     return {
         "person": detail,
+        "contact_person": contact_person,
         "nav_section": "experts",
         "back_url": f"{reverse('experts_list')}?{urlencode({'category': category})}",
     }
@@ -252,7 +258,21 @@ def _with_expert_contacts(
     :raises TypeError: If a projection or username has the wrong type.
     :raises ValueError: If a projection omits its validated public username.
     """
-    raise NotImplementedError()
+    usernames: list[str] = []
+    for person in people:
+        if not isinstance(person, Mapping):
+            raise TypeError("Expert presentation requires a public mapping.")
+        if "username" not in person:
+            raise ValueError("Expert presentation requires a username.")
+        username = person["username"]
+        if not isinstance(username, str):
+            raise TypeError("Expert presentation usernames must be strings.")
+        usernames.append(username)
+    contacts = build_expert_contact_context(request, usernames)
+    return [
+        dict(person, contact=contacts[username])
+        for person, username in zip(people, usernames, strict=True)
+    ]
 
 
 def _stored_expert_card_summaries(user_ids: Sequence[int]) -> Mapping[int, str | None]:
