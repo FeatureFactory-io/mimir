@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+
 from behave import given, then, when
 from behave.runner import Context
+from django.urls import reverse
 
+from tests.support.experts_data import CEDAR_PASSWORD
 from tests.support.experts_html import element_text, find_by_test_id
+
+logger = logging.getLogger(__name__)
+_MARIA_USERNAME = "mrodriguez"
 
 
 @given("Maria is authenticated")
@@ -16,7 +23,13 @@ def maria_is_authenticated(context: Context) -> None:
     :return: None; example: client owns Maria's authenticated session.
     :raises AssertionError: If Maria is missing or authentication fails.
     """
-    raise NotImplementedError()
+    maria = context.cedar_dataset.users_by_username.get(_MARIA_USERNAME)
+    assert maria is not None, "The Cedar baseline must contain Maria."
+    logger.info("Experts profile AT | sign-in entry | user_id=%s", maria.pk)
+    assert context.client.login(
+        username=maria.username, password=CEDAR_PASSWORD
+    ), "Maria's Cedar account could not sign in."
+    logger.info("Experts profile AT | sign-in exit | user_id=%s", maria.pk)
 
 
 @when('she opens "{path}"')
@@ -24,14 +37,24 @@ def maria_is_authenticated(context: Context) -> None:
 def maria_opens_profile_path(
     context: Context, path: str = "/auth/user/profile/"
 ) -> None:
-    """Request a local route and retain the real response.
+    """Request the existing own-profile route and retain the real response.
 
     :param context: Prepared authenticated context; example: Cedar Maria.
     :param path: Absolute local path; example: "/auth/user/profile/".
     :return: None; example: context.response holds the actual GET response.
-    :raises ValueError: If path is external or malformed; example: "//host".
+    :raises ValueError: If path differs from the account profile route.
+    :raises AssertionError: If the response fails or loses Maria's session.
     """
-    raise NotImplementedError()
+    if path != reverse("profile"):
+        raise ValueError("The own-profile step requires the existing profile route.")
+    response = context.client.get(path)
+    logger.info(
+        "Experts profile AT | GET exit | path=%s status=%s", path, response.status_code
+    )
+    assert response.status_code == 200, "The existing profile route did not load."
+    maria = context.cedar_dataset.users_by_username[_MARIA_USERNAME]
+    assert response.wsgi_request.user == maria, "The profile lost Maria's session."
+    context.response = response
 
 
 @then('"{test_id}" is present')
@@ -43,7 +66,8 @@ def profile_element_is_present(context: Context, test_id: str) -> None:
     :return: None; example: Django response assertion passes.
     :raises AssertionError: If the response or hook is absent.
     """
-    raise NotImplementedError()
+    assert context.response.status_code == 200
+    find_by_test_id(context.response.content, test_id)
 
 
 @then('"{test_id}" reads "{value}"')
@@ -55,16 +79,20 @@ def profile_element_reads(context: Context, test_id: str, value: str) -> None:
     :param value: Required display text; example: "8,200".
     :return: None when the displayed value and projection match.
     :raises NotImplementedError: For a pending profile hook.
-    :raises AssertionError: If the public response or value differs.
+    :raises AssertionError: If the profile response or value differs.
     """
-    if test_id != "expert-karma-total":
+    if test_id == "expert-karma-total":
+        route, context_key = "expert_detail", "person"
+    elif test_id == "profile-karma-total":
+        route, context_key = "profile", "contributions"
+    else:
         raise NotImplementedError()
     response = context.response
     assert response.status_code == 200
-    assert response.resolver_match.url_name == "expert_detail"
-    person = response.context["person"]
-    assert person["formatted_karma"] == value
-    assert f"{person['total_karma']:,}" == value
+    assert response.resolver_match.url_name == route
+    projection = response.context[context_key]
+    assert projection["formatted_karma"] == value
+    assert f"{projection['total_karma']:,}" == value
     assert element_text(find_by_test_id(response.content, test_id)) == value
 
 
@@ -74,16 +102,21 @@ def profile_primary_category_is(context: Context, category: str) -> None:
 
     :param context: Actual profile response; example: Maria's public detail.
     :param category: Required category; example: "Design".
-    :return: None when the public badge and projection match.
-    :raises NotImplementedError: For the pending own-profile route.
-    :raises AssertionError: If the public response or category differs.
+    :return: None when the badge and projection match.
+    :raises NotImplementedError: For unrecognized profile routes.
+    :raises AssertionError: If the profile response or category differs.
     """
     response = context.response
-    if response.resolver_match.url_name != "expert_detail":
+    route = response.resolver_match.url_name
+    if route == "expert_detail":
+        context_key, test_id = "person", "expert-primary-category"
+    elif route == "profile":
+        context_key, test_id = "contributions", "profile-primary-category"
+    else:
         raise NotImplementedError()
     assert response.status_code == 200
-    assert response.context["person"]["primary_category"] == category
-    badge = find_by_test_id(response.content, "expert-primary-category")
+    assert response.context[context_key]["primary_category"] == category
+    badge = find_by_test_id(response.content, test_id)
     assert element_text(badge) == category
 
 
@@ -95,7 +128,28 @@ def existing_profile_controls_remain(context: Context) -> None:
     :return: None; example: all existing controls and destinations remain.
     :raises AssertionError: If any account function was replaced or removed.
     """
-    raise NotImplementedError()
+    html = context.response.content
+    edit = find_by_test_id(html, "profile-edit-btn")
+    assert edit.name == "a" and ("href", reverse("profile_edit")) in edit.attributes
+    field = find_by_test_id(html, "profile-token-field")
+    assert field.name == "input" and ("type", "password") in field.attributes
+    assert find_by_test_id(html, "profile-token-toggle").name == "button"
+    assert find_by_test_id(html, "profile-token-copy").name == "button"
+    form = find_by_test_id(html, "profile-token-regenerate-form")
+    assert form.name == "form" and ("method", "post") in form.attributes
+    assert ("action", reverse("profile_regenerate_token")) in form.attributes
+    password = find_by_test_id(str(form), "profile-token-regenerate-password")
+    assert ("name", "current_password") in password.attributes
+    assert ("type", "password") in password.attributes
+    assert "required" in dict(password.attributes)
+    submit = find_by_test_id(str(form), "profile-token-regenerate-submit")
+    assert submit.name == "button" and ("type", "submit") in submit.attributes
+    for test_id in (
+        "profile-pips-table",
+        "profile-playbooks-table",
+        "profile-teams-section",
+    ):
+        find_by_test_id(html, test_id)
 
 
 @then("the source rows show {released:d}, {pip:d}, {consumption:d} and {learning:d}")
