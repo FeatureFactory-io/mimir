@@ -6481,6 +6481,7 @@ scenarios:
           - do-informative-logging
           - pytest
         ownership_reconciliation: Keep the in-memory/PG/owned-demo guards unchanged. The SQLite file lane requires real pytest/test settings, declared runner TEST.NAME matching the effective database, private temp ownership evidence and nonsymlink owner/path checks outside seed/checkouts, plus actual PRAGMA main path equality before any fixture writes. Add positive and negative ownership cases; never infer ownership from a filename alone.
+        private_helper_reconciliation: Add KarmaService._persist_with_retry as a bounded decomposition of the approved whole-batch transaction/retry algorithm so persist_awards stays within thirty lines. The existing sole row writer reports duplicate outcomes to the event-savepoint boundary; all recognized collisions reconcile complete events only after rollback of that savepoint. Insert the unique live anchor before its paired author row and preserve returned input order. No public signature or additional award writer is introduced.
       - id: S45-N3-acceptance
         title: Bind exact retry contract and real receipt boundary
         bpe: BPE-04
