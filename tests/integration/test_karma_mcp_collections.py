@@ -28,6 +28,7 @@ from tests.support.karma_mcp import (
     collection_service_result,
     collection_snapshot,
     decode_tool_payload,
+    run_collection_stdio,
 )
 from tests.support.karma_mcp import (
     mcp_client_factory as _mcp_client_factory,  # noqa: F401 — pytest fixture
@@ -40,6 +41,9 @@ from tests.support.karma_mcp import (
 )
 from tests.support.log_story import assert_log_story
 
+_FORBIDDEN_STDIO_ARGUMENTS = frozenset(
+    {"actor_id", "recipient_id", "points", "category", "timestamp", "event_identity"}
+)
 COLLECTION_TOOLS = (
     "list_playbooks",
     "list_workflows",
@@ -378,17 +382,42 @@ def _adverse_collection_case(
     ],
 )
 def test_collection_with_stdio_entrypoint_preserves_protocol_and_state(
-    tool_name: str, entrypoint: str, tmp_path: Path, live_server: LiveServer
+    tool_name: str,
+    entrypoint: MCPEntrypoint,
+    tmp_path: Path,
+    live_server: LiveServer,
+    mcp_dataset: MCPDataset,
 ) -> None:
     """Prove T3 through actual stdio startup and collection call.
     :param tool_name: Registered list; example: list_activities.
     :param entrypoint: Actual executable surface; example: facade.
     :param tmp_path: Isolated subprocess storage; example: temporary SQLite.
     :param live_server: Real facade HTTP backend; example: random local port.
+    :param mcp_dataset: Actual imported rows/entities; example: Mike workflow6202.
     :return: None; example: valid JSON-RPC and unchanged global invariants.
     :raises AssertionError: Protocol noise, missing content or mutations.
     """
-    raise NotImplementedError()
+    case = collection_case(
+        tool_name, mcp_dataset, actor_username="mrodriguez", entrypoint=entrypoint
+    )
+    before = collection_snapshot()
+    evidence = run_collection_stdio(
+        entrypoint, case, tmp_path, live_server, mcp_dataset
+    )
+    schemas = {tool["name"]: tool["inputSchema"] for tool in evidence.schemas}
+    assert tool_name in schemas
+    properties = set(schemas[tool_name]["properties"])
+    assert set(case.arguments) <= properties
+    assert not _FORBIDDEN_STDIO_ARGUMENTS & properties
+    assert evidence.before == before
+    assert_collection_result(case, evidence.payload, evidence.before, evidence.after)
+    assert collection_snapshot() == before
+    responses = [message for message in evidence.stdout_messages if "id" in message]
+    assert [message["id"] for message in responses] == [1, 2, 3]
+    assert all(
+        message["jsonrpc"] == "2.0" and "result" in message for message in responses
+    )
+    assert len(responses[1]["result"]["tools"]) == len(evidence.schemas)
 
 
 def test_collection_with_exact_acceptance_executes_one_contract() -> None:

@@ -90,6 +90,14 @@ _STDIO_READ_SIZE = 65536
 _STDIO_STDERR_LIMIT = 65536
 _LEGACY_SETTINGS = "karma_mcp_subprocess_settings"
 _LEGACY_DATABASE_FILENAME = "mimir.sqlite3"
+_HTTP_REQUEST_PREFIX = "HTTP Request: "
+_COLLECTION_STDIO_FORBIDDEN = (
+    "consumption-receipts",
+    "KarmaService.award_",
+    "Tool: get_",
+    "ContributionSummaryService.refresh",
+    "PublicContributionSummaryBoundary.complete",
+)
 
 
 @dataclass(frozen=True)
@@ -1327,7 +1335,57 @@ def run_collection_stdio(
     :return: Real schemas/content/state. Example: unchanged complete invariants.
     :raises AssertionError: Protocol, metadata or state differs.
     """
-    raise NotImplementedError()
+    if case.expected.get("entrypoint") != entrypoint:
+        raise ValueError("Collection case and actual stdio entrypoint must agree.")
+    parent_before = collection_snapshot()
+    with StdioMCPClient(
+        entrypoint=entrypoint,
+        actor_username=case.actor_username,
+        dataset=dataset,
+        server_url=live_server.url if entrypoint == "facade" else "",
+        root=root,
+        include_summaries=True,
+    ) as wire:
+        schemas = wire.list_tools()
+        before = wire.snapshot()
+        assert before == parent_before, "Copied backend changed collection state."
+        payload = wire.call(case)
+        if isinstance(payload, dict) and set(payload) == {"result"}:
+            payload = payload["result"]
+        after = wire.snapshot()
+        assert_collection_result(case, payload, before, after)
+    wire.assert_protocol_clean()
+    assert collection_snapshot() == parent_before
+    _assert_collection_stdio_boundary(wire, case, live_server.url)
+    return MCPProtocolEvidence(
+        schemas, payload, before, after, tuple(wire.stdout_messages)
+    )
+
+
+def _assert_collection_stdio_boundary(
+    wire: StdioMCPClient, case: MCPCase, server_url: str
+) -> None:
+    """Inspect real child diagnostics without substituting transport or domain calls.
+
+    :param wire: Closed actual subprocess client. Example: facade with safe stderr.
+    :param case: Actual collection contract. Example: Maria list_activities6202.
+    :param server_url: Actual HTTP backend. Example: live_server.url.
+    :return: None. Example: sole collection GET, no receipt or detail invocation.
+    :raises AssertionError: HTTP boundary, detail or summary side effect differs.
+    """
+    requests = [
+        line.split(_HTTP_REQUEST_PREFIX, 1)[1]
+        for line in wire.stderr.splitlines()
+        if _HTTP_REQUEST_PREFIX in line
+    ]
+    if wire.entrypoint == "facade":
+        assert len(requests) == 1 and requests[0].startswith("GET ")
+        url = urlsplit(requests[0].split()[1])
+        assert url.netloc == urlsplit(server_url).netloc and url.path == case.route
+        assert requests[0].endswith('"HTTP/1.1 200 OK"')
+    else:
+        assert not requests
+    assert not any(fragment in wire.stderr for fragment in _COLLECTION_STDIO_FORBIDDEN)
 
 
 _COLLECTION_FIELDS = {
