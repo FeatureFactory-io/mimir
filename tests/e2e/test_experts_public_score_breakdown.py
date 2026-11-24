@@ -118,6 +118,9 @@ def _settle_public_detail(page: Page) -> None:
     page.evaluate("document.fonts.ready")
     page.wait_for_function("""() => [...document.fonts].some(font =>
         font.status === 'loaded' && /montserrat/i.test(font.family))""")
+    page.wait_for_function("""() => [...document.fonts].some(font =>
+        font.status === 'loaded' && /font awesome/i.test(font.family)) ||
+        Boolean(document.querySelector('svg.svg-inline--fa'))""")
     dismiss = page.get_by_role("button", name="Not now", exact=True)
     if dismiss.is_visible():
         dismiss.click()
@@ -191,7 +194,7 @@ def _assert_legible_text(locator: Locator) -> None:
     Inline text whitespace can hit its own ancestor; unrelated covering nodes fail.
 
     :return: None for unclipped 16px Montserrat text without visible occlusion.
-    :raises AssertionError: If the text is clipped, too small, hidden or covered.
+    :raises AssertionError: For clipped, fragmented, too small or covered text.
     """
     locator.scroll_into_view_if_needed()
     expect(locator).to_be_visible()
@@ -201,6 +204,7 @@ def _assert_legible_text(locator: Locator) -> None:
         const range = document.createRange(); range.selectNodeContents(element);
         const lines = [...range.getClientRects()];
         return parseFloat(style.fontSize) >= 16 && /montserrat/i.test(style.fontFamily) &&
+            (element.tagName !== 'DT' || lines.length === 1) &&
             style.visibility === 'visible' && Number(style.opacity) > 0 && lines.length > 0 &&
             lines.every(line => line.left >= box.left - tolerance &&
                 line.right <= box.right + tolerance && line.top >= box.top - tolerance &&
@@ -213,4 +217,4 @@ def _assert_legible_text(locator: Locator) -> None:
                 }));
     }""",
         _LAYOUT_TOLERANCE_PX,
-    ), "A public breakdown label/value is clipped or obscured."
+    ), "A public breakdown label/value is clipped, fragmented or obscured."
