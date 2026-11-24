@@ -108,6 +108,9 @@ def activate_guest_tooltip(
 ) -> Locator:
     """Reveal the actual Bootstrap tooltip by pointer or bounded Tab traversal.
 
+    Locator hover performs another implicit scroll even after prepositioning.
+    Move the real pointer to the verified native hitpoint without restarting it.
+
     :param page: Actual page. Example: fresh anonymous Chromium context.
     :param wrapper: Unique focusable contact wrapper. Example: Maria's list wrapper.
     :param activation: Real interaction. Example: "keyboard" uses Tab.
@@ -118,7 +121,14 @@ def activate_guest_tooltip(
     if activation == "hover":
         expect(wrapper).not_to_be_focused()
         _settle_guest_control_position(wrapper)
-        wrapper.hover(timeout=_TOOLTIP_TIMEOUT_MS)
+        point = wrapper.evaluate("""control => {
+            const box = control.getBoundingClientRect();
+            const x = box.x + box.width / 2, y = box.y + box.height / 2;
+            const hit = document.elementFromPoint(x, y);
+            return control.contains(hit) ? {x, y} : null;
+        }""")
+        assert point is not None, "The actual pointer target is covered"
+        page.mouse.move(point["x"], point["y"])
         expect(wrapper).not_to_be_focused()
     elif activation == "keyboard":
         tab_to_guest_control(page, wrapper)
