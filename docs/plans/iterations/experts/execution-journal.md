@@ -510,3 +510,6 @@ S38 N1 selector explicitly deselects the two N2-owned self-receipt HTTP/CSRF stu
 
 
 S43 N1’s log contract requires the self-consumption actor, target playbook and author IDs. The existing exclusion branch omits author_id despite already loading the playbook. The node now owns a single metadata-only correction in shared KarmaService, using that loaded ID with no extra query, policy, award or public-interface change. The scenario/node/conflict footprints are reconciled; exact log assertions remain. No new production writer or user question is introduced.
+
+
+S43 N1’s shared author_id log addition exposed an old exact S38 self-copy message expectation. Root keeps one consistent shared log schema across channels and reconciles the narrow expected-message update in `tests/integration/test_karma_copy.py` into S43 N1. The strict story gains the existing author ID; its other assertions and all S36/S38 behavior checks stay intact. A channel-specific production formatting branch is not introduced solely to retain the old test string. The initial compatibility failure and source commit remain recorded; final follow-up and integration gates follow without history rewriting or user questions.

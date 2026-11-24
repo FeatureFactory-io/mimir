@@ -148,6 +148,7 @@ conflict_map:
   - S28
   - S29
   tests/integration/test_karma_copy.py:
+  - S43
   - S36
   - S38
   tests/integration/test_karma_exports.py:
@@ -9152,6 +9153,7 @@ scenarios:
     skeleton_commit: b4ecca6a499524fdfbad94bc47d023c50ad93587
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/integration/test_karma_copy.py
     - methodology/services/karma_service.py
     - docs/experts-replay/pin-evidence/S43.json
     - docs/features/steps/experts_export_steps.py
@@ -9229,6 +9231,7 @@ scenarios:
         bpe: BPE-02
         depends_on: []
         footprint:
+        - tests/integration/test_karma_copy.py
         - methodology/services/karma_service.py
         - tests/integration/test_karma_exports.py
         - tests/support/experts_exports.py
