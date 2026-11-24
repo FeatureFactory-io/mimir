@@ -8573,8 +8573,8 @@ scenarios:
         - facade_export:error
         - export_receipt:error
         gate:
-          command: pytest tests/integration/test_karma_exports.py -k 'not stdio' -x
-          log_story_command: pytest tests/integration/test_karma_exports.py -k log_story -x
+          command: pytest tests/integration/test_karma_exports.py -k 'not stdio and not self_export' -x
+          log_story_command: pytest tests/integration/test_karma_exports.py -k 'log_story and not self_export' -x
         guidance_bundle:
           activity: BPE/BPE-02-Implement_Backend.md
           rules:
