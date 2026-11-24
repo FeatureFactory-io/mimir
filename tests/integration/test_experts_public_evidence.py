@@ -95,6 +95,39 @@ def test_collect_with_cedar_privacy_variant_returns_only_published_public_facts(
 
 
 @pytest.mark.parametrize(
+    ("score_label", "score_value"),
+    [
+        ("Maria's Design score is", "7,200"),
+        ("Maria’s Research subtotal is", "1,450"),
+        ("DEVELOPMENT category points:", "2,300"),
+        ("Product karma score was", "3750"),
+        ("Other point subtotal =", "6,750"),
+        ("Her category score is", "4,120"),
+    ],
+)
+def test_collect_with_category_score_claim_redacts_the_mutable_value(
+    s27_case: Mapping[str, Any], score_label: str, score_value: str
+) -> None:
+    """Keep stable versioned guidance and exclude scores from request evidence.
+
+    :param s27_case: Real DB case. Example: Maria's released Cedar playbook.
+    :param score_label: Mutable claim label. Example: Maria's Design score is.
+    :param score_value: Mutable score value. Example: 7,200.
+    :return: None after verifying the serialized evidence.
+    :raises AssertionError: If a score leaks or the stable guidance is lost.
+    """
+    activity_title = "Trace Keyboard Focus"
+    stable_fact = "Use Design Score 2.0 to review keyboard focus in version 2.1."
+    Activity.objects.filter(workflow__playbook_id=6101, name=activity_title).update(
+        guidance=f"{stable_fact} {score_label} {score_value}."
+    )
+    evidence = PublicContributionEvidenceService().collect(s27_case["subject_id"])
+    serialized = serialize_public_evidence(evidence)
+    assert activity_title in serialized and stable_fact in serialized
+    assert score_value not in serialized
+
+
+@pytest.mark.parametrize(
     "case",
     [
         "partial",

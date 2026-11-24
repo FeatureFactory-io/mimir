@@ -41,6 +41,7 @@ _PUBLISHED_PIP_STATES = (
 _RELATIONSHIP_OPERATIONS = (PipChange.CHANGE_LINK, PipChange.CHANGE_UNLINK)
 _OPERATIONS = {value for value, _ in PipChange.CHANGE_TYPE_CHOICES}
 _CATEGORIES = {value for value, _ in Playbook.CATEGORY_CHOICES}
+_CATEGORY_LABELS = "|".join(re.escape(label) for _, label in Playbook.CATEGORY_CHOICES)
 _INITIAL_RELEASE = Decimal("1.0")
 _VERSION_NUMBER = re.compile(r"[0-9]{1,4}\.[0-9]")
 _ENTITY_FIELDS = {
@@ -58,7 +59,8 @@ _ENTITY_FIELDS = {
     PipChange.ENTITY_ARTIFACT: (Artifact, "playbook", "name", "description", 200),
     PipChange.ENTITY_RULE: (Rule, "playbook", "title", "content", 200),
 }
-_SENSITIVE_TEXT = re.compile(r"""(?ix)
+_SENSITIVE_TEXT = re.compile(
+    r"""(?ix)
     -----BEGIN\ [A-Z\ ]*PRIVATE\ KEY-----[\s\S]*?(?:-----END\ [A-Z\ ]*PRIVATE\ KEY-----|\Z)
     | (?<=://)[^\s/@]+:[^\s/@]+(?=@)
     | \b[\w.%+!-]+@[\w.-]+\.[a-z]{2,}\b
@@ -73,7 +75,14 @@ _SENSITIVE_TEXT = re.compile(r"""(?ix)
            |copy[-_\ ]+count|released[-_\ ]+playbook[-_\ ]+count)
         \s*[:=]?\s*\d[\d,.]*
     | \b\d[\d,.]*\s+(?:karma(?:\s+points)?|copies|released\s+playbooks)\b
-    """)
+    """
+    # An explicit value connector keeps versioned titles like Design Score 2.0.
+    rf"""
+    | \b(?:category|(?:{_CATEGORY_LABELS})(?:[-_\ ]+category)?)[-_\ ]+
+        (?:score|points|(?:point[-_\ ]+)?subtotal|karma(?:[-_\ ]+(?:score|points|total))?)
+        (?:\s*[:=]\s*|\s+(?:is|was|of)\s+)\d+(?:[,.]\d+)*
+    """
+)
 
 
 @dataclass(frozen=True)
@@ -362,7 +371,7 @@ class PublicContributionEvidenceService:
         )
 
     def _safe_text(self, text: str) -> str:
-        """Remove email/recognizable credential material from public text.
+        """Remove sensitive material and mutable aggregate claims from public text.
 
         :param text: Allowlisted published field. Example: "Review focus order".
         :return: Sanitized text. Example: "Review focus order".
