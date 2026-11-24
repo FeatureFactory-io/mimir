@@ -223,6 +223,16 @@ def test_collect_with_category_score_claim_redacts_the_mutable_value(
             id="legacy-released-count",
         ),
         pytest.param(
+            "Her Design score is 7.200.123.",
+            "Her [redacted]",
+            id="period-grouped-design-score",
+        ),
+        pytest.param(
+            "Her released-playbook-count: 7.200.123.",
+            "Her [redacted]",
+            id="period-grouped-released-count",
+        ),
+        pytest.param(
             "Her released playbook count is 7,200.",
             "Her [redacted]",
             id="ordinary-released-playbook-count",
@@ -336,6 +346,16 @@ def test_collect_with_category_score_claim_redacts_the_mutable_value(
             "Her client secret is Bearer fixture-token-928.",
             "Her [redacted]",
             id="overlapping-labelled-and-bearer-credential",
+        ),
+        pytest.param(
+            "Her API key: [mint-fixture-secret-3918].",
+            "Her [redacted]",
+            id="bracket-wrapped-credential",
+        ),
+        pytest.param(
+            "She sent Bearer\nfixture-token-928.",
+            "She sent [redacted]",
+            id="line-wrapped-bearer-token",
         ),
         pytest.param(
             "Maria can be reached at s27-fixture@example.com.",

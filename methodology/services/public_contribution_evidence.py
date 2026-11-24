@@ -59,7 +59,7 @@ _ENTITY_FIELDS = {
     PipChange.ENTITY_ARTIFACT: (Artifact, "playbook", "name", "description", 200),
     PipChange.ENTITY_RULE: (Rule, "playbook", "title", "content", 200),
 }
-# Horizontal whitespace keeps prose matches within a single source line.
+# Horizontal whitespace keeps metric prose matches within a single source line.
 _SPACE = r"[^\S\r\n]"
 _LABEL_SEPARATOR = r"[^\S\r\n]|[-_\u2010\u2011]"
 _LABEL_GAP = rf"(?:{_LABEL_SEPARATOR})+"
@@ -79,7 +79,7 @@ _NUMBER_WORD = (
     r"|seventieth|eightieth|ninetieth|hundredth|thousandth|millionth|billionth)\b"
 )
 _DIGIT_NUMBER = (
-    r"(?:\d{1,3}(?:[ ,\u00a0\u202f]\d{3})+|\d+)(?:[.,]\d+)?(?:st|nd|rd|th)?\b"
+    r"(?:\d{1,3}(?:[., \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d+)?(?:st|nd|rd|th)?\b"
 )
 _WRITTEN_NUMBER = (
     rf"{_NUMBER_WORD}(?:{_NUMBER_GAP}(?:and{_NUMBER_GAP})?{_NUMBER_WORD})"
@@ -121,14 +121,15 @@ _CREDENTIAL_CONNECTOR = (
     rf"(?:\s*{_ASSIGNMENT_SEPARATOR}\s*|{_SPACE}+(?:is|was){_SPACE}+)"
 )
 _CREDENTIAL_VALUE = (
-    r"""(?:"[^"\r\n]*"|'[^'\r\n]*'|`[^`\r\n]*`|[^\s;,()[\]{}<>"'`]+(?<![.!?:]))"""
+    r"""(?:"[^"\r\n]*"|'[^'\r\n]*'|`[^`\r\n]*`|\[[^\]\r\n]*\]"""
+    r"""|[^\s;,()[\]{}<>"'`]+(?<![.!?:]))"""
 )
 _CREDENTIAL_PATTERNS = (
     r"-----BEGIN\ [A-Z\ ]*PRIVATE\ KEY-----[\s\S]*?(?:-----END\ [A-Z\ ]*PRIVATE\ KEY-----|\Z)",
     r"(?<=://)[^\s/@]+:[^\s/@]+(?=@)",
     r"\b[\w.%+!-]+@[\w.-]+\.[a-z]{2,}\b",
     rf"""\b{_CREDENTIAL_LABEL}["']?{_CREDENTIAL_CONNECTOR}{_CREDENTIAL_VALUE}""",
-    rf"\bbearer{_SPACE}+[a-z0-9._~+/=-]+(?<![.])",
+    r"\bbearer\s+[a-z0-9._~+/=-]+(?<![.])",
     r"\b(?:sk-(?:ant-|proj-)?|gh[pousr]_|github_pat_|xox[baprs]-)[a-z0-9_-]{12,}\b",
     r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b",
     r"\beyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+\b",
