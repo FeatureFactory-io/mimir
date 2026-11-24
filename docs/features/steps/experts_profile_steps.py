@@ -6,13 +6,21 @@ import logging
 
 from behave import given, then, when
 from behave.runner import Context
+from django.db.models import Sum
 from django.urls import reverse
 
+from methodology.models import ExpertProfile, KarmaAward
 from tests.support.experts_data import CEDAR_PASSWORD
-from tests.support.experts_html import element_text, find_by_test_id
+from tests.support.experts_html import (
+    assert_karma_source_rows,
+    element_text,
+    find_by_test_id,
+)
 
 logger = logging.getLogger(__name__)
 _MARIA_USERNAME = "mrodriguez"
+_PROFILE_TOTAL_TEST_ID = "profile-karma-total"
+_CEDAR_CATEGORY_BREAKDOWN = "Design 7200 Development 1000"
 
 
 @given("Maria is authenticated")
@@ -156,7 +164,7 @@ def existing_profile_controls_remain(context: Context) -> None:
 def source_rows_show(
     context: Context, released: int, pip: int, consumption: int, learning: int
 ) -> None:
-    """Check the real response's four rows against expected and persisted awards.
+    """Match four source rows to persisted awards and verify separate categories.
 
     :param context: Real HTTP/Cedar context. Example: context.cedar_dataset.
     :param released: Release subtotal. Example: 5000.
@@ -164,18 +172,74 @@ def source_rows_show(
     :param consumption: Author-consumption subtotal. Example: 1200.
     :param learning: Learner subtotal. Example: 400.
     :return: None. Example: four exact source rows match ORM and HTML.
-    :raises AssertionError: If HTTP, ledger or rendered source rows differ.
+    :raises AssertionError: If the ledger, source rows or categories differ.
     """
-    raise NotImplementedError()
+    response = context.response
+    maria = context.cedar_dataset.users_by_username[_MARIA_USERNAME]
+    request_id = response.wsgi_request.request_id
+    logger.info("S12 rows | entry | user_id=%s request_id=%s", maria.pk, request_id)
+    expected_sources = {
+        "Released": released,
+        "PIP": pip,
+        "Consumption": consumption,
+        "Learning": learning,
+    }
+    awards = KarmaAward.objects.filter(recipient=maria)
+    by_kind = dict(awards.values_list("source_kind").annotate(points_sum=Sum("points")))
+    kinds = KarmaAward.SourceKind
+    assert set(by_kind) == set(kinds.values), "Expected all five Cedar award kinds."
+    assert expected_sources == {
+        "Released": by_kind[kinds.RELEASE],
+        "PIP": by_kind[kinds.MAJOR] + by_kind[kinds.MINOR],
+        "Consumption": by_kind[kinds.CONSUMPTION],
+        "Learning": by_kind[kinds.LEARNING],
+    }, "The Cedar ledger does not match the specified source amounts."
+    assert_karma_source_rows(
+        response.text,
+        expected_sources,
+        _PROFILE_TOTAL_TEST_ID,
+        sum(expected_sources.values()),
+    )
+    category = find_by_test_id(response.content, "profile-karma-category-breakdown")
+    assert category.name == "dl" and element_text(category) == _CEDAR_CATEGORY_BREAKDOWN
+    context.s12_source_points = tuple(expected_sources.values())
+    logger.info("S12 rows | exit | user_id=%s request_id=%s", maria.pk, request_id)
 
 
 @then("their sum equals the displayed total {total:d}")
 def source_sum_matches_total(context: Context, total: int) -> None:
-    """Reconcile source body, footer, card and persisted total.
+    """Reconcile the checked rows, footer, card and ledger without changing prose.
 
     :param context: Context retaining actual profile HTTP. Example: context.response.
     :param total: Required total. Example: 8200.
     :return: None. Example: every independently read total equals 8200.
-    :raises AssertionError: If any total or source arithmetic differs.
+    :raises AssertionError: If a total, source arithmetic or complete summary differs.
     """
-    raise NotImplementedError()
+    response = context.response
+    maria = context.cedar_dataset.users_by_username[_MARIA_USERNAME]
+    request_id = response.wsgi_request.request_id
+    logger.info("S12 total | entry | user_id=%s request_id=%s", maria.pk, request_id)
+    awards = KarmaAward.objects.filter(recipient=maria)
+    ledger_total = awards.aggregate(total=Sum("points"))["total"]
+    assert sum(context.s12_source_points) == total == ledger_total
+    profile_element_reads(context, _PROFILE_TOTAL_TEST_ID, f"{total:,}")
+
+    people = context.cedar_dataset.oracle["people"]
+    assert isinstance(people, list), "Cedar baseline people are missing."
+    original = next(
+        (
+            person["summary"]
+            for person in people
+            if person["username"] == maria.username
+        ),
+        None,
+    )
+    stored = ExpertProfile.objects.values_list("contribution_summary", flat=True).get(
+        user=maria
+    )
+    assert stored and stored == original, "The stored Cedar prose changed."
+    paragraph = find_by_test_id(response.content, "profile-contribution-summary")
+    assert paragraph.name == "p" and paragraph.children == [
+        stored
+    ], "The profile did not render the full stored contribution summary."
+    logger.info("S12 total | exit | user_id=%s request_id=%s", maria.pk, request_id)
