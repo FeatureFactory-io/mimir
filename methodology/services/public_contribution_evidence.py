@@ -59,6 +59,34 @@ _ENTITY_FIELDS = {
     PipChange.ENTITY_ARTIFACT: (Artifact, "playbook", "name", "description", 200),
     PipChange.ENTITY_RULE: (Rule, "playbook", "title", "content", 200),
 }
+# Match the entire space-grouped value before any legacy ungrouped alternatives.
+_SPACE_GROUPED_NUMBER = r"\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[,.]\d+)?(?!\d)"
+_DIGIT_NUMBER = rf"(?:{_SPACE_GROUPED_NUMBER}|\d[\d,.]*)"
+_NUMBER_WORD = (
+    r"(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+    r"|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty"
+    r"|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?"
+    r"|millions?|billions?)"
+)
+_NUMBER = (
+    rf"(?:{_DIGIT_NUMBER}(?:st|nd|rd|th)?|{_NUMBER_WORD}"
+    rf"(?:[-\s]+(?:and[-\s]+)?{_NUMBER_WORD})*)"
+)
+# Require an explicit value connector for category metrics to allow versioned titles.
+_AGGREGATE_CLAIMS = re.compile(rf"""(?ix)
+    \b{_NUMBER}\s+(?:(?:{_CATEGORY_LABELS}|management|karma)\s+)?points\b
+    | \b{_NUMBER}\s+(?:(?:released|public|authored|published|accepted)\s+)*
+        (?:playbooks|pips|proposals|contributions|copies)\b
+    | \b(?:copied|downloaded)\s+{_NUMBER}\s+times\b
+    | \b(?:karma(?:\s+(?:total|score|points))?|total\s+score|category\s+point\s+subtotals?|copy\s+count)
+        (?:\s*[:=]\s*|\s+(?:(?:is|was|of|reached|rose\s+to)\s+)?){_NUMBER}\b
+    | \b(?:category|(?:{_CATEGORY_LABELS})(?:[-_\s]+category)?)(?:['’]s)?[-_\s]+
+        (?:score|points|(?:point[-_\s]+)?subtotals?|karma(?:[-_\s]+(?:total|score|points))?)
+        (?:\s*[:=]\s*|\s+(?:is|are|was|were|of|reached|rose\s+to)\s+){_NUMBER}\b
+    | \b(?:rank(?:ed)?|placed)\s*\#?\s*(?:{_NUMBER}|first|second|third)\b
+    | \b(?:position|number)\s*\#?\s*{_NUMBER}\s+on\s+the\s+leaderboard\b
+    | \b(?:first|second|third|top\s+{_NUMBER})\s+(?:place|rank|on\s+the\s+leaderboard)\b
+    """)
 _SENSITIVE_TEXT = re.compile(
     r"""(?ix)
     -----BEGIN\ [A-Z\ ]*PRIVATE\ KEY-----[\s\S]*?(?:-----END\ [A-Z\ ]*PRIVATE\ KEY-----|\Z)
@@ -71,16 +99,18 @@ _SENSITIVE_TEXT = re.compile(
     | \b(?:AKIA|ASIA)[A-Z0-9]{16}\b
     | \beyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+\b
     | \b[a-f0-9]{40}\b
+    """
+    rf"""
     | \b(?:total[-_\ ]+karma|karma(?:[-_\ ]+(?:total|score|points))?|category[-_\ ]+points
            |copy[-_\ ]+count|released[-_\ ]+playbook[-_\ ]+count)
-        \s*[:=]?\s*\d[\d,.]*
-    | \b\d[\d,.]*\s+(?:karma(?:\s+points)?|copies|released\s+playbooks)\b
+        \s*[:=]?\s*{_DIGIT_NUMBER}
+    | \b{_DIGIT_NUMBER}\s+(?:karma(?:\s+points)?|copies|released\s+playbooks)\b
     """
     # An explicit value connector keeps versioned titles like Design Score 2.0.
     rf"""
     | \b(?:category|(?:{_CATEGORY_LABELS})(?:[-_\ ]+category)?)[-_\ ]+
         (?:score|points|(?:point[-_\ ]+)?subtotal|karma(?:[-_\ ]+(?:score|points|total))?)
-        (?:\s*[:=]\s*|\s+(?:is|was|of)\s+)\d+(?:[,.]\d+)*
+        (?:\s*[:=]\s*|\s+(?:is|was|of)\s+)(?:{_SPACE_GROUPED_NUMBER}|\d+(?:[,.]\d+)*)
     """
 )
 
@@ -379,7 +409,8 @@ class PublicContributionEvidenceService:
         """
         if not isinstance(text, str):
             raise ValueError("Public evidence text must be a string.")  # noqa: TRY004
-        return _SENSITIVE_TEXT.sub("[redacted]", text)
+        safe_text = _SENSITIVE_TEXT.sub("[redacted]", text)
+        return _AGGREGATE_CLAIMS.sub("[redacted]", safe_text)
 
     def _validate_snapshot(
         self, evidence: PublicContributionEvidence

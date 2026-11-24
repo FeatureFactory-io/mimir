@@ -11,7 +11,7 @@ from html import unescape
 
 from methodology.llm.base import LLMMessage, LLMResponse
 from methodology.services.public_contribution_evidence import (
-    _CATEGORY_LABELS,
+    _AGGREGATE_CLAIMS,
     _MAX_DATABASE_ID,
     _SENSITIVE_TEXT,
     MAX_EVIDENCE_CHARACTERS,
@@ -32,26 +32,6 @@ _MARKUP = re.compile(r"""(?mx)
     | (?<!\w)(?P<emphasis>\*{1,3}|_{1,3}|~~)(?=\S).+?(?<=\S)(?P=emphasis)(?!\w)
     """)
 _CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
-_NUMBER = (
-    r"(?:\d[\d,.]*(?:st|nd|rd|th)?|one|two|three|four|five|six|seven|eight|nine|ten"
-    r"|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen"
-    r"|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?)"
-)
-# Require an explicit value connector for category metrics to allow versioned titles.
-_AGGREGATE_CLAIMS = re.compile(rf"""(?ix)
-    \b{_NUMBER}\s+(?:(?:{_CATEGORY_LABELS}|management|karma)\s+)?points\b
-    | \b{_NUMBER}\s+(?:(?:released|public|authored|published|accepted)\s+)*
-        (?:playbooks|pips|proposals|contributions|copies)\b
-    | \b(?:copied|downloaded)\s+{_NUMBER}\s+times\b
-    | \b(?:karma(?:\s+(?:total|score|points))?|total\s+score|category\s+point\s+subtotals?|copy\s+count)
-        (?:\s*[:=]\s*|\s+(?:(?:is|was|of|reached|rose\s+to)\s+)?){_NUMBER}\b
-    | \b(?:category|(?:{_CATEGORY_LABELS})(?:[-_\s]+category)?)(?:['’]s)?[-_\s]+
-        (?:score|points|(?:point[-_\s]+)?subtotals?|karma(?:[-_\s]+(?:total|score|points))?)
-        (?:\s*[:=]\s*|\s+(?:is|are|was|were|of|reached|rose\s+to)\s+){_NUMBER}\b
-    | \b(?:rank(?:ed)?|placed)\s*\#?\s*(?:{_NUMBER}|first|second|third)\b
-    | \b(?:position|number)\s*\#?\s*{_NUMBER}\s+on\s+the\s+leaderboard\b
-    | \b(?:first|second|third|top\s+{_NUMBER})\s+(?:place|rank|on\s+the\s+leaderboard)\b
-    """)
 _CREDENTIAL_CLAIMS = re.compile(r"""(?ix)
     \[redacted\]
     | \b(?:api[-_\ ]?(?:key|token)|access[-_\ ]?token|auth[-_\ ]?token|client[-_\ ]?secret|password)

@@ -767,11 +767,26 @@ test-experts-s26:
 
 .PHONY: test-experts-s27-backend
 test-experts-s27-backend:
-	$(PYTHON) -m pytest tests/integration/test_experts_public_evidence.py::test_collect_with_cedar_privacy_variant_returns_only_published_public_facts tests/integration/test_experts_public_evidence.py::test_collect_with_partial_or_unpublished_decisions_excludes_ineligible_changes tests/integration/test_experts_public_evidence.py::test_collect_with_invalid_subject_rejects_before_model_call tests/integration/test_experts_public_evidence.py::test_build_summary_prompt_with_public_evidence_preserves_layers_and_bounds tests/integration/test_experts_public_evidence.py::test_validate_summary_response_with_boundary_or_unsafe_output_enforces_contract tests/integration/test_experts_public_evidence.py::test_public_evidence_log_story_happy tests/integration/test_experts_public_evidence.py::test_public_evidence_log_story_reject tests/integration/test_experts_summary_proofs.py::test_s27_summary_agent_story_happy tests/integration/test_experts_summary_proofs.py::test_s27_summary_agent_story_reject tests/integration/test_experts_summary_proofs.py::test_s27_summary_with_exhausted_script_fails_loudly tests/unit/test_agent_test_support.py::test_scripted_llm_with_recorded_call_preserves_request_and_exhaustion -x
+	$(PYTHON) -m pytest \
+		tests/integration/test_experts_public_evidence.py::test_collect_with_cedar_privacy_variant_returns_only_published_public_facts \
+		tests/integration/test_experts_public_evidence.py::test_collect_with_category_score_claim_redacts_the_mutable_value \
+		tests/integration/test_experts_public_evidence.py::test_s27_summary_with_shared_metric_policy_filters_request_and_output \
+		tests/integration/test_experts_public_evidence.py::test_collect_with_partial_or_unpublished_decisions_excludes_ineligible_changes \
+		tests/integration/test_experts_public_evidence.py::test_collect_with_invalid_subject_rejects_before_model_call \
+		tests/integration/test_experts_public_evidence.py::test_build_summary_prompt_with_public_evidence_preserves_layers_and_bounds \
+		tests/integration/test_experts_public_evidence.py::test_build_summary_prompt_with_malformed_evidence_rejects_invalid_shape \
+		tests/integration/test_experts_public_evidence.py::test_validate_summary_response_with_boundary_or_unsafe_output_enforces_contract \
+		tests/unit/test_agent_test_support.py::test_scripted_llm_with_recorded_call_preserves_request_and_exhaustion -x
 
 .PHONY: test-experts-s27-log
 test-experts-s27-log:
-	$(PYTHON) -m pytest tests/integration/test_experts_public_evidence.py::test_public_evidence_log_story_happy tests/integration/test_experts_public_evidence.py::test_public_evidence_log_story_reject tests/integration/test_experts_summary_proofs.py::test_s27_summary_log_story_happy tests/integration/test_experts_summary_proofs.py::test_s27_summary_log_story_reject -x
+	$(PYTHON) -m pytest \
+		tests/integration/test_experts_public_evidence.py::test_public_evidence_log_story_happy \
+		tests/integration/test_experts_public_evidence.py::test_public_evidence_log_story_reject \
+		tests/integration/test_experts_public_evidence.py::test_summary_prompt_and_response_log_story_happy \
+		tests/integration/test_experts_public_evidence.py::test_summary_prompt_and_response_log_story_reject \
+		tests/integration/test_experts_summary_proofs.py::test_s27_summary_log_story_happy \
+		tests/integration/test_experts_summary_proofs.py::test_s27_summary_log_story_reject -x
 
 .PHONY: test-experts-s27-agent
 test-experts-s27-agent:

@@ -23,6 +23,10 @@ from methodology.models import (
     VersionSource,
     Workflow,
 )
+from methodology.services.contribution_summary_boundary import (
+    PublicContributionSummaryBoundary,
+    SummaryBoundaryError,
+)
 from methodology.services.contribution_summary_prompts import (
     build_summary_prompt,
     serialize_public_evidence,
@@ -38,12 +42,14 @@ from methodology.services.public_contribution_evidence import (
 from tests.support.experts_data import CedarDataset, seed_s27_summary_privacy_variant
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.log_story import assert_log_story
+from tests.support.scripted_llm import ScriptedLLM, ScriptedLLMCall
 
 pytestmark = pytest.mark.django_db
 _LOGGER_NAME = "methodology.services.public_contribution_evidence"
 _COLLECT = "PublicContributionEvidenceService.collect"
 _PROMPT_LOGGER = "methodology.services.contribution_summary_prompts"
 _GOOD_SUMMARY = "Maria maintains Accessibility Audit Playbook."
+_FOCUS_ACTIVITY = "Trace Keyboard Focus"
 
 
 @pytest.fixture
@@ -125,6 +131,178 @@ def test_collect_with_category_score_claim_redacts_the_mutable_value(
     serialized = serialize_public_evidence(evidence)
     assert activity_title in serialized and stable_fact in serialized
     assert score_value not in serialized
+
+
+@pytest.mark.parametrize(
+    ("sentence", "redacted"),
+    [
+        pytest.param(
+            "Maria’s Design score is seven thousand two hundred.",
+            "Maria’s [redacted]",
+            id="reported-written-design-score",
+        ),
+        pytest.param(
+            "Maria's Design score is 7,200.",
+            "Maria's [redacted]",
+            id="reported-comma-design-score",
+        ),
+        pytest.param(
+            "She reported a category score of 4\u202f120.",
+            "She reported a [redacted]",
+            id="category-score-grouped-with-space",
+        ),
+        pytest.param(
+            "Her DEVELOPMENT category points were 2,300.",
+            "Her [redacted]",
+            id="category-points-connector",
+        ),
+        pytest.param(
+            "Her Research-category point subtotal was one thousand four hundred and fifty.",
+            "Her [redacted]",
+            id="written-category-subtotal",
+        ),
+        pytest.param(
+            "Her Product Karma total: eight hundred and twenty-five.",
+            "Her [redacted]",
+            id="written-category-karma",
+        ),
+        pytest.param(
+            "Other’s subtotal = 6,750.", "[redacted]", id="possessive-subtotal"
+        ),
+        pytest.param(
+            "Maria earned nine hundred Design points.",
+            "Maria earned [redacted]",
+            id="number-before-points",
+        ),
+        pytest.param(
+            "Her Karma total reached seven hundred and forty-two.",
+            "Her [redacted]",
+            id="written-karma-total",
+        ),
+        pytest.param(
+            "Her Karma total: 8 200.", "Her [redacted]", id="karma-grouped-with-space"
+        ),
+        pytest.param(
+            "Her playbook was copied forty-seven times.",
+            "Her playbook was [redacted]",
+            id="written-copy-count",
+        ),
+        pytest.param(
+            "She has authored twenty-one released playbooks.",
+            "She has authored [redacted]",
+            id="written-playbook-count",
+        ),
+        pytest.param(
+            "She has two thousand three hundred copies.",
+            "She has [redacted]",
+            id="written-number-before-copies",
+        ),
+        pytest.param(
+            "She has 2\u00a0300 copies.",
+            "She has [redacted]",
+            id="copies-grouped-with-space",
+        ),
+        pytest.param(
+            "Maria ranked first on the Design leaderboard.",
+            "Maria [redacted] on the Design leaderboard",
+            id="ordinal-rank",
+        ),
+        pytest.param(
+            "Maria is number seven on the leaderboard.",
+            "Maria is [redacted]",
+            id="leaderboard-position",
+        ),
+        pytest.param(
+            "Maria is in the top twenty-five on the leaderboard.",
+            "Maria is in the [redacted]",
+            id="written-leaderboard-rank",
+        ),
+        pytest.param(
+            "Her released-playbook-count: 7,200.",
+            "Her [redacted]",
+            id="legacy-released-count",
+        ),
+        pytest.param(
+            "Maria uses Design Score 2.0 in checklist version 2.1.",
+            None,
+            id="versioned-title-and-guidance",
+        ),
+        pytest.param(
+            "Maria audits accessibility using checklist version 2.1.",
+            None,
+            id="versioned-guidance",
+        ),
+    ],
+)
+def test_s27_summary_with_shared_metric_policy_filters_request_and_output(
+    s27_case: Mapping[str, Any], sentence: str, redacted: str | None
+) -> None:
+    """Exercise one sentence through published ORM guidance and model output.
+
+    :param s27_case: Real Cedar case. Example: Maria's published profile evidence.
+    :param sentence: Model input and reply probe. Example: Maria's Design score is 7,200.
+    :param redacted: Expected scrubbed sentence or None. Example: Maria's [redacted].
+    :return: None after checking the request and output outcome.
+    :raises AssertionError: If the policy leaks a fragment or removes stable guidance.
+    """
+    before = "Use Design Score 2.0 to review keyboard focus in version 2.1."
+    after = "Use the checklist to verify focus order."
+    _append_cedar_focus_guidance(f"{before} {sentence} {after}")
+    call = _complete_s27_metric_probe(s27_case["subject_id"], sentence, redacted)
+    (message,) = call.messages
+    begin, payload, end = message.content.splitlines()
+    assert (begin, end) == ("BEGIN PUBLIC EVIDENCE JSON", "END PUBLIC EVIDENCE JSON")
+    assert all(
+        sentinel not in message.content and sentinel not in call.system
+        for sentinel in s27_case["sentinels"]
+    )
+    (guidance,) = (
+        fact["text"]
+        for fact in json.loads(payload)["facts"]
+        if fact["title"] == _FOCUS_ACTIVITY and fact["kind"] == "authored"
+    )
+    assert "Check the focus order." in guidance
+    _, opening, remainder = guidance.partition(f"{before} ")
+    recorded_sentence, closing, _ = remainder.partition(f" {after}")
+    assert opening and closing
+    assert recorded_sentence.removesuffix(".") == (redacted or sentence).removesuffix(
+        "."
+    )
+
+
+def _append_cedar_focus_guidance(text: str) -> None:
+    """Extend actual published guidance while retaining the seeded private sentinels.
+
+    :param text: New guide content. Example: Use checklist version 2.1.
+    :return: None after updating the isolated Cedar activity row.
+    :raises Activity.DoesNotExist: If the Cedar focus activity is missing.
+    """
+    matching = Activity.objects.filter(workflow__playbook_id=6101, name=_FOCUS_ACTIVITY)
+    activity = matching.get()
+    matching.update(guidance=f"{activity.guidance}\n{text}")
+
+
+def _complete_s27_metric_probe(
+    subject_id: int, sentence: str, redacted: str | None
+) -> ScriptedLLMCall:
+    """Return the actual request after the boundary accepts or rejects the reply.
+
+    :param subject_id: Cedar contributor ID. Example: Maria's account ID.
+    :param sentence: Scripted reply. Example: Maria uses Design Score 2.0.
+    :param redacted: Expected scrubbed form, or None for stable prose.
+    :return: One recorded provider request. Example: its delimited evidence body.
+    :raises AssertionError: If the boundary incorrectly accepts or rejects the reply.
+    """
+    llm = ScriptedLLM([sentence])
+    boundary = PublicContributionSummaryBoundary(PublicContributionEvidenceService())
+    if redacted is None:
+        result = boundary.complete(subject_id, llm=llm, correlation_id="s27-metrics")
+        assert result.text == sentence
+    else:
+        with pytest.raises(SummaryBoundaryError, match="^output_validation_failed$"):
+            boundary.complete(subject_id, llm=llm, correlation_id="s27-metrics")
+    (call,) = llm.calls
+    return call
 
 
 @pytest.mark.parametrize(
@@ -675,6 +853,8 @@ def test_public_evidence_log_story_happy(
     :raises AssertionError: For missing beats or leaked content.
     """
     subject_id = s27_case["subject_id"]
+    score_claim = "Maria’s Design score is seven thousand two hundred."
+    _append_cedar_focus_guidance(score_claim)
     with capture_experts_logs(caplog, (_LOGGER_NAME,)):
         evidence = PublicContributionEvidenceService().collect(subject_id)
     assert_log_story(
@@ -696,6 +876,7 @@ def test_public_evidence_log_story_happy(
     )
     assert all(sentinel not in caplog.text for sentinel in s27_case["sentinels"])
     assert "Check the focus order." not in caplog.text
+    assert score_claim not in caplog.text
 
 
 def test_public_evidence_log_story_reject(
