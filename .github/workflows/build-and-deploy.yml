@@ -18,6 +18,11 @@ on:
         type: boolean
         required: true
         default: true
+      preflight_only:
+        description: Inspect idle host identity and capacity without deployment or database access
+        type: boolean
+        required: true
+        default: false
 
 env:
   DOCKERHUB_IMAGE: featurefactory/mimir-mcp
@@ -27,6 +32,7 @@ jobs:
   # ── 1. Tests ──────────────────────────────────────────────────────────────
   test:
     name: Run Tests
+    if: ${{ !inputs.preflight_only }}
     runs-on: ubuntu-latest
     env:
       MIMIR_ENV: test
@@ -114,7 +120,7 @@ jobs:
     name: Build and Push Docker Images
     needs: test
     runs-on: ubuntu-latest
-    if: always() && needs.test.result == 'success'
+    if: always() && !inputs.preflight_only && needs.test.result == 'success'
 
     outputs:
       image_suffix: ${{ steps.tag.outputs.suffix }}
@@ -200,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
     # Only on published release or manual dispatch — not on every push to main.
     if: >
-      vars.AWS_ACCOUNT_ID != '' && (
+      vars.AWS_ACCOUNT_ID != '' && !inputs.preflight_only && (
         github.event_name == 'release' ||
         (github.event_name == 'workflow_dispatch' && inputs.deploy_to_idle)
       )
@@ -290,3 +296,115 @@ jobs:
           echo "| **MCP image** | \`${{ env.DOCKERHUB_IMAGE }}:${{ steps.version.outputs.suffix }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Next step:** trigger the **Promote to Production** workflow (\`promote.yml\`) after reviewing the idle URL." >> $GITHUB_STEP_SUMMARY
+
+  staging-preflight:
+    name: Read-only staging identity and capacity
+    if: github.event_name == 'workflow_dispatch' && inputs.preflight_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Require deployment disabled
+        env:
+          DEPLOY_TO_IDLE: ${{ inputs.deploy_to_idle }}
+        run: |
+          test "$DEPLOY_TO_IDLE" = false
+          mkdir -p preflight-receipts
+      - name: Configure existing deployment connection
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Resolve live and idle from actual environment identities
+        id: identity
+        run: |
+          aws sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output json > preflight-receipts/caller.json
+          aws elasticbeanstalk describe-environments --application-name mimir --environment-names mimir-prod mimir-idle --output json > preflight-receipts/environments.json
+          python3 - <<'PY_IDENTITY'
+          import json
+          import os
+          from pathlib import Path
+          data = json.loads(Path('preflight-receipts/environments.json').read_text())
+          environments = data['Environments']
+          assert len(environments) == 2, 'Require exactly the two declared environments.'
+          assert {item['EnvironmentName'] for item in environments} == {'mimir-prod', 'mimir-idle'}
+          assert all(item['Status'] == 'Ready' for item in environments), 'Environment must be stable.'
+          live = [item for item in environments if 'mimir-prod.eba-' in item.get('CNAME', '')]
+          assert len(live) == 1, 'Production CNAME identity must be unambiguous.'
+          idle = next(item for item in environments if item['EnvironmentId'] != live[0]['EnvironmentId'])
+          assert idle.get('CNAME') and idle['CNAME'] != live[0]['CNAME']
+          receipt = {'live': live[0], 'idle': idle, 'operation': 'read-only; no deployment or database access'}
+          Path('preflight-receipts/identity.json').write_text(json.dumps(receipt, indent=2))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('idle_env=' + idle['EnvironmentName'] + '\n')
+          print('Resolved distinct live and idle environments from their current CNAMEs.')
+          PY_IDENTITY
+      - name: Verify idle instance ownership and SSM availability
+        id: host
+        env:
+          IDLE_ENV: ${{ steps.identity.outputs.idle_env }}
+        run: |
+          aws elasticbeanstalk describe-environment-resources --environment-name "$IDLE_ENV" --output json > preflight-receipts/resources.json
+          python3 - <<'PY_IDS'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('preflight-receipts/resources.json').read_text())
+          ids = [item['Id'] for item in data['EnvironmentResources']['Instances']]
+          assert ids and all(item.startswith('i-') and item[2:].isalnum() for item in ids), 'No existing idle host; capacity remains unverified.'
+          Path('preflight-receipts/instance-ids.txt').write_text('\n'.join(sorted(ids)))
+          PY_IDS
+          mapfile -t INSTANCE_IDS < preflight-receipts/instance-ids.txt
+          aws ec2 describe-instances --instance-ids "${INSTANCE_IDS[@]}" --query 'Reservations[].Instances[].{InstanceId:InstanceId,State:State.Name,Type:InstanceType,Architecture:Architecture,Tags:Tags}' --output json > preflight-receipts/instances.json
+          python3 - <<'PY_HOST'
+          import json
+          import os
+          from pathlib import Path
+          hosts = json.loads(Path('preflight-receipts/instances.json').read_text())
+          assert hosts and all(item['State'] == 'running' for item in hosts)
+          for item in hosts:
+              tags = {tag['Key']: tag['Value'] for tag in item['Tags']}
+              assert tags.get('elasticbeanstalk:environment-name') == os.environ['IDLE_ENV'], 'Host ownership mismatch.'
+          instance_id = sorted(item['InstanceId'] for item in hosts)[0]
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('instance_id=' + instance_id + '\n')
+          Path('preflight-receipts/selected-instance.txt').write_text(instance_id)
+          PY_HOST
+          INSTANCE_ID=$(cat preflight-receipts/selected-instance.txt)
+          aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$INSTANCE_ID" --output json > preflight-receipts/ssm.json
+          python3 - <<'PY_SSM'
+          import json
+          from pathlib import Path
+          hosts = json.loads(Path('preflight-receipts/ssm.json').read_text())['InstanceInformationList']
+          assert len(hosts) == 1 and hosts[0]['PingStatus'] == 'Online', 'Idle SSM host unavailable; no remote operation performed.'
+          PY_SSM
+      - name: Read bounded host capacity without application configuration
+        env:
+          INSTANCE_ID: ${{ steps.host.outputs.instance_id }}
+        run: |
+          python3 - <<'PY_CAPACITY'
+          import json
+          from pathlib import Path
+          commands = ['set -eu', 'uname -m', 'getconf _NPROCESSORS_ONLN', 'free -b', 'df -Pk /', 'docker info --format "{{.ServerVersion}} {{.Architecture}} {{.MemTotal}} {{.NCPU}}"', 'docker ps --format "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"']
+          Path('preflight-receipts/capacity-parameters.json').write_text(json.dumps({'commands': commands, 'executionTimeout': ['60']}))
+          PY_CAPACITY
+          COMMAND_ID=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --comment 'Mimir Experts read-only isolated-staging capacity' --parameters file://preflight-receipts/capacity-parameters.json --query Command.CommandId --output text)
+          printf '%s\n' "$COMMAND_ID" > preflight-receipts/command-id.txt
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID"
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --output json > preflight-receipts/capacity.json
+          python3 - <<'PY_RESULT'
+          import json
+          from pathlib import Path
+          result = json.loads(Path('preflight-receipts/capacity.json').read_text())
+          assert result['Status'] == 'Success' and result['ResponseCode'] == 0
+          print(result['StandardOutputContent'])
+          PY_RESULT
+      - name: Preserve read-only preflight receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: experts-staging-preflight-${{ github.run_id }}
+          path: preflight-receipts/
+          if-no-files-found: warn
+          retention-days: 7
