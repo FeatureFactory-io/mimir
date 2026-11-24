@@ -1,37 +1,185 @@
+"""Captured log stories for the real first-release domain path."""
+
 from __future__ import annotations
 
-"""Captured log stories for the real first-release domain/view paths."""
 import pytest
+from django.core.exceptions import ValidationError
+
+from methodology.models import KarmaAward, PlaybookVersion, VersionSource
+from methodology.services.karma_service import KarmaService
+from methodology.services.playbook_service import PlaybookService
+from tests.support.experts_logs import capture_experts_logs
+from tests.support.experts_release import build_nora_release_case
+from tests.support.log_story import assert_log_story
+
+PLAYBOOK_LOGGER = "methodology.services.playbook_service"
+KARMA_LOGGER = "methodology.services.karma_service"
+RELEASE_METHOD = "PlaybookService.release_playbook_with_award"
+AWARD_METHOD = "KarmaService.award_first_release"
+RELEASE_NOTES = "Private milestone narrative"
 
 
 @pytest.mark.django_db
 def test_karma_release_log_story_happy(caplog: pytest.LogCaptureFixture) -> None:
-    """Prove declared domain, award and HTTP beats with shared correlation.
+    """Prove publication and ledger staging with traceable, safe context.
 
     :param caplog: Real pytest log capture. Example: INFO capture for release-01.
     :return: None when assert_log_story verifies every happy-path row.
     :raises AssertionError: If a required beat/context is absent or sensitive text leaks.
     """
-    raise NotImplementedError()
+    case = build_nora_release_case()
+    caplog.clear()
+    with capture_experts_logs(caplog, (PLAYBOOK_LOGGER, KARMA_LOGGER)):
+        first = PlaybookService.release_playbook_with_award(
+            case.playbook.pk,
+            case.author,
+            description=RELEASE_NOTES,
+            correlation_id="release-01",
+        )
+        later = PlaybookService.release_playbook_with_award(
+            case.playbook.pk,
+            case.author,
+            description=RELEASE_NOTES,
+            correlation_id="release-02",
+        )
+
+    correlation = "correlation_id=release-01"
+    playbook = f"playbook_id={case.playbook.pk}"
+    assert_log_story(
+        caplog,
+        where=RELEASE_METHOD,
+        beats={
+            "entry": ("| entry |", playbook, f"actor_id={case.author.pk}", correlation),
+            "validation": (
+                "| validation |",
+                "owner_valid=true",
+                "workflow_present=true",
+                "first_publication=true",
+                correlation,
+            ),
+            "processing": (
+                "| processing |",
+                "version=1.0",
+                "award_points=5000",
+                "transaction=pending",
+                correlation,
+            ),
+            "branch": (
+                "| branch |",
+                "reason=previously_released",
+                "award_points=0",
+                "correlation_id=release-02",
+            ),
+        },
+    )
+    assert_log_story(
+        caplog,
+        where="KarmaService.persist_awards",
+        beats={
+            "entry": ("| entry |", "award_count=1", correlation),
+        },
+    )
+    assert_log_story(
+        caplog,
+        where=AWARD_METHOD,
+        beats={
+            "config": ("| config |", "source_kind=release", "points=5000", correlation),
+            "exit": (
+                "| exit |",
+                f"recipient_id={case.author.pk}",
+                "category=product",
+                "created=true",
+                "points=5000",
+                correlation,
+            ),
+        },
+    )
+    assert first.first_release_award.created
+    assert not later.first_release_award.created
+    assert KarmaAward.objects.filter(recipient=case.author).count() == 1
+    assert RELEASE_NOTES not in caplog.text
+    assert case.playbook.name not in caplog.text
+    assert case.author.email not in caplog.text
+    assert case.author.username not in caplog.text
 
 
 @pytest.mark.django_db
 def test_karma_release_log_story_reject(caplog: pytest.LogCaptureFixture) -> None:
-    """Prove failed release reason and absence of an award-success story.
+    """Prove rejection logs a safe reason without award-success records.
 
-    :param caplog: Real pytest log capture. Example: wrong-owner release.
+    :param caplog: Real pytest log capture. Example: empty-description release.
     :return: None when the rejection story and unchanged ledger agree.
     :raises AssertionError: If a reason is missing or rejected work earns points.
     """
-    raise NotImplementedError()
+    case = build_nora_release_case()
+    with (
+        capture_experts_logs(caplog, (PLAYBOOK_LOGGER, KARMA_LOGGER)),
+        pytest.raises(ValidationError, match="Release description is required"),
+    ):
+        PlaybookService.release_playbook_with_award(
+            case.playbook.pk,
+            case.author,
+            description=" ",
+            correlation_id="release-rejected",
+        )
+    assert_log_story(
+        caplog,
+        where=RELEASE_METHOD,
+        beats={
+            "error": (
+                "| error |",
+                "reason=release_description_required",
+                f"playbook_id={case.playbook.pk}",
+                "correlation_id=release-rejected",
+            ),
+        },
+    )
+    assert "KarmaService.persist_awards" not in caplog.text
+    assert "KarmaService.award_first_release" not in caplog.text
+    assert not KarmaAward.objects.filter(recipient=case.author).exists()
+    assert not PlaybookVersion.objects.filter(
+        playbook=case.playbook, source=VersionSource.RELEASE
+    ).exists()
 
 
 @pytest.mark.django_db
 def test_karma_release_log_story_duplicate(caplog: pytest.LogCaptureFixture) -> None:
-    """Prove stable-event replay explicitly records zero additional points.
+    """Prove a stable receipt replay identifies zero additional points.
 
     :param caplog: Real pytest log capture. Example: replay first_release:6302.
     :return: None when duplicate branch, row identity and totals agree.
     :raises AssertionError: If duplicate processing is hidden or awards again.
     """
-    raise NotImplementedError()
+    case = build_nora_release_case()
+    release = PlaybookService.release_playbook_with_award(
+        case.playbook.pk,
+        case.author,
+        description=RELEASE_NOTES,
+        correlation_id="release-01",
+    )
+    receipt = PlaybookVersion.objects.get(
+        playbook=case.playbook, source=VersionSource.RELEASE
+    )
+    with capture_experts_logs(caplog, (KARMA_LOGGER,)):
+        replay = KarmaService.award_first_release(
+            release.playbook,
+            receipt,
+            case.author,
+            correlation_id="release-replay",
+        )
+    assert_log_story(
+        caplog,
+        where=AWARD_METHOD,
+        beats={
+            "branch": (
+                "| branch |",
+                f"event_identity=first_release:{case.playbook.pk}",
+                "created=false",
+                "additional_points=0",
+                "correlation_id=release-replay",
+            ),
+        },
+    )
+    assert replay.award == release.first_release_award.award
+    assert not replay.created
+    assert KarmaAward.objects.filter(recipient=case.author).count() == 1

@@ -1,27 +1,61 @@
+"""Immutable contribution award commands shared by Django domain services."""
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from django.db import IntegrityError
-    from django.db import OperationalError
-    from methodology.models import PipChange
-    from methodology.models import ProcessImprovementProposal
-
-from typing import Literal
-from uuid import UUID
-from django.contrib.auth.models import AnonymousUser, User
-from methodology.models import Playbook
-
-"""Immutable contribution award commands shared by Django domain services."""
-from dataclasses import dataclass
+import logging
+import re
+import sqlite3
+from dataclasses import asdict, dataclass
 from datetime import datetime
+from decimal import Decimal
+from typing import TYPE_CHECKING, Literal
+from uuid import UUID
+
+from django.contrib.auth.models import AbstractBaseUser, AnonymousUser, User
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+
+from methodology.models import (
+    EventChannel,
+    KarmaAward,
+    Playbook,
+    PlaybookVersion,
+    VersionSource,
+)
+from methodology.models.karma_award import CATEGORY_SLUGS, first_release_identity
 
 if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractBaseUser
-    from methodology.models import KarmaAward, Playbook, PlaybookVersion
+    from django.db import OperationalError
+
+    from methodology.models import PipChange, ProcessImprovementProposal
+
+logger = logging.getLogger(__name__)
 KarmaSource = Literal["release", "major", "minor", "consumption", "learning"]
 FIRST_RELEASE_POINTS = 5000
+FIRST_RELEASE_VERSION = Decimal("1.0")
+AWARD_CORRELATION_ID = re.compile(r"[A-Za-z0-9._:-]{1,100}")
+
+_RELEASE_LOG = "KarmaService.award_first_release"
+_PERSIST_LOG = "KarmaService.persist_awards"
+_FIRST_RELEASE_POLICY = f"source_kind=release points={FIRST_RELEASE_POINTS}"
+_PAIRED_SOURCES = (KarmaAward.SourceKind.CONSUMPTION, KarmaAward.SourceKind.LEARNING)
+_AWARD_IDENTITY_COLLISIONS = frozenset(
+    {
+        ("23505", "karma_unique_event_recipient"),
+        ("23505", "karma_unique_first_release"),
+        ("23505", "karma_live_event_anchor_unique"),
+        (
+            sqlite3.SQLITE_CONSTRAINT_UNIQUE,
+            "methodology_karmaaward.event_identity, methodology_karmaaward.recipient_id",
+        ),
+        (
+            sqlite3.SQLITE_CONSTRAINT_UNIQUE,
+            "methodology_karmaaward.playbook_id_snapshot",
+        ),
+        (sqlite3.SQLITE_CONSTRAINT_UNIQUE, "methodology_karmaaward.event_identity"),
+    }
+)
+_SQLITE_UNIQUE_PREFIX = "UNIQUE constraint failed: "
 
 
 @dataclass(frozen=True)
@@ -36,6 +70,9 @@ class AwardSpec:
     :param playbook_id_snapshot: Durable playbook reference. Example: 6302.
     :param change_id_snapshot: Optional accepted-change reference. Example: None.
     :param occurred_at: Original event time. Example: release_version.created_at.
+    :param event_channel: Trusted event origin. Example: "release".
+    :param entity_type_snapshot: Optional content kind. Example: None.
+    :param entity_id_snapshot: Optional durable content reference. Example: None.
     """
 
     recipient_id: int
@@ -76,7 +113,7 @@ class KarmaService:
         :return: Stable event identity. Example: "first_release:6302".
         :raises ValueError: If the ID is not a positive non-Boolean integer.
         """
-        raise NotImplementedError()
+        return first_release_identity(playbook_id)
 
     @staticmethod
     def award_first_release(
@@ -101,7 +138,30 @@ class KarmaService:
         :raises PermissionError: If actor does not own the playbook.
         :raises ValidationError: If the receipt or award payload is invalid.
         """
-        raise NotImplementedError()
+        KarmaService._validate_batch((), correlation_id)
+        if (
+            not isinstance(release_version, PlaybookVersion)
+            or release_version._state.adding
+        ):
+            raise ValidationError("A persisted publication receipt is required.")
+        receipt = PlaybookVersion.objects.filter(pk=release_version.pk).first()
+        if receipt is None:
+            raise ValidationError("A persisted publication receipt is required.")
+        if not KarmaService._validate_release_receipt(playbook, receipt, actor):
+            return AwardOutcome(None, False, "previously_released")
+
+        spec = KarmaService._first_release_specification(playbook, receipt)
+        trace = f"correlation_id={correlation_id}"
+        logger.info("%s | config | %s %s", _RELEASE_LOG, _FIRST_RELEASE_POLICY, trace)
+        (outcome,) = KarmaService.persist_awards((spec,), correlation_id=correlation_id)
+        if not outcome.created:
+            result = f"event_identity={spec.event_identity} created=false additional_points=0"
+            logger.info("%s | branch | %s %s", _RELEASE_LOG, result, trace)
+        recipient = f"recipient_id={spec.recipient_id} category={spec.category}"
+        points = spec.points if outcome.created else 0
+        result = f"created={str(outcome.created).lower()} points={points}"
+        logger.info("%s | exit | %s %s %s", _RELEASE_LOG, recipient, result, trace)
+        return outcome
 
     @staticmethod
     def persist_awards(
@@ -119,7 +179,25 @@ class KarmaService:
         :raises ValidationError: If a payload is invalid or conflicts.
         :raises IntegrityError: If an unrelated database constraint fails.
         """
-        raise NotImplementedError()
+        KarmaService._validate_batch(specifications, correlation_id)
+        logger.info(
+            "%s | entry | award_count=%s correlation_id=%s",
+            _PERSIST_LOG,
+            len(specifications),
+            correlation_id,
+        )
+        with transaction.atomic():
+            outcomes = tuple(
+                KarmaService._insert_or_get_award(spec) for spec in specifications
+            )
+            logger.info(
+                "%s | exit | award_count=%s created_count=%s transaction=pending correlation_id=%s",
+                _PERSIST_LOG,
+                len(outcomes),
+                sum(outcome.created for outcome in outcomes),
+                correlation_id,
+            )
+            return outcomes
 
     @staticmethod
     def _validate_batch(
@@ -132,7 +210,29 @@ class KarmaService:
         :return: None when every item can be validated.
         :raises ValidationError: If input or duplicate event payloads conflict.
         """
-        raise NotImplementedError()
+        if not isinstance(correlation_id, str) or not AWARD_CORRELATION_ID.fullmatch(
+            correlation_id
+        ):
+            raise ValidationError("A safe award correlation ID is required.")
+        if not isinstance(specifications, tuple):
+            raise ValidationError(
+                "An immutable tuple of award specifications is required."
+            )
+        seen: dict[str, list[AwardSpec]] = {}
+        for spec in specifications:
+            KarmaService._validate_specification(spec)
+            prior_specs = seen.setdefault(spec.event_identity, [])
+            if any(
+                prior.recipient_id == spec.recipient_id
+                or prior.source_kind not in _PAIRED_SOURCES
+                or spec.source_kind not in _PAIRED_SOURCES
+                for prior in prior_specs
+            ):
+                raise ValidationError(
+                    "Award event has conflicting recipients.",
+                    code="award_recipient_conflict",
+                )
+            prior_specs.append(spec)
 
     @staticmethod
     def _validate_specification(specification: AwardSpec) -> None:
@@ -142,7 +242,17 @@ class KarmaService:
         :return: None for a valid specification.
         :raises ValidationError: If an amount, kind, category or ID is invalid.
         """
-        raise NotImplementedError()
+        if not isinstance(specification, AwardSpec):
+            raise ValidationError("A valid award specification is required.")
+        award = KarmaAward(**asdict(specification))
+        award.clean()
+        award.clean_fields()
+        if award.event_channel == EventChannel.RELEASE and (
+            award.points != FIRST_RELEASE_POINTS
+            or award.change_id_snapshot is not None
+            or award.entity_type_snapshot is not None
+        ):
+            raise ValidationError("Invalid first-release award amount or snapshots.")
 
     @staticmethod
     def _validate_release_receipt(
@@ -157,7 +267,36 @@ class KarmaService:
         :raises PermissionError: If actor is not the author.
         :raises ValidationError: If receipt association or state is invalid.
         """
-        raise NotImplementedError()
+        if not isinstance(playbook, Playbook) or playbook._state.adding:
+            raise ValidationError("A persisted released playbook is required.")
+        if not isinstance(actor, AbstractBaseUser) or actor.pk != playbook.author_id:
+            raise PermissionError(
+                "You don't have permission to award this playbook's release."
+            )
+        if not Playbook.objects.filter(
+            pk=playbook.pk, status="released", author_id=actor.pk
+        ).exists():
+            raise ValidationError(
+                "A released playbook with the original author is required."
+            )
+        if (
+            release_version.playbook_id != playbook.pk
+            or release_version.created_by_id != actor.pk
+            or release_version.source != VersionSource.RELEASE
+            or not release_version.is_major
+        ):
+            raise ValidationError(
+                "The publication receipt must match the playbook and its author."
+            )
+        if release_version.version_number != FIRST_RELEASE_VERSION:
+            return False
+        snapshot = release_version.snapshot_data
+        before = snapshot.get("before_release") if isinstance(snapshot, dict) else None
+        if not isinstance(before, dict) or before.get("status") != "draft":
+            raise ValidationError(
+                "The first publication receipt must record the prior draft."
+            )
+        return True
 
     @staticmethod
     def _first_release_specification(
@@ -170,7 +309,22 @@ class KarmaService:
         :return: Immutable award input. Example: Product release worth 5000.
         :raises ValidationError: If the snapshot cannot be represented.
         """
-        raise NotImplementedError()
+        category = release_version.snapshot_data.get("category")
+        if category not in CATEGORY_SLUGS:
+            raise ValidationError("The release receipt lacks a recognized category.")
+        return AwardSpec(
+            recipient_id=playbook.author_id,
+            source_kind="release",
+            points=FIRST_RELEASE_POINTS,
+            category=category,
+            event_identity=KarmaService.first_release_identity(playbook.pk),
+            playbook_id_snapshot=playbook.pk,
+            change_id_snapshot=None,
+            occurred_at=release_version.created_at,
+            event_channel=EventChannel.RELEASE,
+            entity_type_snapshot=None,
+            entity_id_snapshot=None,
+        )
 
     @staticmethod
     def _insert_or_get_award(specification: AwardSpec) -> AwardOutcome:
@@ -184,7 +338,34 @@ class KarmaService:
         :raises ValidationError: If an existing immutable payload differs.
         :raises IntegrityError: For unrelated database constraints.
         """
-        raise NotImplementedError()
+        rows = KarmaAward.objects.filter(event_identity=specification.event_identity)
+        if specification.source_kind in _PAIRED_SOURCES:
+            rows = rows.filter(recipient_id=specification.recipient_id)
+        existing = list(rows[:2])
+        if not existing:
+            try:
+                with transaction.atomic():
+                    award = KarmaAward.objects.create(**asdict(specification))
+            except IntegrityError as error:
+                cause = error.__cause__
+                sqlstate = getattr(cause, "sqlstate", None)
+                diagnostics = getattr(cause, "diag", None)
+                postgres_key = sqlstate, getattr(diagnostics, "constraint_name", None)
+                sqlite_code = getattr(cause, "sqlite_errorcode", None)
+                sqlite_key = sqlite_code, str(cause).removeprefix(_SQLITE_UNIQUE_PREFIX)
+                if _AWARD_IDENTITY_COLLISIONS.isdisjoint((postgres_key, sqlite_key)):
+                    raise
+                existing = list(rows[:2])
+                if not existing:
+                    raise
+            else:
+                return AwardOutcome(award, True, "created")
+        if len(existing) != 1:
+            raise ValidationError(
+                "Award event identity matches multiple existing awards."
+            )
+        KarmaService._assert_matching_payload(existing[0], specification)
+        return AwardOutcome(existing[0], False, "duplicate")
 
     @staticmethod
     def _assert_matching_payload(award: KarmaAward, specification: AwardSpec) -> None:
@@ -192,10 +373,16 @@ class KarmaService:
 
         :param award: Existing ledger row. Example: first_release:6302 for Nora.
         :param specification: Requested payload. Example: the same release_spec.
-        :return: None when immutable values agree.
+        :return: None when logical values agree; retain the stored original time.
         :raises ValidationError: If recipient, points or attribution conflicts.
         """
-        raise NotImplementedError()
+        requested = asdict(specification)
+        requested.pop("occurred_at")
+        if any(getattr(award, field) != value for field, value in requested.items()):
+            raise ValidationError(
+                "Award event identity conflicts with its recorded payload.",
+                code="award_payload_conflict",
+            )
 
     @staticmethod
     def award_successful_consumption(

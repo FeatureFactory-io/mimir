@@ -6,22 +6,43 @@ Generic service layer used by both UI views and MCP tools.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from django.contrib.auth.models import AbstractBaseUser
-from dataclasses import dataclass
-from methodology.services.karma_service import AwardOutcome
-
 import logging
+from dataclasses import dataclass
 from decimal import Decimal
-from django.db import IntegrityError, transaction
+from uuid import uuid4
+
+from django.contrib.auth.models import AbstractBaseUser
 from django.core.exceptions import ValidationError
-from methodology.models import Playbook, PlaybookVersion, VersionSource, Workflow
+from django.db import IntegrityError, transaction
+from django.db.models import Q
+
+from methodology.models import (
+    KarmaAward,
+    Playbook,
+    PlaybookVersion,
+    VersionSource,
+    Workflow,
+)
+from methodology.models.karma_award import CATEGORY_SLUGS
+from methodology.services.karma_service import (
+    AWARD_CORRELATION_ID,
+    FIRST_RELEASE_VERSION,
+    AwardOutcome,
+    KarmaService,
+)
 
 logger = logging.getLogger(__name__)
 
 _PLAYBOOK_VISIBILITY_ALLOWED = frozenset({"private", "public"})
+_RELEASE_LOG = "PlaybookService.release_playbook_with_award"
+_NOTES_FIELD = "release_description"
+_RELEASE_VALIDATION = "%s | validation | owner_valid=true workflow_present=true %s"
+_RELEASE_ERRORS = (
+    ValidationError,
+    PermissionError,
+    Playbook.DoesNotExist,
+    IntegrityError,
+)
 
 
 def _validate_playbook_visibility(visibility: str) -> None:
@@ -497,85 +518,21 @@ class PlaybookService:
         return duplicate
 
     @staticmethod
-    @transaction.atomic
-    def release_playbook(playbook_id, author, *, description: str):
+    def release_playbook(
+        playbook_id: int, author: AbstractBaseUser, *, description: str
+    ) -> Playbook:
+        """Publish a draft or advance a released playbook, returning the playbook.
+
+        :param playbook_id: Existing playbook PK. Example: 6302.
+        :param author: Acting owner. Example: Nora.
+        :param description: Required release notes. Example: "Initial release".
+        :return: Published playbook. Example: Playbook(pk=6302, version=1.0).
+        :raises ValidationError: If publication or its award is invalid.
+        :raises PermissionError: If the actor does not own the playbook.
         """
-        Publish a draft playbook to released, or bump a released playbook to the next major line.
-
-        Requires a non-empty release description and at least one workflow (VERSIONING-18).
-
-        Draft 0.x transitions to ``released`` at the next major line (for example 0.9 → 1.0).
-        Released ``1.x`` bumps to the next major (for example 1.3 → 2.0) while staying released.
-
-        :param playbook_id: Playbook PK
-        :param author: Acting user (must own the playbook)
-        :param description: Release notes (non-empty)
-        :raises ValidationError: invalid state, empty description, or no workflows
-        :raises PermissionError: not the owner
-        """
-        description_clean = (description or "").strip()
-        if not description_clean:
-            raise ValidationError(
-                {"release_description": "Release description is required."},
-                code="release_description_required",
-            )
-
-        playbook = Playbook.objects.get(pk=playbook_id)
-
-        if playbook.author != author:
-            logger.error(
-                "User %s attempted release on playbook %s owned by %s",
-                author.id,
-                playbook_id,
-                playbook.author_id,
-            )
-            raise PermissionError("You don't have permission to release this playbook")
-
-        if playbook.status not in ("draft", "released"):
-            raise ValidationError(
-                f"Release is only available for draft or released playbooks "
-                f"(current status: {playbook.status})"
-            )
-
-        if not Workflow.objects.filter(playbook=playbook).exists():
-            raise ValidationError(
-                "Add at least one workflow before releasing this playbook.",
-                code="release_requires_workflow",
-            )
-
-        was_draft = playbook.status == "draft"
-        next_version = playbook.compute_next_major_line_version()
-        snapshot_before = _playbook_release_snapshot(playbook)
-
-        if was_draft:
-            playbook.status = "released"
-        playbook.version = next_version
-        update_fields = ["version", "updated_at"]
-        if was_draft:
-            update_fields.insert(0, "status")
-        playbook.save(update_fields=update_fields)
-
-        playbook.refresh_from_db()
-        snapshot_after = _playbook_release_snapshot(playbook)
-
-        PlaybookVersion.objects.create(
-            playbook=playbook,
-            version_number=next_version,
-            snapshot_data={**snapshot_after, "before_release": snapshot_before},
-            change_summary=description_clean,
-            description=description_clean,
-            is_major=True,
-            source=VersionSource.RELEASE,
-            created_by=author,
-        )
-
-        logger.info(
-            "Playbook '%s' (id=%s) advanced to released major v%s",
-            playbook.name,
-            playbook.pk,
-            next_version,
-        )
-        return playbook
+        return PlaybookService.release_playbook_with_award(
+            playbook_id, author, description=description, correlation_id=str(uuid4())
+        ).playbook
 
     @staticmethod
     @transaction.atomic
@@ -632,6 +589,7 @@ class PlaybookService:
         return playbook
 
     @staticmethod
+    @transaction.atomic
     def release_playbook_with_award(
         playbook_id: int,
         author: AbstractBaseUser,
@@ -641,9 +599,7 @@ class PlaybookService:
     ) -> ReleaseOutcome:
         """Publish and stage its eligible award in one atomic transaction.
 
-        Future wiring retains the existing release_playbook entrypoint as a
-        compatibility delegate returning this outcome's playbook. Reuse the
-        existing snapshot and version policy; do not add another version bump.
+        The existing release_playbook entrypoint returns this outcome's playbook.
 
         :param playbook_id: Target ID. Example: 6302.
         :param author: Authenticated owner. Example: Nora.
@@ -654,7 +610,36 @@ class PlaybookService:
         :raises PermissionError: If the actor does not own the target.
         :raises ValidationError: If publication or award validation fails.
         """
-        raise NotImplementedError()
+        if not isinstance(correlation_id, str) or not AWARD_CORRELATION_ID.fullmatch(
+            correlation_id
+        ):
+            raise ValidationError("A safe release correlation ID is required.")
+        if type(playbook_id) is not int or playbook_id < 1:
+            raise ValidationError("A positive playbook ID is required.")
+        actor_id = author.pk if isinstance(author, AbstractBaseUser) else None
+        trace = f"playbook_id={playbook_id} correlation_id={correlation_id}"
+        logger.info("%s | entry | actor_id=%s %s", _RELEASE_LOG, actor_id, trace)
+        try:
+            text = PlaybookService._validated_release_description(description)
+            playbook = PlaybookService._locked_release_target(playbook_id, author)
+            PlaybookService._validate_release_target(playbook)
+            first = PlaybookService._is_first_publication(playbook)
+            validated = f"first_publication={str(first).lower()} {trace}"
+            logger.info(_RELEASE_VALIDATION, _RELEASE_LOG, validated)
+            receipt = PlaybookService._publish_release_version(playbook, author, text)
+            award = PlaybookService._first_publication_award_outcome(
+                playbook,
+                receipt,
+                author,
+                first_publication=first,
+                correlation_id=correlation_id,
+            )
+        except _RELEASE_ERRORS as error:
+            detail = getattr(error, "error_dict", {}).get(_NOTES_FIELD, [error])[0]
+            reason = getattr(detail, "code", None) or type(error).__name__
+            logger.info("%s | error | reason=%s %s", _RELEASE_LOG, reason, trace)
+            raise
+        return ReleaseOutcome(playbook, award)
 
     @staticmethod
     def _validated_release_description(description: str) -> str:
@@ -664,7 +649,17 @@ class PlaybookService:
         :return: Nonempty notes. Example: "Initial release".
         :raises ValidationError: If notes are empty or invalid.
         """
-        raise NotImplementedError()
+        description_clean = description.strip() if isinstance(description, str) else ""
+        if not description_clean:
+            raise ValidationError(
+                {
+                    _NOTES_FIELD: ValidationError(
+                        "Release description is required.",
+                        code="release_description_required",
+                    ),
+                }
+            )
+        return description_clean
 
     @staticmethod
     def _locked_release_target(playbook_id: int, author: AbstractBaseUser) -> Playbook:
@@ -677,7 +672,10 @@ class PlaybookService:
         :raises PermissionError: If actor is not the owner.
         :raises ValidationError: If the ID is malformed.
         """
-        raise NotImplementedError()
+        playbook = Playbook.objects.select_for_update().get(pk=playbook_id)
+        if not isinstance(author, AbstractBaseUser) or playbook.author_id != author.pk:
+            raise PermissionError("You don't have permission to release this playbook")
+        return playbook
 
     @staticmethod
     def _validate_release_target(playbook: Playbook) -> None:
@@ -687,7 +685,17 @@ class PlaybookService:
         :return: None when publication prerequisites hold.
         :raises ValidationError: If status or workflow prerequisites fail.
         """
-        raise NotImplementedError()
+        if playbook.status not in ("draft", "released"):
+            raise ValidationError(
+                f"Release is only available for draft or released playbooks "
+                f"(current status: {playbook.status})",
+                code="invalid_release_status",
+            )
+        if not Workflow.objects.filter(playbook=playbook).exists():
+            raise ValidationError(
+                "Add at least one workflow before releasing this playbook.",
+                code="release_requires_workflow",
+            )
 
     @staticmethod
     def _is_first_publication(playbook: Playbook) -> bool:
@@ -699,9 +707,25 @@ class PlaybookService:
 
         :param playbook: Locked pre-release target. Example: draft v0.2.
         :return: First-publication eligibility. Example: True for Nora.
-        :raises ValidationError: If version/history state cannot be interpreted.
+        :raises ValidationError: If an otherwise eligible first publication lacks a recognized category.
         """
-        raise NotImplementedError()
+        if playbook.status != "draft" or playbook.version >= FIRST_RELEASE_VERSION:
+            return False
+        if playbook.versions.filter(
+            Q(source=VersionSource.RELEASE)
+            | Q(version_number__gte=FIRST_RELEASE_VERSION)
+        ).exists():
+            return False
+        if KarmaAward.objects.filter(
+            source_kind=KarmaAward.SourceKind.RELEASE, playbook_id_snapshot=playbook.pk
+        ).exists():
+            return False
+        if playbook.category not in CATEGORY_SLUGS:
+            raise ValidationError(
+                "Choose a valid playbook category before releasing.",
+                code="release_requires_category",
+            )
+        return True
 
     @staticmethod
     def _publish_release_version(
@@ -718,7 +742,29 @@ class PlaybookService:
         :return: Saved release receipt. Example: PlaybookVersion(version_number=1.0).
         :raises IntegrityError: If publication history cannot be persisted.
         """
-        raise NotImplementedError()
+        version = playbook.compute_next_major_line_version()
+        snapshot_before = _playbook_release_snapshot(playbook)
+        update_fields = ["version", "updated_at"]
+        if playbook.status == "draft":
+            playbook.status = "released"
+            update_fields.append("status")
+        playbook.version = version
+        playbook.save(update_fields=update_fields)
+        playbook.refresh_from_db()
+
+        return PlaybookVersion.objects.create(
+            playbook=playbook,
+            version_number=version,
+            snapshot_data={
+                **_playbook_release_snapshot(playbook),
+                "before_release": snapshot_before,
+            },
+            change_summary=description,
+            description=description,
+            is_major=True,
+            source=VersionSource.RELEASE,
+            created_by=author,
+        )
 
     @staticmethod
     def _first_publication_award_outcome(
@@ -739,7 +785,33 @@ class PlaybookService:
         :return: Award result. Example: AwardOutcome(row, True, "created").
         :raises ValidationError: If eligible award validation fails.
         """
-        raise NotImplementedError()
+        trace = f"playbook_id={playbook.pk} correlation_id={correlation_id}"
+        if first_publication:
+            outcome = KarmaService.award_first_release(
+                playbook, release_version, author, correlation_id=correlation_id
+            )
+            if outcome.award is None:
+                raise ValidationError(
+                    "First publication did not produce a valid Karma award."
+                )
+            points = outcome.award.points if outcome.created else 0
+        else:
+            logger.info(
+                "%s | branch | reason=previously_released award_points=0 %s",
+                _RELEASE_LOG,
+                trace,
+            )
+            outcome = AwardOutcome(None, False, "previously_released")
+            points = 0
+
+        logger.info(
+            "%s | processing | version=%s award_points=%s transaction=pending %s",
+            _RELEASE_LOG,
+            playbook.version,
+            points,
+            trace,
+        )
+        return outcome
 
 
 @dataclass(frozen=True)
