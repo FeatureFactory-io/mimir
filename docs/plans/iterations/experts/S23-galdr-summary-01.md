@@ -127,14 +127,14 @@ Default level INFO; use sanitized IDs and reason codes, never exception bodies f
 |---|---|---|---|---|
 | E1 | `PIPService._schedule_processing` | entry | Valid committed submission | `pip_id=`, `actor_id=`, `correlation_id=`, `reason=submission` |
 | E2 | `ContributionSummaryService.refresh_for_submission` | entry | Processing invokes summary | `subject_id=`, `pip_id=`, `correlation_id=` |
-| E3 | Same | config | Assembly selected | `workflow=contribution_summary`, `model=`, `max_tokens=1024`, `tools=none` |
-| E4 | Same | validation | Subject and public evidence validated | `visibility=public_released`, `evidence_chars=`, `correlation_id=` |
-| E5 | Same | processing | Bounded completion requested | `operation=complete`, `correlation_id=` |
-| E6 | Same | validation | Output accepted | `sentence_count=`, `limit=14`, `correlation_id=` |
-| E7 | Same | exit | Profile and interaction persisted | `outcome=success`, `summary_updated=true`, `interaction_id=`, `karma_awarded=0` |
-| E8 | Same | error | Provider or validation failure | `outcome=failure`, `reason_code=`, `correlation_id=` |
-| E9 | Same | branch | Failure recovery | `last_good_retained=true`, `karma_awarded=0`, `correlation_id=` |
-| E10 | Same | exit | Failed attempt completes | `summary_updated=false`, `pip_lifecycle=unchanged`, `correlation_id=` |
+| E3 | `ContributionSummaryService.refresh_for_submission` | config | Assembly selected | `workflow=contribution_summary`, `model=`, `max_tokens=1024`, `tools=none` |
+| E4 | `PublicContributionSummaryBoundary.complete` | validation | Subject and public evidence validated | `visibility=public_released`, `evidence_chars=`, `correlation_id=` |
+| E5 | `PublicContributionSummaryBoundary.complete` | processing | Bounded completion requested | `operation=complete`, `correlation_id=` |
+| E6 | `ContributionSummaryService.refresh_for_submission` | validation | Output accepted | `sentence_count=`, `limit=14`, `correlation_id=` |
+| E7 | `ContributionSummaryService.refresh_for_submission` | exit | Profile and interaction persisted | `outcome=success`, `summary_updated=true`, `interaction_id=`, `karma_awarded=0` |
+| E8 | `ContributionSummaryService.refresh_for_submission` | error | Provider or validation failure | `outcome=failure`, `reason_code=`, `correlation_id=` |
+| E9 | `ContributionSummaryService.refresh_for_submission` | branch | Failure recovery | `last_good_retained=true`, `karma_awarded=0`, `correlation_id=` |
+| E10 | `ContributionSummaryService.refresh_for_submission` | exit | Failed attempt completes | `summary_updated=false`, `pip_lifecycle=unchanged`, `correlation_id=` |
 
 `test_s23_summary_log_story_happy` covers E1–E7; reject covers E1–E5 and E8–E10. Assertions must include the beat text as well as the fragments: the existing `assert_log_story` helper does not independently enforce its dictionary key.
 

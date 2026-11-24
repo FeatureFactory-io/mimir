@@ -300,3 +300,15 @@ contract; main merge, release and production promotion retain their later human
 review gates. Capture real failures, fixes and changes to this contract in the
 storyboard, with genuine CLI recordings and native Cursor screenshots. Narration
 uses a male voice.
+
+
+## Summary lifecycle logging ownership clarification
+
+S23 E4/E5 are emitted by the existing S27 public completion boundary before the
+provider attempt; E1 belongs to the scheduler and E2/E3/E6–E10 to the summary
+service. The boundary adds only actual body-free evidence length/public IDs and
+accepted sentence-count metadata to its existing typed trace. S23 consumes those
+values after completion; it does not recreate pre-provider beats afterward. This
+clarifies ownership within the existing contract without a callback/observer API,
+evidence requery, extra model turn or changed public signature. S27’s original
+owner performs the bounded follow-up under Denis’s continuing instruction.

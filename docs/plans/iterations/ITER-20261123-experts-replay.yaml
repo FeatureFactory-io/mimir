@@ -1739,6 +1739,22 @@ scenarios:
           rules:
           - do-assert-log-story
           - do-assert-agent-story
+      - id: R4-safe-lifecycle-trace
+        title: Expose actual body-free public evidence and accepted validation metadata
+        bpe: BPE-02
+        depends_on:
+        - S27-N5-dod
+        footprint:
+        - methodology/services/contribution_summary_boundary.py
+        - tests/integration/test_experts_public_evidence.py
+        - Makefile
+        gate:
+          command: make test-experts-s27
+        authority: Existing S27 boundary ownership and explicit continuing fix/recheck instruction
+        constraints:
+        - Preserve the complete privacy policy and read-only public completion API.
+        - Derive metadata from the actual frozen evidence and accepted output without requerying or model-body logging.
+        - S23 owns summary_proofs.py and lifecycle persistence; coordinate rather than duplicate edits.
       scenario_dependencies:
       - S03
     implementation_plan: docs/plans/iterations/experts/S27-galdr-summary-05.md
@@ -3816,42 +3832,42 @@ scenarios:
       trigger: Processing invokes summary
       must_include:
       - subject_id=`, `pip_id=`, `correlation_id=
-    - where: Same
+    - where: ContributionSummaryService.refresh_for_submission
       beat: config
       trigger: Assembly selected
       must_include:
       - workflow=contribution_summary`, `model=`, `max_tokens=1024`, `tools=none
-    - where: Same
+    - where: PublicContributionSummaryBoundary.complete
       beat: validation
       trigger: Subject and public evidence validated
       must_include:
       - visibility=public_released`, `evidence_chars=`, `correlation_id=
-    - where: Same
+    - where: PublicContributionSummaryBoundary.complete
       beat: processing
       trigger: Bounded completion requested
       must_include:
       - operation=complete`, `correlation_id=
-    - where: Same
+    - where: ContributionSummaryService.refresh_for_submission
       beat: validation
       trigger: Output accepted
       must_include:
       - sentence_count=`, `limit=14`, `correlation_id=
-    - where: Same
+    - where: ContributionSummaryService.refresh_for_submission
       beat: exit
       trigger: Profile and interaction persisted
       must_include:
       - outcome=success`, `summary_updated=true`, `interaction_id=`, `karma_awarded=0
-    - where: Same
+    - where: ContributionSummaryService.refresh_for_submission
       beat: error
       trigger: Provider or validation failure
       must_include:
       - outcome=failure`, `reason_code=`, `correlation_id=
-    - where: Same
+    - where: ContributionSummaryService.refresh_for_submission
       beat: branch
       trigger: Failure recovery
       must_include:
       - last_good_retained=true`, `karma_awarded=0`, `correlation_id=
-    - where: Same
+    - where: ContributionSummaryService.refresh_for_submission
       beat: exit
       trigger: Failed attempt completes
       must_include:
