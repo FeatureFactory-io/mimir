@@ -979,7 +979,7 @@ test-experts-s34:
 
 .PHONY: test-experts-s35-backend
 test-experts-s35-backend:
-	$(PYTHON) -m pytest tests/integration/test_experts_karma_nonaccepted.py::test_nonaccepted_pip_log_story_reject tests/integration/test_experts_karma_nonaccepted.py::test_finalize_pip_with_rejected_only_preserves_karma_content_and_version tests/integration/test_experts_karma_nonaccepted.py::test_rejected_finalization_log_story_reject -x
+	$(PYTHON) -m pytest tests/integration/test_experts_karma_nonaccepted.py::test_nonaccepted_pip_log_story_reject tests/integration/test_experts_karma_nonaccepted.py::test_finalize_pip_with_rejected_only_preserves_karma_content_and_version tests/integration/test_experts_karma_nonaccepted.py::test_rejected_finalization_log_story_reject tests/integration/test_pip_finalization_feedback.py -x
 
 .PHONY: test-experts-s35-log
 test-experts-s35-log:

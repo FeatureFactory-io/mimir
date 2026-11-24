@@ -224,3 +224,17 @@ No files changed, tests run, commits made or external mutations performed.
 `docs/experts-replay/pin-evidence/S35.json`, `docs/features/steps/experts_karma_pip_steps.py`, `docs/plans/iterations/experts/S35-karma-pip-04.md`, `tests/integration/test_experts_karma_nonaccepted.py`, `tests/support/experts_data.py`
 
 Skeleton: `05299659ecb8f04625ca7a9a09ef16a7d0e25693`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.
+
+
+## Mandatory feedback regression follow-up
+
+S35 N2 discovered the existing all-reject success banner incorrectly said
+“changes applied.” The S32 view owner repaired only its finalized-status message
+in `methodology/pip_views.py`, with three real strict-CSRF accepted/rejected/partial
+regression cases in `tests/integration/test_pip_finalization_feedback.py`. These
+three cases are mandatory in `make test-experts-s35-backend`: seven original
+S35 cases plus three feedback cases = ten positive backend cases. The original
+one-scenario acceptance contract and six repeated log cases remain unchanged.
+N4 reviews the actual view repair and dedicated tests as well as S35's original
+state/content/award/mail invariants. Existing accepted/partial wording, domain
+behavior, permissions, publication and notification remain governed upstream.

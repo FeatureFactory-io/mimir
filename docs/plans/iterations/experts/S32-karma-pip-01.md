@@ -298,3 +298,15 @@ No files were changed, no tests were run, and no mutations were performed.
 `docs/experts-replay/pin-evidence/S32.json`, `docs/features/steps/experts_karma_pip_steps.py`, `docs/plans/iterations/experts/S32-karma-pip-01.md`, `methodology/services/karma_service.py`, `methodology/services/pip_admin_service.py`, `tests/e2e/test_experts_karma_pip.py`, `tests/integration/test_experts_karma_pip.py`, `tests/support/experts_data.py`
 
 Skeleton: `12f17b598a1c758b6c55d6b8acd879b9c8fbcd94`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.
+
+
+## Rejection-feedback source follow-up
+
+The existing `_submit_admin_review` is the sole owner of finalized feedback. A
+real S35 rejection preserved all content/version/award state but exposed the
+inherited false “changes applied” success text. Bounded follow-up commit
+`dee2114bd7e391bf6e0d19dce311ace287973b9b` selects “no changes applied” only
+for rejected status; accepted/partial wording is unchanged. Three new strict-CSRF
+HTTP/rendered-response cases in `tests/integration/test_pip_finalization_feedback.py`
+are mandatory in S35's backend gate and receive independent review at S35 N4.
+No service, writer, lifecycle, permission or notification policy changed.
