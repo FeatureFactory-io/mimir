@@ -357,3 +357,14 @@ await_human_decision: true
 - Prior emptydefaultconfig Submitted/retry0SDKandvalidrealHTTPretry, rollback0calls andreturnedmodelunknown/nullcostallpass. Existing12batch+threelegacy+nineJSON/requestchecks=24. IndependentlyownedPostgreSQL27passes; basezero tables before/after, isolatedtestDBremoved. An initial unsafe customtestDBname was correctly rejected bythefixture beforetheaccepted isolated runner-name retry.
 - Evidence prefix MIN-S23-N6-S27-R5, particularly canonical, independent-production-json, prior-probe-replay, postgres-scoped, source-and-counts-completed andrawS23/S27 exactJSON. This is scripted-provider integration andrealDB/prodformatterverification, notaliveproviderqualityclaim.
 - S12 source-ledger HTTPproof begins; S11’s primary browserproof andS39’s independentMCPacceptancecontinue. S04remainspending itsconcretetwo-fileprovenancedecision.
+
+
+## User pauses S04; independent delivery continues
+
+Denis answered **“Pause S04”** to the concrete S04 repair/continued-authority question. S04 is paused at its review checkpoint. The two-file provenance patch remains external and unapplied. No extension of continuing repair authority to all49contracts was granted; S27 retains its separate explicit authority. S04-dependent scenarios wait, while independent approved contracts continue. This is a scoped scenario pause, not a whole-iteration pause or dropped contract.
+
+## S39 COMPLETE; S12 source proof and S25 lifecycle begin
+
+- Fresh read-only S39 N5 accepts immutable f9891d92cddc7dbd6dee7974cb96a30437444c39. Canonical77backend (including9actualstdio), oneATlauncher executing9originalexamples/54steps, sixMakeidentifier/logtests pass; graphfourlogs andfull82modulecases pass, zero selectedskip/undefined. Ninechildlifecycles return27cleanJSON-RPCframes/72actualtools and18five-pointrows. A genuine loopbackrelay discards the first response only after the real Django receipt commit; production retry uses the sameUUID/originaltimestamp and a second intentional read uses anewUUID: actual applied/replayed/applied sequence,2GET/3POST/fourrows. Authorization/self/attribution/rollback/asyncguard/factorycleanup pass; no new tools. S39 COMPLETE. Fourteen of49scenarios accepted. No legacy-child/PG-race/staging claim. Evidence MIN-S39-N5-independent-*f9891d9 andraw/S39-N4-stdio/index.json.
+- S12 N1 de626a572d047446ea2fe32dc5bdf3cd104980b5 changes only its two test/support paths. Two HTTPledger cases and24profile/HTMLregressions pass. Sources5000/1600/1200/400 sum8200 andseparateDesign7200/Development1000; a realhistoricalLearning+5 appearsimmediately as405/8205. GETretainscompleteledger/summary/time/history andschedulesnocallback. RemainingexactAT/browser/DoD follow.
+- S25 N1 begins from acceptedS23. Its lifecycle-onlygate explicitly deselects the onefutureN2HTTPstub, retainingthatcase forN2/fullcheckpoint ratherthanclaiming anunimplementedcase passed. No scenario isdropped.

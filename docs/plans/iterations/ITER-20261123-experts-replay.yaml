@@ -4744,7 +4744,11 @@ scenarios:
       - S17
       - S14
     implementation_plan: docs/plans/iterations/experts/S04-experts-list-04.md
-    status: awaiting_repair_decision
+    status: paused_by_user
+    user_pause:
+      decision: Pause S04
+      scope: S04 and its dependent scenario readiness; independent approved work continues
+      proposed_correction_applied: false
     pending_repair_decision:
       finding: Strict validator accepts a false recapture acquisition revision in copied evidence.
       review: /Users/denispetelin/Desktop/RIPL-Experts-Production/review/S04-recapture-provenance.md
@@ -5181,7 +5185,7 @@ scenarios:
         - test_s25_resubmission_agent_story_reject
         gate:
           command: pytest tests/integration/test_experts_summary_resubmission.py tests/integration/test_experts_summary_proofs.py
-            -k s25 -x
+            -k s25 --deselect=tests/integration/test_experts_summary_resubmission.py::test_s25_http_withdraw_and_resubmit_uses_existing_post_routes -x
           log_story_command: pytest tests/integration/test_experts_summary_resubmission.py -k 's25 and log_story'
             -x
           agent_proof_command: pytest tests/integration/test_experts_summary_proofs.py -m agent_proof -k s25
@@ -5257,7 +5261,7 @@ scenarios:
       scenario_dependencies:
       - S23
     implementation_plan: docs/plans/iterations/experts/S25-galdr-summary-03.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S23
@@ -6041,7 +6045,7 @@ scenarios:
       - S30
       - S36
     implementation_plan: docs/plans/iterations/experts/S39-karma-mcp-01.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
