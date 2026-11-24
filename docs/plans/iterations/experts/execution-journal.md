@@ -215,3 +215,16 @@ await_human_decision: true
 - S14 N1 a9839acc5d1736f4ce2212d2c6053c7a4104a5cd: fourteen boundary cases, two log cases and thirty-two S03/S17 HTTP regressions. Immutable contact values/mapping, guest zero target-email queries, unusable-address rejection and no-send boundary pass. Detail preserves original public person and exposes separate contact_person for N2; partial's local person.contact remains its interface. Three rendering tests and frontend wiring remain N2 work.
 - S36 N1 2fcf6448962c967e6491806107cbc17b23adb2a0: eight backend, two log, thirty-four S30 regression cases. CSRF/session/strict-payload receipt and authorized atomic pair pass. Private _build_consumption_specs gains explicitly passed trusted channel; public APIs remain. Existing reader services resolve lazily through module-level import_string to avoid the existing release-service import cycle. Public bodies are thirty lines after a concise refactor without extra methods. S38 tests and S45 race helpers remain unchanged/pending. N2's test-only ownership was reconciled for existing copy-prompt rendering tests, using a positive gate without future S38 stubs.
 - A 44.375-second edited layout insert now combines the original phone failure, actual repaired browser navigation, labeled 1× CLI replay and original repaired frame, with male Daniel narration. It is a draft insert, not the finished film. Sources/hashes and edits are in edit/scene20-layout-insert-draft-v1.json. One editor attempt lacked the local ffmpeg drawtext filter; the successful version uses caption bars outside the actual browser frame. Application pixels are genuine, no simulated typing/screens.
+
+## S27 R2 targeted retry failed independent review — source stopped
+
+- Targeted repair 43bd28a75e63213051b17780469af61b748df088 passed 149 unique checks (135 backend, one exact AT/seven steps, ten log, three agent), retained all original 145 cases, and passed eleven direct real ORM probes with zero completion writes. Four known backward formats were restored. No passing count closes S27.
+- Fresh N5 nevertheless proved two further backward regressions with exact old/new real ORM→ScriptedLLM A/B: `Her API key: (mint-fixture-secret-3918).` and `Her Design score:` followed by a newline and `7,200.` are transmitted and accepted verbatim by the new policy, while R1 scrubbed/rejected both. Both revisions retain stable guidance and have zero completion writes. Evidence: MIN-S27-N5-final-compat-orm-replay and -orm-legacy-baseline.
+<!-- ESCALATE -->
+type: checkpoint_fail_retry
+severity: escalated
+evidence: Fresh final review after the first targeted R2 fix proves parenthesis-wrapped credentials and newline-separated category scores regress relative to the prior recognized policy.
+jedao_recommendation: A: preserve the complete exact prior recognized policy as a shared union with the new forms, prove backward compatibility by construction and a broad real-data matrix, then explicitly authorize fix and retry
+await_human_decision: true
+<!-- /ESCALATE -->
+- Further S27 source changes stop pending the required concrete decision. Preparing a review outside the source tree is allowed; preserve legacy recognition rather than guessing one wrapper/separator at a time. Independent S10/S14/S36 work continues, all contracts remain in scope.
