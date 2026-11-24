@@ -2,16 +2,32 @@
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass, replace
+from http import HTTPStatus
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
 import pytest
+from django.conf import settings
+from django.contrib.auth.models import User
+from django.contrib.sessions.models import Session
+from django.core.mail import EmailMessage
 from django.db.models import Sum
 from django.urls import reverse
 from e2e_helpers import login, open_content_browser
 from playwright.sync_api import BrowserContext, Locator, Page, Request, expect
 
-from methodology.models import Activity, EventChannel, KarmaAward
+from accounts.models import UserEmailVerification, UserOnboardingState
+from methodology.models import (
+    Activity,
+    AgentInteraction,
+    EventChannel,
+    ExpertProfile,
+    KarmaAward,
+)
 from methodology.services.copy_prompt_service import CopyPromptService
+from methodology.services.experts_service import ExpertProjection, ExpertsService
 from tests.support.experts_data import CEDAR_PASSWORD, CedarDataset
 
 ACTIVITY_ID = 6203
@@ -22,6 +38,29 @@ MIKE_USERNAME = "mchen"
 CLIPBOARD_MARKER = "Cedar clipboard before copying activity 6203"
 COPY_RECEIPT_TIMEOUT_MS = 10_000
 COPY_RECEIPT_MAX_ATTEMPTS = 2
+_BASELINE_TOTALS = (8200, 12450)
+_BASELINE_GUI_COPIES = 47
+_COPY_POINTS = 5
+_AWARDED_TOTALS = (8205, 12455)
+_MARIA_BASELINE_DEVELOPMENT = 1000
+_DOMAIN_MODELS = (
+    User,
+    UserEmailVerification,
+    UserOnboardingState,
+    Session,
+    ExpertProfile,
+    AgentInteraction,
+    Activity,
+    KarmaAward,
+)
+
+
+@dataclass(frozen=True)
+class _CopyState:
+    """Persisted values and live account projections around one copy journey."""
+
+    rows: dict[type, dict[int | str, tuple[object, ...]]]
+    projections: dict[int, ExpertProjection]
 
 
 @pytest.fixture
@@ -264,22 +303,48 @@ def _karma_totals(cedar_dataset: CedarDataset) -> tuple[int, int]:
 
 @pytest.mark.django_db(transaction=True)
 def test_copy_prompt_with_mike_copies_actual_prompt_without_awards(
-    page: Page, context: BrowserContext, live_server_url: str
+    expected_activity_prompt: str,
+    cedar_dataset: CedarDataset,
+    mailoutbox: list[EmailMessage],
+    page: Page,
+    context: BrowserContext,
+    live_server_url: str,
 ) -> None:
     """Certify KARMA-COPY-03 through real browser clipboard and network.
 
+    :param expected_activity_prompt: Full prompt built from the restored activity.
+    :param cedar_dataset: Independently loaded Cedar baseline.
+    :param mailoutbox: Local mail outbox. Example: empty.
     :param page: Existing fresh page; authenticates real Cedar mchen.
     :param context: Existing context granted origin-scoped clipboard permissions.
     :param live_server_url: Existing function-scoped Django live server origin.
     :return: None after full prompt, real self receipt and unchanged ledger proofs.
     :raises AssertionError: If clipboard, receipt, totals or copy count differs.
     """
-    raise NotImplementedError()
+    _certify_s38_copy(
+        page,
+        context,
+        live_server_url,
+        cedar_dataset,
+        MIKE_USERNAME,
+        expected_activity_prompt,
+    )
+    assert not mailoutbox
 
 
-@pytest.mark.parametrize("actor_username", ["mrodriguez", None, "mchen"])
+@pytest.mark.parametrize(
+    "actor_username",
+    [
+        pytest.param(MARIA_USERNAME, id="A01-maria"),
+        pytest.param(None, id="A02-guest-bob"),
+        pytest.param(MIKE_USERNAME, id="A03-mike"),
+    ],
+)
 @pytest.mark.django_db(transaction=True)
 def test_copy_uat_with_independent_baseline_lanes_matches_contract(
+    expected_activity_prompt: str,
+    cedar_dataset: CedarDataset,
+    mailoutbox: list[EmailMessage],
     page: Page,
     context: BrowserContext,
     live_server_url: str,
@@ -287,6 +352,9 @@ def test_copy_uat_with_independent_baseline_lanes_matches_contract(
 ) -> None:
     """Compose scripted UAT-18-04 with a fresh baseline for every actor lane.
 
+    :param expected_activity_prompt: Full prompt built from this lane's activity.
+    :param cedar_dataset: New Cedar import in this case's transactional test DB.
+    :param mailoutbox: Local mail outbox. Example: empty.
     :param page: Existing fresh page for this parametrized invocation.
     :param context: Existing isolated clipboard-enabled browser context.
     :param live_server_url: Existing real function-scoped server origin.
@@ -294,4 +362,344 @@ def test_copy_uat_with_independent_baseline_lanes_matches_contract(
     :return: None after actual clipboard and lane-specific real domain assertions.
     :raises AssertionError: If isolation, receipt policy or expected effects differ.
     """
-    raise NotImplementedError()
+    _certify_s38_copy(
+        page,
+        context,
+        live_server_url,
+        cedar_dataset,
+        actor_username,
+        expected_activity_prompt,
+    )
+    assert not mailoutbox
+
+
+def _certify_s38_copy(
+    page: Page,
+    context: BrowserContext,
+    origin: str,
+    cedar: CedarDataset,
+    actor: str | None,
+    expected_prompt: str,
+) -> None:
+    """Perform one native copy from an independently restored Cedar baseline.
+
+    :param page: Existing blank page for the current test.
+    :param context: Existing context without login state.
+    :param origin: Function-scoped live server origin.
+    :param cedar: Imported data, including Mike's public activity 6203.
+    :param actor: Cedar account to sign in as, or None for the anonymous lane.
+    :param expected_prompt: Complete text from the server prompt builder.
+    :return: None after the browser and database agree on the outcome.
+    :raises AssertionError: If isolation, feedback, traffic, or persistence differs.
+    """
+    receipt_url = f"{origin}{reverse('karma_copy_receipt')}"
+    attempts: list[Request] = []
+
+    def observe_receipt(request: Request) -> None:
+        """Retain real receipt traffic from before the first navigation."""
+        if urlsplit(request.url).path == urlsplit(receipt_url).path:
+            attempts.append(request)
+
+    assert page.url == "about:blank" and not context.cookies()
+    page.on("request", observe_receipt)
+    context.grant_permissions(["clipboard-read", "clipboard-write"], origin=origin)
+    try:
+        if actor is not None:
+            login(page, origin, actor, CEDAR_PASSWORD)
+        # Real authentication updates last_login. Snapshot before opening the activity.
+        before = _copy_state()
+        _assert_copy_baseline(before, cedar)
+        button = _open_s38_activity(page, origin, cedar, actor)
+        assert not attempts
+        _click_s38_copy(button, expected_prompt, receipt_url, actor)
+        _assert_public_copy_totals(page, origin, actor)
+        _assert_copy_effects(before, cedar, actor, attempts, receipt_url)
+        if actor is None:
+            assert all(
+                cookie["name"] != settings.SESSION_COOKIE_NAME
+                for cookie in context.cookies()
+            )
+    finally:
+        page.remove_listener("request", observe_receipt)
+
+
+def _copy_state() -> _CopyState:
+    """Read every persisted row value and the actual live account projections.
+
+    :return: Complete comparison state, including cached summaries and model interactions.
+    """
+    rows = {
+        model: {
+            values[0]: values
+            for values in model.objects.order_by("pk").values_list(
+                "pk",
+                *(
+                    field.attname
+                    for field in model._meta.concrete_fields
+                    if not field.primary_key
+                ),
+            )
+        }
+        for model in _DOMAIN_MODELS
+    }
+    experts = ExpertsService()
+    projections = {user_id: experts.project_user(user_id) for user_id in rows[User]}
+    return _CopyState(rows, projections)
+
+
+def _assert_copy_baseline(before: _CopyState, cedar: CedarDataset) -> None:
+    """Require the independent Cedar actor and content baseline before opening detail.
+
+    :param before: Actual rows and projections captured for this case.
+    :param cedar: This case's independently imported Cedar data.
+    :return: None after validating the actor totals, eligible GUI count and ownership.
+    :raises AssertionError: If an actor, the activity, or a projected count differs.
+    """
+    maria, mike = cedar.user_ids[MARIA_USERNAME], cedar.user_ids[MIKE_USERNAME]
+    activity = cedar.activities_by_pk[ACTIVITY_ID]
+    playbook = activity.workflow.playbook
+    assert (activity.workflow_id, playbook.pk, playbook.author_id) == (
+        WORKFLOW_ID,
+        PLAYBOOK_ID,
+        mike,
+    )
+    assert (playbook.visibility, playbook.status, playbook.category) == (
+        "public",
+        "released",
+        "development",
+    )
+    assert _karma_totals(cedar) == _BASELINE_TOTALS
+    assert (
+        before.projections[maria].total_points,
+        before.projections[mike].total_points,
+    ) == _BASELINE_TOTALS
+    assert before.projections[mike].successful_gui_copy_count == _BASELINE_GUI_COPIES
+    assert not User.objects.filter(username__iexact="bob").exists()
+
+
+def _open_s38_activity(
+    page: Page, origin: str, cedar: CedarDataset, actor: str | None
+) -> Locator:
+    """Open the actual released activity and validate its navigation and actor.
+
+    :param page: Browser page with the current actor's session, if any.
+    :param origin: Function-scoped live server origin.
+    :param cedar: Loaded activity names and route identifiers.
+    :param actor: Authenticated Cedar username, or None for the guest.
+    :return: The real Copy Prompt button on activity 6203.
+    :raises AssertionError: If activity, actor, or links are incorrect.
+    """
+    activity = cedar.activities_by_pk[ACTIVITY_ID]
+    path = reverse("activity_detail", args=(PLAYBOOK_ID, WORKFLOW_ID, ACTIVITY_ID))
+    response = page.goto(f"{origin}{path}")
+    assert response is not None and response.status == HTTPStatus.OK
+    assert page.url == f"{origin}{path}"
+    expect(page.get_by_test_id("activity-title")).to_have_text(activity.name)
+    expect(page.get_by_test_id("activity-back-btn")).to_have_attribute(
+        "href", reverse("activity_list", args=(PLAYBOOK_ID, WORKFLOW_ID))
+    )
+    breadcrumb = page.get_by_role("navigation", name="breadcrumb")
+    assert [
+        link.get_attribute("href")
+        for link in breadcrumb.get_by_role(
+            "link", name=activity.workflow.name, exact=True
+        ).all()
+    ] == [
+        reverse("playbook_detail", args=(PLAYBOOK_ID,)),
+        reverse("workflow_detail", args=(PLAYBOOK_ID, WORKFLOW_ID)),
+    ]
+    if actor is None:
+        _assert_guest_copy_navigation(page, path)
+    else:
+        expect(page.get_by_test_id("user-display")).to_have_text(actor)
+        expect(page.get_by_test_id("guest-auth-banner")).to_have_count(0)
+    return page.get_by_test_id("activity-header-actions").get_by_test_id(
+        "copy-prompt-btn"
+    )
+
+
+def _assert_guest_copy_navigation(page: Page, activity_path: str) -> None:
+    """Confirm that anonymous copying preserves the normal public affordances.
+
+    :param page: Real guest activity detail page.
+    :param activity_path: Current public activity URL path.
+    :return: None after validating access and authentication links.
+    :raises AssertionError: If guest controls are missing or editing is exposed.
+    """
+    expect(page.get_by_test_id("user-display")).to_have_count(0)
+    expect(page.get_by_test_id("guest-auth-banner")).to_be_visible()
+    expect(page.get_by_test_id("edit-btn")).to_have_count(0)
+    expect(page.get_by_test_id("guest-banner-register")).to_have_attribute(
+        "href", reverse("register")
+    )
+    sign_in = page.get_by_test_id("guest-banner-sign-in").get_attribute("href") or ""
+    target = urlsplit(sign_in)
+    assert target.path == reverse("login") and parse_qs(target.query) == {
+        "next": [activity_path]
+    }
+
+
+def _click_s38_copy(
+    button: Locator, prompt: str, receipt_url: str, actor: str | None
+) -> None:
+    """Copy through the native control and await the expected real response.
+
+    :param button: Visible Copy Prompt action from the production template.
+    :param prompt: Full service prompt from the fixture's exact activity.
+    :param receipt_url: Exact endpoint for authenticated successful clipboard writes.
+    :param actor: Authenticated Cedar username, or None for the anonymous lane.
+    :return: None after clipboard and feedback succeed in this actor's lane.
+    :raises AssertionError: If the browser response, clipboard, or feedback differs.
+    """
+    page = button.page
+    toast = page.get_by_test_id("copy-prompt-toast")
+    expect(toast).to_be_hidden()
+    page.evaluate("text => navigator.clipboard.writeText(text)", CLIPBOARD_MARKER)
+    assert page.evaluate("() => navigator.clipboard.readText()") == CLIPBOARD_MARKER
+    if actor is None:
+        button.click()
+        _observe_s38_clipboard(page, prompt)
+        # Observe the anonymous lane through the entire normal feedback interval.
+        expect(toast).to_be_hidden()
+    else:
+        with page.expect_response(
+            lambda response: response.url == receipt_url
+            and response.request.method == "POST",
+            timeout=COPY_RECEIPT_TIMEOUT_MS,
+        ) as receipt:
+            button.click()
+            _observe_s38_clipboard(page, prompt)
+        assert receipt.value.status == HTTPStatus.OK
+        expected = (
+            {"status": "applied"}
+            if actor == MARIA_USERNAME
+            else {"status": "skipped", "reason": "self_consumption"}
+        )
+        assert receipt.value.json() == expected
+
+
+def _observe_s38_clipboard(page: Page, prompt: str) -> None:
+    """Check ordinary copy feedback and the Chromium clipboard bytes.
+
+    :param page: Activity view immediately after the actual copy action.
+    :param prompt: Expected complete text, including all line breaks.
+    :return: None after exact clipboard and user-facing feedback assertions.
+    :raises AssertionError: If clipboard does not match or error feedback appears.
+    """
+    toast = page.get_by_test_id("copy-prompt-toast")
+    expect(toast).to_be_visible()
+    expect(toast).to_have_text("Prompt copied to clipboard")
+    assert page.evaluate("() => navigator.clipboard.readText()") == prompt
+    expect(page.get_by_test_id("copy-prompt-error-toast")).to_be_hidden()
+    expect(
+        page.get_by_test_id("alert-message").filter(has_text="You earned")
+    ).to_have_count(0)
+
+
+def _assert_public_copy_totals(page: Page, origin: str, actor: str | None) -> None:
+    """Check the public effect of the copy through existing profile screens.
+
+    :param page: Same browser after Copy Prompt and normal feedback.
+    :param origin: Actual live server origin.
+    :param actor: Actor that determined whether consumption awards were eligible.
+    :return: None after checking both people and visible Development attribution.
+    :raises AssertionError: If any public total, category or author copy count differs.
+    """
+    awarded = actor == MARIA_USERNAME
+    maria, mike = _AWARDED_TOTALS if awarded else _BASELINE_TOTALS
+    maria_development = _MARIA_BASELINE_DEVELOPMENT + _COPY_POINTS * int(awarded)
+    for username, total, development in (
+        (MARIA_USERNAME, maria, maria_development),
+        (MIKE_USERNAME, mike, mike),
+    ):
+        path = reverse("expert_detail", kwargs={"username": username})
+        response = page.goto(f"{origin}{path}")
+        assert response is not None and response.status == HTTPStatus.OK
+        expect(page.get_by_test_id("expert-karma-total")).to_have_text(f"{total:,}")
+        expect(page.get_by_test_id("karma-category-breakdown")).to_contain_text(
+            re.compile(rf"\bDevelopment\s*{development:,}\b"), use_inner_text=True
+        )
+    copy_count = _BASELINE_GUI_COPIES + int(awarded)
+    expect(page.get_by_test_id("expert-numeric-fallback")).to_have_text(
+        f"2 released playbooks · {copy_count} copies"
+    )
+    expect(page.get_by_test_id(f"expert-playbook-{PLAYBOOK_ID}")).to_have_attribute(
+        "href", reverse("playbook_detail", args=(PLAYBOOK_ID,))
+    )
+
+
+def _assert_copy_effects(
+    before: _CopyState,
+    cedar: CedarDataset,
+    actor: str | None,
+    attempts: list[Request],
+    receipt_url: str,
+) -> None:
+    """Compare every original row and verify the only allowed additions.
+
+    :param before: Real domain state before activity navigation.
+    :param cedar: Current Cedar account identities.
+    :param actor: Maria, Mike, or the unregistered guest.
+    :param attempts: Receipt requests observed since before the first navigation.
+    :param receipt_url: Expected full same-origin endpoint.
+    :return: None after checking persisted, projected and network effects.
+    :raises AssertionError: If any unauthorized write or attempt occurs.
+    """
+    after = _copy_state()
+    ledger_before, ledger_after = before.rows[KarmaAward], after.rows[KarmaAward]
+    for model in _DOMAIN_MODELS:
+        if model is not KarmaAward and before.rows[model] != after.rows[model]:
+            pytest.fail(f"Copy changed persisted {model.__name__} rows.")
+    if any(ledger_after.get(pk) != row for pk, row in ledger_before.items()):
+        pytest.fail("Copy changed an existing award row.")
+    assert not User.objects.filter(username__iexact="bob").exists()
+    event_uuid = None
+    if actor is None:
+        assert not attempts
+    else:
+        assert len(attempts) == 1 and attempts[0].url == receipt_url
+        assert bool(attempts[0].header_value("x-csrftoken"))
+        event_uuid = _assert_copy_requests(attempts)
+    if actor == MARIA_USERNAME:
+        assert event_uuid is not None
+        assert len(ledger_after) == len(ledger_before) + 2
+        _assert_copy_awards(cedar, event_uuid)
+        assert _karma_totals(cedar) == _AWARDED_TOTALS
+        assert after.projections == _expected_maria_copy_projections(before, cedar)
+    else:
+        assert len(ledger_after) == len(ledger_before)
+        assert after.projections == before.projections
+        assert _karma_totals(cedar) == _BASELINE_TOTALS
+
+
+def _expected_maria_copy_projections(
+    before: _CopyState, cedar: CedarDataset
+) -> dict[int, ExpertProjection]:
+    """Derive exact category, source, and eligible copy deltas from the baseline.
+
+    :param before: Independent live projections before activity navigation.
+    :param cedar: IDs for Maria and Mike.
+    :return: Expected complete projection mapping after just the two +5 rows.
+    """
+    expected = before.projections.copy()
+    for username, source in (
+        (MARIA_USERNAME, "Learning"),
+        (MIKE_USERNAME, "Consumption"),
+    ):
+        user_id = cedar.user_ids[username]
+        baseline = expected[user_id]
+        expected[user_id] = replace(
+            baseline,
+            total_points=baseline.total_points + _COPY_POINTS,
+            category_points=tuple(
+                (key, points + _COPY_POINTS if key == "development" else points)
+                for key, points in baseline.category_points
+            ),
+            source_points=tuple(
+                (key, points + _COPY_POINTS if key == source else points)
+                for key, points in baseline.source_points
+            ),
+            successful_gui_copy_count=baseline.successful_gui_copy_count
+            + int(username == MIKE_USERNAME),
+        )
+    return expected
