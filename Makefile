@@ -1210,7 +1210,7 @@ test-experts-s46-browser:
 
 .PHONY: test-experts-s46-log
 test-experts-s46-log:
-	$(PYTHON) -m pytest tests/integration/karma_event/test_failures.py::test_consumption_failure_log_story_reject tests/integration/karma_event/test_failures.py::test_consumption_receipt_failure_log_story_recovery -x
+	$(PYTHON) -m pytest tests/integration/karma_event/test_failures.py -k log_story -x
 
 .PHONY: test-experts-s46-at
 test-experts-s46-at:
