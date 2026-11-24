@@ -259,7 +259,7 @@ def test_copy_receipt_with_missing_csrf_rejects_request(
 def test_copy_receipt_log_story_happy(
     client: Client, caplog: LogCaptureFixture, cedar_dataset: CedarDataset
 ) -> None:
-    """Prove correlated validation and persistence beats for a real receipt."""
+    """Prove both receipt outcomes report the original persisted event time."""
     maria = cedar_dataset.users_by_username["mrodriguez"]
     mike = cedar_dataset.users_by_username["mchen"]
     client.force_login(maria)
@@ -268,6 +268,21 @@ def test_copy_receipt_log_story_happy(
 
     with caplog.at_level("INFO"):
         assert _post_receipt(client, _payload()).status_code == 200
+
+    awards = KarmaAward.objects.filter(event_identity=identity)
+    original_awards = dict(awards.values_list("pk", "occurred_at"))
+    assert len(original_awards) == 2
+    (occurred_at,) = set(original_awards.values())
+    recorded_time = f"occurred_at={occurred_at.isoformat()}"
+    eligibility = (
+        "| branch |",
+        f"event_identity={identity}",
+        f"actor_id={maria.pk}",
+        f"playbook_id={PLAYBOOK_ID}",
+        f"author_id={mike.pk}",
+        "category=development",
+        "reason=eligible",
+    )
 
     assert_log_story(
         caplog,
@@ -295,6 +310,7 @@ def test_copy_receipt_log_story_happy(
                 f"playbook_id={PLAYBOOK_ID}",
                 "channel=gui_copy",
             ),
+            "eligibility": eligibility,
             "processing": (
                 "| processing |",
                 identity,
@@ -302,6 +318,38 @@ def test_copy_receipt_log_story_happy(
                 f"author_id={mike.pk}",
                 "points=5",
                 "status=applied",
+            ),
+            "created": (
+                "| exit |",
+                f"event_identity={identity}",
+                "created_count=2",
+                recorded_time,
+            ),
+        },
+    )
+    assert maria.email not in caplog.text and mike.email not in caplog.text
+
+    caplog.clear()
+    with caplog.at_level("INFO"):
+        replay = _post_receipt(client, _payload())
+    assert replay.status_code == 200 and replay.json() == {"status": "replayed"}
+    assert dict(awards.values_list("pk", "occurred_at")) == original_awards
+    assert_log_story(
+        caplog,
+        where=RECEIPT_VIEW,
+        beats={"exit": ("| exit |", trace, str(EVENT_ID), "status=replayed")},
+    )
+    assert_log_story(
+        caplog,
+        where=CONSUMPTION_SERVICE,
+        beats={
+            "eligibility": eligibility,
+            "processing": ("| processing |", identity, "points=5", "status=replayed"),
+            "duplicate": (
+                "| exit |",
+                f"event_identity={identity}",
+                "duplicate",
+                recorded_time,
             ),
         },
     )
@@ -351,6 +399,14 @@ def test_copy_receipt_log_story_reject(
     )
     assert KarmaAward.objects.count() == before
     assert private_content not in caplog.text
+    assert not any(
+        CONSUMPTION_SERVICE in record.getMessage()
+        and any(
+            fragment in record.getMessage()
+            for fragment in ("reason=eligible", "| processing |", "| exit |")
+        )
+        for record in caplog.records
+    )
 
 
 @pytest.mark.django_db

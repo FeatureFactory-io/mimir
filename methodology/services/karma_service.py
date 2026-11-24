@@ -440,29 +440,29 @@ class KarmaService:
         operation = _CONSUMPTION_LOG
         trace = f"channel={channel} action_uuid={event_identity}"
         if isinstance(actor, AnonymousUser):
-            reason = service._consumption_exclusion(actor, None)
-            logger.info(f"{operation} | branch | {trace} reason={reason} awards=0")
+            service._consumption_exclusion(actor, None, None, trace=trace)
             return ()
         target = service._resolve_consumption_target(actor, entity_type, entity_id)
         canonical_id = service._canonical_consumption_identity
         identity = canonical_id(actor.pk, event_identity, channel)
         trace += f" actor_id={actor.pk} playbook_id={target.playbook.pk}"
         logger.info(f"{operation} | validation | {trace} authorized")
-        reason = service._consumption_exclusion(actor, target)
-        build_specs = service._build_consumption_specs
-        specs = () if reason else build_specs(actor, target, identity, channel=channel)
-        rows = KarmaAward.objects.filter(event_identity=identity)
-        existing = set(rows.values_list("recipient_id", flat=True))
-        if existing and existing != {spec.recipient_id for spec in specs}:
-            raise ValidationError("Event conflict.", code="award_payload_conflict")
-        if reason:
-            logger.info(f"{operation} | branch | {trace} reason={reason} awards=0")
+        if service._consumption_exclusion(actor, target, identity, trace=trace):
             return ()
+        build_specs = service._build_consumption_specs
+        specs = build_specs(actor, target, identity, channel=channel)
         outcomes = service.persist_awards(specs, correlation_id=identity)
+        award = outcomes[0].award
+        assert award is not None
         status = "applied" if outcomes[0].created else "replayed"
-        recipients = f"learner_id={actor.pk} author_id={target.playbook.author_id}"
-        result = f"{recipients} points={_CONSUMPTION_POINTS} status={status}"
-        logger.info(f"{operation} | processing | event_identity={identity} {result}")
+        recipients = f"learner_id={actor.pk} author_id={specs[1].recipient_id}"
+        details = f"{recipients} points={_CONSUMPTION_POINTS} status={status}"
+        event = f"event_identity={identity}"
+        logger.info(f"{operation} | processing | {event} {details}")
+        created = sum(outcome.created for outcome in outcomes)
+        result = f"created_count={created}" if created else "duplicate"
+        timestamp = f"occurred_at={award.occurred_at.isoformat()}"
+        logger.info(f"{operation} | exit | {event} {result} {timestamp}")
         return outcomes
 
     @staticmethod
@@ -515,21 +515,49 @@ class KarmaService:
 
     @staticmethod
     def _consumption_exclusion(
-        actor: User | AnonymousUser, target: ConsumptionTarget | None
+        actor: User | AnonymousUser,
+        target: ConsumptionTarget | None,
+        canonical_identity: str | None,
+        *,
+        trace: str,
     ) -> str | None:
-        """Determine guest/self exclusion without assigning points.
+        """Revalidate attribution and existing recipients, then report eligibility.
 
         :param actor: Server actor. Example: Mike.
         :param target: Authorized target, or None for a guest. Example: activity 6203.
+        :param canonical_identity: Scoped ledger key, or None for a guest.
+        :param trace: Validated action and actor context. Example: "channel=gui_copy …".
         :return: Exclusion reason or None. Example: "self_consumption".
-        :raises ValueError: If an authenticated actor has no target.
+        :raises ValueError: If an authenticated actor has no target or event key.
+        :raises ValidationError: If attribution is invalid or existing recipients conflict.
         """
+        operation = _CONSUMPTION_LOG
         if isinstance(actor, AnonymousUser):
+            logger.info(f"{operation} | branch | {trace} reason=guest awards=0")
             return "guest"
-        if target is None:
-            raise ValueError("An authorized consumption target is required.")
-        if actor.pk in (target.playbook.author_id, target.pip_creator_id):
+        if target is None or canonical_identity is None:
+            raise ValueError("An authorized target and event key are required.")
+        book = target.playbook
+        is_self = actor.pk in (book.author_id, target.pip_creator_id)
+        if not is_self and (
+            book.author_id is None or book.category not in CATEGORY_SLUGS
+        ):
+            raise ValidationError("Consumption target has invalid award attribution.")
+        rows = KarmaAward.objects.filter(event_identity=canonical_identity)
+        existing = set(rows.values_list("recipient_id", flat=True))
+        expected = set() if is_self else {actor.pk, book.author_id}
+        if existing and existing != expected:
+            raise ValidationError("Event conflict.", code="award_payload_conflict")
+        if is_self:
+            logger.info(
+                f"{operation} | branch | {trace} reason=self_consumption awards=0"
+            )
             return "self_consumption"
+        attribution = f"author_id={book.author_id} category={book.category}"
+        event = f"event_identity={canonical_identity}"
+        logger.info(
+            f"{operation} | branch | {trace} {event} {attribution} reason=eligible"
+        )
         return None
 
     @staticmethod
@@ -561,18 +589,15 @@ class KarmaService:
         *,
         channel: ConsumptionChannel,
     ) -> tuple[AwardSpec, ...]:
-        """Build the learner and author five-point immutable award specifications.
+        """Build five-point immutable award specifications for an eligible event.
 
         :param actor: Authenticated learner. Example: Maria.
         :param target: Authorized target with real author/category. Example: Mike/Development.
         :param canonical_identity: Scoped stable ledger key. Example: "consumption:gui_copy:…".
         :param channel: Explicit server-selected provenance. Example: "gui_copy".
         :return: Learning then Consumption specifications. Example: a two-item tuple.
-        :raises ValidationError: If attribution is missing or not recognized.
         """
         book = target.playbook
-        if book.author_id is None or book.category not in CATEGORY_SLUGS:
-            raise ValidationError("Consumption target has invalid award attribution.")
         learner_spec = AwardSpec(
             recipient_id=actor.pk,
             source_kind=KarmaAward.SourceKind.LEARNING,
