@@ -1,9 +1,11 @@
 
 <!-- Screen interaction: FOB-EXPERTS-REACH-OUT-1 -->
 {% if person.contact.state == "available" %}
+{# A native title keeps pointer help from covering the neighboring profile action. #}
 <a class="btn btn-outline-primary" href="{{ person.contact.href }}"
-   data-testid="experts-reach-out-{{ person.username }}" data-bs-toggle="tooltip"
+   data-testid="experts-reach-out-{{ person.username }}" aria-describedby="reach-explanation-{{ person.username }}"
    title="Start an email discussion with {{ person.name }}"><i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>Reach out</a>
+<span id="reach-explanation-{{ person.username }}" hidden>Start an email discussion with {{ person.name }}</span>
 {% elif person.contact.explanation %}
 <span tabindex="0" class="d-inline-block" aria-describedby="reach-explanation-{{ person.username }}"
       data-testid="experts-reach-out-{% if person.contact.state == 'authentication_required' %}guest{% else %}unavailable{% endif %}-tooltip"

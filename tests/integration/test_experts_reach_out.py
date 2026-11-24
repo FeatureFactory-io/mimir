@@ -8,6 +8,7 @@ import pytest
 from django.core.mail import EmailMessage
 from django.db import connection
 from django.test import Client
+from django.test.html import parse_html
 from django.test.utils import CaptureQueriesContext
 from pytest import LogCaptureFixture
 
@@ -25,6 +26,8 @@ _DETAIL_PATH = "/experts/mrodriguez/"
 _LIST_PATH = "/experts/"
 _MARIA_CARD = "experts-card-mrodriguez"
 _MAILTO = "mailto:maria.rodriguez@example.com"
+_DISCUSSION = "Start an email discussion with Maria Rodriguez"
+_DESCRIPTION_ID = "reach-explanation-mrodriguez"
 _SIGN_IN = "You need to be logged in to reach out to the expert"
 _UNAVAILABLE = "Contact information is unavailable"
 
@@ -32,7 +35,7 @@ _UNAVAILABLE = "Contact information is unavailable"
 def test_reach_out_with_authenticated_elena_matches_both_surfaces(
     client: Client, cedar_dataset: CedarDataset, mailoutbox: list[EmailMessage]
 ) -> None:
-    """Prove Maria's exact mailto on real list/detail without sending.
+    """Prove the exact mailto and nonblocking discussion hint on both surfaces.
 
     :param client: Real Django client. Example: logged-in Cedar Elena.
     :param cedar_dataset: Real account rows. Example: Elena and Maria.
@@ -47,14 +50,19 @@ def test_reach_out_with_authenticated_elena_matches_both_surfaces(
     assert listing.status_code == detail.status_code == 200
 
     card = find_by_test_id(listing.content, _MARIA_CARD)
-    for surface in (str(card), detail.content):
+    description = parse_html(
+        f'<span id="{_DESCRIPTION_ID}" hidden>{_DISCUSSION}</span>'
+    )
+    for surface in (str(card), detail.content.decode()):
         action = find_by_test_id(surface, "experts-reach-out-mrodriguez")
         assert action.name == "a"
         assert element_text(action) == "Reach out"
-        assert dict(action.attributes)["href"] == _MAILTO
-        assert dict(action.attributes)["title"] == (
-            "Start an email discussion with Maria Rodriguez"
-        )
+        attributes = dict(action.attributes)
+        assert attributes["href"] == _MAILTO
+        assert attributes["title"] == _DISCUSSION
+        assert attributes.get("data-bs-toggle") != "tooltip"
+        assert attributes["aria-describedby"] == _DESCRIPTION_ID
+        assert parse_html(surface).count(description) == 1
     assert len(mailoutbox) == initial_mail_count
 
 
@@ -138,6 +146,10 @@ def _assert_disabled_contact(
     assert attributes["tabindex"] == "0"
     assert attributes["data-bs-toggle"] == "tooltip"
     assert attributes["data-bs-placement"] == "bottom"
+    assert set(attributes.get("data-bs-trigger", "hover focus").split()) == {
+        "hover",
+        "focus",
+    }
     assert attributes["title"] == explanation
     assert attributes["aria-describedby"] == "reach-explanation-mrodriguez"
     assert any(
