@@ -497,9 +497,8 @@ def elena_opens_development_leaderboard(context: Context) -> None:
     response = context.response
     assert response.status_code == HTTPStatus.OK and "Location" not in response
     assert response.wsgi_request.get_full_path() == _S26_PATH
-    assert response.wsgi_request.user == (
-        context.cedar_dataset.users_by_username["esvensson"]
-    )
+    expected_user = context.cedar_dataset.users_by_username["esvensson"]
+    assert response.wsgi_request.user == expected_user
     assert response.context["selected_category"] == "development"
     context.test.assertTemplateUsed(response, "experts/list.html")
 
