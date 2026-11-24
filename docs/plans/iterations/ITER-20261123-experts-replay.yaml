@@ -6521,6 +6521,7 @@ scenarios:
         - S45-N2-atomic-races
         - S45-N3-acceptance
         footprint:
+        - Makefile
         - methodology/services/karma_service.py
         - tests/support/experts_data.py
         - tests/integration/karma_event/conftest.py

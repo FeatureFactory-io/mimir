@@ -1188,7 +1188,7 @@ test-experts-s45-backend:
 
 .PHONY: test-experts-s45-log
 test-experts-s45-log:
-	$(PYTHON) -m pytest tests/integration/karma_event/test_retry.py::test_karma_event_log_story_happy tests/integration/karma_event/test_retry.py::test_karma_event_log_story_reject -x
+	$(PYTHON) -m pytest tests/integration/karma_event/test_retry.py -k log_story -x
 
 .PHONY: test-experts-s45-at
 test-experts-s45-at:
