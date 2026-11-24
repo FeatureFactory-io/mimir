@@ -7,9 +7,8 @@ from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
-from django.db import connections, transaction
-from django.db.models import F, QuerySet
-from django.db.transaction import TransactionManagementError
+from django.db import transaction
+from django.db.models import QuerySet
 from django.utils import timezone
 
 from methodology.models import PipChange, ProcessImprovementProposal
@@ -18,6 +17,7 @@ from methodology.services.pip_apply_changes_service import (
     PipApplyChangesService,
     bump_playbook_major_version_after_pip_apply,
 )
+from methodology.services.pip_locking import lock_proposal_queryset
 from methodology.services.pip_notification_service import send_decision_email
 
 if TYPE_CHECKING:
@@ -55,20 +55,7 @@ class PIPAdminService:
         :raises TypeError: If given something other than a PIP queryset.
         :raises TransactionManagementError: If the caller does not own an atomic block.
         """
-        if (
-            not isinstance(proposals, QuerySet)
-            or proposals.model is not ProcessImprovementProposal
-        ):
-            raise TypeError("PIP review locks require a proposal queryset.")
-        locked = proposals.select_for_update(of=("self",)).order_by("pk")
-        connection = connections[locked.db]
-        if not connection.in_atomic_block:
-            raise TransactionManagementError("PIP review locks require a transaction.")
-        if connection.vendor == "sqlite":
-            # SQLite ignores SELECT FOR UPDATE. Take the write lock before reading
-            # any proposal in this transaction to avoid a stale read snapshot.
-            locked.update(status=F("status"))
-        return list(locked)
+        return list(lock_proposal_queryset(proposals))
 
     @staticmethod
     @transaction.atomic

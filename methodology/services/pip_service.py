@@ -45,6 +45,7 @@ from methodology.services.pip_link_service import (
     validate_no_internal_ref_leakage_in_content,
     validate_pending_or_live_ref,
 )
+from methodology.services.pip_locking import lock_proposal_queryset
 from methodology.services.playbook_service import PlaybookService
 from methodology.services.public_contribution_evidence import (
     _MAX_DATABASE_ID,
@@ -83,14 +84,16 @@ def _last_list_visit(user) -> Optional[datetime]:
 
 
 def _pip_require_submitter_for_submitter_tools(
-    pip: ProcessImprovementProposal, actor
+    pip: ProcessImprovementProposal, actor: AbstractBaseUser
 ) -> None:
     """Owner-only UX actions (withdraw, submit, draft edits)."""
     if pip.created_by_id != actor.pk:
         raise ValidationError("Only the submitter can perform this action.")
 
 
-def _pip_allow_submit_for_review(pip: ProcessImprovementProposal, actor) -> None:
+def _pip_allow_submit_for_review(
+    pip: ProcessImprovementProposal, actor: AbstractBaseUser
+) -> None:
     """
     Submit from Draft or re-queue after Galdr rollback to ``submitted``.
 
@@ -107,11 +110,43 @@ def _pip_allow_submit_for_review(pip: ProcessImprovementProposal, actor) -> None
         raise ValidationError("Submit is only allowed from Draft or a retry queue.")
 
 
-def _pip_require_draft(pip: ProcessImprovementProposal, actor) -> None:
-    """Guard mutating draft builder operations."""
+def _pip_require_draft(
+    pip: ProcessImprovementProposal, actor: AbstractBaseUser
+) -> None:
+    """Lock and check the current proposal for a draft builder operation."""
+    _lock_submitter_proposal(pip)
     _pip_require_submitter_for_submitter_tools(pip, actor)
     if pip.status != ProcessImprovementProposal.STATUS_DRAFT:
         raise ValidationError("Editable only while Draft.")
+
+
+def _lock_submitter_proposal(pip: ProcessImprovementProposal) -> None:
+    """Refresh the caller's instance while holding its persisted parent-row lock.
+
+    :param pip: Existing proposal, possibly stale. Example: the draft editor's PIP.
+    :return: None. Example: the same instance now has the latest owner and status.
+    :raises ProcessImprovementProposal.DoesNotExist: If the proposal was deleted.
+    """
+    proposals = ProcessImprovementProposal.objects.filter(pk=pip.pk)
+    pip.refresh_from_db(from_queryset=lock_proposal_queryset(proposals))
+
+
+def _validate_submission(
+    pip: ProcessImprovementProposal, actor: AbstractBaseUser
+) -> None:
+    """Check the owner and current proposal structure while the parent is locked.
+
+    :param pip: Locked draft or retry proposal. Example: a draft with one ADD change.
+    :param actor: Requesting submitter. Example: Maria's account.
+    :return: None. Example: the proposal can enter processing.
+    :raises ValidationError: If permission, status or structure blocks submission.
+    """
+    _pip_allow_submit_for_review(pip, actor)
+    if not pip.changes.exists():
+        raise ValidationError("Add at least one Change before submitting.")
+    structural = GaldrStructuralValidator.validate_pip_structure(pip)
+    if not structural.ok:
+        raise ValidationError("; ".join(structural.errors))
 
 
 def _next_change_sequence(pip: ProcessImprovementProposal) -> int:
@@ -374,19 +409,20 @@ def _persist_pip_change(
 _MAX_DISPLAY_ORDER = 32767  # Portable PositiveSmallIntegerField limit.
 
 
-def _validate_display_order(
-    change_type: str, entity_type: str, position: Optional[int]
-) -> None:
-    """Validate an optional position before storing a draft change.
+def _normalize_change_type(
+    change_type: str, entity_type: str, position: int | None
+) -> str:
+    """Normalize a draft operation and validate its optional display position.
 
-    :param change_type: Normalized change operation, e.g. ALTER.
+    :param change_type: Change operation as entered. Example: " alter ".
     :param entity_type: Entity being repositioned, e.g. Workflow.
     :param position: One-based container position or None.
-    :return: None when valid.
+    :return: Normalized change operation. Example: "ALTER".
     :raises ValidationError: For unsupported operations or invalid positions.
     """
+    change_type = (change_type or "").upper().strip()
     if position is None:
-        return
+        return change_type
     if change_type != PipChange.CHANGE_ALTER or entity_type.strip() not in {
         PipChange.ENTITY_ACTIVITY,
         PipChange.ENTITY_WORKFLOW,
@@ -398,6 +434,7 @@ def _validate_display_order(
         raise ValidationError(
             f"display_order must be an integer from 1 to {_MAX_DISPLAY_ORDER}."
         )
+    return change_type
 
 
 def _persist_link_change(
@@ -579,14 +616,23 @@ class PIPService:
 
     @staticmethod
     @transaction.atomic
-    def withdraw_pip(pip: ProcessImprovementProposal, actor) -> None:
-        """
-        Mark a PIP as withdrawn (status=withdrawn) for proposals still in editable / pre-review queues.
+    def withdraw_pip(pip: ProcessImprovementProposal, actor: AbstractBaseUser) -> None:
+        """Cancel an eligible proposal using its current persisted state.
 
-        :raises ValidationError: if already progressed past Galdr inbox.
+        :param pip: Existing proposal. Example: a draft or reviewed PIP.
+        :param actor: Original submitter. Example: Maria's account.
+        :return: None. Example: the proposal now has status withdrawn.
+        :raises ValidationError: If the current owner or status disallows cancellation.
         """
+        _lock_submitter_proposal(pip)
         _pip_require_submitter_for_submitter_tools(pip, actor)
         if pip.status not in _WITHDRAW_ALLOWED:
+            logger.info(
+                "PIPService.withdraw_pip denied pip=%s actor=%s status=%s",
+                pip.pk,
+                actor.pk,
+                pip.status,
+            )
             raise ValidationError("This PIP can no longer be withdrawn.")
         pip.status = ProcessImprovementProposal.STATUS_WITHDRAWN
         pip.save(update_fields=["status"])
@@ -598,51 +644,42 @@ class PIPService:
 
     @staticmethod
     @transaction.atomic
-    def revert_to_draft(pip: ProcessImprovementProposal, actor) -> None:
-        """
-        Revert a Submitted or Processing PIP back to Draft for editing and resubmission.
+    def revert_to_draft(
+        pip: ProcessImprovementProposal, actor: AbstractBaseUser
+    ) -> None:
+        """Return an eligible proposal to Draft and clear its Galdr assessments.
 
-        Clears Galdr assessments on all associated changes and the holistic assessment
-        on the PIP itself so the next submission starts fresh.
-
-        :raises ValidationError: if the PIP is not in a revertible state.
+        :param pip: Existing proposal. Example: a reviewed PIP.
+        :param actor: Original submitter. Example: Maria's account.
+        :return: None. Example: the same proposal can now be edited and resubmitted.
+        :raises ValidationError: If the current owner or status disallows withdrawal.
         """
+        _lock_submitter_proposal(pip)
+        action = "PIPService.revert_to_draft"
         logger.info(
-            "PIPService.revert_to_draft entry pip=%s actor=%s status=%s",
-            pip.pk,
-            actor.pk,
-            pip.status,
+            "%s entry pip=%s actor=%s status=%s", action, pip.pk, actor.pk, pip.status
         )
         _pip_require_submitter_for_submitter_tools(pip, actor)
         if pip.status not in _REVERT_ALLOWED:
             logger.info(
-                "PIPService.revert_to_draft error cannot revert pip=%s status=%s",
-                pip.pk,
-                pip.status,
+                "%s error cannot revert pip=%s status=%s", action, pip.pk, pip.status
             )
             raise ValidationError(
                 f"Cannot revert PIP to Draft from status '{pip.status}'."
             )
         logger.info(
-            "PIPService.revert_to_draft validation allowed from status=%s pip=%s",
-            pip.status,
-            pip.pk,
+            "%s validation allowed from status=%s pip=%s", action, pip.status, pip.pk
         )
         changes_cleared = pip.changes.update(
             galdr_recommendation="", galdr_reasoning=""
         )
         logger.info(
-            "PIPService.revert_to_draft processing changes_cleared=%s pip=%s",
-            changes_cleared,
-            pip.pk,
+            "%s processing changes_cleared=%s pip=%s", action, changes_cleared, pip.pk
         )
         pip.status = ProcessImprovementProposal.STATUS_DRAFT
         pip.galdr_holistic_assessment = ""
         pip.save(update_fields=["status", "galdr_holistic_assessment"])
-        logger.info(
-            "PIPService.revert_to_draft exit pip=%s status=draft",
-            pip.pk,
-        )
+        logger.info("%s exit pip=%s status=draft", action, pip.pk)
 
     @staticmethod
     @transaction.atomic
@@ -677,8 +714,21 @@ class PIPService:
     @staticmethod
     @transaction.atomic
     def save_draft_header(
-        *, actor, pip: ProcessImprovementProposal, title: str, summary: str = ""
+        *,
+        actor: AbstractBaseUser,
+        pip: ProcessImprovementProposal,
+        title: str,
+        summary: str = "",
     ) -> ProcessImprovementProposal:
+        """Save the current draft's title and summary for its submitter.
+
+        :param actor: Original submitter. Example: Maria's account.
+        :param pip: Existing proposal. Example: the draft editor's PIP.
+        :param title: Required title. Example: "Improve form review".
+        :param summary: Optional overview. Example: "Clarify accessibility checks".
+        :return: The supplied proposal instance with its saved header.
+        :raises ValidationError: If the owner, current state or title is invalid.
+        """
         _pip_require_draft(pip, actor)
         ttl = title.strip()
         if not ttl:
@@ -692,16 +742,16 @@ class PIPService:
     @transaction.atomic
     def add_change(
         *,
-        actor,
+        actor: AbstractBaseUser,
         pip: ProcessImprovementProposal,
         change_type: str,
         entity_type: str = "",
         name: str = "",
         content: str = "",
-        target_id: Optional[int] = None,
-        parent_workflow_id: Optional[int] = None,
+        target_id: int | None = None,
+        parent_workflow_id: int | None = None,
         parent_workflow_ref: str = "",
-        insert_after_activity_id: Optional[int] = None,
+        insert_after_activity_id: int | None = None,
         insert_after_activity_ref: str = "",
         phase_ref: str = "",
         produced_by_activity_ref: str = "",
@@ -712,11 +762,36 @@ class PIPService:
         relationship_type: str = "",
         source_entity_ref: str = "",
         target_entity_ref: str = "",
-        display_order: Optional[int] = None,
+        display_order: int | None = None,
     ) -> PipChange:
+        """Append a typed entity or relationship change to the current draft.
+
+        :param actor: Original submitter. Example: Maria's account.
+        :param pip: Existing proposal. Example: the draft editor's PIP.
+        :param change_type: Operation. Example: ADD, ALTER, DROP, LINK or UNLINK.
+        :param entity_type: Entity for ADD, ALTER or DROP. Example: Activity.
+        :param name: Entity name. Example: "Verify error recovery".
+        :param content: Entity guidance, change rationale or relationship note.
+        :param target_id: Existing entity ID for ALTER or DROP. Example: 42.
+        :param parent_workflow_id: Existing parent workflow ID. Example: 12.
+        :param parent_workflow_ref: Parent workflow reference for a pending ADD.
+        :param insert_after_activity_id: Existing activity after which to insert.
+        :param insert_after_activity_ref: Alternative pending activity reference.
+        :param phase_ref: Phase reference for an Activity.
+        :param produced_by_activity_ref: Activity reference for an Artifact.
+        :param artifact_type: Artifact classification. Example: Document.
+        :param artifact_is_required: Whether the Artifact is required.
+        :param append_to_playbook_end: Whether to append the entity.
+        :param internal_ref: Reference label for later changes. Example: "#audit".
+        :param relationship_type: Kind of LINK or UNLINK.
+        :param source_entity_ref: Source reference for LINK or UNLINK.
+        :param target_entity_ref: Target reference for LINK or UNLINK.
+        :param display_order: Optional positive workflow or activity position.
+        :return: The persisted change in the current draft.
+        :raises ValidationError: If the owner, current state or proposed change is invalid.
+        """
         _pip_require_draft(pip, actor)
-        ct = (change_type or "").upper().strip()
-        _validate_display_order(ct, entity_type, display_order)
+        ct = _normalize_change_type(change_type, entity_type, display_order)
         if ct in {PipChange.CHANGE_LINK, PipChange.CHANGE_UNLINK}:
             return _persist_link_change(
                 pip=pip,
@@ -749,8 +824,16 @@ class PIPService:
     @staticmethod
     @transaction.atomic
     def remove_change(
-        *, actor, pip: ProcessImprovementProposal, change_id: int
+        *, actor: AbstractBaseUser, pip: ProcessImprovementProposal, change_id: int
     ) -> None:
+        """Remove a change from the current draft and renumber the remaining changes.
+
+        :param actor: Original submitter. Example: Maria's account.
+        :param pip: Existing proposal. Example: the draft editor's PIP.
+        :param change_id: Primary key within this proposal. Example: 42.
+        :return: None. Example: the remaining changes start at order 1.
+        :raises ValidationError: If the owner or state is invalid or the change is missing.
+        """
         _pip_require_draft(pip, actor)
         deleted_count, _ = PipChange.objects.filter(pk=change_id, pip=pip).delete()
         if not deleted_count:
@@ -813,22 +896,15 @@ class PIPService:
         :return: Latest persisted proposal state.
         :raises ValidationError: For an unauthorized or invalid submission.
         """
-        _pip_allow_submit_for_review(pip, actor)
-        if not PipChange.objects.filter(pip=pip).exists():
-            raise ValidationError("Add at least one Change before submitting.")
-        structural = GaldrStructuralValidator.validate_pip_structure(pip)
-        if not structural.ok:
-            raise ValidationError("; ".join(structural.errors))
-
-        correlation_id = _normalize_processing_correlation(correlation_id)
-        port, invalid_configuration = _select_galdr_port(resolve_processing_llm(llm))
         with transaction.atomic():
-            locked = ProcessImprovementProposal.objects.select_for_update().get(
-                pk=pip.pk
+            proposals = ProcessImprovementProposal.objects.filter(pk=pip.pk)
+            locked = lock_proposal_queryset(proposals).get()
+            _validate_submission(locked, actor)
+            correlation_id = _normalize_processing_correlation(correlation_id)
+            # Capture configuration only. Completion remains after commit.
+            port, invalid_configuration = _select_galdr_port(
+                resolve_processing_llm(llm)
             )
-            _pip_allow_submit_for_review(locked, actor)
-            if not PipChange.objects.filter(pip_id=locked.pk).exists():
-                raise ValidationError("Add at least one Change before submitting.")
             locked.status = ProcessImprovementProposal.STATUS_PROCESSING_GALDR
             locked.submitted_at = locked.submitted_at or timezone.now()
             locked.save(update_fields=["status", "submitted_at", "updated_at"])
