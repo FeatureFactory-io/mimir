@@ -93,3 +93,10 @@ All 49 contracts were scaffolded together, so unrelated future test bodies are s
 - Root post-repair pre-Experts CI selection: 1,636 passed, 3 inherited skips, 72 warnings in 27.37s. This is incremental regression evidence; unfinished Experts tests are still pending.
 - Final reviewer found no remaining material S03 contract defect, source/architecture drift, new production methods or integration mocks. Partial scope and S04 Analytics-control overlap remain explicit.
 - Next group: fresh nonconflicting backend nodes S17 public detail, S27 public evidence, S30 first-release awards. Original worktree and shared seed remain preserved; no merge/release/staging deployment yet.
+
+## S17 / N1-public-detail — NODE_PASS
+
+- Commit 2c05351. Backend: 8 passed, 3 later-template cases deselected. Log gate: 4 passed, 7 unrelated cases deselected. Actual initial red was the unregistered detail route; all recordings retained as MIN-S17-N1-*.
+- Only four assigned backend/test paths. Allowlisted public detail and generic HTTP 404 have no email/private evidence; GET is read-only. Generic rejection renders the same detail template without `person` so the N2 template can preserve the navigable shell. This is an implementation of the agreed generic 404, with no signature or footprint expansion.
+- Existing request middleware logs paths app-wide; feature privacy assertions target S17's actual loggers. No global middleware change or hardening claim.
+- Fresh N2 template-graduation worker dispatched. Root approved S30's recognized-category validation only for otherwise award-eligible first publication, using existing caught ValidationError. Real rejection/atomicity tests must prove it; no silent missing award or inferred category.

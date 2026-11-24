@@ -106,6 +106,16 @@ releases for valid ties, and preserve the independent count of all currently
 public released authored playbooks. A legacy book must not turn a valid positive
 contributor's leaderboard into HTTP 500. The real-DB regression belongs to S03.
 
+S30 first-publication precondition: an otherwise award-eligible draft must have
+a recognized playbook category before release/version/award persistence. Reject
+blank/retired categories with the existing Django ValidationError convention and
+a clear instruction to choose a valid category; the existing release view handles
+that exception. Leave the draft and ledger unchanged. Already released or
+historical legacy records keep later-release behavior without award backfill.
+Do not infer a category or silently omit the first-release award for an eligible
+publication. This enforces the approved ledger boundary while preserving reads
+of real legacy history.
+
 `expert_text.py` supplies four pure functions: `format_karma`, `category_label`,
 `display_initials`, and `format_numeric_fallback`. Card, own-profile and detail
 presenters share these; detail must not depend on cards. A zero-score own profile
