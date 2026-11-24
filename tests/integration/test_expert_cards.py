@@ -90,7 +90,8 @@ def test_experts_card_with_stored_caveat_adds_no_suitability_claim(
     assert hint.children == [stored]
     assert stored.endswith("availability and project fit still require a conversation.")
     assert element_text(card) == (
-        f"2 MR Maria Rodriguez Design {stored} 8,200 Karma View profile Reach out"
+        f"2 MR Maria Rodriguez Design {stored} 8,200 Karma View profile Reach out "
+        "Start an email discussion with Maria Rodriguez"
     )
     if markup:
         assert escape(stored).encode() in response.content
