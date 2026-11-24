@@ -207,6 +207,7 @@ def _certify_card_and_public_summary(page: Page, origin: str, paragraph: str) ->
     assert navigation.value.status == HTTPStatus.OK
     assert navigation.value.request.redirected_from is None
     expect(page).to_have_url(origin + path)
+    _wait_for_actual_fonts(page)
     public = page.get_by_test_id("expert-contribution-summary")
     expect(public).to_have_js_property("textContent", paragraph)
     _assert_summary_geometry(public, None)
@@ -362,6 +363,26 @@ def _open_document(page: Page, url: str) -> None:
     assert response is not None and response.status == HTTPStatus.OK
     assert response.request.redirected_from is None
     expect(page).to_have_url(url)
+    _wait_for_actual_fonts(page)
+
+
+def _wait_for_actual_fonts(page: Page) -> None:
+    """Await the existing async icon kit and fonts without substituting assets.
+
+    :param page: Real production document. Example: Maria own/public profile.
+    :return: None after real icon glyphs load. Example: Font Awesome solid glyph.
+    :raises AssertionError: If the actual icon kit or font fails to render.
+    """
+    page.wait_for_function("""() => {
+        if (document.querySelector('svg.svg-inline--fa')) return true;
+        const loaded=[...document.fonts].some(face=>
+            face.family.includes('Font Awesome')&&face.weight==='900'&&face.status==='loaded');
+        return loaded && [...document.querySelectorAll('i.fa-solid')].some(icon => {
+            const s=getComputedStyle(icon,'::before');
+            return !['none','normal','""',"''"].includes(s.content) &&
+                s.fontFamily.includes('Font Awesome');
+        });
+    }""")
     page.evaluate("document.fonts.ready")
 
 
