@@ -8666,7 +8666,7 @@ scenarios:
       - S39
       - S23
     implementation_plan: docs/plans/iterations/experts/S41-karma-mcp-02.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
@@ -9108,7 +9108,7 @@ scenarios:
       - S06
       - S21
     implementation_plan: docs/plans/iterations/experts/S16-experts-reach-03.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
