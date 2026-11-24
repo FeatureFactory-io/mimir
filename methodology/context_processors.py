@@ -6,7 +6,9 @@ Injects global context variables into all template contexts.
 from __future__ import annotations
 
 import logging
+import re
 
+from django.http import HttpRequest
 from django.urls import reverse
 
 from methodology.services.notification_service import NotificationService
@@ -14,6 +16,8 @@ from methodology.services.notification_service import NotificationService
 logger = logging.getLogger(__name__)
 
 ACTIVE_REALM = "mimir"
+_EXPERTS_PATH_PREFIX = "/experts/"
+_INVALID_PATH_CHARACTERS = re.compile(r"[\x00-\x1f\x7f\\?#]")
 REALM_ITEMS = (
     {
         "slug": "featurefactory",
@@ -83,13 +87,18 @@ def pip_nav(request):
     return {"pip_nav_unread_count": 0}
 
 
-def primary_nav_section(request):
+def primary_nav_section(request: HttpRequest) -> dict[str, object]:
     """Inject realm bar and app sidebar context for the FOB shell.
 
     :param request: Django HTTP request. Example: GET /playbooks/
     :return: Shell dict. Example: {"nav_section": "playbooks", "chrome": "authenticated"}
     """
-    logger.info("primary_nav_section entry path=%s", request.path)
+    # Log the configured route without identifiers supplied in the request path.
+    route = getattr(request.resolver_match, "route", None)
+    logger.info(
+        "primary_nav_section entry path=%s",
+        "unresolved" if route is None else f"/{route}",
+    )
     return build_shell_context(request)
 
 
@@ -239,9 +248,10 @@ def _methodology_items() -> list:
 
 
 def _collaborate_items() -> list:
-    """Return Teams and PIPs sidebar links.
+    """Return Teams, Experts, and PIPs sidebar links in that order.
 
     :return: Link dicts. Example: [{"slug": "teams", "url": "/teams/"}]
+    :raises NoReverseMatch: If a configured Collaborate route is unavailable.
     """
     return [
         _link(
@@ -252,6 +262,7 @@ def _collaborate_items() -> list:
             "fas fa-users",
             "Browse and manage teams",
         ),
+        _experts_item(),
         _link(
             "pips",
             "PIPs",
@@ -286,7 +297,7 @@ def _link(
     }
 
 
-def _resolve_nav_section(path: str):
+def _resolve_nav_section(path: str) -> str | None:
     """Return nav section string for ``path``, or ``None`` if no match.
 
     More specific entity paths win over playbook nesting so e.g.
@@ -296,16 +307,23 @@ def _resolve_nav_section(path: str):
     Dashboard is checked before the generic ``/activities/`` substring so
     ``/dashboard/activities/`` stays on Home.
 
-    :param path: URL path string.
-    :returns: Section identifier or ``None``.
+    :param path: URL path string. Example: "/experts/".
+    :return: Section identifier or ``None``. Example: "experts".
     """
+    try:
+        if _is_experts_path(path):
+            return "experts"
+    except ValueError:
+        # Malformed Experts candidates must not disrupt the shared shell.
+        pass
+
     if path.startswith("/dashboard/"):
         return "home"
     if path.startswith("/browser/"):
         return "playbooks"
     if path.startswith("/teams/"):
         return "teams"
-    if path.startswith("/pips/") or path.startswith("/pip/"):
+    if path.startswith(("/pips/", "/pip/")):
         return "pips"
 
     # Nested or global entity routes (before bare /playbooks/)
@@ -348,7 +366,14 @@ def _experts_item() -> dict[str, str]:
         "testid": "nav-experts", "label": "Experts"}.
     :raises NoReverseMatch: If the S03 experts_list route is unavailable.
     """
-    raise NotImplementedError()
+    return _link(
+        "experts",
+        "Experts",
+        reverse("experts_list"),
+        "nav-experts",
+        "fa-solid fa-user-graduate",
+        "Top contributors by playbook category",
+    )
 
 
 def _is_experts_path(path: str) -> bool:
@@ -356,6 +381,13 @@ def _is_experts_path(path: str) -> bool:
 
     :param path: Local request path. Example: "/experts/mrodriguez/".
     :return: Whether Experts should be active. Example: True.
-    :raises ValueError: If path is not a nonempty local absolute string.
+    :raises ValueError: If path is not a local absolute path without query or fragment.
     """
-    raise NotImplementedError()
+    if (
+        not isinstance(path, str)
+        or not path.startswith("/")
+        or path.startswith("//")
+        or _INVALID_PATH_CHARACTERS.search(path)
+    ):
+        raise ValueError("Expected a local absolute path without a query or fragment.")
+    return path.startswith(_EXPERTS_PATH_PREFIX)
