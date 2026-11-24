@@ -144,7 +144,7 @@ feature_execution_graph:
     - primary_nav_section:branch
     - primary_nav_section:exit
     gate:
-      command: make test-experts-s48-backend
+      command: pytest tests/integration/test_experts_sidebar_s48.py -k 'not acceptance' -x
       log_story_command: pytest tests/integration/test_experts_sidebar_s48.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-02-Implement_Backend.md

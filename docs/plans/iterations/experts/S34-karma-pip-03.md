@@ -171,7 +171,8 @@ feature_execution_graph:
     log_story_rows:
     - Sending PIP decision email:processing
     gate:
-      command: make test-experts-s34-at
+      command: pytest tests/integration/test_experts_karma_partial.py -k 'outer_commit or outer_rollback' -x
+      acceptance_command: make test-experts-s34-at
       log_story_command: pytest tests/integration/test_experts_karma_partial.py -k log_story -x
     guidance_bundle:
       activity: BPE/BPE-04-Implement_Feature_Acceptance_Tests.md
