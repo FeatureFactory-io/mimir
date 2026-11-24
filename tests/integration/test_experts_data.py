@@ -334,3 +334,90 @@ def test_cedar_postgres_settings_with_runner_identity_verifies_ownership(
         experts_data._postgres_test_settings_match(actual, configured, worker)
         is expected
     )
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize(
+    ("model_name", "consumed"),
+    [("Activity", 6202), ("Activity", 9000), ("Workflow", 6201), ("Playbook", 6100)],
+)
+def test_load_cedar_baseline_with_postgres_reserved_boundary_preserves_sequence(
+    model_name: str, consumed: int
+) -> None:
+    """Reserve fixed oracle IDs without reusing previously consumed sequence values."""
+    if connection.vendor != "postgresql":
+        pytest.skip("Requires the actual owned PostgreSQL runner.")
+    model = getattr(experts_data, model_name)
+    sequence = _set_owned_test_sequence(model, consumed)
+    data = load_cedar_baseline()
+    assert data.activities_by_pk[6203].pk == 6203
+    before = list(KarmaAward.objects.order_by("pk").values())
+    again = load_cedar_baseline()
+    assert again.user_ids == data.user_ids
+    assert list(KarmaAward.objects.order_by("pk").values()) == before
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT nextval(%s::regclass)", [sequence])
+        assert cursor.fetchone()[0] > consumed
+
+
+@pytest.mark.django_db(transaction=True)
+def test_load_cedar_baseline_with_postgres_pathological_gap_rejects_before_rows(
+    tmp_path: Path,
+) -> None:
+    """A valid-looking huge reserved ID cannot create unbounded sequence work."""
+    if connection.vendor != "postgresql":
+        pytest.skip("Requires the actual owned PostgreSQL runner.")
+    document = json.loads(SOURCE.read_text())
+    person = next(row for row in document["people"] if row["username"] == "mchen")
+    person["public_playbooks"][0]["workflow_pk"] = 10**12
+    source = tmp_path / SOURCE.name
+    source.write_text(json.dumps(document))
+    with (
+        CaptureQueriesContext(connection) as queries,
+        pytest.raises(ValueError, match="sequence reservation"),
+    ):
+        load_cedar_baseline(source)
+    assert not any(
+        query["sql"].lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE"))
+        for query in queries
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_load_cedar_baseline_with_postgres_conflicting_reserved_row_preserves_row() -> (
+    None
+):
+    """Sequence preparation cannot overwrite an unexpected preexisting Cedar row."""
+    if connection.vendor != "postgresql":
+        pytest.skip("Requires the actual owned PostgreSQL runner.")
+    owner = User.objects.create_user(username="existing-owner")
+    book = Playbook.objects.create(
+        pk=6201, author=owner, name="Existing private work", visibility="private"
+    )
+    _set_owned_test_sequence(Playbook, 9000)
+    users_before = User.objects.count()
+    with pytest.raises(ValueError, match="conflict"):
+        load_cedar_baseline()
+    book.refresh_from_db()
+    assert book.name == "Existing private work" and book.author_id == owner.pk
+    assert User.objects.count() == users_before and KarmaAward.objects.count() == 0
+
+
+def _set_owned_test_sequence(model: type, consumed: int) -> str:
+    """Create a real counterexample only inside the actual test-owned PG runner.
+
+    :param model: Declared mixed-ID model. Example: Activity.
+    :param consumed: Controlled consumed fixture value. Example:6202.
+    :return: Actual model sequence name. Example: methodology_activity_id_seq.
+    :raises AssertionError: The connection does not identify its owned test DB.
+    """
+    assert connection.vendor == "postgresql"
+    assert connection.settings_dict["NAME"].startswith("test_")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT pg_get_serial_sequence(%s,%s)",
+            [model._meta.db_table, model._meta.pk.column],
+        )
+        sequence = cursor.fetchone()[0]
+        cursor.execute("SELECT setval(%s::regclass,%s,true)", [sequence, consumed])
+    return sequence

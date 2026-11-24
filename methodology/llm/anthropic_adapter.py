@@ -151,7 +151,7 @@ class AnthropicAdapter:
                     messages=payload,
                     system=system,
                     max_tokens=max_tokens,
-                    temperature=temperature,
+                    extra_body={"temperature": temperature},
                 )
         except Exception:  # noqa: BLE001
             # Omit the original exception, which may contain the provider body.

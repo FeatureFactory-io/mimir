@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import ExitStack
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -22,6 +23,7 @@ from methodology.services.contribution_summary_factory import (
     configured_summary_rates,
     resolve_processing_llm,
 )
+from tests.support.provider_http_server import provider_http_server
 from tests.support.scripted_llm import ScriptedLLM
 
 if TYPE_CHECKING:
@@ -37,25 +39,31 @@ _SECRET = "provider error detail that must stay out of logs"
 @pytest.fixture
 def sdk_transport(
     monkeypatch: pytest.MonkeyPatch,
-) -> Callable[[Callable[[httpx.Request], httpx.Response]], None]:
-    """Install only a unit HTTP transport under the real Anthropic SDK.
+) -> Iterator[Callable[[Callable[[httpx.Request], httpx.Response]], None]]:
+    """Install a private real HTTP endpoint under either supported Anthropic SDK.
 
     :param monkeypatch: Restores the SDK constructor after the test.
     :return: Transport installer. Example: install(handler).
     """
     sdk_constructor = anthropic.Anthropic
+    endpoints = ExitStack()
 
     def install(handler: Callable[[httpx.Request], httpx.Response]) -> None:
+        url = endpoints.enter_context(provider_http_server(handler))
+
         def create_client(*, max_retries: int) -> anthropic.Anthropic:
             return sdk_constructor(
                 api_key="unit-test-api-key",
                 max_retries=max_retries,
-                http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+                base_url=url,
+                timeout=3,
+                http_client=anthropic.DefaultHttpxClient(trust_env=False),
             )
 
         monkeypatch.setattr(anthropic, "Anthropic", create_client)
 
-    return install
+    with endpoints:
+        yield install
 
 
 def _message_body(*, content: list[dict[str, str]], stop_reason: str) -> dict[str, Any]:
@@ -408,3 +416,44 @@ def test_s23_interaction_with_invalid_metadata_rejects_without_leaking_details(
     with pytest.raises(ValidationError) as caught:
         _interaction(**overrides).clean()
     assert _SECRET not in str(caught.value)
+
+
+def test_provider_http_server_with_actual_loopback_request_returns_response() -> None:
+    """Keep SDK response policy independent of either HTTP client's runtime classes."""
+    seen: list[bytes] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        seen.append(request.content)
+        return httpx.Response(200, json={"response": "published"})
+
+    with provider_http_server(respond) as url, httpx.Client(trust_env=False) as client:
+        response = client.post(url, content=b"public evidence", timeout=3)
+        assert response.json() == {"response": "published"}
+    assert seen == [b"public evidence"]
+    with httpx.Client(trust_env=False) as client, pytest.raises(httpx.ConnectError):
+        client.post(url, content=b"closed", timeout=3)
+
+
+def test_provider_http_server_with_raised_body_closes_owned_endpoint() -> None:
+    """A failed unit assertion cannot leave its private provider socket alive."""
+    with (
+        pytest.raises(RuntimeError, match="unit failure"),
+        provider_http_server(lambda request: httpx.Response(200)) as url,
+    ):
+        raise RuntimeError("unit failure")
+    with httpx.Client(trust_env=False) as client, pytest.raises(httpx.ConnectError):
+        client.post(url, content=b"closed", timeout=3)
+
+
+def test_provider_http_server_with_oversized_request_rejects_before_handler() -> None:
+    """Bound the real unit endpoint before invoking a policy or reading its body."""
+    calls: list[httpx.Request] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200)
+
+    with provider_http_server(respond) as url, httpx.Client(trust_env=False) as client:
+        response = client.post(url, content=b"x" * (65 * 1024), timeout=3)
+        assert response.status_code == 413
+    assert not calls

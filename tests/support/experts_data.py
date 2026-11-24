@@ -58,6 +58,8 @@ from methodology.services.pip_service import PIPService
 if TYPE_CHECKING:
     from pytest import FixtureRequest
 
+_MAX_CEDAR_SEQUENCE_ADVANCE = 100_000
+
 CEDAR_PASSWORD = "Cedar-fictional-tests-only-2026"
 CEDAR_BASELINE_TIME_ISO = "2026-11-22T00:00:00+00:00"
 _CEDAR_SOURCE = (
@@ -190,6 +192,7 @@ def load_cedar_baseline(
     _resolve_database_scope(scope)
     document = _read_cedar_document(fixture_path)
     _validate_cedar_document(document)
+    _reserve_cedar_postgres_ids(document)
     try:
         with transaction.atomic():
             users = _create_cedar_users(document)
@@ -212,6 +215,79 @@ def load_cedar_baseline(
             "Cedar import encountered invalid data or a database conflict."
         ) from error
     return dataset
+
+
+def _reserve_cedar_postgres_ids(document: _Record) -> None:
+    """Advance owned PostgreSQL sequences past all declared fixed fixture IDs.
+
+    :param document: Fully validated Cedar oracle after database ownership checks.
+    :return: None; SQLite retains its existing max-PK allocation behavior.
+    :raises ValueError: A sequence is incompatible or its gap exceeds the bound.
+    """
+    if connection.vendor != "postgresql":
+        return
+    books = tuple(book for _, book in _book_declarations(_rows(document, "people")))
+    for model, key in (
+        (Playbook, "pk"),
+        (Workflow, "workflow_pk"),
+        (Activity, "activity_pk"),
+    ):
+        floor = max((book.get(key, 0) for book in books), default=0)
+        if floor:
+            _advance_cedar_postgres_sequence(model, floor)
+
+
+def _advance_cedar_postgres_sequence(model: type[models.Model], floor: int) -> None:
+    """Consume only forward sequence values without rewinding or reusing any ID.
+
+    nextval is deliberately nontransactional: a later row conflict may consume
+    sequence values, while the existing atomic importer still rolls back rows.
+
+    :param model: One declared mixed-ID model. Example: Activity.
+    :param floor: Highest fixed oracle ID to reserve. Example:6203.
+    :return: None; subsequent generated IDs exceed reserved and existing IDs.
+    :raises ValueError: Unsupported sequence shape or excessive reservation work.
+    """
+    sequence, floor, previous = _cedar_postgres_sequence_state(model, floor)
+    gap = max(0, floor - previous)
+    if gap > _MAX_CEDAR_SEQUENCE_ADVANCE:
+        raise ValueError("Cedar sequence reservation exceeds its bounded gap.")
+    if gap:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT max(nextval(%s::regclass)) FROM generate_series(1,%s)",
+                [sequence, gap],
+            )
+            cursor.fetchone()
+
+
+def _cedar_postgres_sequence_state(
+    model: type[models.Model], floor: int
+) -> tuple[str, int, int]:
+    """Read trusted model metadata and reject nonstandard sequence allocation.
+
+    :param model: Declared mixed-ID model. Example: Workflow.
+    :param floor: Validated oracle floor. Example:6202.
+    :return: Sequence, maximum stored/oracle floor and consumed position.
+    :raises ValueError: A normal uncached increasing sequence is unavailable.
+    """
+    table = connection.ops.quote_name(model._meta.db_table)
+    column = connection.ops.quote_name(model._meta.pk.column)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT pg_get_serial_sequence(%s,%s),COALESCE(MAX({column}),0) FROM {table}",
+            [model._meta.db_table, model._meta.pk.column],
+        )
+        sequence, stored = cursor.fetchone()
+        cursor.execute(
+            "SELECT COALESCE(pg_sequence_last_value(seqrelid),0),seqincrement,seqcycle,seqcache "
+            "FROM pg_sequence WHERE seqrelid=%s::regclass",
+            [sequence],
+        )
+        state = cursor.fetchone()
+    if state is None or state[1:] != (1, False, 1):
+        raise ValueError("Cedar sequence reservation requires standard allocation.")
+    return sequence, max(floor, stored), state[0]
 
 
 def _resolve_database_scope(scope: CedarDatabaseScope | None) -> CedarDatabaseScope:

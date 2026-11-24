@@ -262,7 +262,7 @@ async def _call_registered_collection(
         "event_identity",
     } & set(schema["properties"])
     result = await session.client.call_tool(case.tool_name, dict(case.arguments))
-    payload = decode_tool_payload(result)
+    payload = decode_tool_payload(result, allow_empty_collection=True)
     if isinstance(payload, dict) and set(payload) == {"result"}:
         return payload["result"]
     return payload

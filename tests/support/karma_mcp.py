@@ -39,13 +39,12 @@ from django.db.models import Model, Q
 from fastmcp import Client, FastMCP
 from fastmcp.client.client import CallToolResult
 from mcp.types import (
-    LATEST_PROTOCOL_VERSION,
     JSONRPCMessage,
     JSONRPCNotification,
     JSONRPCResponse,
     TextContent,
 )
-from pydantic import ValidationError
+from pydantic import RootModel, TypeAdapter, ValidationError
 from pytest_django.live_server_helper import LiveServer
 from rest_framework.authtoken.models import Token
 
@@ -84,6 +83,8 @@ MCPEntrypoint = Literal["facade", "legacy"]
 _UNSAFE_ORM_FLAG = "DJANGO_ALLOW_ASYNC_UNSAFE"
 _MCP_RUNTIME_LOCK = Lock()
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# MCP2026 is stateless; initialize deliberately targets its supported handshake era.
+_STDIO_HANDSHAKE_VERSION = "2025-11-25"
 _STDIO_TIMEOUT_SECONDS = 30.0
 _STDIO_EXIT_TIMEOUT_SECONDS = 5.0
 _STDIO_READ_SIZE = 65536
@@ -595,10 +596,27 @@ def collection_service_result(case: MCPCase, dataset: MCPDataset) -> object:
     return _collection_native_rows(case, dataset)
 
 
-def decode_tool_payload(result: object) -> object:
+def _decode_jsonrpc_message(line: bytes) -> JSONRPCResponse | JSONRPCNotification:
+    """Validate SDK union and older RootModel representations without lenient parsing.
+
+    :param line: Actual captured JSON-RPC bytes. Example: a response with id1.
+    :return: Validated response or notification preserving its complete payload.
+    :raises ValidationError: The wire envelope is malformed.
+    :raises AssertionError: The envelope is an unexpected request or error.
+    """
+    validated = TypeAdapter(JSONRPCMessage).validate_json(line)
+    message = validated.root if isinstance(validated, RootModel) else validated
+    assert isinstance(message, (JSONRPCResponse, JSONRPCNotification))
+    return message
+
+
+def decode_tool_payload(
+    result: object, *, allow_empty_collection: bool = False
+) -> object:
     """Decode actual FastMCP/JSON-RPC result without masking tool errors.
 
     :param result: Real call result. Example: structured content or JSON text block.
+    :param allow_empty_collection: Collection-only permission for an empty typed success.
     :return: Actual decoded payload. Example: list of authorized metadata.
     :raises AssertionError: Tool error, missing payload or malformed result.
     """
@@ -609,6 +627,8 @@ def decode_tool_payload(result: object) -> object:
         if result.structured_content is not None:
             return result.structured_content
         blocks = result.content
+        if allow_empty_collection and blocks == []:
+            return []
     else:
         assert isinstance(result, Mapping) and result.get("isError") is not True
         if result.get("structuredContent") is not None:
@@ -1037,12 +1057,12 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         result = self._request(
             "initialize",
             {
-                "protocolVersion": LATEST_PROTOCOL_VERSION,
+                "protocolVersion": _STDIO_HANDSHAKE_VERSION,
                 "capabilities": {},
                 "clientInfo": {"name": "mimir-karma-integration", "version": "1"},
             },
         )
-        assert result.get("protocolVersion") == LATEST_PROTOCOL_VERSION
+        assert result.get("protocolVersion") == _STDIO_HANDSHAKE_VERSION
         server_info = result.get("serverInfo")
         assert isinstance(server_info, dict)
         assert server_info.get("name") == "Mimir Methodology Assistant"
@@ -1262,7 +1282,7 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
             self._pending_stdout = tail
             if self._token and self._token.encode("utf-8") in line:
                 raise AssertionError("Facade stdout exposed its test credential.")
-            message = JSONRPCMessage.model_validate_json(line).root
+            message = _decode_jsonrpc_message(line)
             envelope = message.model_dump(mode="json", exclude_unset=True)
             self.stdout_messages.append(envelope)
             if isinstance(message, JSONRPCResponse) and message.id == request_id:
