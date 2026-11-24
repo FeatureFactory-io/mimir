@@ -10005,6 +10005,9 @@ iteration_convergence_followups:
     - tests/support/karma_mcp.py
     - tests/unit/test_mcp_protocol_compatibility.py
     - tests/integration/test_karma_mcp_collections.py
+    - methodology/llm/anthropic_adapter.py
+    - tests/support/experts_data.py
+    - tests/integration/test_experts_data.py
     - .github/workflows/build-and-deploy.yml
     authorization: Necessary compatibility of existing contract proofs with freshly installed supported libraries; preserve real SDK transport and protocol failure semantics.
     constraints:

@@ -1082,3 +1082,61 @@ bounded SDK/protocol test support without loosening native errors. The observed
 PostgreSQL fixture primary-key collision has its own investigation and is not
 silently dismissed. Build-only CI45511392694 runs the reviewed90cd314, before
 those newer CI environment repairs; deploy remains explicitly disabled.
+
+
+### 2026-11-24 — latest SDK and PostgreSQL fixture repair footprint
+
+The latest installed Anthropic SDK rejects the old temperature keyword before
+HTTP. This is a real product adapter incompatibility, not solely a unit fixture
+problem. Parent approved the one-keyword replacement in
+`methodology/llm/anthropic_adapter.py`: use the officially documented extra_body
+request extension to preserve the exact configured temperature in outgoing JSON.
+No model change, dependency downgrade, silently discarded sampling value or
+runtime signature reflection is used. The SDK fixture uses a real loopback HTTP
+responder. The bounded 117-case SDK/protocol lane passes under both older and
+latest installed libraries; final independent review remains pending.
+Official reference: https://github.com/anthropics/anthropic-sdk-python/blob/main/MIGRATION.md#removed-deprecated-request-parameters
+
+Parent also approved the explicit helper/test footprint for the real PostgreSQL
+fixed-PK collision: `tests/support/experts_data.py` and
+`tests/integration/test_experts_data.py`. After ownership and document guards,
+PostgreSQL reservation advances only forward using nextval before implicit rows
+can collide with Cedar's fixed identifiers. The batch is bounded. Existing rows,
+conflict refusal and SQLite behavior remain protected. Sequence consumption is
+nontransactional and must be distinguished from row immutability; no setval,
+sequence rewind or ambient database access is authorized. Real owned-PostgreSQL
+boundary/high-sequence/reimport/huge-gap/conflict cases pass, with original
+counterexamples retained and the final immutable proof still in preparation.
+
+Scene21 is now checked: 120.064 seconds, 11 editable frames, approved Aiden,
+real historical CLI failures, real old/new compatibility matrix and source
+reading views. All final source frames and all 12 decoded movie frames were
+visually reviewed. Full video/audio decode passes with finite, unclipped audio.
+The checked first21 continuous cut is 1,101.056 seconds / 18:21. Its 12 new
+joined/boundary frames were reviewed through three comparison sheets, retaining
+all detailed chapter reviews. The two native Scene21 files are attached to
+storyboard sequence71; the local HTML and README now match. Scenes22–26 and the
+actual reviewed release ending remain open. Media records distinguish original
+acquisition timing from editorial reading holds and retain the failed helper
+runs; no app screens or passing results were invented.
+
+### 2026-11-24 — current main and candidate verification boundary
+
+GitHub main was read live as `d222acb5b4d8ab7b8f48940f8db587e93f425b41`.
+It is the branch ancestor with no main-side commits beyond the cached reference.
+The replay baseline `333c36d` differs from that main only in three pre-existing
+`docs/evangelize/` documents; production/configuration code is identical. Thus
+the architecture/code comparison against333 covers the actual main production
+code boundary. Those inherited document differences are recorded for final
+review rather than attributed to the Experts implementation. No main ref was
+changed and no main merge occurred.
+
+The eight-path SDK/PostgreSQL repair is committed as
+`3a9bec10b1a472f3b8f3526090086e1be2f4c1c8` and pushed to the iteration branch.
+Build-only CI45513892328 is dispatched with idle deployment disabled. Exact
+latest-dependency full MakeTest/AT/agent verification has also started in a real
+isolated Git worktree, independently of the continuing mutable staging harness
+preparation. Its pending outcome must not be replaced by the prior90cd314 pass.
+The source repair owner additionally reports117focused cases under each SDK
+and95actualPostgreSQL cases including the original9owned-scope proofs; exact
+source sealing and fresh independent repair review follow.
