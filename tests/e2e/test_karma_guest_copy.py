@@ -25,6 +25,14 @@ _ACTIVITY_ID = 6203
 _MIKE_USERNAME = "mchen"
 _MIKE_BASELINE_POINTS = 12_450
 _CLIPBOARD_MARKER = "Cedar guest clipboard before Copy Prompt"
+_RICH_GUIDANCE = (
+    "\n\n# Prepare the résumé — 京都\n\n"
+    "- Preserve **all** words, ampersands & brackets <draft>.\n"
+    "- Keep the literal `</textarea>` and `&lt;` in this guidance.\n"
+    "- Use curly quotes ‘like these’ and Unicode ✅.\n\n"
+    "```text\n    preserve indentation and internal  spacing\n```\n\n"
+    "Final line for complete clipboard retrieval.\n\t"
+)
 _DOMAIN_MODELS = (User, ExpertProfile, KarmaAward, Session)
 _DomainSnapshot = Mapping[str, tuple[tuple[object, ...], ...]]
 
@@ -36,16 +44,25 @@ class GuestCopyCase:
     activity_path: str
     receipt_path: str
     expected_prompt: str = field(repr=False)
+    expected_guidance: str = field(repr=False)
     domain_rows: _DomainSnapshot = field(repr=False)
     mike_id: int
 
 
-@pytest.fixture
+@pytest.fixture(
+    params=[
+        pytest.param(None, id="empty"),
+        pytest.param("\n", id="rich-lf"),
+        pytest.param("\r\n", id="rich-crlf"),
+        pytest.param("\r", id="rich-lone-cr"),
+    ]
+)
 def guest_copy_case(
-    transactional_db: None, cedar_dataset: CedarDataset
+    request: FixtureRequest, transactional_db: None, cedar_dataset: CedarDataset
 ) -> GuestCopyCase:
-    """Load S03's baseline and snapshot complete expected anonymous-copy state.
+    """Prepare guidance in the owned test DB before snapshotting guest state.
 
+    :param request: Parameterized case. Example: CRLF for browser-authored Markdown.
     :param transactional_db: Existing real test DB fixture. Example: isolated SQLite.
     :param cedar_dataset: Fresh Cedar dataset imported into the live server test DB.
     :return: Frozen activity 6203 case with full prompt and pre-copy DB state.
@@ -56,6 +73,13 @@ def guest_copy_case(
     playbook = activity.workflow.playbook
     assert playbook.author_id == mike.pk
     assert (playbook.visibility, playbook.status) == ("public", "released")
+    assert activity.guidance == ""
+    newline: str | None = request.param
+    if newline is not None:
+        activity.guidance = _RICH_GUIDANCE.replace("\n", newline)
+        activity.save(update_fields=["guidance"])
+        activity.refresh_from_db(fields=["guidance"])
+        assert activity.guidance == _RICH_GUIDANCE.replace("\n", newline)
     assert not User.objects.filter(username__iexact="bob").exists()
     assert mike.karma_awards.aggregate(points=Sum("points"))["points"] == (
         _MIKE_BASELINE_POINTS
@@ -68,6 +92,7 @@ def guest_copy_case(
         ),
         receipt_path=reverse("karma_copy_receipt"),
         expected_prompt=prompt,
+        expected_guidance="" if newline is None else _RICH_GUIDANCE.strip(),
         domain_rows=_guest_domain_snapshot(),
         mike_id=mike.pk,
     )
@@ -106,21 +131,8 @@ def test_guest_copy_with_public_activity_copies_full_prompt_without_receipt_or_a
     context.grant_permissions(
         ["clipboard-read", "clipboard-write"], origin=live_server_url
     )
-    observed_requests: list[Request] = []
-
-    def observe_request(request: Request) -> None:
-        """Record the observed browser request."""
-        observed_requests.append(request)
-
-    page.on("request", observe_request)
-    response = page.goto(f"{live_server_url}{guest_copy_case.activity_path}")
-    assert response is not None and response.status == HTTPStatus.OK
-    assert urlsplit(page.url).path == guest_copy_case.activity_path
-    assert response.request in observed_requests
-    expect(page.get_by_test_id("guest-auth-banner")).to_be_visible()
-    expect(page.get_by_test_id("edit-btn")).to_have_count(0)
-    page.evaluate("() => document.fonts.ready.then(() => true)")
-    _copy_and_await_feedback(page, guest_copy_case.expected_prompt)
+    observed_requests = _open_guest_activity(page, live_server_url, guest_copy_case)
+    copied_prompt = _copy_and_await_feedback(page)
     page.wait_for_load_state("networkidle")
     receipt_requests = [
         request.method
@@ -130,14 +142,50 @@ def test_guest_copy_with_public_activity_copies_full_prompt_without_receipt_or_a
     ]
     assert receipt_requests == []
     _assert_guest_domain_unchanged(guest_copy_case, context)
+    expected_prompt = guest_copy_case.expected_prompt
+    if copied_prompt != expected_prompt:
+        pytest.fail(
+            f"Native clipboard ({len(copied_prompt.encode())} bytes) differs from "
+            f"the full service prompt ({len(expected_prompt.encode())} bytes)."
+        )
+    assert copied_prompt.partition("\n\n")[2] == guest_copy_case.expected_guidance
 
 
-def _copy_and_await_feedback(page: Page, expected_prompt: str) -> None:
+def _open_guest_activity(page: Page, origin: str, case: GuestCopyCase) -> list[Request]:
+    """Navigate as a guest while collecting requests through the copy action.
+
+    :param page: Fresh anonymous page from the existing fixture.
+    :param origin: Live server origin. Example: http://localhost:port.
+    :param case: Baseline with the exact path to activity 6203.
+    :return: Live request list populated from before navigation onward.
+    :raises AssertionError: If the guest activity is unavailable or editable.
+    """
+    observed_requests: list[Request] = []
+
+    def observe_request(request: Request) -> None:
+        """Append the actual browser request to the ongoing observation.
+
+        :param request: Observed request. Example: activity detail GET.
+        :return: None after the request is recorded.
+        """
+        observed_requests.append(request)
+
+    page.on("request", observe_request)
+    response = page.goto(f"{origin}{case.activity_path}")
+    assert response is not None and response.status == HTTPStatus.OK
+    assert urlsplit(page.url).path == case.activity_path
+    assert response.request in observed_requests
+    expect(page.get_by_test_id("guest-auth-banner")).to_be_visible()
+    expect(page.get_by_test_id("edit-btn")).to_have_count(0)
+    page.evaluate("() => document.fonts.ready.then(() => true)")
+    return observed_requests
+
+
+def _copy_and_await_feedback(page: Page) -> str:
     """Click the real action and observe the native clipboard and toast lifecycle.
 
     :param page: Actual anonymous activity detail. Example: activity 6203.
-    :param expected_prompt: Full text from the server's Copy Prompt service.
-    :return: None after the success toast auto-dismisses.
+    :return: Native clipboard text after the success toast auto-dismisses.
     :raises AssertionError: If copying or the user-visible feedback differs.
     """
     toast = page.get_by_test_id("copy-prompt-toast")
@@ -148,12 +196,12 @@ def _copy_and_await_feedback(page: Page, expected_prompt: str) -> None:
     page.get_by_test_id("copy-prompt-btn").click()
     expect(toast).to_be_visible()
     expect(toast).to_have_text("Prompt copied to clipboard")
-    if page.evaluate("() => navigator.clipboard.readText()") != expected_prompt:
-        pytest.fail("The native clipboard did not receive the full activity prompt.")
+    clipboard_text: str = page.evaluate("() => navigator.clipboard.readText()")
     expect(page.get_by_test_id("copy-prompt-error-toast")).to_be_hidden()
     earned = page.get_by_test_id("alert-message").filter(has_text="You earned")
     expect(earned).to_have_count(0)
     expect(toast).to_be_hidden()
+    return clipboard_text
 
 
 def _assert_guest_domain_unchanged(

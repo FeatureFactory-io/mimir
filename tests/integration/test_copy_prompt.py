@@ -1,5 +1,8 @@
 """Integration tests for Copy Prompt (Act 17)."""
 
+from http import HTTPStatus
+from urllib.parse import urlencode
+
 import pytest
 from django.contrib.auth.models import User
 from django.db.models import Model
@@ -16,6 +19,7 @@ from methodology.models import (
     Skill,
     Workflow,
 )
+from methodology.services.copy_prompt_service import CopyPromptService
 from tests.support.experts_html import find_by_test_id
 
 
@@ -96,6 +100,41 @@ class TestCopyPromptIntegration:
         assert "Scaffold folders." in html
         assert "Copy prompt to use in your ADE" in html
         _assert_copy_receipt_metadata(html, "copy-prompt-btn", "activity", activity.pk)
+
+    def test_activity_create_with_crlf_keeps_guidance_and_builds_lf_prompt(
+        self,
+    ) -> None:
+        """Exercise the actual Add Activity POST with textarea-style form encoding.
+
+        :return: None after checking both saved Markdown and clipboard-ready text.
+        :raises AssertionError: If authoring or copying alters the Markdown content.
+        """
+        user = User.objects.create_user(username="copy-author")
+        playbook = Playbook.objects.create(name="Authoring", author=user)
+        workflow = Workflow.objects.create(playbook=playbook, name="Writing")
+        name = "Prepare the résumé"
+        guidance = (
+            "## Guide — 京都\n\n"
+            "- Keep `<draft>`, `</textarea>` and `&lt;` & Unicode ✅.\n\n"
+            "```text\n    Keep indentation and internal  spacing.\n```"
+        )
+        posted_guidance = guidance.replace("\n", "\r\n")
+        client = Client()
+        client.force_login(user)
+        response = client.post(
+            reverse("activity_create", args=(playbook.pk, workflow.pk)),
+            urlencode({"name": name, "guidance": posted_guidance}),
+            content_type="application/x-www-form-urlencoded",
+        )
+
+        assert response.status_code == HTTPStatus.FOUND
+        activity = Activity.objects.get(workflow=workflow, name=name)
+        assert activity.guidance == posted_guidance
+        prompt = CopyPromptService.build_activity_prompt(activity)
+        assert prompt.partition("\n\n")[2] == guidance
+        assert "\r" not in prompt
+        activity.refresh_from_db(fields=["guidance"])
+        assert activity.guidance == posted_guidance
 
     def test_activity_list_row_includes_copy_prompt_button(self):
         user, playbook, workflow, activity = self._fixture()

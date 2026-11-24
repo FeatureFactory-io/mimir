@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Dict, Iterable, List
 
+from django.utils.text import normalize_newlines
+
 from methodology.models import (
     Activity,
     Agent,
@@ -21,11 +23,15 @@ logger = logging.getLogger(__name__)
 
 
 def _join_instruction_and_body(instruction: str, body: str) -> str:
-    """Combine instruction line with optional Markdown body."""
-    normalized = (body or "").strip()
-    if normalized:
-        return f"{instruction}\n\n{normalized}"
-    return instruction
+    """Combine the instruction and outer-trimmed Markdown for clipboard use.
+
+    :param instruction: Prompt preamble. Example: "Follow this guidance."
+    :param body: Stored Markdown, which may contain CRLF or lone CR.
+    :return: Complete prompt with LF line endings, as read from an HTML textarea.
+    """
+    trimmed_body = (body or "").strip()
+    prompt = f"{instruction}\n\n{trimmed_body}" if trimmed_body else instruction
+    return normalize_newlines(prompt)
 
 
 def _activity_display_ref(activity: Activity) -> str:
