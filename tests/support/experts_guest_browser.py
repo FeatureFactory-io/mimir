@@ -35,6 +35,8 @@ def tab_to_guest_control(page: Page, target: Locator) -> None:
 
     Wait for each native focus scroll before the next Tab so rapid automation
     cannot leave a later control behind an earlier smooth-scroll destination.
+    Intermediate focus stops may be partly visible; the requested target must
+    end fully in the viewport.
 
     :param page: Page accepting keyboard input. Example: the anonymous Design list.
     :param target: Expected focus stop. Example: the Sign In link or Maria's wrapper.
@@ -47,15 +49,15 @@ def tab_to_guest_control(page: Page, target: Locator) -> None:
         assert page.evaluate(
             """async ({frameLimit, stableFrames}) => {
             let previous = '', stable = 0;
+            const focused = document.activeElement;
             for (let frame = 0; frame < frameLimit; frame++) {
                 await new Promise(requestAnimationFrame);
-                const box = document.activeElement.getBoundingClientRect();
+                if (document.activeElement !== focused) return false;
+                const box = focused.getBoundingClientRect();
                 const geometry = JSON.stringify([scrollX, scrollY, box.x, box.y, box.width, box.height]);
                 stable = geometry === previous ? stable + 1 : 0;
                 previous = geometry;
-                const visible = box.top >= 0 && box.left >= 0 &&
-                    box.bottom <= innerHeight && box.right <= innerWidth;
-                if (visible && stable >= stableFrames) return true;
+                if (stable >= stableFrames) return true;
             }
             return false;
         }""",
@@ -63,10 +65,42 @@ def tab_to_guest_control(page: Page, target: Locator) -> None:
                 "frameLimit": _FOCUS_SETTLE_FRAME_LIMIT,
                 "stableFrames": _FOCUS_STABLE_FRAME_COUNT,
             },
-        ), "Native Tab focus scrolling did not settle inside the viewport"
+        ), "Native Tab focus scrolling or focus identity did not settle"
         if target.evaluate("(control) => control === document.activeElement"):
             break
     expect(target).to_be_focused(timeout=_TOOLTIP_TIMEOUT_MS)
+    expect(target).to_be_in_viewport(ratio=1, timeout=_TOOLTIP_TIMEOUT_MS)
+
+
+def _settle_guest_control_position(wrapper: Locator) -> None:
+    """Finish native hover scrolling before the pointer enters the control.
+
+    :param wrapper: Actual guest control. Example: Maria's disabled-contact span.
+    :return: None at stable visible geometry. Example: three equal native frames.
+    :raises AssertionError: If native scrolling or layout does not settle.
+    :raises Error: If the actual browser cannot scroll or inspect the control.
+    """
+    wrapper.scroll_into_view_if_needed(timeout=_TOOLTIP_TIMEOUT_MS)
+    assert wrapper.evaluate(
+        """async (control, {frameLimit, stableFrames}) => {
+        let previous = '', stable = 0;
+        for (let frame = 0; frame < frameLimit; frame++) {
+            await new Promise(requestAnimationFrame);
+            const box = control.getBoundingClientRect();
+            const geometry = JSON.stringify([scrollX, scrollY, box.x, box.y, box.width, box.height]);
+            stable = geometry === previous ? stable + 1 : 0;
+            previous = geometry;
+            const visible = box.top >= 0 && box.left >= 0 &&
+                box.bottom <= innerHeight && box.right <= innerWidth;
+            if (visible && stable >= stableFrames) return true;
+        }
+        return false;
+    }""",
+        {
+            "frameLimit": _FOCUS_SETTLE_FRAME_LIMIT,
+            "stableFrames": _FOCUS_STABLE_FRAME_COUNT,
+        },
+    ), "Native hover scrolling did not settle inside the viewport"
 
 
 def activate_guest_tooltip(
@@ -83,6 +117,7 @@ def activate_guest_tooltip(
     """
     if activation == "hover":
         expect(wrapper).not_to_be_focused()
+        _settle_guest_control_position(wrapper)
         wrapper.hover(timeout=_TOOLTIP_TIMEOUT_MS)
         expect(wrapper).not_to_be_focused()
     elif activation == "keyboard":
