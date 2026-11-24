@@ -1,8 +1,29 @@
+"""Acceptance assertions for the public expert detail response."""
+
 from __future__ import annotations
+
+import re
+
 from behave import then
 from behave.runner import Context
+from django.test.html import Element, parse_html
 
-@then('"expert-contribution-summary" contains the complete stored nine-sentence paragraph')
+from methodology.models import ExpertProfile
+from tests.support.experts_html import element_text, find_by_test_id
+
+_SUMMARY_TEST_ID = "expert-contribution-summary"
+_TRUNCATION_CLASSES = frozenset(
+    {"expert-hint", "expert-summary-collapsed", "text-truncate"}
+)
+_INLINE_TRUNCATION = re.compile(
+    r"(?:^|;)\s*(?:(?:-webkit-)?line-clamp\s*:\s*\d|text-overflow\s*:\s*ellipsis\b)",
+    re.IGNORECASE,
+)
+
+
+@then(
+    '"expert-contribution-summary" contains the complete stored nine-sentence paragraph'
+)
 @then('"expert-contribution-summary" contains her full stored paragraph')
 def complete_stored_contribution_paragraph(context: Context) -> None:
     """Compare rendered summary with Maria's real stored baseline.
@@ -11,9 +32,22 @@ def complete_stored_contribution_paragraph(context: Context) -> None:
     :return: None. Example: exact complete paragraph, including final sentence.
     :raises AssertionError: For shortened or substituted text.
     """
-    raise NotImplementedError()
+    response = context.response
+    assert response.status_code == 200
+    maria_id = context.cedar_dataset.user_ids["mrodriguez"]
+    stored_summary = ExpertProfile.objects.values_list(
+        "contribution_summary", flat=True
+    ).get(user_id=maria_id)
+    assert stored_summary, "Cedar Maria must have a stored contribution summary."
+    person = response.context["person"]
+    assert person["subject_id"] == maria_id
+    assert person["summary"] == stored_summary
+    paragraph = find_by_test_id(response.content, _SUMMARY_TEST_ID)
+    assert paragraph.name == "p"
+    assert paragraph.children == [stored_summary], "The rendered paragraph differs."
 
-@then('the paragraph has no line clamp or ellipsis truncation')
+
+@then("the paragraph has no line clamp or ellipsis truncation")
 def public_paragraph_has_no_truncation_contract(context: Context) -> None:
     """Check the server-rendered summary has no truncation contract.
 
@@ -21,24 +55,45 @@ def public_paragraph_has_no_truncation_contract(context: Context) -> None:
     :return: None. Example: no clamp class, inline clamp or substituted ellipsis.
     :raises AssertionError: For server-authored truncation.
     """
-    raise NotImplementedError()
+    paragraph = find_by_test_id(context.response.content, _SUMMARY_TEST_ID)
+    attributes = dict(paragraph.attributes)
+    assert _TRUNCATION_CLASSES.isdisjoint(
+        attributes.get("class", "").split()
+    ), "The public summary uses a truncation class."
+    assert not _INLINE_TRUNCATION.search(
+        attributes.get("style", "")
+    ), "The public summary declares inline truncation."
+
 
 @then('the title includes "{title}"')
 def public_title_includes_identity(context: Context, title: str) -> None:
     """Assert the real response title contains the selected public identity, independently of page H1.
 
-:param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
-:param title: Expected public identity title fragment. Example: Maria Rodriguez.
-:return: None when the described real observation holds. Example: None.
-:raises AssertionError: Actual domain, response or recorded boundary differs."""
-    raise NotImplementedError()
+    :param context: Actual Django-client acceptance state. Example: Maria's detail GET.
+    :param title: Expected public identity title fragment. Example: Maria Rodriguez.
+    :return: None when the rendered document title contains the identity.
+    :raises AssertionError: If the response or document title differs.
+    """
+    response = context.response
+    assert response.status_code == 200
+    document = parse_html(response.content.decode(response.charset))
+    titles = [
+        child
+        for head in document.children
+        if isinstance(head, Element) and head.name == "head"
+        for child in head.children
+        if isinstance(child, Element) and child.name == "title"
+    ]
+    assert len(titles) == 1, "Expected one title in the document head."
+    assert title in element_text(titles[0]), "Expected identity in the document title."
 
-@then('the response status is {status:d}')
+
+@then("the response status is {status:d}")
 def public_response_has_expected_status(context: Context, status: int) -> None:
     """Assert the actual Django response status; missing and zero-score profiles share generic 404 content.
 
-:param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
-:param status: Expected actual HTTP status. Example: 404.
-:return: None when the described real observation holds. Example: None.
-:raises AssertionError: Actual domain, response or recorded boundary differs."""
+    :param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
+    :param status: Expected actual HTTP status. Example: 404.
+    :return: None when the described real observation holds. Example: None.
+    :raises AssertionError: Actual domain, response or recorded boundary differs."""
     raise NotImplementedError()

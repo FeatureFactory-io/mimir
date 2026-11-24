@@ -1,9 +1,11 @@
-from __future__ import annotations
-from behave import then
+"""Acceptance bindings for expert profiles and shared display phrases."""
 
-"S10 Django-client acceptance bindings; no browser or model substitute."
-from behave import given, when
+from __future__ import annotations
+
+from behave import given, then, when
 from behave.runner import Context
+
+from tests.support.experts_html import element_text, find_by_test_id
 
 
 @given("Maria is authenticated")
@@ -46,28 +48,43 @@ def profile_element_is_present(context: Context, test_id: str) -> None:
 
 @then('"{test_id}" reads "{value}"')
 def profile_element_reads(context: Context, test_id: str, value: str) -> None:
-    """Assert the profile signal's context and rendered value match.
+    """Assert an expert profile value in both the rendered HTML and its context.
 
-    :param context: Real response context; example: contributions mapping.
-    :param test_id: Supported signal hook; example: "profile-karma-total".
+    :param context: Real Django-client response; example: Maria's public detail.
+    :param test_id: Stable display hook; example: "expert-karma-total".
     :param value: Required display text; example: "8,200".
-    :return: None; example: mapped context value and HTML assertions pass.
-    :raises ValueError: If an unsupported hook is supplied.
-    :raises AssertionError: If the actual value differs.
+    :return: None when the displayed value and projection match.
+    :raises NotImplementedError: For a pending profile hook.
+    :raises AssertionError: If the public response or value differs.
     """
-    raise NotImplementedError()
+    if test_id != "expert-karma-total":
+        raise NotImplementedError()
+    response = context.response
+    assert response.status_code == 200
+    assert response.resolver_match.url_name == "expert_detail"
+    person = response.context["person"]
+    assert person["formatted_karma"] == value
+    assert f"{person['total_karma']:,}" == value
+    assert element_text(find_by_test_id(response.content, test_id)) == value
 
 
 @then('the primary playbook category is "{category}"')
 def profile_primary_category_is(context: Context, category: str) -> None:
-    """Assert the owner's projected category and rendered category hook.
+    """Assert the expert's projected category and rendered category badge.
 
-    :param context: Actual profile response; example: Maria's profile.
+    :param context: Actual profile response; example: Maria's public detail.
     :param category: Required category; example: "Design".
-    :return: None; example: context and rendered value agree.
-    :raises AssertionError: If the expected category is not displayed.
+    :return: None when the public badge and projection match.
+    :raises NotImplementedError: For the pending own-profile route.
+    :raises AssertionError: If the public response or category differs.
     """
-    raise NotImplementedError()
+    response = context.response
+    if response.resolver_match.url_name != "expert_detail":
+        raise NotImplementedError()
+    assert response.status_code == 200
+    assert response.context["person"]["primary_category"] == category
+    badge = find_by_test_id(response.content, "expert-primary-category")
+    assert element_text(badge) == category
 
 
 @then("existing account/profile controls remain available")
