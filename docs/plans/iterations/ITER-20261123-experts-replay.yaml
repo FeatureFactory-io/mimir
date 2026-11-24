@@ -32,6 +32,8 @@ iteration:
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
     exact-AT runner implementation is N4. No product or scenario footprint expanded.
 conflict_map:
+  methodology/services/copy_prompt_service.py:
+  - S37
   tests/integration/test_pip_admin_review_view.py:
   - S32
   templates/pips/admin_review.html:
@@ -51,6 +53,7 @@ conflict_map:
   - S23
   - S27
   tests/integration/test_copy_prompt.py:
+  - S37
   - S36
   docs/features/steps/experts_category_steps.py:
   - S47
@@ -5823,6 +5826,8 @@ scenarios:
     skeleton_commit: 155ddebbe23098b398e67cafc6d33369fc652ace
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/integration/test_copy_prompt.py
+    - methodology/services/copy_prompt_service.py
     - docs/experts-replay/pin-evidence/S37.json
     - docs/plans/iterations/experts/S37-karma-copy-02.md
     - tests/e2e/test_karma_guest_copy.py
@@ -5935,11 +5940,29 @@ scenarios:
           - do-test-first
           - do-not-mock-in-integration-tests
           - do-semantic-versioning-on-ui-elements
+      - id: N3a-clipboard-line-endings
+        title: Align clipboard-ready text with ordinary persisted authoring input
+        bpe: BPE-02
+        depends_on:
+        - N3-real-guest-clipboard
+        footprint:
+        - methodology/services/copy_prompt_service.py
+        - tests/integration/test_copy_prompt.py
+        - tests/e2e/test_karma_guest_copy.py
+        gate:
+          command: make test-experts-s37-browser
+          compatibility_command: pytest tests/integration/test_copy_prompt.py -x
+        guidance_bundle:
+          activity: BPE/BPE-02-Implement_Backend.md
+          rules:
+          - do-test-first
+          - do-not-mock-in-integration-tests
+        notes: Real normal browser authoring stores CRLF, while textarea parsing returns LF to the clipboard. Normalize only the assembled clipboard-ready service output to LF, preserve stored Markdown and existing LF output, and retain exact full-text equality. Add durable empty, rich LF, CRLF and lone-CR browser variants with unchanged guest domain and zero receipts. No new product scope or user confirmation is required.
       - id: N4-guest-definition-of-done
         title: Conjunctive server, log and real-browser rollup
         bpe: BPE-06
         depends_on:
-        - N3-real-guest-clipboard
+        - N3a-clipboard-line-endings
         footprint: []
         tests:
         - tests/integration/test_karma_guest_copy.py
