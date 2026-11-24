@@ -31,6 +31,8 @@ from mcp_integration.facade.workspace_mount import (
 
 logger = logging.getLogger(__name__)
 _RECEIPT_PATH = "/api/consumption-receipts/"
+_RECEIPT_CAPABILITY_HEADER = "X-Mimir-Consumption-Receipts"
+_RECEIPT_CAPABILITY_VERSION = "v1"
 _RECEIPT_ATTEMPTS = 2
 _RETRYABLE_RECEIPT_STATUS = {408, 429, 500, 502, 503, 504}
 _MCP_DETAIL_CHANNEL = "mcp_detail"
@@ -150,6 +152,7 @@ def get_playbook(
         raise
     return _complete_mcp_detail(
         payload,
+        response=response,
         tool_name=tool,
         entity_type="playbook",
         entity_id=playbook_id,
@@ -269,6 +272,7 @@ def get_workflow(workflow_id: int, event_identity: str | None = None) -> dict:
         raise
     return _complete_mcp_detail(
         payload,
+        response=response,
         tool_name=tool,
         entity_type="workflow",
         entity_id=workflow_id,
@@ -384,6 +388,7 @@ def get_activity(activity_id: int, event_identity: str | None = None) -> dict:
         raise
     return _complete_mcp_detail(
         payload,
+        response=response,
         tool_name=tool,
         entity_type="activity",
         entity_id=activity_id,
@@ -861,6 +866,7 @@ def get_skill(skill_id: int, event_identity: str | None = None) -> dict:
         raise
     return _complete_mcp_detail(
         payload,
+        response=response,
         tool_name=tool,
         entity_type="skill",
         entity_id=skill_id,
@@ -1040,6 +1046,7 @@ def get_rule(rule_id: int, event_identity: str | None = None) -> dict:
         raise
     return _complete_mcp_detail(
         payload,
+        response=response,
         tool_name=tool,
         entity_type="rule",
         entity_id=rule_id,
@@ -1166,6 +1173,7 @@ def get_agent(agent_id: int, event_identity: str | None = None) -> dict:
         raise
     return _complete_mcp_detail(
         payload,
+        response=response,
         tool_name=tool,
         entity_type="agent",
         entity_id=agent_id,
@@ -1316,6 +1324,7 @@ def get_artifact(artifact_id: int, event_identity: str | None = None) -> dict:
         raise
     return _complete_mcp_detail(
         payload,
+        response=response,
         tool_name=tool,
         entity_type="artifact",
         entity_id=artifact_id,
@@ -1457,6 +1466,7 @@ def get_phase(phase_id: int, event_identity: str | None = None) -> dict:
         raise
     return _complete_mcp_detail(
         payload,
+        response=response,
         tool_name=tool,
         entity_type="phase",
         entity_id=phase_id,
@@ -1562,6 +1572,7 @@ def get_pip(pip_id: int, event_identity: str | None = None) -> dict:
         raise
     return _complete_mcp_detail(
         payload,
+        response=response,
         tool_name=tool,
         entity_type="pip",
         entity_id=pip_id,
@@ -1978,6 +1989,7 @@ def _resolve_consumption_event_identity(value: str | None) -> UUID:
 def _complete_mcp_detail(
     payload: dict,
     *,
+    response: httpx.Response,
     tool_name: str,
     entity_type: str,
     entity_id: int,
@@ -1986,12 +1998,14 @@ def _complete_mcp_detail(
     """Record consumption only after authorized retrieval and serialization.
 
     :param payload: Decoded actual content. Example: {"id": 6203}.
+    :param response: Actual authorized response carrying protocol metadata.
     :param tool_name: Existing registered tool. Example: "get_activity".
     :param entity_type: Supported kind. Example: "activity".
     :param entity_id: Actual entity ID. Example: 6203.
     :param event_identity: Invocation UUID. Example: UUID(int=1).
     :return: Original unchanged payload. Example: {"id": 6203}.
     :raises RuntimeError: Receipt outcome cannot be confirmed.
+    :raises ValueError: Invalid content or an unsupported advertised protocol.
     :raises PermissionError: Receipt revalidation denies access.
     """
     if not isinstance(payload, dict) or not (
@@ -2000,6 +2014,13 @@ def _complete_mcp_detail(
     ):
         logger.info(_DETAIL_REJECT_LOG, tool_name, entity_id, event_identity)
         raise ValueError("The authorized detail response is invalid.")
+    if not _consumption_receipts_supported(response):
+        logger.info(
+            "_complete_mcp_detail | branch | tool=%s entity_id=%s reason=legacy_server receipt_sent=false",
+            tool_name,
+            entity_id,
+        )
+        return payload
     logger.info(
         "_complete_mcp_detail | entry | tool=%s entity_type=%s entity_id=%s event_identity=%s channel=%s",
         tool_name,
@@ -2416,6 +2437,48 @@ def _write_export_plan(
     return completed, result
 
 
+def _consumption_receipts_supported(response: httpx.Response) -> bool:
+    """Negotiate the receipt version from this actual authorized response.
+
+    :param response: Actual FOB response. Example: an authorized detail HTTP 200.
+    :return: Whether strict v1 receipts apply. Example: False for an older FOB.
+    :raises ValueError: An explicitly advertised version is unsupported.
+    """
+    version = response.headers.get(_RECEIPT_CAPABILITY_HEADER)
+    if version is None:
+        return False
+    if version != _RECEIPT_CAPABILITY_VERSION:
+        logger.info("receipt_capability | validation | reason=unsupported_version")
+        raise ValueError("Unsupported consumption receipt protocol advertised by FOB.")
+    return True
+
+
+def _fetch_export_bundle(
+    route: str, payload: dict[str, object], tool: str, trace: str
+) -> tuple[dict, bool]:
+    """Validate authorized content and protocol before any local file writes.
+
+    :param route: Existing export route. Example: /api/workflows/6202/export/.
+    :param payload: Existing export options. Example: {"folder_name": "Review"}.
+    :param tool: Existing tool name. Example: export_workflow_to_local.
+    :param trace: Body-free operation context. Example: entity_id=6202.
+    :return: Native bundle and receipt support. Example: (bundle, True).
+    :raises ValueError: Invalid content or unsupported advertised protocol.
+    :raises PermissionError: Existing authorization denies export.
+    :raises RuntimeError: Actual server or transport cannot complete export.
+    """
+    try:
+        response = get_client().post(route, json=payload)
+        bundle = check_response(response, tool)
+        return bundle, _consumption_receipts_supported(response)
+    except httpx.TransportError, PermissionError, RuntimeError, ValueError:
+        logger.info(
+            "facade_export | error | %s reason=bundle_unavailable completed_file_count=0 receipt_sent=false",
+            trace,
+        )
+        raise
+
+
 def _run_local_export(
     *,
     entity_type: Literal["workflow", "playbook"],
@@ -2430,14 +2493,7 @@ def _run_local_export(
     tool = f"export_{entity_type}_to_local"
     trace = f"tool={tool} entity_type={entity_type} entity_id={entity_id} event_identity={event_identity} channel={_EXPORT_CHANNEL}"
     logger.info("facade_export | entry | %s", trace)
-    try:
-        bundle = check_response(get_client().post(route, json=payload), tool)
-    except httpx.TransportError, PermissionError, RuntimeError, ValueError:
-        logger.info(
-            "facade_export | error | %s reason=bundle_unavailable completed_file_count=0 receipt_sent=false",
-            trace,
-        )
-        raise
+    bundle, receipts_supported = _fetch_export_bundle(route, payload, tool, trace)
     files_written, result = _write_export_plan(
         lambda: planner(
             bundle=bundle,
@@ -2447,10 +2503,15 @@ def _run_local_export(
         ),
         trace,
     )
-    _record_completed_export(
-        entity_type=entity_type,
-        entity_id=entity_id,
-        event_identity=event_identity,
-        files_written=files_written,
-    )
+    if receipts_supported:
+        _record_completed_export(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            event_identity=event_identity,
+            files_written=files_written,
+        )
+    else:
+        logger.info(
+            "facade_export | exit | %s reason=legacy_server receipt_sent=false", trace
+        )
     return result

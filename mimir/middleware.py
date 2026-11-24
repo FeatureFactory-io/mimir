@@ -17,6 +17,25 @@ logger = logging.getLogger(__name__)
 _REQUEST_ID_HEADER = "X-Request-ID"
 
 
+class ConsumptionReceiptCapabilityMiddleware(MiddlewareMixin):
+    """Advertise the receipt protocol independently of request correlation."""
+
+    receipt_version = "v1"
+
+    def process_response(
+        self, request: HttpRequest, response: HttpResponseBase
+    ) -> HttpResponseBase:
+        """Advertise the supported protocol on actual API responses.
+
+        :param request: Completed request. Example: GET /api/playbooks/6201/.
+        :param response: Existing response. Example: authorized HTTP 200 JSON.
+        :return: Original response with protocol metadata. Example: version v1.
+        """
+        if request.path_info.startswith("/api/"):
+            response["X-Mimir-Consumption-Receipts"] = self.receipt_version
+        return response
+
+
 class RequestIDMiddleware(MiddlewareMixin):
     """Correlate a request, log records, and its response with a safe ID."""
 

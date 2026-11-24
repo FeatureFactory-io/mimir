@@ -82,6 +82,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Custom middleware for request ID tracking
     "mimir.middleware.RequestIDMiddleware",
+    "mimir.middleware.ConsumptionReceiptCapabilityMiddleware",
 ]
 
 ROOT_URLCONF = "mimir.urls"
