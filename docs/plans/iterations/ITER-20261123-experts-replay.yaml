@@ -7030,7 +7030,7 @@ scenarios:
       - S07
       - S14
     implementation_plan: docs/plans/iterations/experts/S15-experts-reach-02.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S04
@@ -9682,6 +9682,11 @@ scenarios:
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
     - docs/experts-replay/pin-evidence/S46.json
+    - methodology/karma_views.py
+    - methodology/api/consumption_views.py
+    - tests/integration/test_receipt_rejection_logging.py
+    - tests/support/karma_mcp.py
+    - tests/unit/test_karma_stdio_scope.py
     - docs/features/steps/experts_karma_failure_steps.py
     - docs/plans/iterations/experts/S46-karma-event-02.md
     - tests/e2e/test_karma_failures.py
@@ -9801,11 +9806,25 @@ scenarios:
           - do-not-mock-in-integration-tests
           - do-assert-log-story
           - pytest
+      - id: N1a-rejection-log-repair
+        title: Preserve safe receipt identity in rejection logs and explicit stdio test ownership
+        bpe: BPE-02
+        depends_on: []
+        footprint:
+        - methodology/karma_views.py
+        - methodology/api/consumption_views.py
+        - tests/integration/test_receipt_rejection_logging.py
+        - tests/support/karma_mcp.py
+        - tests/unit/test_karma_stdio_scope.py
+        gate:
+          command: pytest tests/integration/test_receipt_rejection_logging.py tests/unit/test_karma_stdio_scope.py -x
+        authorization: Necessary bounded producer repair for real S46 N1 reds under approved autonomy; preserve receipt policy, responses and database ownership protections.
       - id: N2-server-at
         title: Bind exact server contract without simulated clipboard
         bpe: BPE-04
         depends_on:
         - N1-boundaries
+        - N1a-rejection-log-repair
         footprint:
         - docs/features/steps/experts_karma_failure_steps.py
         gate:
