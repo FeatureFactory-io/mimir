@@ -43,6 +43,7 @@ jobs:
       MIMIR_ENV: test
       DJANGO_SETTINGS_MODULE: mimir.settings
       DATABASE_URL: postgresql://huginn:huginn@localhost:5432/mimir_test
+      EXPERTS_OWNED_PG_TESTS: '1'
 
     services:
       postgres:
@@ -177,6 +178,7 @@ jobs:
 
       - name: Build and push web image → ECR
         if: vars.AWS_ACCOUNT_ID != ''
+        id: web-image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -190,6 +192,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
 
       - name: Build and push MCP facade image → Docker Hub
+        id: facade-image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -201,6 +204,47 @@ jobs:
           cache-from: type=gha,scope=mcp-facade
           cache-to: type=gha,scope=mcp-facade,mode=max
           platforms: linux/amd64,linux/arm64
+
+      - name: Record exact candidate image identities
+        env:
+          SOURCE_REVISION: ${{ github.sha }}
+          WEB_DIGEST: ${{ steps.web-image.outputs.digest }}
+          FACADE_DIGEST: ${{ steps.facade-image.outputs.digest }}
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_SUFFIX: ${{ steps.tag.outputs.suffix }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          web = os.environ['WEB_DIGEST']
+          facade = os.environ['FACADE_DIGEST']
+          digest_pattern = r'sha256:[0-9a-f]{64}'
+          assert re.fullmatch(digest_pattern, facade), 'Missing facade digest'
+          if os.environ['ECR_REGISTRY']:
+              assert re.fullmatch(digest_pattern, web), 'Missing web digest'
+          receipt = {
+              'source_revision': os.environ['SOURCE_REVISION'],
+              'run_id': os.environ['GITHUB_RUN_ID'],
+              'image_suffix': os.environ['IMAGE_SUFFIX'],
+              'web_image': os.environ['ECR_REGISTRY'] + '/mimir',
+              'web_digest': web,
+              'facade_image': os.environ['DOCKERHUB_IMAGE'],
+              'facade_digest': facade,
+              'platforms': ['linux/amd64', 'linux/arm64'],
+          }
+          Path('candidate-image-identities.json').write_text(
+              json.dumps(receipt, indent=2) + '\n'
+          )
+          PY
+
+      - name: Retain exact candidate image identities
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-image-identities-${{ github.run_id }}
+          path: candidate-image-identities.json
 
   # ── 3. Deploy to idle EB env + staging smoke ─────────────────────────────
   deploy-idle:
