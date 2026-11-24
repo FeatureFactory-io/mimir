@@ -1,8 +1,25 @@
 {
-  "status": "planned_unimplemented",
   "owner": "S23",
   "contract": "GALDR-SUMMARY-01",
-  "evidence_observed": false,
-  "responses": [],
-  "note": "Empty structural placeholder; must fail finite-script validation until implemented after GO."
+  "responses": [
+    {
+      "kind": "response",
+      "content": "Maria maintains Accessibility Audit Playbook. She contributed Keyboard Navigation Audit to a published playbook.",
+      "model": "scripted",
+      "usage": {
+        "input_tokens": 210,
+        "output_tokens": 15
+      },
+      "stop_reason": "end_turn"
+    },
+    {
+      "kind": "response",
+      "model": "scripted",
+      "stop_reason": "end_turn",
+      "content": {
+        "recommendation": "ACCEPT",
+        "reasoning": "The proposed activity fits the review workflow."
+      }
+    }
+  ]
 }

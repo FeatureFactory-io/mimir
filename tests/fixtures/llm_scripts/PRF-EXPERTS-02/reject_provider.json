@@ -1,8 +1,28 @@
 {
-  "status": "planned_unimplemented",
   "owner": "S23",
   "contract": "GALDR-SUMMARY-01",
-  "evidence_observed": false,
-  "responses": [],
-  "note": "Empty structural placeholder; must fail finite-script validation until implemented after GO."
+  "responses": [
+    {
+      "kind": "error",
+      "code": "provider_response_private_marker"
+    },
+    {
+      "kind": "response",
+      "model": "scripted",
+      "stop_reason": "end_turn",
+      "content": {
+        "holistic_assessment": {
+          "overall_coherence": "COHERENT",
+          "reasoning": "The proposed activity has a clear place in the workflow."
+        },
+        "change_assessments": [
+          {
+            "change_id": "$CHANGE_ID",
+            "recommendation": "ACCEPT",
+            "reasoning": "The proposed activity fits the review workflow."
+          }
+        ]
+      }
+    }
+  ]
 }

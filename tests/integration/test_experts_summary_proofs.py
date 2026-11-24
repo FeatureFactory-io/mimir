@@ -2,21 +2,34 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import replace
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 import pytest
 from django.db import connection
+from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 
 from methodology.llm.base import LLMError, LLMResponse
-from methodology.models import Activity, AgentInteraction, ExpertProfile, KarmaAward
+from methodology.models import (
+    Activity,
+    AgentInteraction,
+    ExpertProfile,
+    KarmaAward,
+    PipChange,
+    ProcessImprovementProposal,
+)
 from methodology.services.contribution_summary_boundary import (
     PublicContributionSummaryBoundary,
     SummaryBoundaryError,
     SummaryTraceEvent,
     trace_as_agent_story,
 )
+from methodology.services.experts_service import ExpertsService
+from methodology.services.galdr_prompts import HOLISTIC_SYSTEM_PROMPT, SYSTEM_PROMPT
+from methodology.services.pip_service import PIPService
 from methodology.services.public_contribution_evidence import (
     MAX_EVIDENCE_CHARACTERS,
     PublicContributionEvidenceService,
@@ -24,11 +37,21 @@ from methodology.services.public_contribution_evidence import (
 from tests.support.agent_story import assert_agent_story
 from tests.support.experts_data import seed_s27_summary_privacy_variant
 from tests.support.experts_logs import capture_experts_logs
+from tests.support.experts_summary_data import (
+    SUMMARY_CHANGE_BODY,
+    SUMMARY_PIP_BODY,
+    SUMMARY_PIP_TITLE,
+    SUMMARY_SCRIPTS,
+    load_summary_script,
+    prepare_summary_submission,
+    summary_processing_scope,
+)
 from tests.support.log_story import assert_log_story
 from tests.support.scripted_llm import ScriptedLLM, ScriptedLLMCall
 
 _S27_SCRIPTS = Path(__file__).parents[1] / "fixtures/llm_scripts/PRF-EXPERTS-03"
 _S27_RUN = "s27-proof-01"
+_S23_RUN = "s23-agent-proof-01"
 _S27_BOUNDARY = "PublicContributionSummaryBoundary.complete"
 _S27_LOGGERS = (
     "methodology.services.contribution_summary_boundary",
@@ -313,48 +336,200 @@ def test_s27_summary_with_exhausted_script_fails_loudly(
     )
 
 
+def _run_s23_agent_case(
+    script_name: str,
+    *,
+    rates: Mapping[str, tuple[str, str]] | None = None,
+    without_usage: bool = False,
+    holistic: bool = True,
+) -> tuple[
+    Mapping[str, Any],
+    ProcessImprovementProposal,
+    ScriptedLLM,
+    AgentInteraction,
+    LLMResponse | LLMError,
+]:
+    """Run one real Cedar submission with the PRF's finite two-turn queue."""
+    case = seed_s27_summary_privacy_variant()
+    pip = prepare_summary_submission(case["dataset"])
+    summary, assessment = load_summary_script(
+        SUMMARY_SCRIPTS / script_name, pip.changes.get().pk
+    )
+    if without_usage:
+        assert isinstance(summary, LLMResponse)
+        summary = replace(summary, usage={})
+    before = tuple(KarmaAward.objects.order_by("pk").values_list())
+    with (
+        summary_processing_scope((summary, assessment), rates=rates) as llm,
+        override_settings(GALDR_USE_TARGET_STATE=holistic),
+    ):
+        PIPService.submit_for_review(
+            actor=pip.created_by, pip=pip, correlation_id=_S23_RUN
+        )
+    pip.refresh_from_db()
+    assert pip.status == pip.STATUS_REVIEWED
+    assert pip.changes.get().galdr_recommendation == PipChange.GALDR_ACCEPT
+    assert tuple(KarmaAward.objects.order_by("pk").values_list()) == before
+    assert ExpertsService().project_user(pip.created_by_id).total_points == 8200
+    interaction = AgentInteraction.objects.get(pip=pip)
+    assert interaction.correlation_id == _S23_RUN
+    assert interaction.subject_id == pip.created_by_id
+    assert interaction.workflow_id == "contribution_summary"
+    assert interaction.call_id
+    assert len(llm.calls) == 2
+    return case, pip, llm, interaction, summary
+
+
+def _assert_s23_trace(
+    interaction: AgentInteraction,
+    pip: ProcessImprovementProposal,
+    llm: ScriptedLLM,
+    *,
+    failure: str = "",
+    holistic: bool = True,
+) -> None:
+    """Check persisted lifecycle and boundary events in actual order."""
+    public, private = llm.calls
+    assert public.max_tokens == 1024
+    assert private.max_tokens == (16384 if holistic else 4096)
+    assert private.system == (HOLISTIC_SYSTEM_PROMPT if holistic else SYSTEM_PROMPT)
+    assert SUMMARY_PIP_TITLE in private.messages[0].content
+    payload = public.messages[0].content.splitlines()[1]
+    evidence = json.loads(payload)["facts"]
+    public_ids = ",".join(
+        str(pk) for pk in sorted({fact["playbook_id"] for fact in evidence})
+    )
+    beats = {
+        "entry": (
+            f"subject_id={pip.created_by_id}",
+            f"pip_id={pip.pk}",
+            f"correlation_id={_S23_RUN}",
+        ),
+        "public_evidence": (
+            "scope=public_released",
+            f"evidence_chars={len(payload)}",
+            f"public_playbook_ids={public_ids}",
+        ),
+        "llm_call": ("model=scripted", "tools=none", "max_tokens=1024"),
+    }
+    expected_order = ("entry", "entry", "public_evidence", "llm_call")
+    if failure:
+        beats["failure"] = (f"reason_code={failure}", "last_good_retained=true")
+        expected_order += ("failure", "exit", "failure")
+    else:
+        beats["validation"] = ("status=accepted", "sentence_count=2", "limit=14")
+        profile = ExpertProfile.objects.get(user_id=pip.created_by_id)
+        beats["domain_write"] = (f"profile_id={profile.pk}", "summary_updated=true")
+        expected_order += ("validation", "exit", "domain_write")
+    beats["exit"] = (f"outcome={interaction.outcome}", "karma_awarded=0")
+    assert tuple(event["beat"] for event in interaction.events) == (
+        *expected_order,
+        "exit",
+    )
+    assert_agent_story(
+        {"workflow_id": interaction.workflow_id, "events": interaction.events},
+        workflow="contribution_summary",
+        beats=beats,
+    )
+
+
 @pytest.mark.agent_proof
 @pytest.mark.django_db(transaction=True)
-def test_s23_submission_agent_story_happy() -> None:
-    """Prove PRF-EXPERTS-01 through real submit/query/prompt/store orchestration.
-
-    :return: None. Example: None after trace, requests and unchanged-ledger assertions.
-    :raises AssertionError: If a real collaborator is bypassed or prose is not stored.
-    """
-    raise NotImplementedError()
+@pytest.mark.parametrize("holistic", [True, False])
+def test_s23_submission_agent_story_happy(holistic: bool) -> None:
+    """Prove PRF-EXPERTS-01 through both real assessment modes."""
+    name = "happy.json" if holistic else "happy_per_change.json"
+    case, pip, llm, interaction, summary = _run_s23_agent_case(
+        f"PRF-EXPERTS-01/{name}", holistic=holistic
+    )
+    assert isinstance(summary, LLMResponse)
+    call = llm.calls[0]
+    _assert_s27_request(call, case)
+    _assert_s27_body_free(str(interaction.events), case, call, summary.content)
+    assert interaction.outcome == "success"
+    assert not interaction.error_code
+    assert (
+        ExpertProfile.objects.get(user_id=pip.created_by_id).contribution_summary
+        == summary.content
+    )
+    _assert_s23_trace(interaction, pip, llm, holistic=holistic)
 
 
 @pytest.mark.agent_proof
 @pytest.mark.django_db(transaction=True)
 def test_s23_submission_agent_story_reject() -> None:
-    """Prove essential PRF-EXPERTS-02 failure retention and assessment continuity.
-
-    :return: None. Example: None after failure trace and last-good assertions.
-    :raises AssertionError: For domain_write on failure or changed PIP recovery.
-    """
-    raise NotImplementedError()
+    """Prove PRF-EXPERTS-02 retention and assessment continuity."""
+    case, pip, llm, interaction, summary = _run_s23_agent_case(
+        "PRF-EXPERTS-02/reject_provider.json"
+    )
+    assert isinstance(summary, LLMError)
+    assert interaction.outcome == "failure"
+    assert interaction.error_code == "provider_failed"
+    profile = ExpertProfile.objects.get(user_id=pip.created_by_id)
+    person = next(
+        row
+        for row in case["dataset"].oracle["people"]
+        if row["username"] == "mrodriguez"
+    )
+    assert profile.contribution_summary == person["summary"]
+    assert profile.summary_updated_at is None
+    assert profile.summary_status == ExpertProfile.SummaryStatus.FAILURE
+    assert profile.summary_error_code == interaction.error_code
+    assert profile.last_summary_correlation_id == interaction.correlation_id
+    assert (
+        interaction.input_tokens
+        is interaction.output_tokens
+        is interaction.estimated_cost_usd
+        is None
+    )
+    _assert_s23_trace(interaction, pip, llm, failure="provider_failed")
+    _assert_s27_body_free(str(interaction.events), case, llm.calls[0], str(summary))
 
 
 @pytest.mark.agent_proof
 @pytest.mark.django_db(transaction=True)
 def test_s23_submission_with_private_sentinels_agent_story_happy() -> None:
-    """Prove PRF-EXPERTS-03 using the actual recorded summary request.
-
-    :return: None. Example: None after public-fact retention and sentinel exclusions.
-    :raises AssertionError: For private/unpublished evidence or mutable scores.
-    """
-    raise NotImplementedError()
+    """Prove PRF-EXPERTS-03 filters the real current unpublished ADD."""
+    case, pip, llm, interaction, summary = _run_s23_agent_case(
+        "PRF-EXPERTS-03/submission_happy.json"
+    )
+    assert isinstance(summary, LLMResponse)
+    public_call, assessment_call = llm.calls
+    _assert_s27_request(public_call, case)
+    current_sentinels = (SUMMARY_PIP_TITLE, SUMMARY_PIP_BODY, SUMMARY_CHANGE_BODY)
+    public_request = public_call.system + public_call.messages[0].content
+    assert not any(sentinel in public_request for sentinel in current_sentinels)
+    assert SUMMARY_CHANGE_BODY in assessment_call.messages[0].content
+    assert pip.playbook.visibility == "public" and pip.playbook.status == "released"
+    _assert_s23_trace(interaction, pip, llm)
+    _assert_s27_body_free(str(interaction.events), case, public_call, summary.content)
+    assert not any(
+        sentinel in str(interaction.events) for sentinel in current_sentinels
+    )
 
 
 @pytest.mark.agent_proof
 @pytest.mark.django_db(transaction=True)
-def test_s23_summary_interaction_agent_story_happy() -> None:
-    """Prove PRF-OBS-01 persisted correlation, usage, latency and unknown cost.
-
-    :return: None. Example: None after configured-rate and missing-rate assertions.
-    :raises AssertionError: For missing trace metadata or fabricated zero cost.
-    """
-    raise NotImplementedError()
+@pytest.mark.parametrize("pricing", ["known", "unknown_rates", "unknown_usage"])
+def test_s23_summary_interaction_agent_story_happy(pricing: str) -> None:
+    """Prove PRF-OBS-01 persisted correlation, usage, latency, cost and nulls."""
+    rates = None if pricing == "unknown_rates" else {"scripted": ("3", "15")}
+    name = "unknown_rates.json" if rates is None else "happy.json"
+    case, pip, llm, interaction, summary = _run_s23_agent_case(
+        f"PRF-OBS-01/{name}", rates=rates, without_usage=pricing == "unknown_usage"
+    )
+    assert isinstance(summary, LLMResponse)
+    assert interaction.outcome == "success"
+    assert interaction.model == "scripted"
+    assert isinstance(interaction.latency_ms, Decimal) and interaction.latency_ms >= 0
+    assert interaction.input_tokens == summary.usage.get("input_tokens")
+    assert interaction.output_tokens == summary.usage.get("output_tokens")
+    assert interaction.estimated_cost_usd == (
+        Decimal("0.000855") if pricing == "known" else None
+    )
+    interaction.full_clean()
+    _assert_s23_trace(interaction, pip, llm)
+    _assert_s27_body_free(str(interaction.events), case, llm.calls[0], summary.content)
 
 
 @pytest.mark.agent_proof
@@ -513,9 +688,16 @@ def _assert_s27_boundary_logs(
     correlation = f"correlation_id={_S27_RUN}"
     beats = {"entry": ("| entry |", f"subject_id={subject_id}", correlation)}
     if model_called:
+        beats["validation"] = (
+            "| validation |",
+            correlation,
+            "visibility=public_released",
+            "evidence_chars=",
+        )
         beats["processing"] = (
             "| processing |",
             correlation,
+            "operation=complete",
             "model=scripted",
             "tools=none",
         )

@@ -1,19 +1,56 @@
+"""Persist the public completion without acquiring award or decision capabilities."""
+
 from __future__ import annotations
 
-"""Persist the S27 boundary result without acquiring model/domain capabilities."""
+import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
+from types import MappingProxyType
 from typing import Any
+
+from django.core.exceptions import ValidationError
+from django.db import DatabaseError, transaction
 from django.utils import timezone
+
 from methodology.llm.base import BaseLLM, LLMResponse
-from methodology.models import ExpertProfile
+from methodology.models import (
+    AgentInteraction,
+    ExpertProfile,
+    ProcessImprovementProposal,
+)
 from methodology.services.contribution_summary_boundary import (
+    _CORRELATION_ID,
+    _MODEL_ID,
     PublicContributionSummaryBoundary,
     SummaryBoundaryError,
     SummaryBoundaryResult,
     SummaryTraceEvent,
+    trace_as_agent_story,
 )
+from methodology.services.contribution_summary_prompts import (
+    MAX_SUMMARY_TOKENS,
+)
+from methodology.services.public_contribution_evidence import (
+    _MAX_DATABASE_ID,
+    _SENSITIVE_TEXT,
+)
+
+logger = logging.getLogger(__name__)
+
+_REFRESH = "ContributionSummaryService.refresh_for_submission"
+_WORKFLOW = "contribution_summary"
+_MILLISECONDS_PER_SECOND = 1000
+_TOKENS_PER_RATE_UNIT = Decimal(1_000_000)
+_LATENCY_PRECISION = Decimal("0.001")
+_COST_PRECISION = Decimal("0.0000000001")
+_PROFILE_METADATA_FIELDS = (
+    "summary_status",
+    "summary_error_code",
+    "last_summary_correlation_id",
+)
+_LIFECYCLE_BEATS = frozenset({"entry", "domain_write", "failure", "exit"})
 
 
 @dataclass(frozen=True)
@@ -45,7 +82,35 @@ class ContributionSummaryService:
         :return: None. Example: None.
         :raises ValueError: For invalid dependencies.
         """
-        raise NotImplementedError()
+        if not (
+            isinstance(boundary, PublicContributionSummaryBoundary)
+            and isinstance(llm, BaseLLM)
+            and callable(llm.complete)
+            and isinstance(llm.model_id, str)
+            and _MODEL_ID.fullmatch(llm.model_id)
+            and not _SENSITIVE_TEXT.search(llm.model_id)
+            and isinstance(rates, Mapping)
+            and callable(clock)
+        ):
+            raise ValueError("A valid contribution summary composition is required.")
+        for model, pair in rates.items():
+            if (
+                not isinstance(model, str)
+                or not _MODEL_ID.fullmatch(model)
+                or not isinstance(pair, tuple)
+                or len(pair) != 2
+                or any(
+                    not isinstance(rate, Decimal) or not rate.is_finite() or rate < 0
+                    for rate in pair
+                )
+            ):
+                raise ValueError(
+                    "Contribution summary rates must be finite decimal pairs."
+                )
+        self._boundary = boundary
+        self._llm = llm
+        self._rates = MappingProxyType(dict(rates))
+        self._clock = clock
 
     def refresh_for_submission(
         self, pip_id: int, correlation_id: str
@@ -62,7 +127,33 @@ class ContributionSummaryService:
         :return: Safe outcome. Example: SummaryRefreshResult("success", True, 8, "cedar-submit-01").
         :raises ValueError: For malformed boundary identifiers.
         """
-        raise NotImplementedError()
+        self._validate_identifiers(pip_id, correlation_id)
+        subject_id = self._processing_subject(pip_id)
+        if subject_id is None:
+            logger.info(
+                "%s | branch | pip_id=%s correlation_id=%s reason=stale_submission",
+                _REFRESH,
+                pip_id,
+                correlation_id,
+            )
+            return SummaryRefreshResult("skipped", False, None, correlation_id)
+        logger.info(
+            "%s | entry | subject_id=%s pip_id=%s correlation_id=%s",
+            _REFRESH,
+            subject_id,
+            pip_id,
+            correlation_id,
+        )
+        started_at = self._clock()
+        try:
+            completed = self._complete_boundary(subject_id, correlation_id)
+        except SummaryBoundaryError as error:
+            return self._handle_boundary_failure(
+                subject_id, pip_id, correlation_id, error, started_at
+            )
+        return self._store_completed(
+            subject_id, pip_id, correlation_id, completed, started_at
+        )
 
     @staticmethod
     def _validate_identifiers(pip_id: int, correlation_id: str) -> None:
@@ -73,7 +164,14 @@ class ContributionSummaryService:
         :return: None. Example: None for valid IDs.
         :raises ValueError: For invalid IDs, including booleans.
         """
-        raise NotImplementedError()
+        if type(pip_id) is not int or not 0 < pip_id <= _MAX_DATABASE_ID:
+            raise ValueError("A positive PIP ID is required.")
+        if (
+            not isinstance(correlation_id, str)
+            or not _CORRELATION_ID.fullmatch(correlation_id)
+            or _SENSITIVE_TEXT.search(correlation_id)
+        ):
+            raise ValueError("A safe processing correlation ID is required.")
 
     @staticmethod
     def _processing_subject(pip_id: int) -> int | None:
@@ -86,7 +184,15 @@ class ContributionSummaryService:
         :return: Real creator ID or None. Example: 42.
         :raises ValueError: For a malformed proposal ID.
         """
-        raise NotImplementedError()
+        if type(pip_id) is not int or not 0 < pip_id <= _MAX_DATABASE_ID:
+            raise ValueError("A positive PIP ID is required.")
+        return (
+            ProcessImprovementProposal.objects.filter(
+                pk=pip_id, status=ProcessImprovementProposal.STATUS_PROCESSING_GALDR
+            )
+            .values_list("created_by_id", flat=True)
+            .first()
+        )
 
     def _complete_boundary(
         self, subject_id: int, correlation_id: str
@@ -98,7 +204,17 @@ class ContributionSummaryService:
         :return: S27 result. Example: SummaryBoundaryResult(text, response, trace).
         :raises SummaryBoundaryError: For sanitized boundary failure.
         """
-        raise NotImplementedError()
+        logger.info(
+            "%s | config | workflow=%s model=%s max_tokens=%s tools=none correlation_id=%s",
+            _REFRESH,
+            _WORKFLOW,
+            self._llm.model_id,
+            MAX_SUMMARY_TOKENS,
+            correlation_id,
+        )
+        return self._boundary.complete(
+            subject_id, llm=self._llm, correlation_id=correlation_id
+        )
 
     def _store_completed(
         self,
@@ -121,7 +237,38 @@ class ContributionSummaryService:
         :return: Stored success or recovered failure. Example: success result.
         :raises ValueError: For inconsistent internal metadata.
         """
-        raise NotImplementedError()
+        latency_ms = self._elapsed_ms(started_at)
+        validated = next(
+            event.details for event in completed.trace if event.beat == "validation"
+        )
+        logger.info(
+            "%s | validation | %s correlation_id=%s",
+            _REFRESH,
+            validated,
+            correlation_id,
+        )
+        try:
+            result = self._persist_success(
+                subject_id, pip_id, correlation_id, completed, latency_ms
+            )
+        except (DatabaseError, ValidationError):
+            return self._record_failure(
+                subject_id,
+                pip_id,
+                correlation_id,
+                "storage_failed",
+                completed.trace,
+                completed.response,
+                latency_ms,
+            )
+        logger.info(
+            "%s | exit | outcome=success summary_updated=true interaction_id=%s "
+            "karma_awarded=0 correlation_id=%s",
+            _REFRESH,
+            result.interaction_id,
+            correlation_id,
+        )
+        return result
 
     def _persist_success(
         self,
@@ -145,7 +292,35 @@ class ContributionSummaryService:
         :return: Safe success result. Example: SummaryRefreshResult("success", True, 8, "cedar-submit-01").
         :raises DatabaseError: When atomic storage fails.
         """
-        raise NotImplementedError()
+        trace = (
+            SummaryTraceEvent(
+                "entry",
+                f"subject_id={subject_id} pip_id={pip_id} correlation_id={correlation_id}",
+            ),
+            *completed.trace,
+        )
+        with transaction.atomic():
+            profile = self._lock_profile(subject_id)
+            self._write_success_profile(
+                profile, completed.text, correlation_id, timezone.now()
+            )
+            trace = self._append_event(
+                trace, "domain_write", f"profile_id={profile.pk} summary_updated=true"
+            )
+            trace = self._append_event(
+                trace, "exit", "outcome=success summary_updated=true karma_awarded=0"
+            )
+            interaction = AgentInteraction(
+                subject_id=subject_id,
+                pip_id=pip_id,
+                correlation_id=correlation_id,
+                outcome=AgentInteraction.Outcome.SUCCESS,
+                events=self._serialize_trace(trace),
+                **self._interaction_values(completed.response, latency_ms),
+            )
+            interaction.full_clean()
+            interaction.save(force_insert=True)
+        return SummaryRefreshResult("success", True, interaction.pk, correlation_id)
 
     def _handle_boundary_failure(
         self,
@@ -165,7 +340,15 @@ class ContributionSummaryService:
         :return: Failure result. Example: SummaryRefreshResult("failure", False, 9, "cedar-submit-01").
         :raises ValueError: For inconsistent internal metadata.
         """
-        raise NotImplementedError()
+        return self._record_failure(
+            subject_id,
+            pip_id,
+            correlation_id,
+            error.code,
+            error.trace,
+            error.response,
+            self._elapsed_ms(started_at),
+        )
 
     def _record_failure(
         self,
@@ -179,8 +362,8 @@ class ContributionSummaryService:
     ) -> SummaryRefreshResult:
         """Attempt failure storage, retaining last-good prose even if storage fails.
 
-        Append orchestration failure/exit without rewriting S27 events. If
-        recording itself fails, emit a body-free storage-failure log and return
+        Preserve S27 events and delegate failure storage. If recording itself
+        fails, emit a body-free storage-failure log and return
         interaction_id=None; existing Galdr assessment must still proceed.
 
         :param subject_id: Profile owner. Example: 42.
@@ -193,7 +376,38 @@ class ContributionSummaryService:
         :return: Safe failure result. Example: SummaryRefreshResult("failure", False, None, "cedar-submit-01").
         :raises ValueError: For an invalid internal reason code.
         """
-        raise NotImplementedError()
+        logger.info(
+            "%s | error | outcome=failure reason_code=%s correlation_id=%s",
+            _REFRESH,
+            code,
+            correlation_id,
+        )
+        trace = (
+            SummaryTraceEvent(
+                "entry",
+                f"subject_id={subject_id} pip_id={pip_id} correlation_id={correlation_id}",
+            ),
+            *trace,
+        )
+        interaction_id = None
+        try:
+            interaction_id = self._persist_failure(
+                subject_id, pip_id, correlation_id, code, trace, response, latency_ms
+            )
+        except (DatabaseError, ValidationError):
+            logger.error(
+                "%s | error | reason_code=storage_failed correlation_id=%s",
+                _REFRESH,
+                correlation_id,
+            )
+        logger.info(
+            "%s | exit | outcome=failure summary_updated=false pip_lifecycle=unchanged "
+            "interaction_id=%s correlation_id=%s",
+            _REFRESH,
+            interaction_id if interaction_id is not None else "none",
+            correlation_id,
+        )
+        return SummaryRefreshResult("failure", False, interaction_id, correlation_id)
 
     def _persist_failure(
         self,
@@ -214,13 +428,43 @@ class ContributionSummaryService:
         :param pip_id: Trigger proposal. Example: 7301.
         :param correlation_id: Safe run ID. Example: "cedar-submit-01".
         :param code: Sanitized reason. Example: "output_validation_failed".
-        :param trace: Completed failure trace. Example: partial boundary plus failure/exit.
+        :param trace: Lifecycle entry followed by actual boundary events.
         :param response: Optional received response. Example: rejected LLMResponse.
         :param latency_ms: Measured duration. Example: Decimal("125").
         :return: Persisted interaction ID. Example: 9.
         :raises DatabaseError: When storage fails.
         """
-        raise NotImplementedError()
+        with transaction.atomic():
+            profile = self._lock_profile(subject_id)
+            retained = bool(profile.contribution_summary.strip())
+            failure_details = f"reason_code={code}"
+            if retained:
+                failure_details += " last_good_retained=true"
+            trace = self._append_event(trace, "failure", failure_details)
+            trace = self._append_event(
+                trace,
+                "exit",
+                "outcome=failure summary_updated=false karma_awarded=0 pip_lifecycle=unchanged",
+            )
+            self._write_failure_profile(profile, code, correlation_id)
+            interaction = AgentInteraction(
+                subject_id=subject_id,
+                pip_id=pip_id,
+                correlation_id=correlation_id,
+                outcome=AgentInteraction.Outcome.FAILURE,
+                error_code=code,
+                events=self._serialize_trace(trace),
+                **self._interaction_values(response, latency_ms),
+            )
+            interaction.full_clean()
+            interaction.save(force_insert=True)
+        logger.info(
+            "%s | branch | last_good_retained=%s karma_awarded=0 correlation_id=%s",
+            _REFRESH,
+            str(retained).lower(),
+            correlation_id,
+        )
+        return interaction.pk
 
     @staticmethod
     def _lock_profile(subject_id: int) -> ExpertProfile:
@@ -230,14 +474,17 @@ class ContributionSummaryService:
         :return: Locked profile. Example: Maria's ExpertProfile.
         :raises DatabaseError: For failed creation/locking.
         """
-        raise NotImplementedError()
+        profile, _ = ExpertProfile.objects.select_for_update().get_or_create(
+            user_id=subject_id
+        )
+        return profile
 
     @staticmethod
     def _write_success_profile(
         profile: ExpertProfile,
         text: str,
         correlation_id: str,
-        updated_at: timezone.datetime,
+        updated_at: datetime,
     ) -> None:
         """Update only canonical S03 summary fields after boundary validation.
 
@@ -252,7 +499,19 @@ class ContributionSummaryService:
         :return: None. Example: None after saving selected fields.
         :raises DatabaseError: When the save fails.
         """
-        raise NotImplementedError()
+        profile.contribution_summary = text
+        profile.summary_updated_at = updated_at
+        profile.summary_status = ExpertProfile.SummaryStatus.SUCCESS
+        profile.summary_error_code = ""
+        profile.last_summary_correlation_id = correlation_id
+        profile.full_clean()
+        profile.save(
+            update_fields=(
+                "contribution_summary",
+                "summary_updated_at",
+                *_PROFILE_METADATA_FIELDS,
+            )
+        )
 
     @staticmethod
     def _write_failure_profile(
@@ -266,7 +525,11 @@ class ContributionSummaryService:
         :return: None. Example: None after metadata-only save.
         :raises DatabaseError: When the metadata save fails.
         """
-        raise NotImplementedError()
+        profile.summary_status = ExpertProfile.SummaryStatus.FAILURE
+        profile.summary_error_code = code
+        profile.last_summary_correlation_id = correlation_id
+        profile.full_clean()
+        profile.save(update_fields=_PROFILE_METADATA_FIELDS)
 
     @staticmethod
     def _append_event(
@@ -283,7 +546,9 @@ class ContributionSummaryService:
         :return: Extended immutable trace. Example: boundary events plus domain_write.
         :raises ValueError: For unsupported beats or unsafe details.
         """
-        raise NotImplementedError()
+        if beat not in _LIFECYCLE_BEATS or not isinstance(details, str) or not details:
+            raise ValueError("Invalid contribution summary lifecycle event.")
+        return (*trace, SummaryTraceEvent(beat, details))
 
     @staticmethod
     def _serialize_trace(trace: tuple[SummaryTraceEvent, ...]) -> list[dict[str, str]]:
@@ -293,7 +558,7 @@ class ContributionSummaryService:
         :return: JSON-compatible event objects. Example: [{"beat": "exit", "details": "outcome=success"}].
         :raises ValueError: For malformed or unsafe trace data.
         """
-        raise NotImplementedError()
+        return trace_as_agent_story(trace)["events"]
 
     def _interaction_values(
         self, response: LLMResponse | None, latency_ms: Decimal
@@ -305,7 +570,20 @@ class ContributionSummaryService:
         :return: Safe measurement fields. Example: {"input_tokens": None, "estimated_cost_usd": None}.
         :raises ValueError: For invalid normalized metadata.
         """
-        raise NotImplementedError()
+        model = (response.model if response is not None else "") or self._llm.model_id
+        usage = response.usage if response is not None else {}
+        input_tokens, output_tokens = usage.get("input_tokens"), usage.get(
+            "output_tokens"
+        )
+        return {
+            "model": model,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "latency_ms": latency_ms,
+            "estimated_cost_usd": self._estimated_cost(
+                model, input_tokens, output_tokens
+            ),
+        }
 
     def _estimated_cost(
         self, model: str, input_tokens: int | None, output_tokens: int | None
@@ -318,7 +596,19 @@ class ContributionSummaryService:
         :return: Estimated USD or unknown. Example: None without rates.
         :raises ValueError: For invalid negative token counts.
         """
-        raise NotImplementedError()
+        if any(
+            tokens is not None and (type(tokens) is not int or tokens < 0)
+            for tokens in (input_tokens, output_tokens)
+        ):
+            raise ValueError("Token usage must be nonnegative integer counts.")
+        rates = self._rates.get(model)
+        if rates is None or input_tokens is None or output_tokens is None:
+            return None
+        input_rate, output_rate = rates
+        cost = (
+            input_rate * input_tokens + output_rate * output_tokens
+        ) / _TOKENS_PER_RATE_UNIT
+        return cost.quantize(_COST_PRECISION)
 
     def _elapsed_ms(self, started_at: float) -> Decimal:
         """Measure nonnegative monotonic boundary duration.
@@ -327,4 +617,7 @@ class ContributionSummaryService:
         :return: Milliseconds. Example: Decimal("125.000").
         :raises ValueError: For invalid/nonmonotonic measurements.
         """
-        raise NotImplementedError()
+        elapsed = Decimal(str(self._clock() - started_at)) * _MILLISECONDS_PER_SECOND
+        if not elapsed.is_finite() or elapsed < 0:
+            raise ValueError("Invalid monotonic summary duration.")
+        return elapsed.quantize(_LATENCY_PRECISION)

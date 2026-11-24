@@ -2,11 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from methodology.llm.base import BaseLLM
-
 import logging
 import threading
 from typing import ClassVar
@@ -15,9 +10,14 @@ from django.conf import settings
 from django.db import close_old_connections, transaction
 from django.utils import timezone
 
+from methodology.llm.base import BaseLLM
 from methodology.models import PipChange, ProcessImprovementProposal
 from methodology.services import galdr_client
-from methodology.services.galdr_client import GaldrLLMError
+from methodology.services.contribution_summary_boundary import _CORRELATION_ID
+from methodology.services.contribution_summary_factory import (
+    build_contribution_summary_service,
+)
+from methodology.services.galdr_client import GaldrClient, GaldrLLMError
 from methodology.services.galdr_prompts import (
     build_change_prompt,
     build_playbook_context_summary,
@@ -25,6 +25,10 @@ from methodology.services.galdr_prompts import (
 )
 from methodology.services.galdr_validator import GaldrStructuralValidator
 from methodology.services.pip_apply_changes_service import PipApplyChangesService
+from methodology.services.public_contribution_evidence import (
+    _MAX_DATABASE_ID,
+    _SENSITIVE_TEXT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,30 +43,42 @@ class GaldrEngine:
     }
 
     @classmethod
-    def schedule(cls, pip_id: int) -> None:
-        """Fire-and-forget thread; survives the HTTP response lifecycle."""
-        if getattr(settings, "GALDR_EAGER", False):
-            try:
-                cls.assess_sync(pip_id)
-            except ProcessImprovementProposal.DoesNotExist:
-                logger.error("Galdr eager: missing pip id=%s", pip_id)
-            except Exception:
-                logger.exception("Galdr eager failure pip id=%s", pip_id)
+    def schedule(
+        cls,
+        pip_id: int,
+        *,
+        llm: BaseLLM | None = None,
+        correlation_id: str | None = None,
+    ) -> None:
+        """Dispatch Galdr synchronously or via the existing daemon thread.
+
+        :param pip_id: Committed proposal ID. Example: 7301.
+        :param llm: Captured processing port. Example: ScriptedLLM([...]).
+        :param correlation_id: Submission correlation; absent for legacy assess-only calls.
+        :return: None after scheduling.
+        :raises ValueError: For a malformed proposal or correlation identifier.
+        """
+        if type(pip_id) is not int or not 0 < pip_id <= _MAX_DATABASE_ID:
+            raise ValueError("A positive PIP ID is required.")
+        if correlation_id is not None and (
+            not isinstance(correlation_id, str)
+            or not _CORRELATION_ID.fullmatch(correlation_id)
+            or _SENSITIVE_TEXT.search(correlation_id)
+        ):
+            raise ValueError("A safe processing correlation ID is required.")
+        if settings.GALDR_EAGER:
+            cls._run_scheduled_processing(pip_id, llm, correlation_id)
             return
 
         def _runner() -> None:
             close_old_connections()
             try:
-                cls.assess_sync(pip_id)
-            except ProcessImprovementProposal.DoesNotExist:
-                logger.error("Galdr: missing pip id=%s", pip_id)
-            except Exception:
-                logger.exception("Galdr: unhandled failure pip id=%s", pip_id)
+                cls._run_scheduled_processing(pip_id, llm, correlation_id)
+            finally:
+                close_old_connections()
 
         threading.Thread(
-            target=_runner,
-            name=f"galdr-pip-{pip_id}",
-            daemon=True,
+            target=_runner, name=f"galdr-pip-{pip_id}", daemon=True
         ).start()
         logger.info("GaldrEngine.schedule dispatched pip id=%s", pip_id)
 
@@ -100,11 +116,15 @@ class GaldrEngine:
             logger.warning("Galdr failure handler: pip id=%s missing", pip_id)
 
     @classmethod
-    def assess_sync(cls, pip_id: int) -> None:
+    def assess_sync(cls, pip_id: int, *, llm: BaseLLM | None = None) -> None:
         """
         Blocking assessment used by daemon thread and ``manage.py run_galdr``.
 
         Performs LLM turns **outside** DB locks to avoid holding rows open.
+
+        :param pip_id: Processing proposal. Example: 7301.
+        :param llm: Captured processing port or None for the existing client selector.
+        :return: None after assessment or retry-state recovery.
         """
         holistic = getattr(settings, "GALDR_USE_TARGET_STATE", True)
         logger.info(
@@ -113,12 +133,14 @@ class GaldrEngine:
             "holistic" if holistic else "per_change",
         )
         if holistic:
-            cls._assess_sync_holistic(pip_id)
+            cls._assess_sync_holistic(pip_id, llm=llm)
         else:
-            cls._assess_sync_per_change(pip_id)
+            cls._assess_sync_per_change(pip_id, llm=llm)
 
     @classmethod
-    def _assess_sync_per_change(cls, pip_id: int) -> None:
+    def _assess_sync_per_change(
+        cls, pip_id: int, *, llm: BaseLLM | None = None
+    ) -> None:
         bootstrap = ProcessImprovementProposal.objects.select_related("playbook").get(
             pk=pip_id
         )
@@ -132,7 +154,11 @@ class GaldrEngine:
 
         playbook = bootstrap.playbook
         summary_text = build_playbook_context_summary(playbook)
-        client = galdr_client.get_galdr_client()
+        client = (
+            galdr_client.get_galdr_client()
+            if llm is None
+            else GaldrClient._from_port(llm)
+        )
 
         payloads: list[tuple[int, str, str]] = []
         try:
@@ -150,21 +176,26 @@ class GaldrEngine:
                 rec_text, reasoning = client.evaluate_change(user_prompt)
                 rec_upper = rec_text.upper()
                 if rec_upper not in cls.REC_CODE:
-                    raise GaldrLLMError(f"Unsupported recommendation '{rec_text}'.")
+                    raise GaldrLLMError("Unsupported recommendation.")
                 payloads.append((change.pk, rec_upper, reasoning))
-        except GaldrLLMError as exc:
-            logger.warning("Galdr assess LLM phase failed pip id=%s: %s", pip_id, exc)
+        except GaldrLLMError:
+            logger.warning(
+                "Galdr assess LLM phase failed pip id=%s reason=assessment_failed",
+                pip_id,
+            )
             cls._mark_submitted_retry(pip_id)
             return
         except Exception:
-            logger.exception("Galdr assess unexpected pip id=%s", pip_id)
+            logger.error(
+                "Galdr assess unexpected pip id=%s reason=assessment_failed", pip_id
+            )
             cls._mark_submitted_retry(pip_id)
             return
 
         cls._persist_recommendations(pip_id, payloads, holistic_note="")
 
     @classmethod
-    def _assess_sync_holistic(cls, pip_id: int) -> None:
+    def _assess_sync_holistic(cls, pip_id: int, *, llm: BaseLLM | None = None) -> None:
         bootstrap = ProcessImprovementProposal.objects.select_related("playbook").get(
             pk=pip_id
         )
@@ -199,27 +230,31 @@ class GaldrEngine:
                 changes,
                 ref_map=ref_map,
             )
-            client = galdr_client.get_galdr_client()
+            client = (
+                galdr_client.get_galdr_client()
+                if llm is None
+                else GaldrClient._from_port(llm)
+            )
             holistic, payloads = client.evaluate_pip_holistically(prompt)
-        except GaldrLLMError as exc:
+        except GaldrLLMError:
             logger.warning(
-                "Galdr holistic LLM phase failed pip id=%s: %s",
+                "Galdr holistic LLM phase failed pip id=%s reason=assessment_failed",
                 pip_id,
-                exc,
             )
             cls._mark_submitted_retry(pip_id)
             return
         except Exception:
-            logger.exception("Galdr holistic unexpected pip id=%s", pip_id)
+            logger.error(
+                "Galdr holistic unexpected pip id=%s reason=assessment_failed", pip_id
+            )
             cls._mark_submitted_retry(pip_id)
             return
 
         for _cid, rec_upper, _why in payloads:
             if rec_upper not in cls.REC_CODE:
                 logger.warning(
-                    "Galdr holistic unsupported recommendation pip id=%s rec=%s",
+                    "Galdr holistic unsupported recommendation pip id=%s",
                     pip_id,
-                    rec_upper,
                 )
                 cls._mark_submitted_retry(pip_id)
                 return
@@ -297,12 +332,14 @@ class GaldrEngine:
                 pip.save(update_fields=update_fields)
                 logger.info("Galdr persisted pip id=%s → reviewed", pip_id)
         except Exception:
-            logger.exception("Galdr DB persist pip id=%s", pip_id)
+            logger.error(
+                "Galdr DB persist pip id=%s reason=assessment_storage_failed", pip_id
+            )
             cls._mark_submitted_retry(pip_id)
 
     @classmethod
     def _run_scheduled_processing(
-        cls, pip_id: int, llm: BaseLLM | None, correlation_id: str
+        cls, pip_id: int, llm: BaseLLM | None, correlation_id: str | None
     ) -> None:
         """Execute the existing eager/thread worker with explicit dependencies.
 
@@ -315,7 +352,24 @@ class GaldrEngine:
         :return: None. Example: None after assess_sync.
         :raises ValueError: For malformed invocation arguments.
         """
-        raise NotImplementedError()
+        try:
+            if correlation_id is not None:
+                if llm is not None:
+                    cls._refresh_contribution_summary(pip_id, llm, correlation_id)
+                else:
+                    logger.info(
+                        "GaldrEngine._run_scheduled_processing | branch | pip_id=%s "
+                        "correlation_id=%s reason=provider_disabled",
+                        pip_id,
+                        correlation_id,
+                    )
+            cls.assess_sync(pip_id, llm=llm)
+        except ProcessImprovementProposal.DoesNotExist:
+            logger.error("Galdr processing missing pip id=%s", pip_id)
+        except Exception:  # noqa: BLE001
+            logger.error(
+                "Galdr processing failed pip id=%s reason=assessment_failed", pip_id
+            )
 
     @classmethod
     def _processing_is_current(cls, pip_id: int) -> bool:
@@ -325,7 +379,11 @@ class GaldrEngine:
         :return: Whether processing is current. Example: False for a reviewed PIP.
         :raises ValueError: For a malformed identifier.
         """
-        raise NotImplementedError()
+        if type(pip_id) is not int or not 0 < pip_id <= _MAX_DATABASE_ID:
+            raise ValueError("A positive PIP ID is required.")
+        return ProcessImprovementProposal.objects.filter(
+            pk=pip_id, status=ProcessImprovementProposal.STATUS_PROCESSING_GALDR
+        ).exists()
 
     @classmethod
     def _refresh_contribution_summary(
@@ -343,4 +401,16 @@ class GaldrEngine:
         :return: None. Example: None after success or isolated summary failure.
         :raises ValueError: For malformed boundary arguments.
         """
-        raise NotImplementedError()
+        try:
+            if llm is not None and cls._processing_is_current(pip_id):
+                build_contribution_summary_service(llm).refresh_for_submission(
+                    pip_id, correlation_id
+                )
+        except Exception:  # noqa: BLE001
+            # Summary composition/storage cannot interrupt existing assessment.
+            logger.error(
+                "GaldrEngine._refresh_contribution_summary | error | pip_id=%s "
+                "correlation_id=%s reason_code=summary_refresh_failed",
+                pip_id,
+                correlation_id,
+            )

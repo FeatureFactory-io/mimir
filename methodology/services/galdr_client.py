@@ -2,23 +2,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from methodology.llm.base import BaseLLM
-
 import json
 import logging
 import re
 
 from django.conf import settings
 
+from methodology.llm.anthropic_adapter import AnthropicAdapter
+from methodology.llm.base import BaseLLM, LLMError, LLMMessage, LLMResponse
 from methodology.services.galdr_prompts import HOLISTIC_SYSTEM_PROMPT, SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
 _SINGLE_CHANGE_MAX_TOKENS = 4096
 _HOLISTIC_MAX_TOKENS = 16384  # Allow complete diagnostics for large (e.g. 58-row) PIPs.
+_ASSESSMENT_TEMPERATURE = 1.0  # Preserve the earlier SDK default.
 
 
 class GaldrLLMError(Exception):
@@ -59,46 +57,76 @@ class GaldrClient:
         raw = self._call_llm_raw(user_prompt, system=HOLISTIC_SYSTEM_PROMPT)
         return self._parse_holistic_response(raw)
 
-    def _call_llm_raw(self, user_prompt: str, *, system: str = SYSTEM_PROMPT) -> str:
-        model = getattr(settings, "GALDR_MODEL", "claude-sonnet-4-20250514")
-        try:
-            import anthropic
-        except ImportError as exc:
-            raise GaldrLLMError("anthropic package is not installed") from exc
+    _llm: BaseLLM | None = None
 
-        logger.info(
-            "GaldrClient anthropic model=%s user_chars=%s", model, len(user_prompt)
+    def _call_llm_raw(self, user_prompt: str, *, system: str = SYSTEM_PROMPT) -> str:
+        """Ask the selected port for the private assessment response.
+
+        :param user_prompt: Existing Galdr prompt. Example: a change review.
+        :param system: Existing evaluation policy. Example: SYSTEM_PROMPT.
+        :return: Assessment JSON text.
+        :raises GaldrLLMError: For failed or truncated assessment.
+        """
+        llm = self._llm
+        if llm is None:
+            llm = AnthropicAdapter(settings.GALDR_MODEL)
+        max_tokens = (
+            _HOLISTIC_MAX_TOKENS
+            if system == HOLISTIC_SYSTEM_PROMPT
+            else _SINGLE_CHANGE_MAX_TOKENS
         )
-        client = anthropic.Anthropic()
-        message = client.messages.create(
-            model=model,
-            max_tokens=(
-                _HOLISTIC_MAX_TOKENS
-                if system == HOLISTIC_SYSTEM_PROMPT
-                else _SINGLE_CHANGE_MAX_TOKENS
-            ),
-            system=system,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
-        if getattr(message, "stop_reason", None) == "max_tokens":
+        return self._complete_via_port(llm, user_prompt, system, max_tokens)
+
+    @classmethod
+    def _from_port(cls, llm: BaseLLM) -> GaldrClient:
+        """Attach a provider port to the existing assessment parser client.
+
+        Do not add a raising constructor that changes current instantiation.
+
+        :param llm: Valid provider port. Example: ScriptedLLM([...]).
+        :return: Existing parser client using that port. Example: GaldrClient().
+        :raises ValueError: For an invalid provider port.
+        """
+        if not isinstance(llm, BaseLLM) or not callable(llm.complete):
+            raise ValueError("Galdr requires a completion port.")
+        client = cls()
+        client._llm = llm
+        return client
+
+    def _complete_via_port(
+        self, llm: BaseLLM, user_prompt: str, system: str, max_tokens: int
+    ) -> str:
+        """Request private assessment text for the existing unchanged parsers.
+
+        Preserve existing assessment token limits and convert LLMError to the
+        existing GaldrLLMError contract. No public-evidence filtering belongs here:
+        authorized private assessment and public summary are distinct requests.
+
+        :param llm: Selected provider port. Example: ScriptedLLM([...]).
+        :param user_prompt: Existing assessment prompt. Example: "Change [7]...".
+        :param system: Existing assessment system policy. Example: HOLISTIC_SYSTEM_PROMPT.
+        :param max_tokens: Existing bound. Example: 16384.
+        :return: Raw text for existing parsing. Example: valid holistic verdict JSON.
+        :raises GaldrLLMError: For provider, empty or truncated assessment output.
+        """
+        try:
+            response = llm.complete(
+                (LLMMessage("user", user_prompt),),
+                system=system,
+                max_tokens=max_tokens,
+                temperature=_ASSESSMENT_TEMPERATURE,
+            )
+        except (LLMError, ValueError):
+            raise GaldrLLMError("Galdr assessment provider failed.") from None
+        if not isinstance(response, LLMResponse):
+            raise GaldrLLMError("Galdr assessment returned invalid metadata.")
+        if response.stop_reason == "max_tokens":
             raise GaldrLLMError(
                 "Galdr assessment was truncated at the output token limit."
             )
-        pieces: list[str] = []
-        for block in getattr(message, "content", []) or []:
-            txt = getattr(block, "text", None)
-            if txt:
-                pieces.append(txt)
-        text = "".join(pieces).strip()
-        if not text:
-            first = getattr(message, "content", [None])[0]
-            text = getattr(first, "text", "") or str(message.content)
-        logger.info(
-            "GaldrClient anthropic response_chars=%s stop=%s",
-            len(text),
-            getattr(message.stop_reason, "value", message.stop_reason),
-        )
-        return text
+        if not isinstance(response.content, str) or not response.content.strip():
+            raise GaldrLLMError("Galdr assessment returned no text.")
+        return response.content
 
     @staticmethod
     def _strip_code_fences(raw: str) -> str:
@@ -111,7 +139,7 @@ class GaldrClient:
         try:
             payload = json.loads(blob)
         except json.JSONDecodeError as exc:
-            logger.warning("Galdr parse JSON failure raw=%s", blob[:400])
+            logger.warning("Galdr parse JSON failure reason=invalid_json")
             raise GaldrLLMError("Invalid JSON from model") from exc
         rec = str(payload.get("recommendation", "")).strip().upper()
         why = str(payload.get("reasoning", "")).strip()
@@ -128,7 +156,7 @@ class GaldrClient:
         try:
             payload = json.loads(blob)
         except json.JSONDecodeError as exc:
-            logger.warning("Galdr holistic parse JSON failure raw=%s", blob[:400])
+            logger.warning("Galdr holistic parse JSON failure reason=invalid_json")
             raise GaldrLLMError("Invalid JSON from model") from exc
 
         holistic_raw = payload.get("holistic_assessment") or {}
@@ -203,38 +231,6 @@ def get_galdr_client() -> GaldrClient:
     return StubGaldrClient()
 
 
-@classmethod
-def _from_port(cls, llm: BaseLLM) -> "GaldrClient":
-    """Attach a provider port to the existing assessment parser client.
-
-    Do not add a raising constructor that changes current instantiation.
-
-    :param llm: Valid provider port. Example: ScriptedLLM([...]).
-    :return: Existing parser client using that port. Example: GaldrClient().
-    :raises ValueError: For an invalid provider port.
-    """
-    raise NotImplementedError()
-
-
-def _complete_via_port(
-    self, llm: BaseLLM, user_prompt: str, system: str, max_tokens: int
-) -> str:
-    """Request private assessment text for the existing unchanged parsers.
-
-    Preserve existing assessment token limits and convert LLMError to the
-    existing GaldrLLMError contract. No public-evidence filtering belongs here:
-    authorized private assessment and public summary are distinct requests.
-
-    :param llm: Selected provider port. Example: ScriptedLLM([...]).
-    :param user_prompt: Existing assessment prompt. Example: "Change [7]...".
-    :param system: Existing assessment system policy. Example: HOLISTIC_SYSTEM_PROMPT.
-    :param max_tokens: Existing bound. Example: 16384.
-    :return: Raw text for existing parsing. Example: valid holistic verdict JSON.
-    :raises GaldrLLMError: For provider, empty or truncated assessment output.
-    """
-    raise NotImplementedError()
-
-
 def _select_galdr_port(injected: BaseLLM | None) -> BaseLLM | None:
     """Select explicit/scoped injection or the configured production adapter.
 
@@ -246,4 +242,10 @@ def _select_galdr_port(injected: BaseLLM | None) -> BaseLLM | None:
     :return: Provider or legacy-selection sentinel. Example: None.
     :raises ValueError: For an invalid configured provider.
     """
-    raise NotImplementedError()
+    if injected is not None:
+        if not isinstance(injected, BaseLLM) or not callable(injected.complete):
+            raise ValueError("Galdr requires a completion port.")
+        return injected
+    if settings.GALDR_USE_ANTHROPIC:
+        return AnthropicAdapter(settings.GALDR_MODEL)
+    return None

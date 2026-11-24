@@ -5,20 +5,19 @@ Shared by Django views, admin, and MCP tool wrappers.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from methodology.llm.base import BaseLLM
-
 import logging
 from datetime import datetime
 from typing import Iterable, Optional
+from uuid import uuid4
 
+from django.conf import settings
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Count, Max, QuerySet
 from django.utils import timezone
 
+from methodology.llm.base import BaseLLM
 from methodology.models import (
     Activity,
     Agent,
@@ -32,6 +31,11 @@ from methodology.models import (
     UserPIPListVisit,
     Workflow,
 )
+from methodology.services.contribution_summary_boundary import _CORRELATION_ID
+from methodology.services.contribution_summary_factory import resolve_processing_llm
+from methodology.services.galdr_client import _select_galdr_port
+from methodology.services.galdr_engine import GaldrEngine
+from methodology.services.galdr_validator import GaldrStructuralValidator
 from methodology.services.pip_link_service import (
     collect_pip_internal_refs,
     link_change_summary_label,
@@ -41,6 +45,10 @@ from methodology.services.pip_link_service import (
     validate_pending_or_live_ref,
 )
 from methodology.services.playbook_service import PlaybookService
+from methodology.services.public_contribution_evidence import (
+    _MAX_DATABASE_ID,
+    _SENSITIVE_TEXT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -786,50 +794,44 @@ class PIPService:
         return rows
 
     @staticmethod
-    def submit_for_review(*, actor, pip: ProcessImprovementProposal):
-        """Move Draft/Submitted retry → processing_galdr and enqueue Galdr."""
-        from django.conf import settings
+    def submit_for_review(
+        *,
+        actor: AbstractBaseUser,
+        pip: ProcessImprovementProposal,
+        llm: BaseLLM | None = None,
+        correlation_id: str | None = None,
+    ) -> ProcessImprovementProposal:
+        """Move a valid draft or retry into processing and register Galdr.
 
-        from methodology.services.galdr_engine import GaldrEngine
-
+        :param actor: Original submitter. Example: Maria's account.
+        :param pip: Persisted proposal. Example: a draft with one ADD change.
+        :param llm: Optional explicit provider shared by summary and assessment.
+        :param correlation_id: Optional safe request ID. Example: "cedar-submit-01".
+        :return: Latest persisted proposal state.
+        :raises ValidationError: For an unauthorized or invalid submission.
+        """
         _pip_allow_submit_for_review(pip, actor)
         if not PipChange.objects.filter(pip=pip).exists():
             raise ValidationError("Add at least one Change before submitting.")
-
-        from methodology.services.galdr_validator import GaldrStructuralValidator
-
         structural = GaldrStructuralValidator.validate_pip_structure(pip)
         if not structural.ok:
             raise ValidationError("; ".join(structural.errors))
 
-        pk_holder = pip.pk
-
-        def _enqueue() -> None:
-            GaldrEngine.schedule(pk_holder)
-
-        now = timezone.now()
+        correlation_id = _normalize_processing_correlation(correlation_id)
+        port = _select_galdr_port(resolve_processing_llm(llm))
         with transaction.atomic():
             locked = ProcessImprovementProposal.objects.select_for_update().get(
-                pk=pk_holder
+                pk=pip.pk
             )
             _pip_allow_submit_for_review(locked, actor)
             if not PipChange.objects.filter(pip_id=locked.pk).exists():
                 raise ValidationError("Add at least one Change before submitting.")
             locked.status = ProcessImprovementProposal.STATUS_PROCESSING_GALDR
-            if locked.submitted_at is None:
-                locked.submitted_at = now
-            locked.save(
-                update_fields=["status", "submitted_at", "updated_at"],
-            )
+            locked.submitted_at = locked.submitted_at or timezone.now()
+            locked.save(update_fields=["status", "submitted_at", "updated_at"])
 
-        # Tests wrap each case in ambient transactions; ``on_commit`` would defer
-        # until teardown. Production keeps the daemon thread tied to HTTP commits.
-        if getattr(settings, "GALDR_EAGER", False):
-            _enqueue()
-        else:
-            transaction.on_commit(_enqueue)
-        logger.info("PIP queued for Galdr pk=%s", pk_holder)
-        return ProcessImprovementProposal.objects.get(pk=pk_holder)
+        PIPService._schedule_processing(pip.pk, actor.pk, port, correlation_id)
+        return ProcessImprovementProposal.objects.get(pk=pip.pk)
 
     @staticmethod
     def _schedule_processing(
@@ -837,9 +839,8 @@ class PIPService:
     ) -> None:
         """Dispatch existing Galdr processing with captured provider/correlation.
 
-        This callback is registered only after existing permission/structural
-        validation and successful processing transition. Preserve the current
-        GALDR_EAGER branch and production on_commit semantics.
+        Register the worker after validation and a successful processing
+        transition. A real outer transaction must commit before dispatch.
 
         :param pip_id: Committed processing proposal. Example: 7301.
         :param actor_id: Validated submitter. Example: 42.
@@ -848,7 +849,34 @@ class PIPService:
         :return: None. Example: None after existing scheduler dispatch.
         :raises ValueError: For malformed callback arguments.
         """
-        raise NotImplementedError()
+        if any(
+            type(pk) is not int or not 0 < pk <= _MAX_DATABASE_ID
+            for pk in (pip_id, actor_id)
+        ):
+            raise ValueError("Processing requires positive PIP and actor IDs.")
+
+        def _dispatch() -> None:
+            logger.info(
+                "PIPService._schedule_processing | entry | pip_id=%s actor_id=%s "
+                "correlation_id=%s reason=submission",
+                pip_id,
+                actor_id,
+                correlation_id,
+            )
+            GaldrEngine.schedule(pip_id, llm=llm, correlation_id=correlation_id)
+
+        # Django TestCase wraps each legacy eager test in rollback-only atomic
+        # blocks. Keep its provider-free assessment path synchronous; explicit
+        # ports and genuine transactions always use on_commit.
+        if (
+            llm is None
+            and settings.GALDR_EAGER
+            and connection.atomic_blocks
+            and all(block._from_testcase for block in connection.atomic_blocks)
+        ):
+            _dispatch()
+        else:
+            transaction.on_commit(_dispatch)
 
 
 def _normalize_processing_correlation(correlation_id: str | None) -> str:
@@ -861,4 +889,12 @@ def _normalize_processing_correlation(correlation_id: str | None) -> str:
     :return: Safe correlation. Example: "cedar-submit-01".
     :raises ValueError: For a non-string supplied value.
     """
-    raise NotImplementedError()
+    if correlation_id is not None and not isinstance(correlation_id, str):
+        raise ValueError("A request correlation ID must be a string.")
+    if (
+        correlation_id
+        and _CORRELATION_ID.fullmatch(correlation_id)
+        and not _SENSITIVE_TEXT.search(correlation_id)
+    ):
+        return correlation_id
+    return uuid4().hex

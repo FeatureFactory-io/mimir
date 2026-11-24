@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from django.http import HttpRequest
-
 import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -20,6 +16,10 @@ from django.views.generic import RedirectView
 from methodology.models import PipChange
 from methodology.models import ProcessImprovementProposal as PipModel
 from methodology.services.copy_prompt_service import CopyPromptService
+from methodology.services.pip_service import (
+    PIPService,
+    _normalize_processing_correlation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -587,12 +587,20 @@ def pip_preview(request, pk: int):
 
 @login_required
 @require_POST
-def pip_submit_review(request, pk: int):
-    from methodology.services.pip_service import PIPService
+def pip_submit_review(request: HttpRequest, pk: int) -> HttpResponseRedirect:
+    """Submit through the owner-only lifecycle, preserving safe request correlation.
 
+    :param request: Authenticated POST. Example: a request with X-Request-ID.
+    :param pk: Target PIP primary key. Example: 7301.
+    :return: Redirect to the proposal or its edit page after validation failure.
+    """
     pip = PIPService.get_pip(pk, request.user)
     try:
-        PIPService.submit_for_review(actor=request.user, pip=pip)
+        PIPService.submit_for_review(
+            actor=request.user,
+            pip=pip,
+            correlation_id=_processing_correlation_from_request(request),
+        )
         messages.success(request, "PIP submitted — Galdr is reviewing your changes.")
     except ValidationError as exc:
         messages.error(request, _format_validation_error(exc))
@@ -739,4 +747,6 @@ def _processing_correlation_from_request(request: HttpRequest) -> str:
     :return: Safe correlation. Example: "cedar-submit-01".
     :raises ValueError: For an invalid request object.
     """
-    raise NotImplementedError()
+    if not isinstance(request, HttpRequest):
+        raise ValueError("A Django HTTP request is required.")
+    return _normalize_processing_correlation(request.headers.get("X-Request-ID"))
