@@ -27,6 +27,12 @@ iteration:
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
     exact-AT runner implementation is N4. No product or scenario footprint expanded.
 conflict_map:
+  tests/integration/test_experts_acceptance_runner.py:
+  - S36
+  tests/support/experts_acceptance.py:
+  - S36
+  Makefile:
+  - S36
   tests/integration/test_copy_prompt.py:
   - S36
   docs/features/steps/experts_category_steps.py:
@@ -49,6 +55,7 @@ conflict_map:
   - S12
   docs/features/steps/experts_steps.py:
   - S03
+  - S36
   - S18
   docs/features/steps/experts_summary_submission_steps.py:
   - S27
@@ -1173,7 +1180,7 @@ scenarios:
       - S03
       - S17
     implementation_plan: docs/plans/iterations/experts/S10-experts-profile-01.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
@@ -3983,6 +3990,10 @@ scenarios:
     skeleton_commit: 4d1cda411e711635805a07af8abcdd38ea014720
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - docs/features/steps/experts_steps.py
+    - tests/integration/test_experts_acceptance_runner.py
+    - tests/support/experts_acceptance.py
+    - Makefile
     - tests/integration/test_copy_prompt.py
     - docs/experts-replay/pin-evidence/S36.json
     - docs/features/steps/experts_copy_steps.py
@@ -4163,6 +4174,10 @@ scenarios:
         depends_on:
         - N2-clipboard-integration
         footprint:
+        - Makefile
+        - tests/support/experts_acceptance.py
+        - tests/integration/test_experts_acceptance_runner.py
+        - docs/features/steps/experts_steps.py
         - docs/features/steps/experts_copy_steps.py
         tests:
         - KARMA-COPY-01
