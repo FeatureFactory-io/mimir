@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping
 from decimal import Decimal
 
 from behave import given, then, when
 from behave.runner import Context
+from django.apps import apps
 from django.core import mail
+from django.db import transaction
+from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
@@ -20,8 +25,17 @@ from methodology.models import (
     Skill,
     VersionSource,
 )
+from methodology.models import (
+    ProcessImprovementProposal as PIP,
+)
 from methodology.services.experts_service import ExpertsService
-from tests.support.experts_data import CedarDataset, create_reviewed_major_add_pip
+from methodology.services.karma_service import KarmaService
+from tests.support.experts_data import (
+    CedarDataset,
+    create_nonaccepted_pip_case,
+    create_reviewed_major_add_pip,
+    load_cedar_baseline,
+)
 from tests.support.experts_pip_minor import (
     assert_minor_change_applied,
     create_reviewed_minor_pip,
@@ -38,6 +52,20 @@ _MARIA_DEVELOPMENT = 1000
 _MAJOR_POINTS = 500
 _MINOR_POINTS = 100
 _RELEASE = KarmaAward.SourceKind.RELEASE
+
+_S35_STATES = (
+    PIP.STATUS_DRAFT,
+    PIP.STATUS_SUBMITTED,
+    PIP.STATUS_PROCESSING_GALDR,
+    PIP.STATUS_REVIEWED,
+    PIP.STATUS_REJECTED,
+)
+_S35_PIP_FIELDS = frozenset(("status", "decided_at", "status_changed_at", "updated_at"))
+_S35_CHANGE_FIELDS = frozenset(("admin_decision", "admin_note"))
+_S35_SESSION_FIELDS = frozenset(("session_data", "expire_date"))
+_S35_REJECTION_NOTE = "Rejected after checking the unchanged published baseline"
+S35DatabaseState = tuple[tuple[str, int, str], ...]
+S35Observation = tuple[object, ...]
 
 
 @given("Maria's new PIP targets Hana's Accessible Forms Review version 2.0")
@@ -333,7 +361,9 @@ def assert_maria_pip_local_notification(context: Context) -> None:
     assert "Decision: ACCEPT" in sent.body and f"is now v{_VERSION_AFTER}" in sent.body
 
 
-@when("Maria's PIP is draft, submitted, processing, reviewed or rejected without an accepted eligible change")
+@when(
+    "Maria's PIP is draft, submitted, processing, reviewed or rejected without an accepted eligible change"
+)
 def exercise_maria_nonaccepted_states(context: Context) -> None:
     """Record five independently restored cases and real rejected finalization.
 
@@ -341,7 +371,18 @@ def exercise_maria_nonaccepted_states(context: Context) -> None:
     :return: None. Example: five persisted outcomes retained for shared assertions.
     :raises AssertionError: If any case awards points or changes target content.
     """
-    raise NotImplementedError()
+    assert not mail.outbox
+    context.s35_baseline = _s35_database_state()
+    context.s35_observations = []
+    for status in _S35_STATES:
+        assert _s35_database_state() == context.s35_baseline
+        context.s35_observations.append(_s35_observe_nonaccepted(context, status))
+        # A transaction rollback does not undo delivered locmem mail.
+        assert len(mail.outbox) == (1 if status == PIP.STATUS_REJECTED else 0)
+        mail.outbox.clear()
+        assert _s35_database_state() == context.s35_baseline
+    context.s35_observations = tuple(context.s35_observations)
+
 
 @given("Maria's PIP contains one ADD Activity and one ALTER Activity")
 def prepare_maria_partial_pip(context: Context) -> None:
@@ -353,7 +394,8 @@ def prepare_maria_partial_pip(context: Context) -> None:
     """
     raise NotImplementedError()
 
-@when('the Administrator accepts ADD and rejects ALTER')
+
+@when("the Administrator accepts ADD and rejects ALTER")
 def finalize_maria_partial_pip(context: Context) -> None:
     """POST real staff decisions accepting ADD and rejecting ALTER.
 
@@ -362,6 +404,7 @@ def finalize_maria_partial_pip(context: Context) -> None:
     :raises AssertionError: Unauthorized response or unsuccessful finalization.
     """
     raise NotImplementedError()
+
 
 @then("Maria's total becomes 8700 rather than 8800")
 def assert_maria_partial_total(context: Context) -> None:
@@ -394,12 +437,214 @@ def minor_change_design_attribution_matches(context: Context, points: int) -> No
     assert_maria_pip_local_notification(context)
 
 
-@then('her total remains {total:d}')
+@then("her total remains {total:d}")
 def nonaccepted_total_remains(context: Context, total: int) -> None:
     """Check every independent nonaccepted/rejected state and complete unchanged ledger snapshots, not only the last total.
 
-:param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
-:param total: Expected actual ledger total. Example: 8200.
-:return: None when the described real observation holds. Example: None.
-:raises AssertionError: Actual domain, response or recorded boundary differs."""
-    raise NotImplementedError()
+    :param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
+    :param total: Expected actual ledger total. Example: 8200.
+    :return: None when the described real observation holds. Example: None.
+    :raises AssertionError: Actual domain, response or recorded boundary differs."""
+    assert total == _MARIA_DESIGN_BEFORE + _MARIA_DEVELOPMENT
+    assert tuple(row[0] for row in context.s35_observations) == _S35_STATES
+    for observation in context.s35_observations:
+        _s35_assert_observation(observation, total)
+    assert _s35_database_state() == context.s35_baseline
+    assert not mail.outbox
+    maria_id = context.cedar_dataset.user_ids["mrodriguez"]
+    assert ExpertsService().project_user(maria_id).total_points == total
+
+
+def _s35_database_state(
+    pip: PIP | None = None, client: Client | None = None
+) -> S35DatabaseState:
+    """Hash every real row, optionally normalizing only an allowed staff decision.
+
+    :param pip: Current reviewed proposal, or None for exact state. Example: PIP42.
+    :param client: Its authenticated client, or None. Example: Mike strict-CSRF client.
+    :return: Immutable model/count/hash rows. Example: complete historical ledger hash.
+    :raises AssertionError: If only one review normalization parameter is supplied.
+    """
+    assert (pip is None) == (client is None)
+    session_key = client.session.session_key if client is not None else None
+    snapshots: list[tuple[str, int, str]] = []
+    for model in sorted(
+        apps.get_models(include_auto_created=True),
+        key=lambda item: item._meta.label_lower,
+    ):
+        label = model._meta.label_lower
+        rows = list(model.objects.order_by("pk").values())
+        for row in rows:
+            omitted = frozenset()
+            if (
+                pip is not None
+                and label == PIP._meta.label_lower
+                and row["id"] == pip.pk
+            ):
+                omitted = _S35_PIP_FIELDS
+            elif (
+                pip is not None
+                and label == PipChange._meta.label_lower
+                and row["pip_id"] == pip.pk
+            ):
+                omitted = _S35_CHANGE_FIELDS
+            elif label == "sessions.session" and row["session_key"] == session_key:
+                omitted = _S35_SESSION_FIELDS
+            for field in omitted:
+                row.pop(field)
+        payload = json.dumps(rows, sort_keys=True, default=str).encode()
+        snapshots.append((label, len(rows), hashlib.sha256(payload).hexdigest()))
+    return tuple(snapshots)
+
+
+def _s35_finalize_rejection(context: Context, pip: PIP) -> int:
+    """Finalize a saved ACCEPT as REJECT through real CSRF-protected staff HTTP.
+
+    :param context: Real AT lifecycle with callback capture. Example: Cedar scenario.
+    :param pip: Actual Reviewed fixture. Example: Maria's unapplied ADD Activity.
+    :return: Actual locally delivered mail count. Example: one rejection notice.
+    :raises AssertionError: If HTTP, notification or protected content differs.
+    """
+    client = Client(enforce_csrf_checks=True)
+    staff = context.cedar_dataset.users_by_username["mchen"]
+    client.force_login(staff)
+    route = reverse("pip_admin_review", args=[pip.pk])
+    assert client.get(route).status_code == 200
+    csrf = client.cookies["csrftoken"].value
+    change = pip.changes.get()
+    assert change.admin_decision == PipChange.ADMIN_ACCEPT
+    fields = {"action": "finalize"}
+    fields[f"decision_{change.pk}"] = PipChange.ADMIN_REJECT
+    fields[f"note_{change.pk}"] = _S35_REJECTION_NOTE
+    before, started = _s35_database_state(pip, client), timezone.now()
+    with context.test.captureOnCommitCallbacks(execute=True) as callbacks:
+        response = client.post(route, fields, HTTP_X_CSRFTOKEN=csrf)
+        assert not mail.outbox
+    assert response.status_code == 302
+    assert response.url == reverse("pip_detail", args=[pip.pk])
+    assert len(callbacks) == 1 and client.session["_auth_user_id"] == str(staff.pk)
+    pip.refresh_from_db()
+    assert (
+        started
+        <= pip.decided_at
+        <= pip.status_changed_at
+        <= pip.updated_at
+        <= timezone.now()
+    )
+    assert _s35_database_state(pip, client) == before
+    return _s35_rejection_mail(pip)
+
+
+def _s35_observe_nonaccepted(context: Context, status: str) -> S35Observation:
+    """Observe one real eligibility case while its rows live, then roll back it alone.
+
+    :param context: Real AT context. Example: independently restored Cedar baseline.
+    :param status: Exact stored boundary. Example: processing_galdr.
+    :return: Immutable actual outcome and before/after snapshots. Example: rejected/zero awards.
+    :raises AssertionError: If real setup, decision or eligibility differs.
+    """
+    with transaction.atomic():
+        dataset = load_cedar_baseline()
+        fixture_status = (
+            PIP.STATUS_REVIEWED if status == PIP.STATUS_REJECTED else status
+        )
+        pip = create_nonaccepted_pip_case(dataset, fixture_status)
+        delivered = (
+            _s35_finalize_rejection(context, pip)
+            if status == PIP.STATUS_REJECTED
+            else 0
+        )
+        before = _s35_database_state()
+        outcomes = KarmaService.award_accepted_changes(
+            pip=pip, correlation_id=f"s35_at:{status}"
+        )
+        after = _s35_database_state()
+        values = _s35_case_values(dataset, pip, delivered)
+        observed = (status, pip.status, before, after, outcomes, *values)
+        transaction.set_rollback(True)
+    return observed
+
+
+def _s35_assert_observation(observed: S35Observation, total: int) -> None:
+    """Check every independently recorded actual case rather than only the final total.
+
+    :param observed: Real persisted-state observations before rollback. Example: Reviewed case.
+    :param total: Expected unchanged Maria total. Example:8200.
+    :return: None when ledger/content/status and notification agree.
+    :raises AssertionError: If any recorded outcome differs from the contract.
+    """
+    status, stored, before, after, outcomes = observed[:5]
+    projection, times, choices, target, delivered = observed[5:]
+    assert status == stored and before == after and outcomes == ()
+    assert projection[0:2] == (total, _DESIGN)
+    assert dict(projection[2]) == {
+        _DESIGN: _MARIA_DESIGN_BEFORE,
+        _DEVELOPMENT: _MARIA_DEVELOPMENT,
+    }
+    assert times == (
+        status != PIP.STATUS_DRAFT,
+        status in (PIP.STATUS_REVIEWED, PIP.STATUS_REJECTED),
+        status == PIP.STATUS_REJECTED,
+    )
+    assert target == (_TARGET_ID, _VERSION_BEFORE, _DESIGN, True)
+    assert delivered == (1 if status == PIP.STATUS_REJECTED else 0)
+    if status in (PIP.STATUS_REVIEWED, PIP.STATUS_REJECTED):
+        expected = (
+            PipChange.ADMIN_REJECT
+            if status == PIP.STATUS_REJECTED
+            else PipChange.ADMIN_ACCEPT
+        )
+        assert choices == (PipChange.GALDR_ACCEPT, expected)
+
+
+def _s35_rejection_mail(pip: PIP) -> int:
+    """Verify the actual delivered rejection before owner-local outbox cleanup.
+
+    :param pip: Really rejected proposal. Example: Maria's ADD Activity PIP42.
+    :return: Actual local delivery count. Example: one message.
+    :raises AssertionError: If recipient, decision or publication wording differs.
+    """
+    (sent,) = mail.outbox
+    assert sent.to == [pip.created_by.email] and not sent.cc and not sent.bcc
+    assert sent.subject == f'Your PIP "{pip.title}" — Rejected ✗'
+    assert all(
+        part in sent.body
+        for part in ("Overall: Rejected.", "Decision: REJECT", _S35_REJECTION_NOTE)
+    )
+    assert "is now v" not in sent.body
+    return len(mail.outbox)
+
+
+def _s35_case_values(dataset: CedarDataset, pip: PIP, delivered: int) -> S35Observation:
+    """Read immutable real projection/status/target facts before case rollback.
+
+    :param dataset: Actual imported Cedar records. Example: Maria and Hana6106.
+    :param pip: Live independently prepared proposal. Example: Reviewed eligibility case.
+    :param delivered: Actual locally observed message count. Example:1 for rejected.
+    :return: Immutable live facts. Example:8200/Design and unchanged target2.0.
+    :raises AssertionError: If the proposed Activity was actually applied.
+    """
+    projection = ExpertsService().project_user(dataset.user_ids["mrodriguez"])
+    pip.refresh_from_db()
+    change = pip.changes.get()
+    assert not change.parent_workflow.activities.filter(name=change.name).exists()
+    return (
+        (
+            projection.total_points,
+            projection.primary_category,
+            projection.category_points,
+        ),
+        (
+            pip.submitted_at is not None,
+            pip.reviewed_at is not None,
+            pip.decided_at is not None,
+        ),
+        (change.galdr_recommendation, change.admin_decision),
+        (
+            pip.playbook_id,
+            pip.playbook.version,
+            pip.playbook.category,
+            pip.playbook.author_id == dataset.user_ids["hkim"],
+        ),
+        delivered,
+    )
