@@ -503,6 +503,21 @@ scenarios:
           - do-test-first
           - do-assert-log-story
           - do-not-mock-in-integration-tests
+      - id: R2-shared-breakdown-hooks
+        title: Reconcile shared breakdown parameters for the existing own-profile contract
+        bpe: BPE-03
+        depends_on:
+        - N6-definition-of-done
+        footprint:
+        - templates/experts/_breakdown.html
+        gate:
+          command: pytest tests/integration/test_expert_detail.py tests/integration/test_experts_list_s03.py -x
+        guidance_bundle:
+          activity: BPE/BPE-03-Implement_Frontend.md
+          rules:
+          - do-test-first
+          - do-semantic-versioning-on-ui-elements
+        notes: Existing S03 shared-component ownership; two optional test-hook inputs preserve public defaults and enable the already planned S10 profile hooks. No new scenario or file ownership.
       scenario_dependencies: []
     implementation_plan: docs/plans/iterations/experts/S03-experts-list-03.md
     status: complete
