@@ -13,19 +13,25 @@ from django.db import DatabaseError
 
 from methodology.llm.base import BaseLLM, LLMError, LLMResponse
 from methodology.services.contribution_summary_prompts import (
+    MAX_SUMMARY_SENTENCES,
     SummaryPrompt,
+    _count_sentences,
     build_summary_prompt,
+    serialize_public_evidence,
     validate_summary_response,
 )
 from methodology.services.public_contribution_evidence import (
     _MAX_DATABASE_ID,
     _SENSITIVE_TEXT,
+    PublicContributionEvidence,
     PublicContributionEvidenceService,
 )
 
 logger = logging.getLogger(__name__)
 
 _COMPLETE = "PublicContributionSummaryBoundary.complete"
+_VALIDATION_LOG = "%s | validation | %s visibility=public_released evidence_chars=%s"
+_PROCESSING_LOG = "%s | processing | %s operation=complete %s"
 _CORRELATION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
 _MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}")
 _STOP_REASON = re.compile(r"[a-z][a-z0-9_]{0,39}")
@@ -132,12 +138,13 @@ class PublicContributionSummaryBoundary:
             code = "public_evidence_failed"
             evidence = self._evidence_service.collect(subject_id)
             prompt = build_summary_prompt(evidence)
-            public_scope = f"scope=public_released fact_count={len(evidence.facts)}"
-            trace += (SummaryTraceEvent("public_evidence", public_scope),)
+            evidence_chars = len(serialize_public_evidence(evidence))
+            trace += (_public_evidence_event(evidence, evidence_chars),)
+            logger.info(_VALIDATION_LOG, _COMPLETE, details, evidence_chars)
             code = "provider_failed"
             call = f"model={llm.model_id} tools=none max_tokens={prompt.max_tokens}"
             trace += (SummaryTraceEvent("llm_call", call),)
-            logger.info("%s | processing | %s %s", _COMPLETE, details, call)
+            logger.info(_PROCESSING_LOG, _COMPLETE, details, call)
             raw_response = self._complete_once(prompt, llm)
             code = "output_validation_failed"
             response = self._freeze_response(raw_response)
@@ -146,9 +153,7 @@ class PublicContributionSummaryBoundary:
             failure = self._failure(code, trace, response)
         else:
             logger.info("%s | exit | %s outcome=success", _COMPLETE, details)
-            validation = SummaryTraceEvent("validation", "status=accepted")
-            trace += (validation, SummaryTraceEvent("exit", "outcome=success"))
-            return SummaryBoundaryResult(text, replace(response, content=text), trace)
+            return _accepted_result(text, response, trace)
         raise failure
 
     def _validate_request(
@@ -252,6 +257,42 @@ class PublicContributionSummaryBoundary:
         )
         logger.info("%s | exit | %s %s", _COMPLETE, trace[0].details, outcome)
         return failure
+
+
+def _public_evidence_event(
+    evidence: PublicContributionEvidence, evidence_chars: int
+) -> SummaryTraceEvent:
+    """Report size and identifiers from the validated immutable public snapshot.
+
+    :param evidence: Frozen snapshot sent to the provider. Example: Cedar facts.
+    :param evidence_chars: Length of the compact JSON. Example: 2156.
+    :return: Body-free public evidence event. Example: public_playbook_ids=6101,6106.
+    """
+    public_ids = sorted({fact.playbook_id for fact in evidence.facts})
+    identifiers = ",".join(map(str, public_ids)) or "none"
+    details = (
+        f"scope=public_released fact_count={len(evidence.facts)} "
+        f"evidence_chars={evidence_chars} public_playbook_ids={identifiers}"
+    )
+    return SummaryTraceEvent("public_evidence", details)
+
+
+def _accepted_result(
+    text: str, response: LLMResponse, trace: tuple[SummaryTraceEvent, ...]
+) -> SummaryBoundaryResult:
+    """Return the validated paragraph with its body-free validation metadata.
+
+    :param text: Accepted prose. Example: "Maria maintains Accessibility Audit."
+    :param response: Normalized provider result with immutable usage.
+    :param trace: Actual preceding control events. Example: entry through llm_call.
+    :return: Validated result and completed immutable trace.
+    """
+    validation = SummaryTraceEvent(
+        "validation",
+        f"status=accepted sentence_count={_count_sentences(text)} limit={MAX_SUMMARY_SENTENCES}",
+    )
+    events = (*trace, validation, SummaryTraceEvent("exit", "outcome=success"))
+    return SummaryBoundaryResult(text, replace(response, content=text), events)
 
 
 def trace_as_agent_story(trace: tuple[SummaryTraceEvent, ...]) -> Mapping[str, Any]:

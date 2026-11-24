@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
@@ -26,6 +27,7 @@ from methodology.models import (
 from methodology.services.contribution_summary_boundary import (
     PublicContributionSummaryBoundary,
     SummaryBoundaryError,
+    SummaryTraceEvent,
 )
 from methodology.services.contribution_summary_prompts import (
     build_summary_prompt,
@@ -48,6 +50,9 @@ pytestmark = pytest.mark.django_db
 _LOGGER_NAME = "methodology.services.public_contribution_evidence"
 _COLLECT = "PublicContributionEvidenceService.collect"
 _PROMPT_LOGGER = "methodology.services.contribution_summary_prompts"
+_BOUNDARY_LOGGER = "methodology.services.contribution_summary_boundary"
+_BOUNDARY_COMPLETE = "PublicContributionSummaryBoundary.complete"
+_TRACE_CORRELATION = "s27-public-evidence-trace"
 _GOOD_SUMMARY = "Maria maintains Accessibility Audit Playbook."
 _FOCUS_ACTIVITY = "Trace Keyboard Focus"
 
@@ -624,6 +629,152 @@ def _append_cedar_focus_guidance(text: str) -> None:
     matching = Activity.objects.filter(workflow__playbook_id=6101, name=_FOCUS_ACTIVITY)
     activity = matching.get()
     matching.update(guidance=f"{activity.guidance}\n{text}")
+
+
+@pytest.mark.parametrize("populated", [True, False], ids=("published", "empty"))
+def test_s27_summary_with_correlated_trace_reports_only_actual_safe_metadata(
+    s27_case: Mapping[str, Any], caplog: pytest.LogCaptureFixture, populated: bool
+) -> None:
+    """Match real provider input and validated output to the reported control metadata.
+
+    :param s27_case: Isolated Cedar rows and private disclosure sentinels.
+    :param caplog: Capture for real correlated boundary logs.
+    :param populated: Whether to use the contributor's published evidence.
+    :return: None after verifying request, trace, logs and read-only SQL.
+    :raises AssertionError: For false or sensitive metadata or additional queries.
+    """
+    subject_id = _s27_trace_subject(s27_case["subject_id"], populated)
+    service = PublicContributionEvidenceService()
+    with CaptureQueriesContext(connection) as baseline:
+        evidence = service.collect(subject_id)
+    sentence_count = 14 if populated else 1
+    reply = (
+        " ".join([_GOOD_SUMMARY] * sentence_count)
+        if populated
+        else "No published contributions were supplied."
+    )
+    llm = ScriptedLLM([reply])
+    with (
+        CaptureQueriesContext(connection) as queries,
+        capture_experts_logs(caplog, (_BOUNDARY_LOGGER,)),
+    ):
+        result = PublicContributionSummaryBoundary(service).complete(
+            subject_id, llm=llm, correlation_id=_TRACE_CORRELATION
+        )
+    (call,) = llm.calls
+    payload = _assert_s27_trace_metadata(result.trace, call, evidence, sentence_count)
+    _assert_s27_trace_logs(caplog, subject_id, len(payload))
+    assert _read_only_selects(queries) == _read_only_selects(baseline)
+    recorded = f"{result.trace} {caplog.text}"
+    assert all(
+        body not in recorded
+        for body in (call.system, payload, reply, *s27_case["sentinels"])
+    )
+
+
+def _s27_trace_subject(cedar_subject_id: int, populated: bool) -> int:
+    """Select an empty subject or real adjacent authored and published change facts.
+
+    :param cedar_subject_id: Real Cedar contributor ID. Example: Maria's ID.
+    :param populated: Whether the subject has published facts.
+    :return: Existing subject ID for a real ORM completion.
+    """
+    if not populated:
+        return get_user_model().objects.create_user(username="s27-empty-trace").pk
+    _append_cedar_focus_guidance("Read the résumé for keyboard focus.")
+    # Authored facts precede lower-ID published change attributions in the snapshot.
+    Playbook.objects.create(
+        pk=6199,
+        author_id=cedar_subject_id,
+        name="Published Accessibility Checklist",
+        description="Review form feedback.",
+        category="design",
+        visibility="public",
+        status="released",
+        version=Decimal("1.0"),
+    )
+    return cedar_subject_id
+
+
+def _assert_s27_trace_metadata(
+    trace: tuple[SummaryTraceEvent, ...],
+    call: ScriptedLLMCall,
+    evidence: PublicContributionEvidence,
+    sentence_count: int,
+) -> str:
+    """Compare trace details with the exact compact JSON captured at the port.
+
+    :param trace: Actual immutable control events from the read-only boundary.
+    :param call: Actual recorded completion request.
+    :param evidence: Real ORM snapshot for independently checking the request.
+    :param sentence_count: Expected validated output length, in sentences.
+    :return: Captured compact JSON, for matching correlated log lengths.
+    :raises AssertionError: For mismatched request or trace metadata.
+    """
+    (message,) = call.messages
+    _, payload, _ = message.content.splitlines()
+    assert payload == serialize_public_evidence(evidence)
+    ids = [fact["playbook_id"] for fact in json.loads(payload)["facts"]]
+    if ids:
+        assert len(ids) > len(set(ids)) > 1 and ids != sorted(ids)
+        assert len(payload) < len(payload.encode("utf-8"))
+    public_ids = ",".join(map(str, sorted(set(ids)))) or "none"
+    assert tuple(event.beat for event in trace) == (
+        "entry",
+        "public_evidence",
+        "llm_call",
+        "validation",
+        "exit",
+    )
+    _, public_evidence, llm_call, validation, _ = trace
+    assert public_evidence.details == (
+        f"scope=public_released fact_count={len(ids)} evidence_chars={len(payload)} "
+        f"public_playbook_ids={public_ids}"
+    )
+    assert llm_call.details == "model=scripted tools=none max_tokens=1024"
+    assert (
+        validation.details
+        == f"status=accepted sentence_count={sentence_count} limit=14"
+    )
+    return payload
+
+
+def _assert_s27_trace_logs(
+    caplog: pytest.LogCaptureFixture, subject_id: int, evidence_chars: int
+) -> None:
+    """Check one real validation log precedes the one correlated provider beat.
+
+    :param caplog: Actual records captured from the boundary logger.
+    :param subject_id: Request subject identifier.
+    :param evidence_chars: Measured character count of the actual captured payload.
+    :return: None after checking ordinary log messages and their order.
+    :raises AssertionError: For missing, duplicate or uncorrelated logs.
+    """
+    records = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == _BOUNDARY_LOGGER
+    ]
+    details = f"subject_id={subject_id} correlation_id={_TRACE_CORRELATION}"
+    assert records == [
+        f"{_BOUNDARY_COMPLETE} | entry | {details}",
+        f"{_BOUNDARY_COMPLETE} | validation | {details} visibility=public_released evidence_chars={evidence_chars}",
+        f"{_BOUNDARY_COMPLETE} | processing | {details} operation=complete model=scripted tools=none max_tokens=1024",
+        f"{_BOUNDARY_COMPLETE} | exit | {details} outcome=success",
+    ]
+
+
+def _read_only_selects(queries: CaptureQueriesContext) -> tuple[str, ...]:
+    """Return application SELECTs after checking SQL contains no writes.
+
+    :param queries: Actual ORM statements from a QueryCapture context.
+    :return: Ordered SELECT text without transaction-management statements.
+    :raises AssertionError: For a non-read-only query.
+    """
+    statements = tuple(query["sql"] for query in queries)
+    commands = {sql.split(maxsplit=1)[0].upper() for sql in statements}
+    assert commands <= {"SELECT", "BEGIN", "COMMIT", "SAVEPOINT", "RELEASE"}
+    return tuple(sql for sql in statements if sql.startswith("SELECT"))
 
 
 def _complete_s27_policy_probe(

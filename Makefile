@@ -773,6 +773,7 @@ test-experts-s27-backend:
 		tests/integration/test_experts_public_evidence.py::test_s27_summary_with_shared_text_policy_filters_request_and_output \
 		tests/integration/test_experts_public_evidence.py::test_s27_summary_with_redaction_pass_limit_scrubs_entire_source_field \
 		tests/integration/test_experts_public_evidence.py::test_s27_summary_with_completion_metadata_keeps_only_safe_identifiers \
+		tests/integration/test_experts_public_evidence.py::test_s27_summary_with_correlated_trace_reports_only_actual_safe_metadata \
 		tests/integration/test_experts_public_evidence.py::test_collect_with_partial_or_unpublished_decisions_excludes_ineligible_changes \
 		tests/integration/test_experts_public_evidence.py::test_collect_with_invalid_subject_rejects_before_model_call \
 		tests/integration/test_experts_public_evidence.py::test_build_summary_prompt_with_public_evidence_preserves_layers_and_bounds \
