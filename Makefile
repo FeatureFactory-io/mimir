@@ -991,7 +991,7 @@ test-experts-s36-log:
 
 .PHONY: test-experts-s36-server
 test-experts-s36-server:
-	+$(MAKE) test-experts-s36-backend
+	$(PYTHON) -m pytest tests/integration/test_experts_acceptance_runner.py::test_copy_server_acceptance_with_authoritative_contract_passes_all_steps -x
 
 .PHONY: test-experts-s36
 test-experts-s36:

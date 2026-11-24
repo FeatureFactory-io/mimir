@@ -1,4 +1,4 @@
-"""One real living-spec runner, with all 43 exact server contracts."""
+"""Real living-spec checks for 43 server contracts and a supplementary copy check."""
 
 from __future__ import annotations
 
@@ -8,11 +8,15 @@ import pytest
 
 from tests.support.experts_acceptance import (
     _validate_acceptance_selection,
+    _validate_copy_server_reports,
+    run_copy_server_acceptance,
     run_exact_acceptance,
 )
 
 _RANKING_FEATURE = Path("docs/features/act-18-experts/experts-list.feature")
 _RANKING_ID = "EXPERTS-LIST-03"
+_COPY_FEATURE = Path("tests/e2e/experts-interactions.feature")
+_COPY_ID = "KARMA-COPY-01"
 _PASSING_CASE = {
     "type": "scenario",
     "name": f"{_RANKING_ID} Ranks contributors",
@@ -350,6 +354,15 @@ def test_exact_experts_acceptance_with_declared_contract_runs_all_examples(
         assert result.step_count == 9, scenario
 
 
+def test_copy_server_acceptance_with_authoritative_contract_passes_all_steps() -> None:
+    """Check the Django payload and receipt steps before browser certification."""
+    result = run_copy_server_acceptance()
+
+    assert result.scenario_count == 1
+    assert result.step_count == 6
+    assert result.skipped_count == result.undefined_count == 0
+
+
 @pytest.mark.parametrize(
     "path,acceptance_id,count",
     [
@@ -369,6 +382,39 @@ def test_run_exact_acceptance_with_invalid_contract_rejects(
     """Reject malformed arguments before attempting to execute Behave."""
     with pytest.raises(ValueError):
         run_exact_acceptance(path, acceptance_id, count)
+
+
+def test_run_exact_acceptance_with_browser_feature_rejects() -> None:
+    """Keep the primary server runner limited to docs/features."""
+    with pytest.raises(ValueError, match="local docs/features"):
+        run_exact_acceptance(_COPY_FEATURE, _COPY_ID, 1)
+
+
+@pytest.mark.parametrize(
+    "anchor_status,source,reason",
+    [
+        ("passed", _COPY_FEATURE, "Unexpected executed scenario"),
+        ("skipped", Path("tests/e2e/experts-journey.feature"), "Unexpected feature"),
+    ],
+    ids=["executed-anchor", "incorrect-feature"],
+)
+def test_validate_copy_server_reports_with_unexpected_execution_rejects(
+    anchor_status: str, source: Path, reason: str
+) -> None:
+    """Reject an executed anchor case or a report from another feature file."""
+    reports = [
+        {
+            "location": f"{_RANKING_FEATURE}:2",
+            "elements": [{**_PASSING_CASE, "status": anchor_status}],
+        },
+        {
+            "location": f"{source}:2",
+            "elements": [{**_PASSING_CASE, "name": f"{_COPY_ID} Copy an activity"}],
+        },
+    ]
+
+    with pytest.raises(AssertionError, match=reason):
+        _validate_copy_server_reports(reports)
 
 
 def test_validate_acceptance_selection_with_outline_and_filtered_neighbors_counts_cases() -> (

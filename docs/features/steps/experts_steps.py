@@ -21,6 +21,7 @@ _DEVELOPMENT_PATH = "/experts/?category=development"
 
 
 @given("the CEDAR-RFP-01 baseline dataset")
+@given("the isolated CEDAR-RFP-01 baseline is restored")
 def cedar_baseline_dataset(context: Context) -> None:
     """Import real baseline rows into the Behave-owned test DB.
 

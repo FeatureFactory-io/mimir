@@ -18,6 +18,12 @@ _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _FEATURE_ROOT = _REPOSITORY_ROOT / "docs" / "features"
 _ACCEPTANCE_ID = re.compile(r"[A-Z]+(?:-[A-Z0-9]+)*-[0-9]+")
 _RUN_TIMEOUT_SECONDS = 120
+_COPY_SERVER_ID = "KARMA-COPY-01"
+_COPY_SERVER_PATHS = (
+    # Behave discovers the shared environment and steps from the first path.
+    Path("docs/features/act-18-experts/experts-list.feature"),
+    Path("tests/e2e/experts-interactions.feature"),
+)
 
 
 @dataclass(frozen=True)
@@ -50,7 +56,7 @@ def run_exact_acceptance(
         "Experts AT | entry | contract=%s cases=%s", acceptance_id, expected_cases
     )
     with TemporaryDirectory(prefix="mimir-experts-acceptance-") as report_dir:
-        payload = _run_behave(feature, pattern, Path(report_dir) / "results.json")
+        payload = _run_behave((feature,), pattern, Path(report_dir) / "results.json")
     result = _validate_acceptance_selection(payload, acceptance_id, expected_cases)
     logger.info(
         "Experts AT | exit | contract=%s passed=%s steps=%s",
@@ -59,6 +65,44 @@ def run_exact_acceptance(
         result.step_count,
     )
     return result
+
+
+def run_copy_server_acceptance() -> AcceptanceResult:
+    """Execute the supplementary Django payload and receipt checks for KARMA-COPY-01.
+
+    :return: One supplementary server result for the original browser feature.
+    :raises AssertionError: For missing, extra or incomplete scenario execution.
+    """
+    pattern = _selection_pattern(_COPY_SERVER_ID)
+    with TemporaryDirectory(prefix="mimir-experts-copy-server-") as report_dir:
+        reports = _run_behave(
+            _COPY_SERVER_PATHS, pattern, Path(report_dir) / "results.json"
+        )
+    return _validate_copy_server_reports(reports)
+
+
+def _validate_copy_server_reports(reports: object) -> AcceptanceResult:
+    """Verify the skipped anchor and exact scenario from the browser feature.
+
+    :param reports: Behave JSON for the two expected feature paths in CLI order.
+    :return: Passing target scenario and step counts.
+    :raises AssertionError: For any unexpected report source or scenario execution.
+    """
+    assert isinstance(reports, list) and len(reports) == len(_COPY_SERVER_PATHS), (
+        "Expected the Behave environment anchor and the copy feature report."
+    )
+    for feature, expected in zip(reports, _COPY_SERVER_PATHS, strict=True):
+        assert isinstance(feature, dict), "Malformed Behave feature report."
+        location = feature.get("location")
+        assert isinstance(location, str) and location.rpartition(":")[0] == (
+            expected.as_posix()
+        ), f"Unexpected feature location: expected {expected}, got {location!r}."
+
+    anchor, copy_feature = reports
+    assert not _selected_scenarios(anchor, _selection_pattern(_COPY_SERVER_ID)), (
+        "The Behave environment anchor must not define the copy scenario."
+    )
+    return _validate_acceptance_selection([copy_feature], _COPY_SERVER_ID, 1)
 
 
 def _local_feature_path(feature_path: Path) -> Path:
@@ -91,7 +135,9 @@ def _selection_pattern(acceptance_id: str) -> str:
     return rf"^{acceptance_id}(?=\s|$)"
 
 
-def _run_behave(feature_path: Path, pattern: str, report_path: Path) -> object:
+def _run_behave(
+    feature_paths: tuple[Path, ...], pattern: str, report_path: Path
+) -> object:
     """Execute Behave against its own database and read the formatter output."""
     command = [
         sys.executable,
@@ -103,7 +149,7 @@ def _run_behave(feature_path: Path, pattern: str, report_path: Path) -> object:
         f"--name={pattern}",
         "--format=json",
         f"--outfile={report_path}",
-        str(feature_path),
+        *map(str, feature_paths),
     ]
     env = dict(
         os.environ,
