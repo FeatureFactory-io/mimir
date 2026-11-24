@@ -8,6 +8,7 @@ import sqlite3
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from decimal import Decimal
+from itertools import chain
 from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
@@ -40,6 +41,7 @@ AWARD_CORRELATION_ID = re.compile(r"[A-Za-z0-9._:-]{1,100}")
 
 _RELEASE_LOG = "KarmaService.award_first_release"
 _PERSIST_LOG = "KarmaService.persist_awards"
+_EVENT_MATCH_LOG = "KarmaService._assert_matching_event"
 _ACCEPTED_CHANGE_LOG = "KarmaService.award_accepted_changes"
 _ACCEPTED_POLICY_LOG = "KarmaService._accepted_change_policy"
 _ACCEPTED_MAJOR_POINTS = 500
@@ -228,22 +230,23 @@ class KarmaService:
         :raises IntegrityError: If an unrelated database constraint fails.
         """
         KarmaService._validate_batch(specifications, correlation_id)
-        logger.info(
-            "%s | entry | award_count=%s correlation_id=%s",
-            _PERSIST_LOG,
-            len(specifications),
-            correlation_id,
-        )
+        groups = KarmaService._partition_event_specs(specifications)
+        counts = f"event_count={len(groups)} row_count={len(specifications)}"
+        trace = f"award_count={len(specifications)} correlation_id={correlation_id}"
+        logger.info("%s | entry | %s %s", _PERSIST_LOG, counts, trace)
         with transaction.atomic():
-            outcomes = tuple(
-                KarmaService._insert_or_get_award(spec) for spec in specifications
+            grouped = KarmaService._persist_batch_atomic(
+                groups, correlation_id=correlation_id
             )
+            by_spec = dict(zip(chain.from_iterable(groups), grouped, strict=True))
+            outcomes = tuple(by_spec[spec] for spec in specifications)
+            created_count = sum(outcome.created for outcome in outcomes)
             logger.info(
-                "%s | exit | award_count=%s created_count=%s transaction=pending correlation_id=%s",
+                "%s | exit | created_count=%s existing_count=%s transaction=pending %s",
                 _PERSIST_LOG,
-                len(outcomes),
-                sum(outcome.created for outcome in outcomes),
-                correlation_id,
+                created_count,
+                len(outcomes) - created_count,
+                trace,
             )
             return outcomes
 
@@ -251,12 +254,12 @@ class KarmaService:
     def _validate_batch(
         specifications: tuple[AwardSpec, ...], correlation_id: str
     ) -> None:
-        """Validate batch type, trace identifier and duplicate recipients.
+        """Validate batch type, trace identifier and individual specifications.
 
         :param specifications: Candidate immutable batch. Example: (spec,).
         :param correlation_id: Safe trace ID. Example: "release-01".
         :return: None when every item can be validated.
-        :raises ValidationError: If input or duplicate event payloads conflict.
+        :raises ValidationError: If the batch, trace or an award is invalid.
         """
         if not isinstance(correlation_id, str) or not AWARD_CORRELATION_ID.fullmatch(
             correlation_id
@@ -266,21 +269,8 @@ class KarmaService:
             raise ValidationError(
                 "An immutable tuple of award specifications is required."
             )
-        seen: dict[str, list[AwardSpec]] = {}
         for spec in specifications:
             KarmaService._validate_specification(spec)
-            prior_specs = seen.setdefault(spec.event_identity, [])
-            if any(
-                prior.recipient_id == spec.recipient_id
-                or prior.source_kind not in _PAIRED_SOURCES
-                or spec.source_kind not in _PAIRED_SOURCES
-                for prior in prior_specs
-            ):
-                raise ValidationError(
-                    "Award event has conflicting recipients.",
-                    code="award_recipient_conflict",
-                )
-            prior_specs.append(spec)
 
     @staticmethod
     def _validate_specification(specification: AwardSpec) -> None:
@@ -295,12 +285,6 @@ class KarmaService:
         award = KarmaAward(**asdict(specification))
         award.clean()
         award.clean_fields()
-        if award.event_channel == EventChannel.RELEASE and (
-            award.points != FIRST_RELEASE_POINTS
-            or award.change_id_snapshot is not None
-            or award.entity_type_snapshot is not None
-        ):
-            raise ValidationError("Invalid first-release award amount or snapshots.")
 
     @staticmethod
     def _validate_release_receipt(
@@ -444,7 +428,7 @@ class KarmaService:
     ) -> tuple[AwardOutcome, ...]:
         """Persist eligible learner/author awards after a successful operation.
 
-        Check existing recipients before delegating row comparison and writes.
+        Resolve authorization and attribution before validating the whole event.
 
         :param actor: Server-authenticated actor. Example: Maria.
         :param entity_type: Allowlisted entity kind. Example: "activity".
@@ -544,7 +528,7 @@ class KarmaService:
         *,
         trace: str,
     ) -> str | None:
-        """Revalidate attribution and existing recipients, then report eligibility.
+        """Revalidate attribution and guard reuse of a now-ineligible self receipt.
 
         :param actor: Server actor. Example: Mike.
         :param target: Authorized target, or None for a guest. Example: activity 6203.
@@ -566,12 +550,9 @@ class KarmaService:
             book.author_id is None or book.category not in CATEGORY_SLUGS
         ):
             raise ValidationError("Consumption target has invalid award attribution.")
-        rows = KarmaAward.objects.filter(event_identity=canonical_identity)
-        existing = set(rows.values_list("recipient_id", flat=True))
-        expected = set() if is_self else {actor.pk, book.author_id}
-        if existing and existing != expected:
-            raise ValidationError("Event conflict.", code="award_payload_conflict")
         if is_self:
+            if KarmaAward.objects.filter(event_identity=canonical_identity).exists():
+                raise ValidationError("Event conflict.", code="award_payload_conflict")
             logger.info(
                 f"{operation} | branch | {trace} author_id={book.author_id} "
                 "reason=self_consumption awards=0"
@@ -988,7 +969,89 @@ class KarmaService:
         :return: Groups ordered by identity. Example: ((learner_spec, author_spec),).
         :raises ValidationError: Invalid singleton/pair or duplicate recipient.
         """
-        raise NotImplementedError()
+        events: dict[str, list[AwardSpec]] = {}
+        for spec in specifications:
+            events.setdefault(spec.event_identity, []).append(spec)
+        groups = tuple(tuple(events[key]) for key in sorted(events))
+        for group in groups:
+            KarmaService._validate_event_shape(group)
+        return groups
+
+    @staticmethod
+    def _validate_event_shape(specifications: tuple[AwardSpec, ...]) -> None:
+        """Check the shape, identity and amount of a complete event.
+
+        :param specifications: Rows for one event. Example: (learner_spec, author_spec).
+        :return: None for a valid event. Example: one accepted-change singleton.
+        :raises ValidationError: For a policy mismatch, incomplete event or duplicate.
+        """
+        if len(specifications) == 1:
+            (spec,) = specifications
+            if spec.event_channel == EventChannel.HISTORICAL:
+                return
+            if spec.event_channel == EventChannel.RELEASE and (
+                spec.source_kind == KarmaAward.SourceKind.RELEASE
+                and spec.points == FIRST_RELEASE_POINTS
+                and spec.change_id_snapshot is None
+                and spec.entity_type_snapshot is None
+            ):
+                return
+            if spec.event_channel == EventChannel.ACCEPTED_CHANGE and (
+                (spec.source_kind, spec.points)
+                in (
+                    (KarmaAward.SourceKind.MAJOR, _ACCEPTED_MAJOR_POINTS),
+                    (KarmaAward.SourceKind.MINOR, _ACCEPTED_MINOR_POINTS),
+                )
+                and spec.playbook_id_snapshot is not None
+                and spec.change_id_snapshot is not None
+                and spec.event_identity == f"accepted_change:{spec.change_id_snapshot}"
+            ):
+                return
+        if len(specifications) == 2 and KarmaService._has_valid_consumption_pair(
+            specifications
+        ):
+            return
+        raise ValidationError(
+            "Award event shape conflict.", code="award_event_shape_conflict"
+        )
+
+    @staticmethod
+    def _has_valid_consumption_pair(specifications: tuple[AwardSpec, ...]) -> bool:
+        """Verify both sides of one consumption and its actor-scoped UUID.
+
+        :param specifications: Two proposed or stored rows. Example: learning and consumption.
+        :return: True only for a complete canonical pair. Example: Maria/Mike, five each.
+        """
+        if {spec.source_kind for spec in specifications} != set(_PAIRED_SOURCES):
+            return False
+        first, second = specifications
+        learner, author = (
+            (first, second)
+            if first.source_kind == KarmaAward.SourceKind.LEARNING
+            else (second, first)
+        )
+        if (
+            learner.recipient_id == author.recipient_id
+            or learner.points != _CONSUMPTION_POINTS
+            or learner.change_id_snapshot is not None
+            or learner.playbook_id_snapshot is None
+            or learner.entity_type_snapshot not in _CONSUMPTION_READERS
+            or learner.entity_id_snapshot is None
+            or learner.event_channel not in _CONSUMPTION_CHANNELS
+        ):
+            return False
+        try:
+            action = UUID(learner.event_identity.rsplit(":", 1)[-1])
+            canonical = KarmaService._canonical_consumption_identity(
+                learner.recipient_id, action, learner.event_channel
+            )
+        except ValueError:
+            return False
+        return canonical == learner.event_identity and author == replace(
+            learner,
+            recipient_id=author.recipient_id,
+            source_kind=KarmaAward.SourceKind.CONSUMPTION,
+        )
 
     @staticmethod
     def _existing_event_rows(event_identity: str) -> tuple[KarmaAward, ...]:
@@ -998,7 +1061,13 @@ class KarmaService:
         :return: Recipient-ordered real rows. Example: (stored_release_award,).
         :raises ValidationError: Empty or malformed identity.
         """
-        raise NotImplementedError()
+        if not isinstance(event_identity, str) or not event_identity.strip():
+            raise ValidationError("An event identity is required.")
+        return tuple(
+            KarmaAward.objects.filter(event_identity=event_identity).order_by(
+                "recipient_id"
+            )
+        )
 
     @staticmethod
     def _logical_award_payload(specification: AwardSpec) -> tuple[object, ...]:
@@ -1008,11 +1077,18 @@ class KarmaService:
         :return: Comparable field tuple. Example: (42, "learning", 5, ...).
         :raises ValidationError: Invalid snapshot/source/channel values.
         """
-        raise NotImplementedError()
+        return tuple(
+            getattr(specification, field)
+            for field in AwardSpec.__dataclass_fields__
+            if field != "occurred_at"
+        )
 
     @staticmethod
     def _assert_matching_event(
-        existing: tuple[KarmaAward, ...], requested: tuple[AwardSpec, ...]
+        existing: tuple[KarmaAward, ...],
+        requested: tuple[AwardSpec, ...],
+        *,
+        correlation_id: str,
     ) -> tuple[AwardOutcome, ...]:
         """Compare complete event shape and payload; retain stored timestamps.
 
@@ -1022,10 +1098,59 @@ class KarmaService:
 
         :param existing: Entire stored event. Example: learner/author pair.
         :param requested: Complete requested event. Example: same pair at newer time.
+        :param correlation_id: Safe trace identifier. Example: "receipt-45".
         :return: Existing outcomes in request order. Example: two created=False rows.
         :raises ValidationError: Changed recipient, target, attribution or shape.
         """
-        raise NotImplementedError()
+        identity = requested[0].event_identity
+        if requested[0].event_channel == EventChannel.HISTORICAL:
+            identity = "historical"
+        trace = f"event_identity={identity} correlation_id={correlation_id}"
+        stored_specs = tuple(
+            AwardSpec(
+                **{
+                    field: getattr(row, field)
+                    for field in AwardSpec.__dataclass_fields__
+                }
+            )
+            for row in existing
+        )
+        try:
+            KarmaService._validate_event_shape(stored_specs)
+            if len(existing) != len(requested):
+                raise ValidationError(
+                    "Award event shape conflict.", code="award_event_shape_conflict"
+                )
+        except ValidationError:
+            logger.info(
+                "%s | branch | reason=event_shape_conflict %s", _EVENT_MATCH_LOG, trace
+            )
+            raise
+
+        logical_payload = KarmaService._logical_award_payload
+        if {logical_payload(spec) for spec in stored_specs} != {
+            logical_payload(spec) for spec in requested
+        }:
+            logger.info(
+                "%s | branch | reason=event_payload_conflict %s",
+                _EVENT_MATCH_LOG,
+                trace,
+            )
+            raise ValidationError(
+                "Award event identity conflicts with its recorded payload.",
+                code="award_payload_conflict",
+            )
+        logger.info(
+            "%s | validation | recipient_count=%s payload_match=true %s",
+            _EVENT_MATCH_LOG,
+            len(existing),
+            trace,
+        )
+        by_recipient = {row.recipient_id: row for row in existing}
+        return tuple(
+            AwardOutcome(by_recipient[spec.recipient_id], False, "duplicate")
+            for spec in requested
+        )
 
     @staticmethod
     def _insert_event_rows(
@@ -1092,7 +1217,24 @@ class KarmaService:
         :raises IntegrityError: Database invariant violation.
         :raises OperationalError: Database contention or failure.
         """
-        raise NotImplementedError()
+        replays: dict[str, tuple[AwardOutcome, ...]] = {}
+        for group in groups:
+            identity = group[0].event_identity
+            existing = KarmaService._existing_event_rows(identity)
+            if existing:
+                replays[identity] = KarmaService._assert_matching_event(
+                    existing, group, correlation_id=correlation_id
+                )
+        outcomes = []
+        for group in groups:
+            replay = replays.get(group[0].event_identity)
+            if replay is None:
+                outcomes.extend(
+                    KarmaService._insert_or_get_award(spec) for spec in group
+                )
+            else:
+                outcomes.extend(replay)
+        return tuple(outcomes)
 
     @staticmethod
     def _is_retryable_database_busy(error: OperationalError) -> bool:

@@ -1,20 +1,42 @@
 from __future__ import annotations
 
-from pathlib import Path
 from collections.abc import Iterator
+from uuid import UUID
+
 import pytest
-from django.db import connections
 
-@pytest.fixture(scope='session')
-def django_db_modify_db_settings(django_db_modify_db_settings: None, tmp_path_factory: pytest.TempPathFactory) -> None:
-    """Select a unique file-backed test NAME for SQLite before DB creation.
+from methodology.services.karma_service import AwardSpec, KarmaService
+from tests.support.experts_data import CedarDataset
 
-    :param django_db_modify_db_settings: Parent configuration. Example: None.
-    :param tmp_path_factory: Pytest temp factory. Example: isolated event DB dir.
-    :return: None; engine and production settings remain unchanged.
-    :raises RuntimeError: Configuration happens after test DB initialization.
+
+@pytest.fixture(scope="session")
+def django_db_modify_db_settings(django_db_modify_db_settings: None) -> None:
+    """Keep pytest-django's owned test database for the Cedar importer.
+
+    :param django_db_modify_db_settings: Standard runner setup. Example: None.
+    :return: None. Example: leave the owned SQLite shared-memory setup in place.
     """
-    raise NotImplementedError()
+    return django_db_modify_db_settings
+
+
+@pytest.fixture
+def consumption_specs(cedar_dataset: CedarDataset) -> tuple[AwardSpec, ...]:
+    """Build one frozen pair from an actual authorized Cedar Activity.
+
+    :param cedar_dataset: Real imported Cedar accounts and their playbooks.
+    :return: Learning and consumption specs. Example: Maria and Mike, five each.
+    :raises PermissionError: If the fixture actor loses access to the Activity.
+    """
+    actor = cedar_dataset.users_by_username["mrodriguez"]
+    target = KarmaService._resolve_consumption_target(actor, "activity", 6203)
+    channel = "gui_copy"
+    identity = KarmaService._canonical_consumption_identity(
+        actor.pk, UUID(int=45), channel
+    )
+    return KarmaService._build_consumption_specs(
+        actor, target, identity, channel=channel
+    )
+
 
 @pytest.fixture
 def separate_connections() -> Iterator[None]:
