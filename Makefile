@@ -1111,15 +1111,19 @@ test-experts-s41:
 
 .PHONY: test-experts-s42-backend
 test-experts-s42-backend:
-	$(PYTHON) -m pytest tests/integration/test_karma_exports.py::test_karma_export_facade_t1_with_multiple_files_awards_one_pair tests/integration/test_karma_exports.py::test_karma_export_service_t2_with_multiple_files_awards_one_pair tests/integration/test_karma_exports.py::test_karma_export_with_mirrors_and_ade_files_awards_one_pair tests/integration/test_karma_exports.py::test_karma_export_with_second_independent_call_creates_new_identity tests/integration/test_karma_exports.py::test_karma_export_bundle_with_generation_only_creates_no_awards tests/integration/test_karma_exports.py::test_karma_export_with_receipt_replay_preserves_single_pair tests/integration/test_karma_exports.py::test_karma_export_with_escaping_folder_or_symlink_rejects_before_write tests/integration/test_karma_exports.py::test_karma_export_with_partial_file_failure_creates_no_receipt tests/integration/test_karma_exports.py::test_karma_export_stdio_t3_with_success_returns_clean_jsonrpc tests/integration/test_karma_exports.py::test_karma_export_log_story_happy tests/integration/test_karma_exports.py::test_karma_export_log_story_reject -x
+	$(PYTHON) -m pytest tests/integration/test_karma_exports.py -k 'not self_export' -x
 
 .PHONY: test-experts-s42-log
 test-experts-s42-log:
-	$(PYTHON) -m pytest tests/integration/test_karma_exports.py::test_karma_export_log_story_happy tests/integration/test_karma_exports.py::test_karma_export_log_story_reject -x
+	$(PYTHON) -m pytest tests/integration/test_karma_exports.py -k 'log_story and not self_export' -x
 
 .PHONY: test-experts-s42-at
 test-experts-s42-at:
 	$(PYTHON) -m pytest tests/integration/test_experts_acceptance_runner.py -k S42 -x
+
+# Compatibility gate required by the converged export acceptance contract.
+.PHONY: test-at-karma-export
+test-at-karma-export: test-experts-s42-at
 
 .PHONY: test-experts-s42
 test-experts-s42:

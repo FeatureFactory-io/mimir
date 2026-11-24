@@ -43,6 +43,7 @@ conflict_map:
   tests/support/experts_acceptance.py:
   - S36
   Makefile:
+  - S42
   - S36
   - S10
   - S12
@@ -82,6 +83,7 @@ conflict_map:
   - S26
   - S29
   docs/features/steps/karma_mcp_steps.py:
+  - S42
   - S39
   - S41
   mcp_integration/facade/tools_http.py:
@@ -8440,6 +8442,8 @@ scenarios:
     skeleton_commit: f16474cfae587db99d4845f2fa265dae24a597e6
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - Makefile
+    - docs/features/steps/karma_mcp_steps.py
     - tests/unit/test_facade_tools_mount.py
     - docs/experts-replay/pin-evidence/S42.json
     - docs/features/steps/experts_export_steps.py
@@ -8618,6 +8622,8 @@ scenarios:
         depends_on:
         - S42-N2-facade-receipts
         footprint:
+        - Makefile
+        - docs/features/steps/karma_mcp_steps.py
         - docs/features/steps/experts_export_steps.py
         - tests/integration/test_karma_exports.py
         tests:
