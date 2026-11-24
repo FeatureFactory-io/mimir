@@ -10,14 +10,28 @@ from behave.runner import Context
 from django.http import HttpResponse
 from django.test.html import Element
 
+from methodology.services.expert_text import format_karma
 from methodology.services.experts_service import ExpertsService
 from tests.support.experts_data import load_cedar_baseline
-from tests.support.experts_html import element_text, find_by_test_id
+from tests.support.experts_html import (
+    _walk_elements,
+    assert_karma_source_rows,
+    element_text,
+    find_by_test_id,
+)
 
 logger = logging.getLogger(__name__)
 _CARD_PREFIX = "experts-card-"
 _DEVELOPMENT_TAB = "experts-category-development"
 _DEVELOPMENT_PATH = "/experts/?category=development"
+_PUBLIC_SCORE_TOTAL = 8200
+_PUBLIC_SCORE_SOURCES = (
+    ("Released playbooks", 5000),
+    ("PIP contributions", 1600),
+    ("Consumption", 1200),
+    ("Learning", 400),
+)
+_PUBLIC_SCORE_CATEGORIES = (("Design", 7200), ("Development", 1000))
 
 
 @given("the CEDAR-RFP-01 baseline dataset")
@@ -216,7 +230,19 @@ def public_score_sources(context: Context) -> None:
     :return: None. Example: None after shared source helper succeeds.
     :raises AssertionError: If any source label/value is missing or duplicated.
     """
-    raise NotImplementedError()
+    response = context.response
+    assert response.status_code == 200
+    assert response.context["person"]["username"] == "mrodriguez"
+    assert_karma_source_rows(
+        response.content.decode(response.charset),
+        dict(_PUBLIC_SCORE_SOURCES),
+        "expert-karma-total",
+        _PUBLIC_SCORE_TOTAL,
+    )
+    assert response.context["person"]["source_rows"] == tuple(
+        {"label": label, "points": format_karma(points)}
+        for label, points in _PUBLIC_SCORE_SOURCES
+    )
 
 
 @then("the source rows sum to the displayed total 8200")
@@ -227,7 +253,16 @@ def public_score_source_sum(context: Context) -> None:
     :return: None. Example: None for sum=8200 and formatted total 8,200.
     :raises AssertionError: If source sum and displayed total disagree.
     """
-    raise NotImplementedError()
+    person = context.response.context["person"]
+    assert sum(points for _, points in _PUBLIC_SCORE_SOURCES) == _PUBLIC_SCORE_TOTAL
+    assert person["total_karma"] == _PUBLIC_SCORE_TOTAL
+    assert person["formatted_karma"] == format_karma(_PUBLIC_SCORE_TOTAL) == "8,200"
+    assert_karma_source_rows(
+        context.response.content.decode(context.response.charset),
+        dict(_PUBLIC_SCORE_SOURCES),
+        "expert-karma-total",
+        person["total_karma"],
+    )
 
 
 @then(
@@ -240,4 +275,24 @@ def public_score_category_separation(context: Context) -> None:
     :return: None. Example: None for the two correctly classified categories.
     :raises AssertionError: If category/source sections overlap or values differ.
     """
-    raise NotImplementedError()
+    response = context.response
+    section = find_by_test_id(response.content, "karma-category-breakdown")
+    assert section.name == "dl"
+    actual = [(node.name, element_text(node)) for node in _walk_elements(section)]
+    assert actual[1:] == [
+        item
+        for label, points in _PUBLIC_SCORE_CATEGORIES
+        for item in (("dt", label), ("dd", format_karma(points)))
+    ]
+    table = find_by_test_id(response.content, "karma-source-breakdown")
+    body = next(
+        node
+        for node in table.children
+        if isinstance(node, Element) and node.name == "tbody"
+    )
+    assert all(label not in element_text(body) for label, _ in _PUBLIC_SCORE_CATEGORIES)
+    assert sum(points for _, points in _PUBLIC_SCORE_CATEGORIES) == _PUBLIC_SCORE_TOTAL
+    assert response.context["person"]["category_rows"] == tuple(
+        {"label": label, "points": format_karma(points)}
+        for label, points in _PUBLIC_SCORE_CATEGORIES
+    )
