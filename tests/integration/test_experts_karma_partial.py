@@ -120,7 +120,7 @@ def test_finalize_partial_with_outer_commit_sends_one_normal_notification() -> N
         _assert_partial_notification_pending()
     assert not connection.in_atomic_block and not connection.run_on_commit
     _assert_partial_outcome(dataset, pip, before, started)
-    _assert_partial_mail(pip)
+    _assert_partial_transaction_mail(pip)
 
 
 def test_finalize_partial_with_outer_rollback_preserves_baseline_and_sends_no_mail() -> (
@@ -784,3 +784,17 @@ def _assert_partial_transaction_rolled_back(
             pk=change_id
         )
         assert actual == {"admin_decision": decision, "admin_note": note}
+
+
+def _assert_partial_transaction_mail(pip: ProcessImprovementProposal) -> None:
+    """Associate each delivered decision with its own actual change header.
+
+    :param pip: Committed partial proposal. Example: ADD accepted, ALTER rejected.
+    :return: None. Example: the delivered ADD line is followed by ACCEPT, not REJECT.
+    :raises AssertionError: If a correct-looking message swaps the two decisions.
+    """
+    _assert_partial_mail(pip)
+    body = mail.outbox[0].body
+    for number, change in enumerate(pip.changes.order_by("order", "pk"), start=1):
+        header = f'Change {number}: {change.change_type} Activity "{change.name}"'
+        assert f"{header}\n  Decision: {change.admin_decision}" in body
