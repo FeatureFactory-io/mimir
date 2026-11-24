@@ -9,6 +9,8 @@ from playwright.sync_api import Locator, Page, expect
 from tests.support.experts_guest_contact import GUEST_CONTACT_EXPLANATION
 
 _MAX_TAB_PRESSES = 40
+_FOCUS_SETTLE_FRAME_LIMIT = 120
+_FOCUS_STABLE_FRAME_COUNT = 3
 _TOOLTIP_TIMEOUT_MS = 2500
 
 
@@ -31,14 +33,37 @@ def guest_contact_wrapper(page: Page, container_test_id: str | None) -> Locator:
 def tab_to_guest_control(page: Page, target: Locator) -> None:
     """Reach a control through native sequential focus from the current stop.
 
+    Wait for each native focus scroll before the next Tab so rapid automation
+    cannot leave a later control behind an earlier smooth-scroll destination.
+
     :param page: Page accepting keyboard input. Example: the anonymous Design list.
     :param target: Expected focus stop. Example: the Sign In link or Maria's wrapper.
     :return: None when the actual active element is the target.
-    :raises AssertionError: If bounded sequential traversal misses the target.
+    :raises AssertionError: If focus scrolling fails or traversal misses the target.
     """
     expect(target).not_to_be_focused()
     for _ in range(_MAX_TAB_PRESSES):
         page.keyboard.press("Tab")
+        assert page.evaluate(
+            """async ({frameLimit, stableFrames}) => {
+            let previous = '', stable = 0;
+            for (let frame = 0; frame < frameLimit; frame++) {
+                await new Promise(requestAnimationFrame);
+                const box = document.activeElement.getBoundingClientRect();
+                const geometry = JSON.stringify([scrollX, scrollY, box.x, box.y, box.width, box.height]);
+                stable = geometry === previous ? stable + 1 : 0;
+                previous = geometry;
+                const visible = box.top >= 0 && box.left >= 0 &&
+                    box.bottom <= innerHeight && box.right <= innerWidth;
+                if (visible && stable >= stableFrames) return true;
+            }
+            return false;
+        }""",
+            {
+                "frameLimit": _FOCUS_SETTLE_FRAME_LIMIT,
+                "stableFrames": _FOCUS_STABLE_FRAME_COUNT,
+            },
+        ), "Native Tab focus scrolling did not settle inside the viewport"
         if target.evaluate("(control) => control === document.activeElement"):
             break
     expect(target).to_be_focused(timeout=_TOOLTIP_TIMEOUT_MS)
