@@ -2790,7 +2790,7 @@ scenarios:
       - S03
       - S01
     implementation_plan: docs/plans/iterations/experts/S09-experts-list-09.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
@@ -7861,7 +7861,7 @@ scenarios:
       scenario_dependencies:
       - S32
     implementation_plan: docs/plans/iterations/experts/S33-karma-pip-02.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S32
