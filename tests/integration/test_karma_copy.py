@@ -12,12 +12,14 @@ from _pytest.logging import LogCaptureFixture
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ValidationError
+from django.core.mail import EmailMessage
 from django.db.models import Sum
 from django.http import HttpResponse
+from django.middleware.csrf import REASON_CSRF_TOKEN_MISSING
 from django.test import Client
 from django.urls import reverse
 
-from methodology.models import EventChannel, ExpertProfile, KarmaAward
+from methodology.models import AgentInteraction, EventChannel, ExpertProfile, KarmaAward
 from methodology.services.experts_service import ExpertProjection, ExpertsService
 from methodology.services.karma_service import KarmaService
 from tests.support.experts_data import CedarDataset
@@ -36,6 +38,7 @@ _MIKE_BASELINE_POINTS = 12_450
 _MARIA_BASELINE_POINTS = 8_200
 _MIKE_BASELINE_GUI_COPIES = 47
 _RECEIPT_LOGGERS = ("methodology.karma_views", "methodology.services.karma_service")
+_CSRF_LOGGER = "django.security.csrf"
 
 
 def _payload() -> dict[str, object]:
@@ -495,24 +498,68 @@ def test_award_successful_consumption_with_self_activity_returns_no_awards(
     _assert_self_copy_state_unchanged(before)
 
 
-@pytest.mark.django_db
-def test_copy_receipt_with_self_activity_returns_successful_exclusion() -> None:
+@pytest.mark.django_db(transaction=True)
+def test_copy_receipt_with_self_activity_returns_successful_exclusion(
+    cedar_dataset: CedarDataset, mailoutbox: list[EmailMessage]
+) -> None:
     """Exercise a genuine strict-CSRF self-copy receipt.
 
+    :param cedar_dataset: Real imported baseline. Example: Mike owns activity 6203.
+    :param mailoutbox: Test email capture. Example: an empty outbox.
     :return: None after HTTP 200, self-exclusion and unchanged-domain assertions.
     :raises AssertionError: If real token, route, result or effects differ.
     """
-    raise NotImplementedError()
+    mike = cedar_dataset.users_by_username["mchen"]
+    client, csrf_token = _self_copy_client(mike)
+    before = _self_copy_state()
+    interactions = AgentInteraction.objects.order_by("pk")
+    prior_interactions = list(interactions.values())
+
+    response = _post_receipt(client, _payload(), HTTP_X_CSRFTOKEN=csrf_token)
+
+    assert response.wsgi_request.user.pk == mike.pk
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {"status": "skipped", "reason": "self_consumption"}
+    _assert_self_copy_state_unchanged(before)
+    assert list(interactions.values()) == prior_interactions
+    assert not mailoutbox
 
 
-@pytest.mark.django_db
-def test_copy_receipt_with_self_activity_without_csrf_returns_forbidden() -> None:
-    """Prove authenticated self-copy does not bypass CSRF middleware.
+@pytest.mark.django_db(transaction=True)
+def test_copy_receipt_with_self_activity_without_csrf_returns_forbidden(
+    cedar_dataset: CedarDataset,
+    caplog: LogCaptureFixture,
+    mailoutbox: list[EmailMessage],
+) -> None:
+    """Prove CSRF middleware stops the authenticated receipt before the view.
 
-    :return: None after HTTP 403 and unchanged ledger assertions.
-    :raises AssertionError: If a tokenless session receipt succeeds.
+    :param cedar_dataset: Real imported baseline. Example: Mike owns activity 6203.
+    :param caplog: Real log capture. Example: Django's missing-token rejection.
+    :param mailoutbox: Test email capture. Example: an empty outbox.
+    :return: None after HTTP 403 and unchanged-domain assertions.
+    :raises AssertionError: If a tokenless session receipt reaches the view.
     """
-    raise NotImplementedError()
+    mike = cedar_dataset.users_by_username["mchen"]
+    client, _ = _self_copy_client(mike)
+    before = _self_copy_state()
+    interactions = AgentInteraction.objects.order_by("pk")
+    prior_interactions = list(interactions.values())
+
+    with capture_experts_logs(caplog, (_CSRF_LOGGER, *_RECEIPT_LOGGERS)):
+        response = _post_receipt(client, _payload())
+
+    assert response.wsgi_request.user.pk == mike.pk
+    assert settings.CSRF_COOKIE_NAME in response.wsgi_request.COOKIES
+    assert settings.CSRF_HEADER_NAME not in response.wsgi_request.META
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert any(
+        record.name == _CSRF_LOGGER and REASON_CSRF_TOKEN_MISSING in record.getMessage()
+        for record in caplog.records
+    )
+    assert not any(record.name in _RECEIPT_LOGGERS for record in caplog.records)
+    _assert_self_copy_state_unchanged(before)
+    assert list(interactions.values()) == prior_interactions
+    assert not mailoutbox
 
 
 @pytest.mark.django_db
