@@ -1,30 +1,44 @@
+"""Real registered MCP/HTTP/DB and stdio support; no domain or HTTP doubles."""
+
 from __future__ import annotations
 
-"""Real registered MCP/HTTP/DB and stdio support; no domain or HTTP doubles."""
 import json
 import os
+import sys
 from collections.abc import Mapping, Sequence
 from contextlib import (
     AbstractAsyncContextManager,
     AbstractContextManager,
     AsyncExitStack,
+    ExitStack,
 )
 from dataclasses import dataclass, field
 from functools import partial
 from importlib import import_module
 from pathlib import Path
-from subprocess import CompletedProcess
+from select import select
+from subprocess import PIPE, CompletedProcess, Popen, TimeoutExpired
+from tempfile import TemporaryFile
 from threading import Lock
+from time import monotonic
 from types import TracebackType
-from typing import Literal
-from uuid import UUID
+from typing import BinaryIO, Literal, Self
+from urllib.parse import urlsplit
+
 import httpx
 import pytest
 from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
 from fastmcp import Client, FastMCP
 from fastmcp.client.client import CallToolResult
-from mcp.types import TextContent
+from mcp.types import (
+    LATEST_PROTOCOL_VERSION,
+    JSONRPCMessage,
+    JSONRPCNotification,
+    JSONRPCResponse,
+    TextContent,
+)
+from pydantic import ValidationError
 from pytest_django.live_server_helper import LiveServer
 from rest_framework.authtoken.models import Token
 
@@ -32,11 +46,16 @@ from mcp_integration.context import _current_user, set_current_user
 from mcp_integration.facade import client as facade_client
 from mcp_integration.facade.server import _build_mcp
 from methodology.models import Agent, Artifact, Phase, Rule, Skill
-from tests.support.experts_data import CedarDataset
+from tests.support.experts_data import CedarDataset, _resolve_database_scope
 
 MCPEntrypoint = Literal["facade", "legacy"]
 _UNSAFE_ORM_FLAG = "DJANGO_ALLOW_ASYNC_UNSAFE"
 _MCP_RUNTIME_LOCK = Lock()
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_STDIO_TIMEOUT_SECONDS = 30.0
+_STDIO_EXIT_TIMEOUT_SECONDS = 5.0
+_STDIO_READ_SIZE = 65536
+_STDIO_STDERR_LIMIT = 65536
 
 
 @dataclass(frozen=True)
@@ -697,16 +716,18 @@ def _remap_subprocess_case(case: MCPCase, manifest: Mapping[str, object]) -> MCP
 def _stdio_command(entrypoint: MCPEntrypoint, actor_username: str) -> tuple[str, ...]:
     """Select the existing executable using the current test interpreter.
 
-    :param entrypoint: Existing server. Example: "legacy".
-    :param actor_username: Explicit legacy context. Example: "mchen".
-    :return: Argument vector. Example: python/manage.py/mcp_server/--user=mchen.
+    :param entrypoint: Existing server owned by this proof. Example: "facade".
+    :param actor_username: Explicit facade token actor. Example: "mchen".
+    :return: Argument vector. Example: python -m mcp_integration.facade.server --transport=stdio.
     :raises ValueError: Unsupported entrypoint or actor identifier.
     """
-    raise NotImplementedError()
+    if entrypoint != "facade" or not actor_username:
+        raise ValueError("Facade stdio requires an explicit actor.")
+    return (sys.executable, "-m", "mcp_integration.facade.server", "--transport=stdio")
 
 
 class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
-    """Real protocol client over an actual existing server subprocess."""
+    """Real protocol client over the existing facade subprocess."""
 
     def __init__(
         self,
@@ -729,15 +750,49 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :return: None. Example: unopened protocol client.
         :raises ValueError: Invalid dependencies/ownership.
         """
-        raise NotImplementedError()
+        url = urlsplit(server_url)
+        if (
+            entrypoint != "facade"
+            or actor_username not in dataset.cedar.users_by_username
+            or url.scheme != "http"
+            or url.hostname not in {"localhost", "127.0.0.1"}
+            or not url.port
+            or url.netloc != f"{url.hostname}:{url.port}"
+            or url.path not in {"", "/"}
+            or url.query
+            or url.fragment
+            or not root.is_dir()
+            or root.is_symlink()
+        ):
+            raise ValueError(
+                "Facade stdio requires a fixture actor, loopback server and owned directory."
+            )
+        self.entrypoint, self.actor_username = entrypoint, actor_username
+        self.dataset, self.server_url, self.root = dataset, server_url, root
+        self.include_summaries = include_summaries
+        self._process: Popen[bytes] | None = None
+        self._resources = ExitStack()
+        self._stderr_file: BinaryIO | None = None
+        self._token = ""
+        self._request_id = 0
+        self._pending_stdout = b""
+        self.stderr = ""
+        self.stdout_messages: list[Mapping[str, object]] = []
 
-    def __enter__(self) -> StdioMCPClient:
+    def __enter__(self) -> Self:
         """Prepare isolated backend, launch existing server and complete handshake.
 
-        :return: Connected actual stdio client. Example: initialized legacy server.
+        :return: Connected actual stdio client. Example: initialized facade server.
         :raises RuntimeError: Startup/handshake failure after resource cleanup.
         """
-        raise NotImplementedError()
+        try:
+            self._prepare_backend()
+            self._start_process()
+            self.initialize()
+        except BaseException as error:
+            self.__exit__(type(error), error, error.__traceback__)
+            raise
+        return self
 
     def __exit__(
         self,
@@ -753,7 +808,13 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :return: False. Example: original assertion propagates.
         :raises RuntimeError: Cleanup fails without an earlier failure.
         """
-        raise NotImplementedError()
+        try:
+            self._stop_process()
+        except (AssertionError, OSError, RuntimeError, TimeoutExpired):
+            if exc is None:
+                raise
+            exc.add_note("Facade stdio cleanup also failed.")
+        return False
 
     def initialize(self) -> Mapping[str, object]:
         """Perform real initialize request followed by initialized notification.
@@ -761,7 +822,24 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :return: Actual initialization result. Example: serverInfo/protocolVersion.
         :raises AssertionError: Invalid handshake or incompatible response.
         """
-        raise NotImplementedError()
+        result = self._request(
+            "initialize",
+            {
+                "protocolVersion": LATEST_PROTOCOL_VERSION,
+                "capabilities": {},
+                "clientInfo": {"name": "mimir-karma-integration", "version": "1"},
+            },
+        )
+        assert result.get("protocolVersion") == LATEST_PROTOCOL_VERSION
+        server_info = result.get("serverInfo")
+        assert isinstance(server_info, dict)
+        assert server_info.get("name") == "Mimir Methodology Assistant"
+        assert (
+            isinstance(result.get("capabilities"), dict)
+            and "tools" in result["capabilities"]
+        )
+        self._notify("notifications/initialized", {})
+        return result
 
     def list_tools(self) -> tuple[Mapping[str, object], ...]:
         """Read actual registered tool schemas via tools/list.
@@ -769,16 +847,30 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :return: Real schema entries. Example: get_pip input schema.
         :raises AssertionError: Missing/malformed tool list.
         """
-        raise NotImplementedError()
+        tools = self._request("tools/list", {}).get("tools")
+        assert (
+            isinstance(tools, list) and tools
+        ), "No registered MCP tools were returned."
+        assert all(
+            isinstance(tool, dict) and isinstance(tool.get("inputSchema"), dict)
+            for tool in tools
+        )
+        return tuple(tools)
 
     def call(self, case: MCPCase) -> object:
-        """Call an actual registered tool, rebasing only independent DB references.
+        """Call an actual tool with the actor authenticated at startup.
 
         :param case: Explicit invocation. Example: Mike reading Maria Design PIP.
         :return: Actual decoded content. Example: historical changes.
         :raises AssertionError: Tool error, malformed result or wrong actor context.
         """
-        raise NotImplementedError()
+        assert (
+            case.actor_username == self.actor_username
+        ), "Case actor differs from the stdio token actor."
+        result = self._request(
+            "tools/call", {"name": case.tool_name, "arguments": dict(case.arguments)}
+        )
+        return decode_tool_payload(result)
 
     def snapshot(self) -> MCPInvariantSnapshot:
         """Read actual HTTP-backend or independent legacy DB invariants.
@@ -794,23 +886,50 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :return: None. Example: requests/results/notifications only.
         :raises AssertionError: Banner, log line, malformed JSON or unmatched result.
         """
-        raise NotImplementedError()
+        assert self._process is not None and self._process.returncode == 0
+        assert (
+            not self._pending_stdout
+        ), "Child wrote more stdout after its last matched response."
+        response_ids = [
+            message["id"] for message in self.stdout_messages if "id" in message
+        ]
+        assert response_ids == list(range(1, self._request_id + 1))
 
     def _prepare_backend(self) -> None:
-        """Prepare actual token HTTP backend or migrate/bootstrap a temporary legacy DB.
+        """Verify the runner-owned HTTP backend and load the fixture actor's token.
 
         :return: None. Example: actor token placed in private facade environment.
         :raises RuntimeError: Actor/backend/ownership preparation fails.
         """
-        raise NotImplementedError()
+        # The HTTP facade uses no database. Verify Django's actual ORM target before
+        # creating its token and keep all database/provider settings out of the child.
+        _resolve_database_scope(None)
+        _, self._token = _load_actor_and_token(self.dataset, self.actor_username)
 
     def _start_process(self) -> None:
-        """Launch existing entrypoint with real pipes and bounded stderr draining.
+        """Launch the facade with protocol pipes and a separate temporary stderr stream.
 
         :return: None. Example: live child process with owned streams.
         :raises RuntimeError: Child exits or cannot start.
         """
-        raise NotImplementedError()
+        command = _stdio_command(self.entrypoint, self.actor_username)
+        self._stderr_file = self._resources.enter_context(
+            TemporaryFile(dir=self.root)  # noqa: SIM115 — ExitStack owns the file.
+        )
+        self._process = Popen(
+            command,
+            cwd=self.root,
+            env={
+                "PATH": os.defpath,
+                "PYTHONPATH": str(_PROJECT_ROOT),
+                "PYTHONIOENCODING": "utf-8",
+                "MIMIR_SERVER_URL": self.server_url,
+                "MIMIR_TOKEN": self._token,
+            },
+            stdin=PIPE,
+            stdout=PIPE,
+            stderr=self._stderr_file,
+        )
 
     def _request(
         self, method: str, parameters: Mapping[str, object]
@@ -823,7 +942,24 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :raises TimeoutError: Bounded response deadline exceeded.
         :raises AssertionError: Protocol error or malformed response.
         """
-        raise NotImplementedError()
+        self._request_id += 1
+        self._write_message(
+            {
+                "jsonrpc": "2.0",
+                "id": self._request_id,
+                "method": method,
+                "params": dict(parameters),
+            }
+        )
+        try:
+            message = self._read_response(self._request_id, _STDIO_TIMEOUT_SECONDS)
+        except ValidationError:
+            raise AssertionError(
+                "Facade stdout contained invalid protocol output."
+            ) from None
+        result = message["result"]
+        assert isinstance(result, dict)
+        return result
 
     def _notify(self, method: str, parameters: Mapping[str, object]) -> None:
         """Send a notification without waiting for a nonexistent response.
@@ -833,7 +969,9 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :return: None. Example: initialized notification written.
         :raises RuntimeError: Child input unavailable.
         """
-        raise NotImplementedError()
+        self._write_message(
+            {"jsonrpc": "2.0", "method": method, "params": dict(parameters)}
+        )
 
     def _write_message(self, message: Mapping[str, object]) -> None:
         """Write one actual JSON-RPC line and flush the child input.
@@ -842,7 +980,10 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :return: None. Example: one complete JSON line flushed.
         :raises RuntimeError: Closed/broken child input.
         """
-        raise NotImplementedError()
+        if self._process is None or self._process.stdin is None:
+            raise RuntimeError("Facade stdio input is unavailable.")
+        self._process.stdin.write(json.dumps(dict(message)).encode("utf-8") + b"\n")
+        self._process.stdin.flush()
 
     def _read_response(
         self, request_id: int, timeout_seconds: float
@@ -853,25 +994,80 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :param timeout_seconds: Named bounded deadline. Example: 30.0.
         :return: Matched response. Example: tools/call result.
         :raises TimeoutError: No matching result before deadline.
-        :raises AssertionError: Nonprotocol output or child failure.
+        :raises AssertionError: Unexpected response or child failure.
+        :raises ValidationError: Malformed JSON-RPC line.
         """
-        raise NotImplementedError()
+        process = self._process
+        assert process is not None and process.stdout is not None
+        descriptor = process.stdout.fileno()
+        deadline = monotonic() + timeout_seconds
+        while (remaining := deadline - monotonic()) > 0:
+            line, separator, tail = self._pending_stdout.partition(b"\n")
+            if not separator:
+                ready, _, _ = select([descriptor], [], [], remaining)
+                if not ready:
+                    break
+                chunk = os.read(descriptor, _STDIO_READ_SIZE)
+                if not chunk:
+                    raise AssertionError(
+                        "Facade stdout closed before its JSON-RPC response."
+                    )
+                self._pending_stdout += chunk
+                continue
+            self._pending_stdout = tail
+            if self._token.encode("utf-8") in line:
+                raise AssertionError("Facade stdout exposed its test credential.")
+            message = JSONRPCMessage.model_validate_json(line).root
+            envelope = message.model_dump(mode="json", exclude_unset=True)
+            self.stdout_messages.append(envelope)
+            if isinstance(message, JSONRPCResponse) and message.id == request_id:
+                return envelope
+            assert isinstance(
+                message, JSONRPCNotification
+            ), "Unexpected facade JSON-RPC message."
+        raise TimeoutError(f"No facade JSON-RPC response for request {request_id}.")
 
     def _drain_stderr(self) -> None:
-        """Drain child diagnostics without logging credentials or blocking stdout.
+        """Read bounded diagnostics after the child has closed its stderr.
 
         :return: None. Example: bounded diagnostic buffer retained privately.
-        :raises RuntimeError: Unexpected diagnostic-reader failure.
+        :raises AssertionError: Excessive output or a leaked test credential.
         """
-        raise NotImplementedError()
+        if self._stderr_file is None:
+            return
+        self._stderr_file.seek(0)
+        stderr = self._stderr_file.read(_STDIO_STDERR_LIMIT + 1)
+        if len(stderr) > _STDIO_STDERR_LIMIT:
+            raise AssertionError("Facade emitted excessive diagnostic output.")
+        if self._token.encode("utf-8") in stderr:
+            raise AssertionError("Facade stderr exposed its test credential.")
+        self.stderr = stderr.decode("utf-8", errors="replace")
 
     def _stop_process(self) -> None:
-        """Terminate, bounded-wait/kill if needed, join reader and close owned pipes.
+        """Close child input, reap the process and close its diagnostic stream.
 
         :return: None. Example: no remaining child or stream resources.
         :raises RuntimeError: Child/resource cleanup cannot complete.
         """
-        raise NotImplementedError()
+        try:
+            if self._process is not None:
+                # Closing stdin gives the server an EOF. communicate drains residual
+                # stdout and reaps the process before any assertion inspects stderr.
+                try:
+                    stdout, _ = self._process.communicate(
+                        timeout=_STDIO_EXIT_TIMEOUT_SECONDS
+                    )
+                except TimeoutExpired:
+                    self._process.kill()
+                    self._process.communicate(timeout=_STDIO_EXIT_TIMEOUT_SECONDS)
+                    raise RuntimeError(
+                        "Facade stdio process failed to stop on EOF."
+                    ) from None
+                self._pending_stdout += stdout
+            self._drain_stderr()
+        finally:
+            self._resources.close()
+            self._token = ""
 
 
 def run_collection_stdio(

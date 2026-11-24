@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib import import_module
+from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -45,6 +47,7 @@ from tests.support.karma_mcp import (
     MCPDataset,
     MCPEntrypoint,
     MCPRuntimeState,
+    StdioMCPClient,
     _capture_mcp_runtime,
     decode_tool_payload,
     detail_case,
@@ -503,16 +506,46 @@ async def test_mcp_detail_with_legacy_registration_returns_content_and_pair(
 @pytest.mark.parametrize("tool_name", DETAIL_TOOLS)
 @pytest.mark.django_db(transaction=True)
 def test_mcp_detail_with_stdio_transport_returns_clean_jsonrpc(
-    tool_name: str, live_server: LiveServer
+    tool_name: str, live_server: LiveServer, mcp_dataset: MCPDataset, tmp_path: Path
 ) -> None:
     """Prove T3 with real facade subprocess and isolated HTTP backend.
 
     :param tool_name: Registered detail tool. Example: "get_rule".
     :param live_server: Real Django HTTP backend. Example: local random port.
+    :param mcp_dataset: Independent Cedar fixture data. Example: Mike playbook 6201.
+    :param tmp_path: Owned subprocess directory. Example: one per detail case.
     :return: None. Example: protocol-only stdout and exact persisted pair.
     :raises AssertionError: Protocol noise, missing content or wrong awards.
     """
-    raise NotImplementedError()
+    case = _eligible_mcp_case(tool_name, mcp_dataset)
+    arguments = {**case.arguments, "event_identity": str(RECEIPT_UUID)}
+    optional = {"include_history", "version"} if tool_name == "get_playbook" else set()
+    before = KarmaAward.objects.count()
+    roles = User.objects.order_by("pk").values_list("pk", "is_staff", "is_superuser")
+    initial_roles = list(roles)
+    with StdioMCPClient(
+        entrypoint="facade",
+        actor_username=case.actor_username,
+        dataset=mcp_dataset,
+        server_url=live_server.url,
+        root=tmp_path,
+    ) as wire:
+        schemas = {tool["name"]: tool["inputSchema"] for tool in wire.list_tools()}
+        schema = schemas[tool_name]
+        assert set(schema["properties"]) == arguments.keys() | optional
+        assert "event_identity" not in schema.get("required", [])
+        assert KarmaAward.objects.count() == before
+        payload = wire.call(replace(case, arguments=arguments))
+
+    wire.assert_protocol_clean()
+    requests = re.findall(r"HTTP Request: (.+)", wire.stderr)
+    assert requests == [
+        f'GET {live_server.url}{case.route} "HTTP/1.1 200 OK"',
+        f'POST {live_server.url}{RECEIPT_PATH} "HTTP/1.1 200 OK"',
+    ]
+    _assert_mcp_content(case, payload, "facade")
+    _assert_mcp_pair(case, mcp_dataset, before)
+    assert list(roles.all()) == initial_roles
 
 
 @pytest.mark.parametrize("tool_name", DETAIL_TOOLS)
