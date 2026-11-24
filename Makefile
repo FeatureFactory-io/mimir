@@ -911,7 +911,7 @@ test-experts-s31:
 
 .PHONY: test-experts-s32-backend
 test-experts-s32-backend:
-	$(PYTHON) -m pytest tests/integration/test_experts_karma_pip.py tests/integration/test_pip_admin_integrity.py tests/integration/test_pip_admin_review_view.py::test_admin_review_with_two_changes_labels_each_decision tests/integration/test_pip_admin_review_view.py::test_admin_review_with_finalize_dialog_associates_visible_title tests/integration/test_pip_admin_review_view.py::test_admin_review_with_finalize_dialog_names_close_button -x
+	$(PYTHON) -m pytest tests/integration/test_experts_karma_pip.py tests/integration/test_pip_admin_integrity.py tests/integration/test_pip_lifecycle_integrity.py tests/integration/test_pip_admin_review_view.py::test_admin_review_with_two_changes_labels_each_decision tests/integration/test_pip_admin_review_view.py::test_admin_review_with_finalize_dialog_associates_visible_title tests/integration/test_pip_admin_review_view.py::test_admin_review_with_finalize_dialog_names_close_button -x
 
 .PHONY: test-experts-s32-browser
 test-experts-s32-browser:
