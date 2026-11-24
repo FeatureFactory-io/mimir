@@ -7399,7 +7399,7 @@ scenarios:
       - S10
       - S17
     implementation_plan: docs/plans/iterations/experts/S26-galdr-summary-04.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
@@ -7616,7 +7616,7 @@ scenarios:
       - S10
       - S17
     implementation_plan: docs/plans/iterations/experts/S29-galdr-summary-07.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S23
