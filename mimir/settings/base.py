@@ -155,6 +155,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 GALDR_MODEL = os.environ.get("GALDR_MODEL", "claude-sonnet-4-20250514")
 GALDR_USE_ANTHROPIC = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
 
+# Server-only provider override. The submission scheduler captures it before dispatch.
+CONTRIBUTION_SUMMARY_LLM = None
+# Optional JSON model-to-[input, output] USD rates per million tokens.
+CONTRIBUTION_SUMMARY_MODEL_RATES = os.environ.get(
+    "CONTRIBUTION_SUMMARY_MODEL_RATES", ""
+)
+
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@mimir.local")
 
 # Galdr MVP: use synchronous assessments in tests only (sqlite + threads are flaky).
@@ -204,8 +211,3 @@ REST_FRAMEWORK = {
 
 # Django messages → Bootstrap alert classes (alert-danger, not alert-error).
 MESSAGE_TAGS = {message_constants.ERROR: "danger"}
-
-# PIN S23: wire the reviewed GALDR-SUMMARY-01 collaborators after PIN-05 GO; preserve current behavior.
-
-# Explicit server-only port override; captured before normal Galdr dispatch.
-CONTRIBUTION_SUMMARY_LLM = None
