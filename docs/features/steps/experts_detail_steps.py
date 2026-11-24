@@ -105,6 +105,5 @@ def public_response_has_expected_status(context: Context, status: int) -> None:
         raise ValueError("An integer HTTP status from 100 through 599 is required.")
     response = getattr(context, "response", None)
     assert isinstance(response, HttpResponseBase), "A Django HTTP response is required."
-    assert (
-        response.status_code == status
-    ), f"Expected HTTP {status}, got HTTP {response.status_code}."
+    actual_status = response.status_code
+    assert actual_status == status, f"Expected HTTP {status}, got HTTP {actual_status}."
