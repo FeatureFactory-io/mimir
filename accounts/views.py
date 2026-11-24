@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 from urllib.parse import quote
 
 from django.conf import settings
@@ -38,7 +38,11 @@ from methodology.models import (
     ProcessImprovementProposal,
     TeamMembership,
 )
-from methodology.services.expert_text import category_label, format_karma
+from methodology.services.expert_text import (
+    category_label,
+    format_karma,
+    format_numeric_fallback,
+)
 from methodology.services.experts_service import (
     SOURCE_BUCKETS,
     ExpertProjection,
@@ -1014,6 +1018,7 @@ class ProfileContributions(TypedDict):
     formatted_karma: str
     primary_category: str | None
     summary: str
+    numeric_fallback: NotRequired[str]
     source_rows: tuple[ProfileContributionRow, ...]
     category_rows: tuple[ProfileContributionRow, ...]
 
@@ -1070,7 +1075,7 @@ def _profile_contribution_display(
 
     :param projection: S03 result; example: total_points=8200, category=Design.
     :param summary: Stored prose for template autoescaping; example: "Maria maintains...".
-    :return: Presentation context; example: formatted_karma="8,200".
+    :return: Context with missing-only numeric fallback; example: formatted_karma="8,200".
     :raises ValueError: If numeric/source/category data is invalid.
     :raises TypeError: If summary is not text; example: None.
     """
@@ -1089,6 +1094,7 @@ def _profile_contribution_display(
             else None
         ),
         "summary": summary,
+        **_profile_numeric_fallback_context(projection, summary),
         "source_rows": tuple(
             {"label": label, "points": points, "formatted_points": format_karma(points)}
             for label, points in projection.source_points
@@ -1101,6 +1107,26 @@ def _profile_contribution_display(
             }
             for slug, points in projection.category_points
         ),
+    }
+
+
+def _profile_numeric_fallback_context(
+    projection: ExpertProjection, summary: str
+) -> dict[str, str]:
+    """Format live missing-prose counts without changing stored-summary context.
+
+    :param projection: Validated live projection. Example: two releases/47 copies.
+    :param summary: Validated normalized stored prose. Example: empty string.
+    :return: Missing-only fallback mapping. Example: {"numeric_fallback": "2 released playbooks · 47 copies"}.
+    :raises ValueError: If shared formatter rejects invalid numeric counts.
+    """
+    if summary:
+        return {}
+    return {
+        "numeric_fallback": format_numeric_fallback(
+            projection.released_public_playbook_count,
+            projection.successful_gui_copy_count,
+        )
     }
 
 
