@@ -20,33 +20,32 @@ logger = logging.getLogger(__name__)
 _current_user = contextvars.ContextVar("current_user", default=None)
 
 
-def set_current_user(user):
+def set_current_user(user: User) -> None:
+    """Set the saved user for the current MCP execution context.
+
+    :param user: Loaded Django user. Example: authenticated MCP account.
+    :return: None. Example: get_current_user() returns the account.
+    :raises ValueError: The user has no persisted identifier.
     """
-    Set the current user in MCP context.
-    
-    :param user: Django User instance
-    """
-    logger.info(f'MCP context: About to set user to {user.username} (id={user.id})...')
+    _log_user_context(user)
     _current_user.set(user)
-    logger.info(f'MCP context: ✓ User successfully set to {user.username} (id={user.id})')
-    logger.info(f'MCP context: User attributes - email={user.email}, is_active={user.is_active}, is_staff={user.is_staff}')
 
 
-def get_current_user():
+def get_current_user() -> User:
     """
     Get the current user from MCP context.
-    
+
     :returns: Django User instance
     :raises ValueError: If no user context is set
     """
     user = _current_user.get(None)
     if user is None:
-        logger.error('MCP context: No user context available')
-        raise ValueError('No user context available. Call set_current_user() first.')
+        logger.error("MCP context: No user context available")
+        raise ValueError("No user context available. Call set_current_user() first.")
     return user
 
 
-def clear_current_user():
+def clear_current_user() -> None:
     """Clear the current user context."""
     _current_user.set(None)
     logger.info("MCP context: User context cleared")
@@ -59,4 +58,12 @@ def _log_user_context(user: User) -> None:
     :return: None. Example: user_id, is_active and is_staff logged at INFO.
     :raises ValueError: Missing persisted user identifier.
     """
-    raise NotImplementedError()
+    user_id = getattr(user, "pk", None)
+    if type(user_id) is not int or user_id <= 0:
+        raise ValueError("MCP context requires a saved user identifier.")
+    logger.info(
+        "MCP context: user_id=%s is_active=%s is_staff=%s",
+        user_id,
+        user.is_active,
+        user.is_staff,
+    )

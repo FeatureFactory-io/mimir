@@ -1,22 +1,42 @@
 from __future__ import annotations
 
 """Real registered MCP/HTTP/DB and stdio support; no domain or HTTP doubles."""
+import json
+import os
 from collections.abc import Mapping, Sequence
-from contextlib import AbstractAsyncContextManager, AbstractContextManager
+from contextlib import (
+    AbstractAsyncContextManager,
+    AbstractContextManager,
+    AsyncExitStack,
+)
 from dataclasses import dataclass, field
+from functools import partial
+from importlib import import_module
 from pathlib import Path
 from subprocess import CompletedProcess
+from threading import Lock
 from types import TracebackType
 from typing import Literal
 from uuid import UUID
 import httpx
 import pytest
+from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
 from fastmcp import Client, FastMCP
+from fastmcp.client.client import CallToolResult
+from mcp.types import TextContent
 from pytest_django.live_server_helper import LiveServer
+from rest_framework.authtoken.models import Token
+
+from mcp_integration.context import _current_user, set_current_user
+from mcp_integration.facade import client as facade_client
+from mcp_integration.facade.server import _build_mcp
+from methodology.models import Agent, Artifact, Phase, Rule, Skill
 from tests.support.experts_data import CedarDataset
 
 MCPEntrypoint = Literal["facade", "legacy"]
+_UNSAFE_ORM_FLAG = "DJANGO_ALLOW_ASYNC_UNSAFE"
+_MCP_RUNTIME_LOCK = Lock()
 
 
 @dataclass(frozen=True)
@@ -102,7 +122,7 @@ class MCPProtocolEvidence:
     stdout_messages: tuple[Mapping[str, object], ...]
 
 
-@pytest.fixture
+@pytest.fixture(name="mcp_dataset")
 def mcp_dataset(cedar_dataset: CedarDataset) -> MCPDataset:
     """Add only supplementary real phase/skill/rule/agent/artifact fixture rows.
 
@@ -110,7 +130,7 @@ def mcp_dataset(cedar_dataset: CedarDataset) -> MCPDataset:
     :return: Real fixture references/content. Example: mike_phase and maria_design_pip.
     :raises AssertionError: Required fixture relationship or baseline differs.
     """
-    raise NotImplementedError()
+    return _prepare_mcp_entities(cedar_dataset)
 
 
 def _prepare_mcp_entities(dataset: CedarDataset) -> MCPDataset:
@@ -120,17 +140,64 @@ def _prepare_mcp_entities(dataset: CedarDataset) -> MCPDataset:
     :return: Named real IDs and expected content. Example: mike_rule ID/content.
     :raises AssertionError: Fixture cannot satisfy actual model constraints.
     """
-    raise NotImplementedError()
+    book = dataset.playbooks_by_pk[6201]
+    activity = dataset.activities_by_pk[6203]
+    phase = Phase.objects.create(
+        playbook=book, name="Cedar Review Phase", description="Review evidence"
+    )
+    activity.phase = phase
+    activity.save(update_fields=["phase"])
+    entities = {
+        "mike_playbook": book,
+        "mike_workflow": dataset.workflows_by_pk[6202],
+        "mike_activity": activity,
+        "mike_phase": phase,
+        "mike_agent": Agent.objects.create(
+            playbook=book, name="Cedar Review Agent", description="Review evidence"
+        ),
+        "mike_skill": Skill.objects.create(
+            playbook=book, title="Cedar Review Skill", content="Verify review evidence"
+        ),
+        "mike_rule": Rule.objects.create(
+            playbook=book,
+            title="Cedar Review Rule",
+            slug="cedar-review-rule",
+            content="Check review evidence",
+        ),
+        "mike_artifact": Artifact.objects.create(
+            playbook=book,
+            name="Cedar Evidence Checklist",
+            produced_by=activity,
+            description="Checklist evidence",
+        ),
+        "maria_design_pip": dataset.pips_by_key["HIST-MARIA-DESIGN-01"],
+        "maria_dev_pip": dataset.pips_by_key["HIST-MARIA-DEV-01"],
+    }
+    content = {}
+    for key, entity in entities.items():
+        persisted_fields = {field.name for field in entity._meta.concrete_fields}
+        title_field = "title" if hasattr(entity, "title") else "name"
+        content[key] = {
+            title_field: getattr(entity, title_field),
+            **{
+                field: getattr(entity, field)
+                for field in ("description", "guidance", "summary", "content")
+                if field in persisted_fields
+            },
+        }
+    return MCPDataset(
+        dataset, {key: entity.pk for key, entity in entities.items()}, content
+    )
 
 
-@pytest.fixture
+@pytest.fixture(name="mcp_request_paths")
 def mcp_request_paths() -> list[tuple[str, str]]:
     """Provide body-free observations from actual httpx request hooks.
 
     :return: Method/path observations. Example: [("GET", "/api/activities/")].
     :raises RuntimeError: Observation storage unavailable.
     """
-    raise NotImplementedError()
+    return []
 
 
 def record_mcp_request(paths: list[tuple[str, str]], request: httpx.Request) -> None:
@@ -141,10 +208,10 @@ def record_mcp_request(paths: list[tuple[str, str]], request: httpx.Request) -> 
     :return: None. Example: ("POST", "/api/consumption-receipts/") appended.
     :raises ValueError: Request has no usable path.
     """
-    raise NotImplementedError()
+    paths.append((request.method, request.url.path))
 
 
-@pytest.fixture
+@pytest.fixture(name="mcp_client_factory")
 def mcp_client_factory(
     live_server: LiveServer,
     mcp_dataset: MCPDataset,
@@ -158,7 +225,7 @@ def mcp_client_factory(
     :return: Context factory. Example: open(actor_username="mchen", entrypoint="legacy").
     :raises RuntimeError: Real fixture/server prerequisites unavailable.
     """
-    raise NotImplementedError()
+    return MCPClientFactory(mcp_dataset, live_server.url, mcp_request_paths)
 
 
 class MCPClientFactory:
@@ -175,7 +242,9 @@ class MCPClientFactory:
         :return: None. Example: factory ready.
         :raises ValueError: Invalid dependencies.
         """
-        raise NotImplementedError()
+        self.dataset = dataset
+        self.server_url = server_url
+        self.request_paths = request_paths
 
     def open(
         self, *, actor_username: str, entrypoint: MCPEntrypoint
@@ -187,7 +256,11 @@ class MCPClientFactory:
         :return: Async context. Example: context yielding connected Client.
         :raises ValueError: Missing actor or unknown entrypoint.
         """
-        raise NotImplementedError()
+        if not actor_username or entrypoint not in ("facade", "legacy"):
+            raise ValueError(
+                "An explicit actor and supported MCP entrypoint are required."
+            )
+        return MCPClientContext(self, actor_username, entrypoint)
 
 
 class MCPClientContext(AbstractAsyncContextManager[MCPClientSession]):
@@ -204,7 +277,11 @@ class MCPClientContext(AbstractAsyncContextManager[MCPClientSession]):
         :return: None. Example: unopened context.
         :raises ValueError: Invalid session request.
         """
-        raise NotImplementedError()
+        self._factory = factory
+        self._actor_username = actor_username
+        self._entrypoint = entrypoint
+        self._state: MCPRuntimeState | None = None
+        self._resources = AsyncExitStack()
 
     async def __aenter__(self) -> MCPClientSession:
         """Acquire runtime lease, prepare real auth/server and enter Client.
@@ -212,7 +289,26 @@ class MCPClientContext(AbstractAsyncContextManager[MCPClientSession]):
         :return: Connected actual session. Example: Client(transport=initialize_mcp()).
         :raises RuntimeError: Setup/connect failure after safe rollback.
         """
-        raise NotImplementedError()
+        _acquire_mcp_runtime()
+        try:
+            self._state = _capture_mcp_runtime()
+            actor, token = await sync_to_async(_load_actor_and_token)(
+                self._factory.dataset, self._actor_username
+            )
+            if self._entrypoint == "facade":
+                mcp = await self._prepare_facade(actor, token)
+            else:
+                mcp = await self._prepare_legacy(actor)
+            client = await self._resources.enter_async_context(Client(mcp))
+            return MCPClientSession(
+                client,
+                self._actor_username,
+                self._entrypoint,
+                self._factory.request_paths,
+            )
+        except BaseException as error:
+            await self.__aexit__(type(error), error, error.__traceback__)
+            raise
 
     async def __aexit__(
         self,
@@ -228,7 +324,19 @@ class MCPClientContext(AbstractAsyncContextManager[MCPClientSession]):
         :return: False. Example: original assertion remains visible.
         :raises RuntimeError: Cleanup failure when no earlier error exists.
         """
-        raise NotImplementedError()
+        try:
+            await self._close_owned_clients()
+        except Exception:
+            if exc is None:
+                raise
+            exc.add_note("An owned MCP client failed during cleanup.")
+        finally:
+            try:
+                if self._state is not None:
+                    self._restore_runtime(self._state)
+            finally:
+                _release_mcp_runtime()
+        return False
 
     async def _prepare_facade(self, actor: User, token: str) -> FastMCP:
         """Configure actual httpx singleton, attach real hook and call _build_mcp.
@@ -238,7 +346,13 @@ class MCPClientContext(AbstractAsyncContextManager[MCPClientSession]):
         :return: Actual existing facade registration. Example: _build_mcp().
         :raises RuntimeError: Configuration/registration fails.
         """
-        raise NotImplementedError()
+        facade_client.configure(self._factory.server_url, token)
+        client = facade_client.get_client()
+        self._resources.callback(client.close)
+        client.event_hooks["request"].append(
+            partial(record_mcp_request, self._factory.request_paths)
+        )
+        return _build_mcp()
 
     async def _prepare_legacy(self, actor: User) -> FastMCP:
         """Use actual context functions and initialize_mcp, then enforce ORM safety.
@@ -247,7 +361,15 @@ class MCPClientContext(AbstractAsyncContextManager[MCPClientSession]):
         :return: Existing real legacy registration. Example: initialize_mcp().
         :raises RuntimeError: Context/registration preparation fails.
         """
-        raise NotImplementedError()
+        legacy_tools = import_module("mcp_integration.tools")
+        os.environ.pop(_UNSAFE_ORM_FLAG, None)
+        set_current_user(actor)
+        # Register on an owned component map and restore the exact original map.
+        provider = legacy_tools.mcp.local_provider
+        components = provider._components
+        self._resources.callback(setattr, provider, "_components", components)
+        provider._components = components.copy()
+        return legacy_tools.initialize_mcp()
 
     async def _close_owned_clients(self) -> None:
         """Exit FastMCP Client and close only this context's created httpx client.
@@ -255,7 +377,7 @@ class MCPClientContext(AbstractAsyncContextManager[MCPClientSession]):
         :return: None. Example: preexisting client remains open.
         :raises RuntimeError: Owned-resource cleanup fails.
         """
-        raise NotImplementedError()
+        await self._resources.aclose()
 
     def _restore_runtime(self, state: MCPRuntimeState) -> None:
         """Clear/restore actual ContextVar, exact facade globals and prior env flag.
@@ -264,7 +386,14 @@ class MCPClientContext(AbstractAsyncContextManager[MCPClientSession]):
         :return: None. Example: previous context restored without account logging.
         :raises RuntimeError: Restoration fails.
         """
-        raise NotImplementedError()
+        _current_user.set(state.legacy_user)
+        facade_client._server_url = state.facade.server_url
+        facade_client._token = state.facade.token
+        facade_client._http_client = state.facade.client
+        if state.unsafe_environment_value is None:
+            os.environ.pop(_UNSAFE_ORM_FLAG, None)
+        else:
+            os.environ[_UNSAFE_ORM_FLAG] = state.unsafe_environment_value
 
 
 def _acquire_mcp_runtime() -> None:
@@ -273,7 +402,8 @@ def _acquire_mcp_runtime() -> None:
     :return: None. Example: exclusive fixture runtime acquired.
     :raises RuntimeError: Lease acquisition fails.
     """
-    raise NotImplementedError()
+    if not _MCP_RUNTIME_LOCK.acquire(blocking=False):
+        raise RuntimeError("Another MCP client context owns the shared runtime.")
 
 
 def _release_mcp_runtime() -> None:
@@ -282,7 +412,7 @@ def _release_mcp_runtime() -> None:
     :return: None. Example: next explicit actor context may open.
     :raises RuntimeError: Context does not own the lease.
     """
-    raise NotImplementedError()
+    _MCP_RUNTIME_LOCK.release()
 
 
 def _capture_mcp_runtime() -> MCPRuntimeState:
@@ -291,7 +421,13 @@ def _capture_mcp_runtime() -> MCPRuntimeState:
     :return: Original state. Example: previously unconfigured facade.
     :raises RuntimeError: Runtime cannot be inspected safely.
     """
-    raise NotImplementedError()
+    return MCPRuntimeState(
+        FacadeConfiguration(
+            facade_client._server_url, facade_client._token, facade_client._http_client
+        ),
+        _current_user.get(),
+        os.environ.get(_UNSAFE_ORM_FLAG),
+    )
 
 
 def _load_actor_and_token(dataset: MCPDataset, actor_username: str) -> tuple[User, str]:
@@ -302,7 +438,11 @@ def _load_actor_and_token(dataset: MCPDataset, actor_username: str) -> tuple[Use
     :return: Fully loaded actor and real token. Example: existing staff Mike/token.
     :raises ValueError: Actor missing or inactive; no privilege changes.
     """
-    raise NotImplementedError()
+    actor = dataset.cedar.users_by_username.get(actor_username)
+    if actor is None or not actor.is_active:
+        raise ValueError("The requested Cedar actor does not exist or is inactive.")
+    token, _ = Token.objects.get_or_create(user=actor)
+    return actor, token.key
 
 
 def detail_case(
@@ -317,7 +457,36 @@ def detail_case(
     :return: Actual arguments and expectations. Example: Mike12455/Hana5805.
     :raises ValueError: Unsupported tool, actor or target fixture.
     """
-    raise NotImplementedError()
+    entity_type = tool_name.removeprefix("get_")
+    if not tool_name.startswith("get_") or entity_type not in {
+        "playbook",
+        "workflow",
+        "activity",
+        "phase",
+        "skill",
+        "rule",
+        "agent",
+        "artifact",
+        "pip",
+    }:
+        raise ValueError("The tool is not a supported detail tool.")
+    if actor_username not in dataset.cedar.users_by_username:
+        raise ValueError("An explicit Cedar actor is required.")
+    if fixture_key not in dataset.entity_ids or not fixture_key.endswith(
+        ("_" + entity_type,)
+    ):
+        raise ValueError("The fixture does not match the tool's entity type.")
+    entity_id = dataset.entity_ids[fixture_key]
+    resource = "activities" if entity_type == "activity" else f"{entity_type}s"
+    return MCPCase(
+        tool_name,
+        actor_username,
+        tool_name,
+        fixture_key,
+        {f"{entity_type}_id": entity_id},
+        f"/api/{resource}/{entity_id}/",
+        dataset.expected_content[fixture_key],
+    )
 
 
 def collection_case(
@@ -357,7 +526,24 @@ def decode_tool_payload(result: object) -> object:
     :return: Actual decoded payload. Example: list of authorized metadata.
     :raises AssertionError: Tool error, missing payload or malformed result.
     """
-    raise NotImplementedError()
+    if isinstance(result, CallToolResult):
+        assert (
+            not result.is_error
+        ), "Registered MCP call did not return a successful result."
+        if result.structured_content is not None:
+            return result.structured_content
+        blocks = result.content
+    else:
+        assert isinstance(result, Mapping) and result.get("isError") is not True
+        if result.get("structuredContent") is not None:
+            return result["structuredContent"]
+        blocks = result["content"]
+    assert len(blocks) == 1, "Expected one JSON MCP result block."
+    block = blocks[0]
+    if isinstance(block, TextContent):
+        return json.loads(block.text)
+    assert isinstance(block, Mapping) and block.get("type") == "text"
+    return json.loads(block["text"])
 
 
 def karma_snapshot(*, include_summaries: bool = False) -> MCPInvariantSnapshot:

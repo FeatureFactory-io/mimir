@@ -300,12 +300,8 @@ class PhaseService:
             >>> len(result['workflow_activities'])
             3  # 3 workflows have activities in this phase
         """
-        logger.info(
-            "Getting phase %s with activities for user %s",
-            phase_id,
-            getattr(user, "email", None) or getattr(user, "username", "anonymous"),
-        )
-        
+        PhaseService._log_phase_detail_request(phase_id, user)
+
         try:
             phase = Phase.objects.select_related('playbook').get(id=phase_id)
         except Phase.DoesNotExist:
@@ -315,7 +311,7 @@ class PhaseService:
         if not phase.playbook.can_view(user):
             logger.warning(
                 "User %s denied view on phase %s (playbook id=%s)",
-                getattr(user, "pk", user),
+                getattr(user, "pk", None),
                 phase_id,
                 phase.playbook_id,
             )
@@ -419,6 +415,9 @@ class PhaseService:
         :param phase_id: Requested phase ID. Example: 42.
         :param user: Loaded requesting actor. Example: Maria.
         :return: None. Example: phase_id and actor_id logged.
-        :raises ValueError: Invalid phase or actor identifier.
         """
-        raise NotImplementedError()
+        logger.info(
+            "PhaseService.get_phase_with_activities | entry | phase_id=%s actor_id=%s",
+            phase_id,
+            getattr(user, "pk", None),
+        )

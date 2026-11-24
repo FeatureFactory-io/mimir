@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import httpx
 from typing import TYPE_CHECKING
+from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-    from uuid import UUID
 
 import logging
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -31,6 +32,11 @@ from mcp_integration.facade.workspace_mount import (
 )
 
 logger = logging.getLogger(__name__)
+_RECEIPT_PATH = "/api/consumption-receipts/"
+_RECEIPT_ATTEMPTS = 2
+_RETRYABLE_RECEIPT_STATUS = {408, 429, 500, 502, 503, 504}
+_MCP_DETAIL_CHANNEL = "mcp_detail"
+_DETAIL_REJECT_LOG = "%s | branch | entity_id=%s event_identity=%s reason=read_rejected"
 
 
 # ============================================================================
@@ -86,6 +92,7 @@ def get_playbook(
     playbook_id: int,
     include_history: bool = False,
     version: str | None = None,
+    event_identity: str | None = None,
 ) -> dict:
     """
     Get playbook details with workflows and optional version history.
@@ -99,31 +106,38 @@ def get_playbook(
     :param version: When provided, returns only the recorded snapshot at that
         version (``snapshot_data`` + metadata). Raises ValueError if not found.
         Takes precedence over ``include_history``. Example: "1.0"
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Playbook dict with nested workflows (and optionally ``versions``);
         or snapshot dict when ``version`` is supplied (contains
         ``snapshot_data``, no top-level ``workflows`` key).
     :raises ValueError: if the requested version does not exist.
     """
-    logger.info(
-        "HTTP Tool: get_playbook id=%s include_history=%s version=%s",
-        playbook_id,
-        include_history,
-        version,
-    )
-    params: dict = {}
+    tool = "get_playbook"
+    identity = _resolve_consumption_event_identity(event_identity)
+    params = {}
     if include_history:
         params["include_history"] = "true"
     if version is not None:
         params["version"] = version
-    r = get_client().get(f"/api/playbooks/{playbook_id}/", params=params)
-    if version is not None and r.status_code == 404:
-        data = r.json()
-        raise ValueError(
-            data.get(
-                "detail", f"Version {version} not found for playbook {playbook_id}."
+    try:
+        response = get_client().get(f"/api/playbooks/{playbook_id}/", params=params)
+        if version is not None and response.status_code == 404:
+            raise ValueError(
+                response.json().get(
+                    "detail", f"Version {version} not found for playbook {playbook_id}."
+                )
             )
-        )
-    return check_response(r, "get_playbook")
+        payload = check_response(response, tool)
+    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+        logger.info(_DETAIL_REJECT_LOG, tool, playbook_id, identity)
+        raise
+    return _complete_mcp_detail(
+        payload,
+        tool_name=tool,
+        entity_type="playbook",
+        entity_id=playbook_id,
+        event_identity=identity,
+    )
 
 
 def update_playbook(
@@ -219,16 +233,30 @@ def list_workflows(playbook_id: int) -> list:
     return data.get("results", data) if isinstance(data, dict) else data
 
 
-def get_workflow(workflow_id: int) -> dict:
+def get_workflow(workflow_id: int, event_identity: str | None = None) -> dict:
     """
     Get workflow details with activities.
 
     :param workflow_id: Workflow ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Workflow dict with nested activities
+    :raises ValueError: Invalid identity or unavailable resource.
     """
-    logger.info(f"HTTP Tool: get_workflow id={workflow_id}")
-    r = get_client().get(f"/api/workflows/{workflow_id}/")
-    return check_response(r, "get_workflow")
+    tool = "get_workflow"
+    identity = _resolve_consumption_event_identity(event_identity)
+    try:
+        response = get_client().get(f"/api/workflows/{workflow_id}/")
+        payload = check_response(response, tool)
+    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+        logger.info(_DETAIL_REJECT_LOG, tool, workflow_id, identity)
+        raise
+    return _complete_mcp_detail(
+        payload,
+        tool_name=tool,
+        entity_type="workflow",
+        entity_id=workflow_id,
+        event_identity=identity,
+    )
 
 
 def update_workflow(
@@ -320,16 +348,30 @@ def list_activities(workflow_id: int) -> list:
     return data.get("results", data) if isinstance(data, dict) else data
 
 
-def get_activity(activity_id: int) -> dict:
+def get_activity(activity_id: int, event_identity: str | None = None) -> dict:
     """
     Get activity details with dependencies, agent, skill, and artifacts.
 
     :param activity_id: Activity ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Activity dict with predecessor/successor, agent, skill, artifacts
+    :raises ValueError: Invalid identity or unavailable resource.
     """
-    logger.info(f"HTTP Tool: get_activity id={activity_id}")
-    r = get_client().get(f"/api/activities/{activity_id}/")
-    return check_response(r, "get_activity")
+    tool = "get_activity"
+    identity = _resolve_consumption_event_identity(event_identity)
+    try:
+        response = get_client().get(f"/api/activities/{activity_id}/")
+        payload = check_response(response, tool)
+    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+        logger.info(_DETAIL_REJECT_LOG, tool, activity_id, identity)
+        raise
+    return _complete_mcp_detail(
+        payload,
+        tool_name=tool,
+        entity_type="activity",
+        entity_id=activity_id,
+        event_identity=identity,
+    )
 
 
 def update_activity(
@@ -884,16 +926,30 @@ def list_skills(
     return data.get("results", data) if isinstance(data, dict) else data
 
 
-def get_skill(skill_id: int) -> dict:
+def get_skill(skill_id: int, event_identity: str | None = None) -> dict:
     """
     Get skill details with activity count.
 
     :param skill_id: Skill ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Skill dict with activity_count
+    :raises ValueError: Invalid identity or unavailable resource.
     """
-    logger.info(f"HTTP Tool: get_skill id={skill_id}")
-    r = get_client().get(f"/api/skills/{skill_id}/")
-    return check_response(r, "get_skill")
+    tool = "get_skill"
+    identity = _resolve_consumption_event_identity(event_identity)
+    try:
+        response = get_client().get(f"/api/skills/{skill_id}/")
+        payload = check_response(response, tool)
+    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+        logger.info(_DETAIL_REJECT_LOG, tool, skill_id, identity)
+        raise
+    return _complete_mcp_detail(
+        payload,
+        tool_name=tool,
+        entity_type="skill",
+        entity_id=skill_id,
+        event_identity=identity,
+    )
 
 
 def update_skill(
@@ -1049,16 +1105,30 @@ def list_rules(playbook_id: int, search: str = "", unlinked_only: bool = False) 
     return data.get("results", data) if isinstance(data, dict) else data
 
 
-def get_rule(rule_id: int) -> dict:
+def get_rule(rule_id: int, event_identity: str | None = None) -> dict:
     """
     Get rule by ID.
 
     :param rule_id: Rule ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Rule dict
+    :raises ValueError: Invalid identity or unavailable resource.
     """
-    logger.info(f"HTTP Tool: get_rule id={rule_id}")
-    r = get_client().get(f"/api/rules/{rule_id}/")
-    return check_response(r, "get_rule")
+    tool = "get_rule"
+    identity = _resolve_consumption_event_identity(event_identity)
+    try:
+        response = get_client().get(f"/api/rules/{rule_id}/")
+        payload = check_response(response, tool)
+    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+        logger.info(_DETAIL_REJECT_LOG, tool, rule_id, identity)
+        raise
+    return _complete_mcp_detail(
+        payload,
+        tool_name=tool,
+        entity_type="rule",
+        entity_id=rule_id,
+        event_identity=identity,
+    )
 
 
 def update_rule(
@@ -1161,16 +1231,30 @@ def list_agents(playbook_id: int, search: str = "") -> list:
     return data.get("results", data) if isinstance(data, dict) else data
 
 
-def get_agent(agent_id: int) -> dict:
+def get_agent(agent_id: int, event_identity: str | None = None) -> dict:
     """
     Get agent details with activity count.
 
     :param agent_id: Agent ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Agent dict with activity_count
+    :raises ValueError: Invalid identity or unavailable resource.
     """
-    logger.info(f"HTTP Tool: get_agent id={agent_id}")
-    r = get_client().get(f"/api/agents/{agent_id}/")
-    return check_response(r, "get_agent")
+    tool = "get_agent"
+    identity = _resolve_consumption_event_identity(event_identity)
+    try:
+        response = get_client().get(f"/api/agents/{agent_id}/")
+        payload = check_response(response, tool)
+    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+        logger.info(_DETAIL_REJECT_LOG, tool, agent_id, identity)
+        raise
+    return _complete_mcp_detail(
+        payload,
+        tool_name=tool,
+        entity_type="agent",
+        entity_id=agent_id,
+        event_identity=identity,
+    )
 
 
 def update_agent(agent_id: int, name: str = None, description: str = None) -> dict:
@@ -1297,16 +1381,30 @@ def list_artifacts(
     return data.get("results", data) if isinstance(data, dict) else data
 
 
-def get_artifact(artifact_id: int) -> dict:
+def get_artifact(artifact_id: int, event_identity: str | None = None) -> dict:
     """
     Get artifact details with consumer count.
 
     :param artifact_id: Artifact ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Artifact dict with consumer_count
+    :raises ValueError: Invalid identity or unavailable resource.
     """
-    logger.info(f"HTTP Tool: get_artifact id={artifact_id}")
-    r = get_client().get(f"/api/artifacts/{artifact_id}/")
-    return check_response(r, "get_artifact")
+    tool = "get_artifact"
+    identity = _resolve_consumption_event_identity(event_identity)
+    try:
+        response = get_client().get(f"/api/artifacts/{artifact_id}/")
+        payload = check_response(response, tool)
+    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+        logger.info(_DETAIL_REJECT_LOG, tool, artifact_id, identity)
+        raise
+    return _complete_mcp_detail(
+        payload,
+        tool_name=tool,
+        entity_type="artifact",
+        entity_id=artifact_id,
+        event_identity=identity,
+    )
 
 
 def update_artifact(
@@ -1424,16 +1522,30 @@ def list_phases(playbook_id: int) -> list:
     return data.get("results", data) if isinstance(data, dict) else data
 
 
-def get_phase(phase_id: int) -> dict:
+def get_phase(phase_id: int, event_identity: str | None = None) -> dict:
     """
     Get phase details with activities.
 
     :param phase_id: Phase ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Phase dict with activities list
+    :raises ValueError: Invalid identity or unavailable resource.
     """
-    logger.info(f"HTTP Tool: get_phase id={phase_id}")
-    r = get_client().get(f"/api/phases/{phase_id}/")
-    return check_response(r, "get_phase")
+    tool = "get_phase"
+    identity = _resolve_consumption_event_identity(event_identity)
+    try:
+        response = get_client().get(f"/api/phases/{phase_id}/")
+        payload = check_response(response, tool)
+    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+        logger.info(_DETAIL_REJECT_LOG, tool, phase_id, identity)
+        raise
+    return _complete_mcp_detail(
+        payload,
+        tool_name=tool,
+        entity_type="phase",
+        entity_id=phase_id,
+        event_identity=identity,
+    )
 
 
 def update_phase(
@@ -1515,16 +1627,30 @@ def list_pips(
     return data.get("results", data) if isinstance(data, dict) else data
 
 
-def get_pip(pip_id: int) -> dict:
+def get_pip(pip_id: int, event_identity: str | None = None) -> dict:
     """
     Get a single PIP with nested change rows.
 
     :param pip_id: PIP ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: PIP dict with nested changes list
+    :raises ValueError: Invalid identity or unavailable resource.
     """
-    logger.info(f"HTTP Tool: get_pip id={pip_id}")
-    r = get_client().get(f"/api/pips/{pip_id}/")
-    return check_response(r, "get_pip")
+    tool = "get_pip"
+    identity = _resolve_consumption_event_identity(event_identity)
+    try:
+        response = get_client().get(f"/api/pips/{pip_id}/")
+        payload = check_response(response, tool)
+    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+        logger.info(_DETAIL_REJECT_LOG, tool, pip_id, identity)
+        raise
+    return _complete_mcp_detail(
+        payload,
+        tool_name=tool,
+        entity_type="pip",
+        entity_id=pip_id,
+        event_identity=identity,
+    )
 
 
 def create_pip(playbook_id: int, title: str, summary: str = "") -> dict:
@@ -1922,7 +2048,15 @@ def _resolve_consumption_event_identity(value: str | None) -> UUID:
     :return: Stable invocation UUID. Example: UUID(int=1).
     :raises ValueError: Malformed supplied identity.
     """
-    raise NotImplementedError()
+    if value is None:
+        return uuid4()
+    try:
+        return UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        logger.info(
+            "_resolve_consumption_event_identity | branch | reason=invalid_event_identity"
+        )
+        raise ValueError("event_identity must be a UUID.") from None
 
 
 def _complete_mcp_detail(
@@ -1944,7 +2078,27 @@ def _complete_mcp_detail(
     :raises RuntimeError: Receipt outcome cannot be confirmed.
     :raises PermissionError: Receipt revalidation denies access.
     """
-    raise NotImplementedError()
+    if not isinstance(payload, dict) or not (
+        payload.get("id") == entity_id
+        or (entity_type == "playbook" and "snapshot_data" in payload)
+    ):
+        logger.info(_DETAIL_REJECT_LOG, tool_name, entity_id, event_identity)
+        raise ValueError("The authorized detail response is invalid.")
+    logger.info(
+        "_complete_mcp_detail | entry | tool=%s entity_type=%s entity_id=%s event_identity=%s channel=%s",
+        tool_name,
+        entity_type,
+        entity_id,
+        event_identity,
+        _MCP_DETAIL_CHANNEL,
+    )
+    _post_consumption_receipt(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        event_identity=event_identity,
+        channel=_MCP_DETAIL_CHANNEL,
+    )
+    return payload
 
 
 def _post_consumption_receipt(
@@ -1965,7 +2119,33 @@ def _post_consumption_receipt(
     :raises PermissionError: Current target access is denied.
     :raises RuntimeError: Transport outcome remains uncertain.
     """
-    raise NotImplementedError()
+    payload = {
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "event_identity": str(event_identity),
+        "channel": channel,
+    }
+    response = _request_consumption_receipt(payload)
+    if response.status_code != 200:
+        logger.info(
+            "_post_consumption_receipt | branch | entity_type=%s entity_id=%s event_identity=%s "
+            "channel=%s reason=receipt_rejected status_code=%s",
+            entity_type,
+            entity_id,
+            event_identity,
+            channel,
+            response.status_code,
+        )
+        if response.status_code in {401, 403, 404}:
+            raise PermissionError(
+                "The consumption receipt target or token is unavailable."
+            )
+        if response.status_code in {400, 409}:
+            raise ValueError("The consumption receipt was rejected.")
+        raise RuntimeError(
+            f"Consumption receipt could not be confirmed. Retry with event_identity={event_identity}."
+        )
+    return _validate_consumption_receipt_response(response.json(), event_identity)
 
 
 def _request_consumption_receipt(payload: Mapping[str, object]) -> httpx.Response:
@@ -1975,7 +2155,27 @@ def _request_consumption_receipt(payload: Mapping[str, object]) -> httpx.Respons
     :return: Actual HTTP response. Example: receipt HTTP 200.
     :raises RuntimeError: Bounded transport/retryable-server attempts exhausted.
     """
-    raise NotImplementedError()
+    identity = str(payload["event_identity"])
+    for attempt in range(1, _RECEIPT_ATTEMPTS + 1):
+        try:
+            response = get_client().post(
+                _RECEIPT_PATH, json=payload, headers={"X-Request-ID": identity}
+            )
+        except httpx.TransportError:
+            reason = "transport_error"
+        else:
+            if response.status_code not in _RETRYABLE_RECEIPT_STATUS:
+                return response
+            reason = "retryable_status"
+        logger.info(
+            "_request_consumption_receipt | branch | event_identity=%s attempt=%s reason=%s",
+            identity,
+            attempt,
+            reason,
+        )
+    raise RuntimeError(
+        f"Consumption receipt could not be confirmed. Retry with event_identity={identity}."
+    )
 
 
 def _validate_consumption_receipt_response(
@@ -1988,7 +2188,27 @@ def _validate_consumption_receipt_response(
     :return: Validated safe response. Example: skipped/self_consumption.
     :raises ValueError: Unexpected status, count, identity or response shape.
     """
-    raise NotImplementedError()
+    if not isinstance(payload, dict) or payload.get("event_identity") != str(
+        event_identity
+    ):
+        raise ValueError("Unexpected consumption receipt identity or response.")
+    status, count = payload.get("status"), payload.get("created_count")
+    if status not in ("applied", "replayed", "skipped") or type(count) is not int:
+        raise ValueError("Unexpected consumption receipt status or award count.")
+    if (
+        status == "skipped"
+        and count == 0
+        and payload.get("reason") == "self_consumption"
+    ):
+        return payload
+    if status in ("applied", "replayed") and count == (2 if status == "applied" else 0):
+        occurred_at = payload.get("occurred_at")
+        if (
+            isinstance(occurred_at, str)
+            and datetime.fromisoformat(occurred_at).tzinfo is not None
+        ):
+            return payload
+    raise ValueError("Unexpected consumption receipt outcome.")
 
 
 def _preflight_workflow_export(

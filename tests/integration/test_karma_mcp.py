@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
+from asgiref.sync import sync_to_async
+from fastmcp.exceptions import ToolError
 from django.contrib.auth.models import User
 from django.db.models import Model, Sum
 from django.http import HttpResponse
@@ -18,14 +20,30 @@ from pytest import LogCaptureFixture
 from pytest_django.live_server_helper import LiveServer
 from rest_framework.authtoken.models import Token
 
+from mcp_integration.context import (
+    _current_user,
+    clear_current_user,
+    get_current_user,
+    set_current_user,
+)
 from methodology.api.consumption_views import ReceiptChannel
 from methodology.models import Agent, Artifact, KarmaAward, Phase, Playbook, Rule, Skill
 from methodology.services.karma_service import KarmaService
+from methodology.services.phase_service import PhaseService
 from tests.support.experts_data import CedarDataset
+from tests.support.experts_logs import capture_experts_logs
+from tests.support.karma_mcp import (
+    MCPCase,
+    MCPClientFactory,
+    MCPDataset,
+    MCPEntrypoint,
+    decode_tool_payload,
+    detail_case,
+    mcp_client_factory as _mcp_client_factory,  # noqa: F401 — pytest fixture
+    mcp_dataset as _mcp_dataset,  # noqa: F401 — pytest fixture
+    mcp_request_paths as _mcp_request_paths,  # noqa: F401 — pytest fixture dependency
+)
 from tests.support.log_story import assert_log_story
-
-if TYPE_CHECKING:
-    from tests.support.karma_mcp import MCPClientFactory, MCPDataset
 
 DETAIL_TOOLS: tuple[str, ...] = (
     "get_playbook",
@@ -178,19 +196,206 @@ def _assert_receipt_log(
     )
 
 
+MCP_LOGGERS = (
+    "mcp_integration.context",
+    "mcp_integration.facade.tools_http",
+    "mcp_integration.tools",
+    "methodology.api.consumption_views",
+    "methodology.services.karma_service",
+    "methodology.services.phase_service",
+)
+UNSAFE_ORM_FLAG = "DJANGO_ALLOW_ASYNC_UNSAFE"
+CONSUMPTION_LOG = "KarmaService.award_successful_consumption"
+RECEIPT_PATH = "/api/consumption-receipts/"
+
+
+def _eligible_mcp_case(tool_name: str, dataset: MCPDataset) -> MCPCase:
+    """Select the independent Cedar actor and authorized fixture for each tool."""
+    entity_type = tool_name.removeprefix("get_")
+    actor, fixture_key = (
+        ("mchen", "maria_design_pip")
+        if entity_type == "pip"
+        else ("mrodriguez", f"mike_{entity_type}")
+    )
+    return detail_case(
+        tool_name, dataset, actor_username=actor, fixture_key=fixture_key
+    )
+
+
+def _assert_mcp_content(
+    case: MCPCase, payload: object, entrypoint: MCPEntrypoint
+) -> None:
+    """Check the actual ID and source content returned before crediting a read."""
+    assert isinstance(payload, dict)
+    assert payload["id"] == next(iter(case.arguments.values()))
+    assert all(payload.get(field) == value for field, value in case.expected.items())
+    if case.tool_name == "get_pip":
+        assert [row["name"] for row in payload["changes"]] == [
+            "Keyboard Navigation Audit",
+            "Error Message Review",
+        ]
+        assert payload["submitted_by_username"] == "mrodriguez"
+    if case.tool_name == "get_phase" and entrypoint == "legacy":
+        assert payload["activities"][0]["activities"][0]["id"] == CEDAR_ACTIVITY_ID
+        assert payload["artifacts"][0]["name"] == "Cedar Evidence Checklist"
+
+
+def _assert_mcp_pair(case: MCPCase, dataset: MCPDataset, before_count: int) -> str:
+    """Read persisted learner and author awards, including their exact timestamp."""
+    users = dataset.cedar.users_by_username
+    actor = users[case.actor_username]
+    is_pip = case.tool_name == "get_pip"
+    author = users["hkim" if is_pip else "mchen"]
+    playbook_id, category = (6106, "design") if is_pip else (6201, "development")
+    awards = _receipt_awards(actor, "mcp_detail", RECEIPT_UUID)
+    assert KarmaAward.objects.count() == before_count + 2
+    assert len(awards) == 2
+    assert {(row.recipient_id, row.source_kind, row.points) for row in awards} == {
+        (actor.pk, KarmaAward.SourceKind.LEARNING, 5),
+        (author.pk, KarmaAward.SourceKind.CONSUMPTION, 5),
+    }
+    assert awards[0].occurred_at == awards[1].occurred_at
+    for row in awards:
+        assert row.category == category
+        assert row.event_channel == "mcp_detail"
+        assert row.playbook_id_snapshot == playbook_id
+        assert row.entity_type_snapshot == case.tool_name.removeprefix("get_")
+        assert row.entity_id_snapshot == next(iter(case.arguments.values()))
+        assert row.change_id_snapshot is None
+    if is_pip:
+        assert _total_points(users["mrodriguez"]) == 8200
+    totals = (12455, 5805) if is_pip else (8205, 12455)
+    assert (_total_points(actor), _total_points(author)) == totals
+    return awards[0].occurred_at.isoformat()
+
+
+def _assert_mcp_success_logs(
+    caplog: LogCaptureFixture,
+    case: MCPCase,
+    dataset: MCPDataset,
+    entrypoint: MCPEntrypoint,
+    timestamp: str,
+) -> None:
+    """Check real boundary and service records for the same immutable action."""
+    users = dataset.cedar.users_by_username
+    actor, author = users[case.actor_username], users["hkim"]
+    identity = f"event_identity={RECEIPT_UUID}"
+    entity = f"entity_id={case.arguments['pip_id']}"
+    boundary = (
+        "_complete_mcp_detail"
+        if entrypoint == "facade"
+        else "_complete_legacy_mcp_detail"
+    )
+    assert_log_story(
+        caplog,
+        where=boundary,
+        beats={
+            "entry": (
+                "| entry |",
+                "tool=get_pip",
+                "entity_type=pip",
+                entity,
+                identity,
+                "channel=mcp_detail",
+            )
+        },
+    )
+    if entrypoint == "facade":
+        assert_log_story(
+            caplog,
+            where=RECEIPT_VIEW,
+            beats={
+                "validation": (
+                    "| validation |",
+                    f"actor_id={actor.pk}",
+                    f"request_id={RECEIPT_UUID}",
+                    "entity_type=pip",
+                    entity,
+                    identity,
+                    "channel=mcp_detail",
+                )
+            },
+        )
+    canonical = f"event_identity=consumption:mcp_detail:{actor.pk}:{RECEIPT_UUID}"
+    assert_log_story(
+        caplog,
+        where=CONSUMPTION_LOG,
+        beats={
+            "branch": (
+                "| branch |",
+                canonical,
+                f"actor_id={actor.pk}",
+                "playbook_id=6106",
+                f"author_id={author.pk}",
+                "category=design",
+                "reason=eligible",
+            ),
+            "applied": (
+                "| exit |",
+                canonical,
+                "created_count=2",
+                f"occurred_at={timestamp}",
+            ),
+            "duplicate": (
+                "| exit |",
+                canonical,
+                "duplicate",
+                f"occurred_at={timestamp}",
+            ),
+        },
+    )
+    ordered_beats = [
+        ("entry", boundary),
+        *((("validation", RECEIPT_VIEW),) if entrypoint == "facade" else ()),
+        ("branch", CONSUMPTION_LOG),
+        ("exit", CONSUMPTION_LOG),
+    ]
+    actual_beats = [
+        (beat, logger)
+        for record in caplog.records
+        for beat, logger in ordered_beats
+        if logger in record.getMessage()
+        and f"| {beat} |" in record.getMessage()
+        and str(RECEIPT_UUID) in record.getMessage()
+    ]
+    assert actual_beats == ordered_beats * 2
+
+
 @pytest.mark.parametrize("tool_name", DETAIL_TOOLS)
 @pytest.mark.django_db(transaction=True)
 async def test_mcp_detail_with_authorized_fixture_returns_content_and_pair(
-    tool_name: str, live_server: LiveServer
+    tool_name: str, mcp_client_factory: MCPClientFactory, mcp_dataset: MCPDataset
 ) -> None:
     """Prove T1 against real registered facade, token, HTTP and DB.
 
     :param tool_name: Independent Cedar case. Example: "get_pip".
-    :param live_server: Real Django HTTP server. Example: local random port.
+    :param mcp_client_factory: Actor-explicit real registered client factory.
+    :param mcp_dataset: Genuine independently seeded Cedar fixture data.
     :return: None. Example: all content/award assertions pass.
     :raises AssertionError: Content, schema, recipient or totals differ.
     """
-    raise NotImplementedError()
+    case = _eligible_mcp_case(tool_name, mcp_dataset)
+    before = await KarmaAward.objects.acount()
+    async with mcp_client_factory.open(
+        actor_username=case.actor_username, entrypoint="facade"
+    ) as session:
+        schema = next(
+            tool.inputSchema
+            for tool in await session.client.list_tools()
+            if tool.name == tool_name
+        )
+        assert "event_identity" in schema["properties"]
+        assert "event_identity" not in schema.get("required", [])
+        assert set(schema["properties"]) == {*case.arguments, "event_identity"} | (
+            {"include_history", "version"} if tool_name == "get_playbook" else set()
+        )
+        result = await session.client.call_tool(
+            tool_name, {**case.arguments, "event_identity": str(RECEIPT_UUID)}
+        )
+        assert session.request_paths == [("GET", case.route), ("POST", RECEIPT_PATH)]
+
+    _assert_mcp_content(case, decode_tool_payload(result), "facade")
+    await sync_to_async(_assert_mcp_pair)(case, mcp_dataset, before)
 
 
 @pytest.mark.parametrize("tool_name", DETAIL_TOOLS)
@@ -247,7 +452,7 @@ def test_consumption_service_with_authorized_fixture_records_pair(
 @pytest.mark.parametrize("tool_name", DETAIL_TOOLS)
 @pytest.mark.django_db(transaction=True)
 async def test_mcp_detail_with_legacy_registration_returns_content_and_pair(
-    tool_name: str,
+    tool_name: str, mcp_client_factory: MCPClientFactory, mcp_dataset: MCPDataset
 ) -> None:
     """Exercise the existing legacy FastMCP registration and real service.
 
@@ -255,7 +460,29 @@ async def test_mcp_detail_with_legacy_registration_returns_content_and_pair(
     :return: None. Example: original content and exact paired awards.
     :raises AssertionError: Legacy registration bypasses the shared path.
     """
-    raise NotImplementedError()
+    case = _eligible_mcp_case(tool_name, mcp_dataset)
+    before, environment = await KarmaAward.objects.acount(), os.environ.get(
+        UNSAFE_ORM_FLAG
+    )
+    async with mcp_client_factory.open(
+        actor_username=case.actor_username, entrypoint="legacy"
+    ) as session:
+        assert UNSAFE_ORM_FLAG not in os.environ
+        schema = next(
+            tool.inputSchema
+            for tool in await session.client.list_tools()
+            if tool.name == tool_name
+        )
+        assert "event_identity" in schema["properties"]
+        assert "event_identity" not in schema.get("required", [])
+        result = await session.client.call_tool(
+            tool_name, {**case.arguments, "event_identity": str(RECEIPT_UUID)}
+        )
+        assert not session.request_paths
+
+    assert os.environ.get(UNSAFE_ORM_FLAG) == environment
+    _assert_mcp_content(case, decode_tool_payload(result), "legacy")
+    await sync_to_async(_assert_mcp_pair)(case, mcp_dataset, before)
 
 
 @pytest.mark.parametrize("tool_name", DETAIL_TOOLS)
@@ -597,44 +824,209 @@ def test_consumption_receipt_with_pip_self_excludes_creator_and_author(
 
 
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("entrypoint", ["facade", "legacy"])
 async def test_mcp_detail_with_history_options_records_one_pair(
-    live_server: LiveServer,
+    entrypoint: MCPEntrypoint,
+    mcp_client_factory: MCPClientFactory,
+    mcp_dataset: MCPDataset,
 ) -> None:
     """Preserve playbook version/history semantics and failed-version behavior.
 
-    :param live_server: Real Django HTTP backend. Example: local random port.
+    :param mcp_client_factory: Actor-explicit real registered client factory.
+    :param mcp_dataset: Genuine independently seeded Cedar fixture data.
+    :param entrypoint: Registered transport path under test.
     :return: None. Example: successful historical fetch awards once.
     :raises AssertionError: Nested data duplicates awards or failure awards.
     """
-    raise NotImplementedError()
+    case = _eligible_mcp_case("get_playbook", mcp_dataset)
+    before = await KarmaAward.objects.acount()
+    async with mcp_client_factory.open(
+        actor_username=case.actor_username, entrypoint=entrypoint
+    ) as session:
+        result = await session.client.call_tool(
+            case.tool_name, {**case.arguments, "include_history": True}
+        )
+        versioned = decode_tool_payload(result)
+        assert versioned["versions"]
+        assert await KarmaAward.objects.acount() == before + 2
+
+        snapshot_args = {
+            **case.arguments,
+            "include_history": True,
+            "version": versioned["versions"][0]["version_number"],
+        }
+        snapshot = decode_tool_payload(
+            await session.client.call_tool(case.tool_name, snapshot_args)
+        )
+        assert snapshot["version_number"] == snapshot_args["version"]
+        assert "snapshot_data" in snapshot and "versions" not in snapshot
+        assert await KarmaAward.objects.acount() == before + 4
+
+        with pytest.raises(ToolError, match="not found"):
+            await session.client.call_tool(
+                case.tool_name, {**case.arguments, "version": "999.9"}
+            )
+        if entrypoint == "facade":
+            assert session.request_paths.count(("POST", RECEIPT_PATH)) == 2
+    assert await KarmaAward.objects.acount() == before + 4
 
 
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("entrypoint", ["facade", "legacy"])
 async def test_mcp_detail_log_story_happy(
-    live_server: LiveServer, caplog: LogCaptureFixture
+    entrypoint: MCPEntrypoint,
+    mcp_client_factory: MCPClientFactory,
+    mcp_dataset: MCPDataset,
+    caplog: LogCaptureFixture,
 ) -> None:
     """Assert successful boundary/service beats using assert_log_story.
 
-    :param live_server: Real HTTP backend. Example: local random port.
+    :param mcp_client_factory: Actor-explicit real registered client factory.
+    :param mcp_dataset: Genuine independently seeded Cedar fixture data.
+    :param entrypoint: Registered transport path under test.
     :param caplog: Captured actual logs. Example: receipt validation records.
     :return: None. Example: declared happy beats present.
     :raises AssertionError: Required beat absent or sensitive data logged.
     """
-    raise NotImplementedError()
+    case = _eligible_mcp_case("get_pip", mcp_dataset)
+    before = await KarmaAward.objects.acount()
+    arguments = {**case.arguments, "event_identity": str(RECEIPT_UUID)}
+    with capture_experts_logs(caplog, MCP_LOGGERS):
+        async with mcp_client_factory.open(
+            actor_username=case.actor_username, entrypoint=entrypoint
+        ) as session:
+            result = await session.client.call_tool(case.tool_name, arguments)
+            timestamp = await sync_to_async(_assert_mcp_pair)(case, mcp_dataset, before)
+            replay = await session.client.call_tool(case.tool_name, arguments)
+            assert decode_tool_payload(result) == decode_tool_payload(replay)
+    assert await sync_to_async(_assert_mcp_pair)(case, mcp_dataset, before) == timestamp
+    _assert_mcp_success_logs(caplog, case, mcp_dataset, entrypoint, timestamp)
+    actor = mcp_dataset.cedar.users_by_username[case.actor_username]
+    token = await Token.objects.aget(user_id=actor.pk)
+    assert token.key not in caplog.text
+    assert case.expected["title"] not in caplog.text
+    assert all(
+        user.email not in caplog.text
+        for user in mcp_dataset.cedar.users_by_username.values()
+    )
 
 
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("entrypoint", ["facade", "legacy"])
 async def test_mcp_detail_log_story_reject(
-    live_server: LiveServer, caplog: LogCaptureFixture
+    entrypoint: MCPEntrypoint,
+    mcp_client_factory: MCPClientFactory,
+    mcp_dataset: MCPDataset,
+    caplog: LogCaptureFixture,
 ) -> None:
     """Assert denied/invalid paths without award-success or private log bodies.
 
-    :param live_server: Real HTTP backend. Example: local random port.
+    :param mcp_client_factory: Actor-explicit real registered client factory.
+    :param mcp_dataset: Genuine independently seeded Cedar fixture data.
+    :param entrypoint: Registered transport path under test.
     :param caplog: Captured actual logs. Example: denied receipt records.
     :return: None. Example: rejection beats and absence checks pass.
     :raises AssertionError: Missing rejection or leaked secret/private body.
     """
-    raise NotImplementedError()
+    denied = detail_case(
+        "get_pip", mcp_dataset, actor_username="hkim", fixture_key="maria_design_pip"
+    )
+    before = await KarmaAward.objects.acount()
+    secret_identity = "private-invalid-identity-sentinel"
+    with capture_experts_logs(caplog, MCP_LOGGERS):
+        async with mcp_client_factory.open(
+            actor_username=denied.actor_username, entrypoint=entrypoint
+        ) as session:
+            with pytest.raises(ToolError):
+                await session.client.call_tool(
+                    denied.tool_name,
+                    {**denied.arguments, "event_identity": secret_identity},
+                )
+            assert not session.request_paths
+            with pytest.raises(ToolError) as rejected:
+                await session.client.call_tool(
+                    denied.tool_name,
+                    {**denied.arguments, "event_identity": str(RECEIPT_UUID)},
+                )
+            assert denied.expected["title"] not in str(rejected.value)
+            assert ("POST", RECEIPT_PATH) not in session.request_paths
+    assert await KarmaAward.objects.acount() == before
+    assert_log_story(
+        caplog,
+        where="consumption_event_identity",
+        beats={
+            "invalid": ("| branch |", "reason=invalid_event_identity"),
+        },
+    )
+    assert_log_story(
+        caplog,
+        where="get_pip",
+        beats={
+            "denied": (
+                "| branch |",
+                f"entity_id={denied.arguments['pip_id']}",
+                "reason=read_rejected",
+            ),
+        },
+    )
+    assert secret_identity not in caplog.text
+    assert denied.expected["title"] not in caplog.text
+    assert not any(
+        "created_count=2" in record.getMessage() for record in caplog.records
+    )
+    actor = mcp_dataset.cedar.users_by_username[denied.actor_username]
+    token = await Token.objects.aget(user_id=actor.pk)
+    assert token.key not in caplog.text
+
+    # A second authorized detail with an already-used UUID must reject its receipt.
+    original = _eligible_mcp_case("get_workflow", mcp_dataset)
+    conflicting = _eligible_mcp_case("get_skill", mcp_dataset)
+    action = {"event_identity": str(RECEIPT_RETRY_UUID)}
+    async with mcp_client_factory.open(
+        actor_username=original.actor_username, entrypoint=entrypoint
+    ) as session:
+        await session.client.call_tool(
+            original.tool_name, {**original.arguments, **action}
+        )
+        caplog.clear()
+        with capture_experts_logs(caplog, MCP_LOGGERS), pytest.raises(ToolError):
+            await session.client.call_tool(
+                conflicting.tool_name, {**conflicting.arguments, **action}
+            )
+    where = (
+        "_post_consumption_receipt"
+        if entrypoint == "facade"
+        else "_complete_legacy_mcp_detail"
+    )
+    assert_log_story(
+        caplog,
+        where=where,
+        beats={
+            "conflict": (
+                "| branch |",
+                "reason=receipt_rejected",
+                f"event_identity={RECEIPT_RETRY_UUID}",
+                "entity_type=skill",
+            )
+        },
+    )
+    if entrypoint == "facade":
+        assert_log_story(
+            caplog,
+            where=RECEIPT_VIEW,
+            beats={
+                "conflict": (
+                    "| branch |",
+                    "reason=event_conflict",
+                    f"event_identity={RECEIPT_RETRY_UUID}",
+                    "awards=0",
+                )
+            },
+        )
+    assert await KarmaAward.objects.acount() == before + 2
+    assert not any(
+        "created_count=2" in record.getMessage() for record in caplog.records
+    )
 
 
 @pytest.mark.django_db(transaction=True)
@@ -676,7 +1068,27 @@ def test_set_current_user_with_account_metadata_logs_only_safe_context(
     :return: None. Example: no email/username/full-name metadata appears.
     :raises AssertionError: Personal metadata leaks or ContextVar behavior changes.
     """
-    raise NotImplementedError()
+    actor = mcp_dataset.cedar.users_by_username["mrodriguez"]
+    prior = _current_user.set(None)
+    try:
+        with capture_experts_logs(caplog, ("mcp_integration.context",)):
+            set_current_user(actor)
+            assert get_current_user() is actor
+            clear_current_user()
+        with pytest.raises(ValueError, match="No user context"):
+            get_current_user()
+    finally:
+        _current_user.reset(prior)
+    assert_log_story(
+        caplog,
+        where="MCP context",
+        beats={
+            "context": (f"user_id={actor.pk}", "is_active=True", "is_staff=False"),
+        },
+    )
+    assert actor.email not in caplog.text
+    assert actor.username not in caplog.text
+    assert actor.get_full_name() not in caplog.text
 
 
 @pytest.mark.django_db
@@ -690,7 +1102,17 @@ def test_phase_detail_with_actor_email_logs_only_identifiers(
     :return: None. Example: actual phase returned without actor email logging.
     :raises AssertionError: Sensitive account metadata appears or read behavior changes.
     """
-    raise NotImplementedError()
-
-
-pytest_plugins = ["tests.support.karma_mcp"]
+    actor = mcp_dataset.cedar.users_by_username["mrodriguez"]
+    phase_id = mcp_dataset.entity_ids["mike_phase"]
+    with capture_experts_logs(caplog, ("methodology.services.phase_service",)):
+        result = PhaseService.get_phase_with_activities(phase_id, actor)
+    assert result["phase"].pk == phase_id
+    assert_log_story(
+        caplog,
+        where="phase",
+        beats={
+            "entry": (f"phase_id={phase_id}", f"actor_id={actor.pk}"),
+        },
+    )
+    assert actor.email not in caplog.text
+    assert actor.username not in caplog.text

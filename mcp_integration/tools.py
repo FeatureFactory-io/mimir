@@ -22,7 +22,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-    from uuid import UUID
     from django.contrib.auth.models import User
 
 import os
@@ -34,11 +33,23 @@ os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 import logging
 from decimal import Decimal
 from typing import Literal, Optional
+from uuid import UUID, uuid4
 
 from asgiref.sync import sync_to_async
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from fastmcp import FastMCP
 
+from methodology.models import Activity, Agent, Artifact, Rule, Skill, Workflow
+from methodology.models import ProcessImprovementProposal as Pipo
+from methodology.services.activity_service import ActivityService
+from methodology.services.agent_service import AgentService
+from methodology.services.artifact_service import ArtifactService
+from methodology.services.karma_service import KarmaService
+from methodology.services.phase_service import PhaseService
+from methodology.services.pip_service import PIPService
+from methodology.services.rule_service import RuleService
+from methodology.services.skill_service import SkillService
+from methodology.services.workflow_service import WorkflowService
 from methodology.services.playbook_history_service import (
     get_playbook_version_by_number,
     list_playbook_version_rows,
@@ -46,6 +57,10 @@ from methodology.services.playbook_history_service import (
 )
 
 logger = logging.getLogger(__name__)
+_MCP_DETAIL_CHANNEL = "mcp_detail"
+_PLAYBOOK_DETAIL_FIELDS = ("id", "name", "description", "category", "status", "visibility")
+_WORKFLOW_DETAIL_FIELDS = ("id", "name", "description", "order")
+_DETAIL_REJECT_LOG = "%s | branch | entity_id=%s event_identity=%s reason=read_rejected"
 
 # Initialize FastMCP server
 mcp = FastMCP("Mimir Methodology Assistant")
@@ -241,6 +256,7 @@ async def get_playbook(
     playbook_id: int,
     include_history: bool = False,
     version: str | None = None,
+    event_identity: str | None = None,
 ) -> dict:
     """
     Get playbook details with workflows and optional version history.
@@ -254,46 +270,41 @@ async def get_playbook(
     :param version: When provided, returns the recorded snapshot at that version
         instead of the current playbook state. Raises ValueError if not found.
         Takes precedence over ``include_history``. Example: "1.0"
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Playbook dict with nested workflows; or snapshot dict when ``version``
         is supplied (contains ``snapshot_data``, no top-level ``workflows`` key).
     :raises ValueError: if playbook not found, not accessible, or requested
         version does not exist.
     """
-    logger.info(
-        "MCP Tool: get_playbook called - id=%s include_history=%s version=%s",
-        playbook_id,
-        include_history,
-        version,
+    identity = _legacy_consumption_event_identity(event_identity)
+    user = get_current_user()
+    try:
+        playbook = await _playbook_for_read(
+            playbook_id, user, prefetch_workflows=version is None
+        )
+        if version is not None:
+            result = await _get_version_snapshot(playbook, version)
+        else:
+            workflows = await sync_to_async(lambda: list(playbook.workflows.all()))()
+            fields = _PLAYBOOK_DETAIL_FIELDS
+            result = {field: getattr(playbook, field) for field in fields}
+            result["version"] = str(playbook.version)
+            result["workflows"] = [
+                {field: getattr(workflow, field) for field in _WORKFLOW_DETAIL_FIELDS}
+                for workflow in workflows
+            ]
+            if include_history:
+                result = await _attach_version_history(playbook, result)
+    except ValueError:
+        logger.info(_DETAIL_REJECT_LOG, "get_playbook", playbook_id, identity)
+        raise
+    return await _complete_legacy_mcp_detail(
+        result,
+        actor=user,
+        entity_type="playbook",
+        entity_id=playbook_id,
+        event_identity=identity,
     )
-
-    user = await sync_to_async(get_current_user)()
-    playbook = await _playbook_for_read(
-        playbook_id, user, prefetch_workflows=not bool(version)
-    )
-
-    if version is not None:
-        return await _get_version_snapshot(playbook, version)
-
-    workflows = await sync_to_async(list)(playbook.workflows.all())
-    result = {
-        "id": playbook.id,
-        "name": playbook.name,
-        "description": playbook.description,
-        "category": playbook.category,
-        "status": playbook.status,
-        "version": str(playbook.version),
-        "visibility": playbook.visibility,
-        "workflows": [
-            {"id": w.id, "name": w.name, "description": w.description, "order": w.order}
-            for w in workflows
-        ],
-    }
-    logger.info("MCP Tool: Playbook has %d workflows", len(result["workflows"]))
-
-    if include_history:
-        result = await _attach_version_history(playbook, result)
-
-    return result
 
 
 async def _get_version_snapshot(playbook, version: str) -> dict:
@@ -317,7 +328,9 @@ async def _get_version_snapshot(playbook, version: str) -> dict:
 
 async def _attach_version_history(playbook, result: dict) -> dict:
     """Fetch ordered version rows and attach them to the result dict."""
-    raw_versions = await sync_to_async(list)(playbook_versions_ordered(playbook))
+    raw_versions = await sync_to_async(
+        lambda: list(playbook_versions_ordered(playbook))
+    )()
     result["versions"] = [_serialize_version_row(v) for v in raw_versions]
     logger.info(
         "MCP Tool: Attached %d version history rows for playbook %s",
@@ -521,55 +534,43 @@ async def list_workflows(playbook_id: int) -> list:
     return result
 
 
-async def get_workflow(workflow_id: int) -> dict:
+async def get_workflow(workflow_id: int, event_identity: str | None = None) -> dict:
     """
     Get workflow details with activities.
     
     :param workflow_id: Workflow ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Workflow dict with nested activities
     :raises ValueError: if not found or not owned
     """
-    logger.info(f'MCP Tool: get_workflow called - id={workflow_id}')
-    
-    user = await sync_to_async(get_current_user)()
-
-    from methodology.models import Workflow
-    from methodology.services.workflow_service import WorkflowService
-
-    def _load():
-        try:
-            return WorkflowService.get_workflow_for_user(
-                workflow_id,
-                user,
-                write=False,
-                prefetch_activities=True,
-            )
-        except Workflow.DoesNotExist:
-            raise ValueError(f'Workflow {workflow_id} not found') from None
-        except PermissionError:
-            raise ValueError(f'Workflow {workflow_id} not found') from None
-
-    workflow = await sync_to_async(_load)()
-
-    activities = await sync_to_async(list)(workflow.activities.all())
+    identity = _legacy_consumption_event_identity(event_identity)
+    user = get_current_user()
+    try:
+        workflow = await sync_to_async(WorkflowService.get_workflow_for_user)(
+            workflow_id, user, write=False, prefetch_activities=True
+        )
+    except (Workflow.DoesNotExist, PermissionError):
+        logger.info(_DETAIL_REJECT_LOG, "get_workflow", workflow_id, identity)
+        raise ValueError(f"Workflow {workflow_id} not found") from None
+    activities = await sync_to_async(lambda: list(workflow.activities.all()))()
     result = {
-        'id': workflow.id,
-        'name': workflow.name,
-        'description': workflow.description,
-        'abbreviation': workflow.abbreviation,
-        'order': workflow.order,
-        'playbook_id': workflow.playbook_id,
-        'activities': [
-            {
-                'id': a.id,
-                'name': a.name,
-                'order': a.order,
-            }
-            for a in activities
-        ]
+        "id": workflow.id,
+        "name": workflow.name,
+        "description": workflow.description,
+        "abbreviation": workflow.abbreviation,
+        "order": workflow.order,
+        "playbook_id": workflow.playbook_id,
+        "activities": [
+            {"id": a.id, "name": a.name, "order": a.order} for a in activities
+        ],
     }
-    logger.info(f'MCP Tool: Workflow has {len(result["activities"])} activities')
-    return result
+    return await _complete_legacy_mcp_detail(
+        result,
+        actor=user,
+        entity_type="workflow",
+        entity_id=workflow_id,
+        event_identity=identity,
+    )
 
 
 async def update_workflow(workflow_id: int, name: str = None,
@@ -848,7 +849,7 @@ async def list_activities(workflow_id: int) -> list:
     return result
 
 
-async def get_activity(activity_id: int) -> dict:
+async def get_activity(activity_id: int, event_identity: str | None = None) -> dict:
     """
     Get activity details with dependencies, agent, skill, and artifacts.
     
@@ -856,140 +857,152 @@ async def get_activity(activity_id: int) -> dict:
     the "Recently Used" dashboard section.
     
     :param activity_id: Activity ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Activity dict with predecessor/successor, agent, skill, and artifacts
     :raises ValueError: if not found or not owned
     """
-    logger.info(f'MCP Tool: get_activity called - id={activity_id}')
+    identity = _legacy_consumption_event_identity(event_identity)
+    user = get_current_user()
+    try:
+        result = await sync_to_async(_legacy_activity_detail_payload)(activity_id, user)
+    except ValueError:
+        logger.info(_DETAIL_REJECT_LOG, "get_activity", activity_id, identity)
+        raise
+    # Recently Used tracking is independent from the paired consumption award.
+    try:
+        await sync_to_async(ActivityService.touch_activity_access)(activity_id)
+    except Exception:
+        logger.warning("Failed to track access for activity %s", activity_id)
+    return await _complete_legacy_mcp_detail(
+        result,
+        actor=user,
+        entity_type="activity",
+        entity_id=activity_id,
+        event_identity=identity,
+    )
     
-    user = await sync_to_async(get_current_user)()
     
-    # Run all database access in a single sync function
-    def get_activity_data():
-        from methodology.models import Activity
-        from methodology.services.activity_service import ActivityService
+def _legacy_activity_detail_payload(activity_id: int, user: User) -> dict:
+    """Serialize the authorized detail and its relations in the ORM thread.
 
-        try:
-            activity = ActivityService.get_activity_for_user(
-                activity_id, user, write=False, with_full_detail=True
-            )
-        except Activity.DoesNotExist:
-            logger.error(f'MCP Tool: Activity id={activity_id} not found for user')
-            raise ValueError(f'Activity {activity_id} not found')
-        except PermissionError:
-            logger.error(f'MCP Tool: Activity id={activity_id} not found for user')
-            raise ValueError(f'Activity {activity_id} not found')
+    :param activity_id: Requested activity primary key.
+    :param user: Authenticated MCP actor.
+    :return: Fully evaluated JSON-friendly activity detail.
+    :raises ValueError: If the activity is missing or inaccessible.
+    """
         
-        # Build agent dict
-        agent_dict = None
-        if activity.agent:
-            agent_dict = {
-                'id': activity.agent.id,
-                'name': activity.agent.name,
-                'description': activity.agent.description,
-            }
+    try:
+        activity = ActivityService.get_activity_for_user(
+            activity_id, user, write=False, with_full_detail=True
+        )
+    except Activity.DoesNotExist:
+        logger.error(f"MCP Tool: Activity id={activity_id} not found for user")
+        raise ValueError(f"Activity {activity_id} not found")
+    except PermissionError:
+        logger.error(f"MCP Tool: Activity id={activity_id} not found for user")
+        raise ValueError(f"Activity {activity_id} not found")
         
-        # Build skills list
-        skills_list = [
-            {
-                'id': s.id,
-                'title': s.title,
-                'capability_domain': s.capability_domain,
-                'technology_stack': s.technology_stack,
-            }
-            for s in sorted(activity.skills.all(), key=lambda x: x.title.lower())
-        ]
-
-        rules_list = [
-            {
-                'id': r.id,
-                'title': r.title,
-                'slug': r.slug,
-                'always_apply': r.always_apply,
-            }
-            for r in sorted(activity.rules.all(), key=lambda x: x.slug)
-        ]
-
-        # Build output artifacts list
-        output_artifacts = list(activity.output_artifacts.all())
-        output_artifacts_list = [
-            {
-                'id': artifact.id,
-                'name': artifact.name,
-                'type': artifact.type,
-                'is_required': artifact.is_required,
-            }
-            for artifact in output_artifacts
-        ]
-        
-        # Build input artifacts list
-        input_artifact_inputs = list(activity.input_artifacts.all())
-        input_artifacts_list = []
-        for ai in input_artifact_inputs:
-            input_artifacts_list.append({
-                'id': ai.artifact.id,
-                'name': ai.artifact.name,
-                'type': ai.artifact.type,
-                'is_required': ai.is_required,
-            })
-        
-        # Build predecessor dict
-        predecessor_dict = None
-        if activity.predecessor:
-            predecessor_dict = {
-                'id': activity.predecessor.id,
-                'name': activity.predecessor.name,
-            }
-        
-        # Build successor dict
-        successor_dict = None
-        if activity.successor:
-            successor_dict = {
-                'id': activity.successor.id,
-                'name': activity.successor.name,
-            }
-        
-        # Build phase dict
-        phase_dict = None
-        if activity.phase:
-            phase_dict = {
-                'id': activity.phase.id,
-                'name': activity.phase.name,
-            }
-        
-        result = {
-            'id': activity.id,
-            'name': activity.name,
-            'guidance': activity.guidance,
-            'phase': phase_dict,
-            'order': activity.order,
-            'workflow_id': activity.workflow_id,
-            'predecessor': predecessor_dict,
-            'successor': successor_dict,
-            'agent': agent_dict,
-            'skills': skills_list,
-            'rules': rules_list,
-            'output_artifacts': output_artifacts_list,
-            'input_artifacts': input_artifacts_list,
+    # Build agent dict
+    agent_dict = None
+    if activity.agent:
+        agent_dict = {
+            "id": activity.agent.id,
+            "name": activity.agent.name,
+            "description": activity.agent.description,
         }
-        
-        logger.info(
-            f'MCP Tool: Activity with predecessor={activity.predecessor_id}, '
-            f'successor={activity.successor_id}, agent={activity.agent_id}, '
-            f'skills={len(skills_list)}, rules={len(rules_list)}, outputs={len(output_artifacts_list)}, '
-            f'inputs={len(input_artifacts_list)}'
+
+    # Build skills list
+    skills_list = [
+        {
+            "id": s.id,
+            "title": s.title,
+            "capability_domain": s.capability_domain,
+            "technology_stack": s.technology_stack,
+        }
+        for s in sorted(activity.skills.all(), key=lambda x: x.title.lower())
+    ]
+
+    rules_list = [
+        {
+            "id": r.id,
+            "title": r.title,
+            "slug": r.slug,
+            "always_apply": r.always_apply,
+        }
+        for r in sorted(activity.rules.all(), key=lambda x: x.slug)
+    ]
+
+    # Build output artifacts list
+    output_artifacts = list(activity.output_artifacts.all())
+    output_artifacts_list = [
+        {
+            "id": artifact.id,
+            "name": artifact.name,
+            "type": artifact.type,
+            "is_required": artifact.is_required,
+        }
+        for artifact in output_artifacts
+    ]
+
+    # Build input artifacts list
+    input_artifact_inputs = list(activity.input_artifacts.all())
+    input_artifacts_list = []
+    for ai in input_artifact_inputs:
+        input_artifacts_list.append(
+            {
+                "id": ai.artifact.id,
+                "name": ai.artifact.name,
+                "type": ai.artifact.type,
+                "is_required": ai.is_required,
+            }
         )
         
-        return result
+    # Build predecessor dict
+    predecessor_dict = None
+    if activity.predecessor:
+        predecessor_dict = {
+            "id": activity.predecessor.id,
+            "name": activity.predecessor.name,
+        }
     
-    # Execute all database operations in sync context
-    result = await sync_to_async(get_activity_data)()
+    # Build successor dict
+    successor_dict = None
+    if activity.successor:
+        successor_dict = {
+            "id": activity.successor.id,
+            "name": activity.successor.name,
+        }
     
-    # Track access for "Recently Used" dashboard section (non-critical)
-    try:
-        from methodology.services.activity_service import ActivityService
-        await sync_to_async(ActivityService.touch_activity_access)(activity_id)
-    except Exception as e:
-        logger.warning(f'Failed to track access for activity {activity_id}: {e}')
+    # Build phase dict
+    phase_dict = None
+    if activity.phase:
+        phase_dict = {
+            "id": activity.phase.id,
+            "name": activity.phase.name,
+        }
+
+    result = {
+        "id": activity.id,
+        "name": activity.name,
+        "guidance": activity.guidance,
+        "phase": phase_dict,
+        "order": activity.order,
+        "workflow_id": activity.workflow_id,
+        "predecessor": predecessor_dict,
+        "successor": successor_dict,
+        "agent": agent_dict,
+        "skills": skills_list,
+        "rules": rules_list,
+        "output_artifacts": output_artifacts_list,
+        "input_artifacts": input_artifacts_list,
+    }
+
+    logger.info(
+        f"MCP Tool: Activity with predecessor={activity.predecessor_id}, "
+        f"successor={activity.successor_id}, agent={activity.agent_id}, "
+        f"skills={len(skills_list)}, rules={len(rules_list)}, outputs={len(output_artifacts_list)}, "
+        f"inputs={len(input_artifacts_list)}"
+    )
     
     return result
 
@@ -1503,33 +1516,26 @@ async def list_skills(
     return result
 
 
-async def get_skill(skill_id: int) -> dict:
+async def get_skill(skill_id: int, event_identity: str | None = None) -> dict:
     """
     Get skill details with activity count.
 
     :param skill_id: Skill ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Skill dict with activity_count
     :raises ValueError: If skill not found or not owned
     """
-    logger.info(f"MCP Tool: get_skill called - skill_id={skill_id}")
-
-    user = await sync_to_async(get_current_user)()
-
-    from methodology.models import Skill
-    from methodology.services.skill_service import SkillService
-
+    identity = _legacy_consumption_event_identity(event_identity)
+    user = get_current_user()
     try:
         skill = await sync_to_async(SkillService.get_skill_for_user)(
             skill_id, user, write=False
         )
-    except Skill.DoesNotExist:
-        raise ValueError(f"Skill {skill_id} not found")
-    except PermissionError:
-        raise ValueError(f"Skill {skill_id} not found")
-
+    except (Skill.DoesNotExist, PermissionError):
+        logger.info(_DETAIL_REJECT_LOG, "get_skill", skill_id, identity)
+        raise ValueError(f"Skill {skill_id} not found") from None
     activity_count = await sync_to_async(skill.activities.count)()
-
-    return {
+    result = {
         "id": skill.id,
         "title": skill.title,
         "content": skill.content,
@@ -1538,6 +1544,13 @@ async def get_skill(skill_id: int) -> dict:
         "playbook_id": skill.playbook_id,
         "activity_count": activity_count,
     }
+    return await _complete_legacy_mcp_detail(
+        result,
+        actor=user,
+        entity_type="skill",
+        entity_id=skill_id,
+        event_identity=identity,
+    )
 
 
 async def update_skill(
@@ -1829,24 +1842,25 @@ async def list_rules(
     ]
 
 
-async def get_rule(rule_id: int) -> dict:
-    """Get rule by ID."""
-    logger.info(f"MCP Tool: get_rule rule_id={rule_id}")
-    user = await sync_to_async(get_current_user)()
+async def get_rule(rule_id: int, event_identity: str | None = None) -> dict:
+    """Get rule by ID.
 
-    from methodology.models import Rule
-    from methodology.services.rule_service import RuleService
-
+    :param rule_id: Requested rule primary key.
+    :param event_identity: Optional UUID to reuse when retrying this read.
+    :return: Authorized rule detail.
+    :raises ValueError: Invalid identity or unavailable resource.
+    """
+    identity = _legacy_consumption_event_identity(event_identity)
+    user = get_current_user()
     try:
         rule = await sync_to_async(RuleService.get_rule_for_user)(
             rule_id, user, write=False
         )
-    except Rule.DoesNotExist:
-        raise ValueError(f"Rule {rule_id} not found")
-    except PermissionError:
-        raise ValueError(f"Rule {rule_id} not found")
+    except (Rule.DoesNotExist, PermissionError):
+        logger.info(_DETAIL_REJECT_LOG, "get_rule", rule_id, identity)
+        raise ValueError(f"Rule {rule_id} not found") from None
     ac = await sync_to_async(rule.activities.count)()
-    return {
+    result = {
         "id": rule.id,
         "title": rule.title,
         "slug": rule.slug,
@@ -1855,6 +1869,13 @@ async def get_rule(rule_id: int) -> dict:
         "playbook_id": rule.playbook_id,
         "activity_count": ac,
     }
+    return await _complete_legacy_mcp_detail(
+        result,
+        actor=user,
+        entity_type="rule",
+        entity_id=rule_id,
+        event_identity=identity,
+    )
 
 
 async def update_rule(
@@ -2074,39 +2095,39 @@ async def list_agents(
     return result
 
 
-async def get_agent(agent_id: int) -> dict:
+async def get_agent(agent_id: int, event_identity: str | None = None) -> dict:
     """
     Get agent details with activity count.
 
     :param agent_id: Agent ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Agent dict with activity_count
     :raises ValueError: If agent not found or not owned
     """
-    logger.info(f"MCP Tool: get_agent called - agent_id={agent_id}")
-
-    user = await sync_to_async(get_current_user)()
-
-    from methodology.models import Agent
-    from methodology.services.agent_service import AgentService
-
+    identity = _legacy_consumption_event_identity(event_identity)
+    user = get_current_user()
     try:
         agent = await sync_to_async(AgentService.get_agent_for_user)(
             agent_id, user, write=False
         )
-    except Agent.DoesNotExist:
-        raise ValueError(f"Agent {agent_id} not found")
-    except PermissionError:
-        raise ValueError(f"Agent {agent_id} not found")
-
+    except (Agent.DoesNotExist, PermissionError):
+        logger.info(_DETAIL_REJECT_LOG, "get_agent", agent_id, identity)
+        raise ValueError(f"Agent {agent_id} not found") from None
     activity_count = await sync_to_async(agent.activities.count)()
-
-    return {
+    result = {
         "id": agent.id,
         "name": agent.name,
         "description": agent.description,
         "playbook_id": agent.playbook_id,
         "activity_count": activity_count,
     }
+    return await _complete_legacy_mcp_detail(
+        result,
+        actor=user,
+        entity_type="agent",
+        entity_id=agent_id,
+        event_identity=identity,
+    )
 
 
 async def update_agent(
@@ -2411,37 +2432,26 @@ async def list_artifacts(
     return result
 
 
-async def get_artifact(artifact_id: int) -> dict:
+async def get_artifact(artifact_id: int, event_identity: str | None = None) -> dict:
     """
     Get artifact details with consumer count.
 
     :param artifact_id: Artifact ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Artifact dict with consumer_count
     :raises ValueError: If not found or not owned
     """
-    logger.info(f"MCP Tool: get_artifact called - artifact_id={artifact_id}")
-
-    user = await sync_to_async(get_current_user)()
-
-    from methodology.models import Artifact
-    from methodology.services.artifact_service import ArtifactService
-
+    identity = _legacy_consumption_event_identity(event_identity)
+    user = get_current_user()
     try:
         artifact = await sync_to_async(ArtifactService.get_artifact_for_user)(
             artifact_id, user, write=False
         )
-    except Artifact.DoesNotExist:
-        raise ValueError(f"Artifact {artifact_id} not found")
-    except PermissionError:
-        raise ValueError(f"Artifact {artifact_id} not found")
-
+    except (Artifact.DoesNotExist, PermissionError):
+        logger.info(_DETAIL_REJECT_LOG, "get_artifact", artifact_id, identity)
+        raise ValueError(f"Artifact {artifact_id} not found") from None
     consumer_count = await sync_to_async(artifact.get_consumer_count)()
-
-    logger.info(
-        f'MCP Tool: Got artifact {artifact_id} "{artifact.name}" '
-        f"(consumers={consumer_count})"
-    )
-    return {
+    result = {
         "id": artifact.id,
         "name": artifact.name,
         "description": artifact.description,
@@ -2452,6 +2462,13 @@ async def get_artifact(artifact_id: int) -> dict:
         "consumer_count": consumer_count,
         "playbook_id": artifact.playbook_id,
     }
+    return await _complete_legacy_mcp_detail(
+        result,
+        actor=user,
+        entity_type="artifact",
+        entity_id=artifact_id,
+        event_identity=identity,
+    )
 
 
 async def update_artifact(
@@ -2768,57 +2785,29 @@ async def list_phases(playbook_id: int) -> list[dict]:
     return phases_dicts
 
 
-async def get_phase(phase_id: int) -> dict:
+async def get_phase(phase_id: int, event_identity: str | None = None) -> dict:
     """
     Get phase details with activities.
     
     :param phase_id: Phase ID. Example: 1
+    :param event_identity: Optional UUID to reuse when retrying this read.
     :return: Phase dict with activities list
     :raises ValueError: If phase not found or not owned
     """
-    logger.info(f'MCP Tool: get_phase called - phase_id={phase_id}')
-    
-    user = await sync_to_async(get_current_user)()
-
-    from django.core.exceptions import PermissionDenied
-
-    from methodology.services.phase_service import PhaseService
-
+    identity = _legacy_consumption_event_identity(event_identity)
+    user = get_current_user()
     try:
-        phase_data = await sync_to_async(PhaseService.get_phase_with_activities)(phase_id, user)
-    except ValidationError:
-        raise ValueError(f'Phase {phase_id} not found')
-    except PermissionDenied:
-        raise ValueError(f'Phase {phase_id} not found')
-    
-    # Convert phase object to dict — serialize ORM objects to JSON-safe primitives
-    raw_activities = phase_data['workflow_activities']
-    serialized_activities = [
-        {
-            'workflow_id': wf.id,
-            'workflow_name': wf.name,
-            'activities': [
-                {'id': a.id, 'name': a.name, 'order': a.order}
-                for a in acts
-            ]
-        }
-        for wf, acts in raw_activities.items()
-    ] if isinstance(raw_activities, dict) else list(raw_activities)
-
-    raw_artifacts = phase_data['artifacts']
-    serialized_artifacts = [
-        {'id': a.id, 'name': a.name, 'type': a.type}
-        for a in raw_artifacts
-    ]
-
-    result = {
-        **_phase_to_dict(phase_data['phase']),
-        'activities': serialized_activities,
-        'artifacts': serialized_artifacts,
-    }
-    
-    logger.info(f'MCP Tool: Retrieved phase {phase_id}')
-    return result
+        payload = await sync_to_async(_legacy_phase_detail_payload)(phase_id, user)
+    except ValueError:
+        logger.info(_DETAIL_REJECT_LOG, "get_phase", phase_id, identity)
+        raise
+    return await _complete_legacy_mcp_detail(
+        payload,
+        actor=user,
+        entity_type="phase",
+        entity_id=phase_id,
+        event_identity=identity,
+    )
 
 
 async def update_phase(
@@ -3045,28 +3034,28 @@ async def list_pips(
     return payload
 
 
-async def get_pip(pip_id: int) -> dict:
-    """Return a single proposal with nested change rows."""
+async def get_pip(pip_id: int, event_identity: str | None = None) -> dict:
+    """Return a single proposal with nested change rows.
 
-    user = await sync_to_async(get_current_user)()
-
-    def _fetch():
-        from methodology.models import ProcessImprovementProposal as Pipo
-        from methodology.services.pip_service import PIPService
-
-        try:
-            return PIPService.get_pip_with_changes(int(pip_id), user)
-        except Pipo.DoesNotExist as exc:
-            raise ValueError(f"PIP {pip_id} not found") from exc
-        except PermissionError as exc:
-            raise ValueError(str(exc)) from exc
-
-    pip = await sync_to_async(_fetch)()
-    summary = _serialize_pip_summary(pip)
-    summary["changes"] = [
-        _serialize_pip_change(c) for c in pip.changes.order_by("order", "pk")
-    ]
-    return summary
+    :param pip_id: Requested pip primary key.
+    :param event_identity: Optional UUID to reuse when retrying this read.
+    :return: Authorized pip detail.
+    :raises ValueError: Invalid identity or unavailable resource.
+    """
+    identity = _legacy_consumption_event_identity(event_identity)
+    user = get_current_user()
+    try:
+        payload = await sync_to_async(_legacy_pip_detail_payload)(pip_id, user)
+    except ValueError:
+        logger.info(_DETAIL_REJECT_LOG, "get_pip", pip_id, identity)
+        raise
+    return await _complete_legacy_mcp_detail(
+        payload,
+        actor=user,
+        entity_type="pip",
+        entity_id=pip_id,
+        event_identity=identity,
+    )
 
 
 async def create_pip(playbook_id: int, title: str, summary: str = "") -> dict:
@@ -3908,7 +3897,15 @@ def _legacy_consumption_event_identity(value: str | None) -> UUID:
     :return: Stable action UUID. Example: UUID(int=1).
     :raises ValueError: Malformed supplied identity.
     """
-    raise NotImplementedError()
+    if value is None:
+        return uuid4()
+    try:
+        return UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        logger.info(
+            "_legacy_consumption_event_identity | branch | reason=invalid_event_identity"
+        )
+        raise ValueError("event_identity must be a UUID.") from None
 
 
 async def _complete_legacy_mcp_detail(
@@ -3930,7 +3927,30 @@ async def _complete_legacy_mcp_detail(
     :raises ValueError: Invalid reference or conflicting replay.
     :raises PermissionError: Current target access denied.
     """
-    raise NotImplementedError()
+    logger.info(
+        "_complete_legacy_mcp_detail | entry | tool=get_%s entity_type=%s entity_id=%s "
+        "event_identity=%s channel=%s",
+        entity_type,
+        entity_type,
+        entity_id,
+        event_identity,
+        _MCP_DETAIL_CHANNEL,
+    )
+    try:
+        await sync_to_async(KarmaService.award_successful_consumption)(
+            actor, entity_type, entity_id, event_identity, channel=_MCP_DETAIL_CHANNEL
+        )
+    except (ObjectDoesNotExist, PermissionError, ValidationError, ValueError):
+        logger.info(
+            "_complete_legacy_mcp_detail | branch | entity_type=%s entity_id=%s "
+            "event_identity=%s channel=%s reason=receipt_rejected",
+            entity_type,
+            entity_id,
+            event_identity,
+            _MCP_DETAIL_CHANNEL,
+        )
+        raise
+    return payload
 
 
 def _legacy_phase_detail_payload(phase_id: int, actor: User) -> dict:
@@ -3941,7 +3961,11 @@ def _legacy_phase_detail_payload(phase_id: int, actor: User) -> dict:
     :return: Existing phase response shape. Example: activities and artifacts.
     :raises ValueError: Missing or unauthorized phase, retaining tool contract.
     """
-    raise NotImplementedError()
+    try:
+        data = PhaseService.get_phase_with_activities(phase_id, actor)
+    except (ValidationError, PermissionDenied):
+        raise ValueError(f"Phase {phase_id} not found") from None
+    return _serialize_legacy_phase_detail(data)
 
 
 def _serialize_legacy_phase_detail(data: Mapping[str, object]) -> dict:
@@ -3951,7 +3975,30 @@ def _serialize_legacy_phase_detail(data: Mapping[str, object]) -> dict:
     :return: JSON-safe existing payload. Example: {"activities": [], "artifacts": []}.
     :raises ValueError: Invalid service result.
     """
-    raise NotImplementedError()
+    raw_activities = data["workflow_activities"]
+    activities = (
+        [
+            {
+                "workflow_id": workflow.id,
+                "workflow_name": workflow.name,
+                "activities": [
+                    {"id": activity.id, "name": activity.name, "order": activity.order}
+                    for activity in workflow_activities
+                ],
+            }
+            for workflow, workflow_activities in raw_activities.items()
+        ]
+        if isinstance(raw_activities, dict)
+        else list(raw_activities)
+    )
+    return {
+        **_phase_to_dict(data["phase"]),
+        "activities": activities,
+        "artifacts": [
+            {"id": artifact.id, "name": artifact.name, "type": artifact.type}
+            for artifact in data["artifacts"]
+        ],
+    }
 
 
 def _legacy_pip_detail_payload(pip_id: int, actor: User) -> dict:
@@ -3962,7 +4009,17 @@ def _legacy_pip_detail_payload(pip_id: int, actor: User) -> dict:
     :return: Existing summary/change shape. Example: actual historical changes.
     :raises ValueError: Missing or denied PIP, retaining legacy contract.
     """
-    raise NotImplementedError()
+    try:
+        pip = PIPService.get_pip_with_changes(int(pip_id), actor)
+    except Pipo.DoesNotExist as error:
+        raise ValueError(f"PIP {pip_id} not found") from error
+    except PermissionError as error:
+        raise ValueError(str(error)) from error
+    summary = _serialize_pip_summary(pip)
+    summary["changes"] = [
+        _serialize_pip_change(change) for change in pip.changes.order_by("order", "pk")
+    ]
+    return summary
 
 
 def _legacy_pip_list_payload(
