@@ -3761,7 +3761,7 @@ scenarios:
           - do-assert-log-story
           - do-github-issues
     implementation_plan: docs/plans/iterations/experts/S21-experts-view-05.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S17
@@ -5053,7 +5053,7 @@ scenarios:
           - do-github-issues
           - do-follow-commit-convention
     implementation_plan: docs/plans/iterations/experts/S18-experts-view-02.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S12
@@ -9106,7 +9106,7 @@ scenarios:
       - S06
       - S21
     implementation_plan: docs/plans/iterations/experts/S16-experts-reach-03.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
@@ -9897,7 +9897,7 @@ scenarios:
       - S42
       - S45
     implementation_plan: docs/plans/iterations/experts/S46-karma-event-02.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S36
