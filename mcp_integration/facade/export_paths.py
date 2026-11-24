@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Sequence
+from collections.abc import Sequence
+from pathlib import Path, PureWindowsPath
 
 
 def confined_export_path(root: Path, relative_path: str) -> Path:
@@ -12,7 +12,31 @@ def confined_export_path(root: Path, relative_path: str) -> Path:
     :return: Confined absolute Path. Example: Path("/tmp/export/BPE/task.md").
     :raises ValueError: If empty, absolute, traversing, or resolving outside root.
     """
-    raise NotImplementedError()
+    if not isinstance(root, Path) or not root.is_absolute():
+        raise ValueError("An absolute export root is required.")
+    if not isinstance(relative_path, str) or not relative_path.strip():
+        raise ValueError("A nonempty relative export destination is required.")
+    if "\0" in relative_path or "\0" in str(root):
+        raise ValueError("Invalid export destination.")
+    native, windows = Path(relative_path), PureWindowsPath(relative_path)
+    if (
+        not native.parts
+        or native.anchor
+        or windows.anchor
+        or ".." in native.parts
+        or ".." in windows.parts
+    ):
+        raise ValueError(
+            "Export destinations must be relative and cannot traverse parents."
+        )
+    try:
+        resolved_root = root.resolve()
+        destination = (resolved_root / native).resolve()
+    except (OSError, RuntimeError) as exc:
+        raise ValueError("Invalid export destination.") from exc
+    if destination == resolved_root or not destination.is_relative_to(resolved_root):
+        raise ValueError("Export destination escapes its approved root.")
+    return destination
 
 
 def validate_export_destinations(
@@ -24,4 +48,4 @@ def validate_export_destinations(
     :return: Immutable resolved destinations. Example: (root / "a.md",).
     :raises ValueError: If any destination escapes its approved root.
     """
-    raise NotImplementedError()
+    return tuple(confined_export_path(root, child) for root, child in destinations)

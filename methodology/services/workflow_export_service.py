@@ -2,21 +2,29 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from uuid import UUID
-    from django.contrib.auth.models import User
-
 import logging
 import re
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
-from django.core.exceptions import ObjectDoesNotExist
+from typing import TYPE_CHECKING
+from uuid import UUID, uuid4
+
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db import DatabaseError
+
+from mcp_integration.facade.export_paths import (
+    confined_export_path,
+    validate_export_destinations,
+)
 from methodology.models import Workflow
+from methodology.services.karma_service import KarmaService
 from methodology.services.workflow_service import WorkflowService
 
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AnonymousUser, User
+
 logger = logging.getLogger(__name__)
+_EXPORT_LOG = "WorkflowExportService.export_workflow_to_markdown"
 
 
 class WorkflowExportService:
@@ -26,118 +34,147 @@ class WorkflowExportService:
     def export_workflow_to_markdown(
         workflow_id: int,
         target_directory: str,
-        folder_name: Optional[str] = None,
-        user=None,
+        folder_name: str | None = None,
+        user: User | AnonymousUser | None = None,
         skip_rules: bool = False,
     ) -> dict:
+        """Export a workflow and its linked rules as Markdown files.
+
+        :param workflow_id: Existing workflow ID. Example: 6202.
+        :param target_directory: Approved local base. Example: ".windsurf/workflows".
+        :param folder_name: Relative output folder. Example: "Frontend".
+        :param user: Existing read actor, or None for non-awarding export.
+        :param skip_rules: Exclude linked rule files. Example: False.
+        :return: Existing export summary. Example: {"status": "exported", ...}.
+        :raises ObjectDoesNotExist: If the workflow does not exist.
+        :raises PermissionError: If access is denied.
+        :raises ValueError: If a requested path is invalid.
+        :raises OSError: If a filesystem operation fails.
         """
-        Export workflow and activities as markdown files.
-        
-        :param workflow_id: Workflow ID. Example: 42
-        :param target_directory: Target directory path. Example: ".windsurf/workflows"
-        :param folder_name: Folder name. Example: "FFE" (defaults to workflow slug)
-        :param user: When set, only export if user may view the parent playbook
-        :return: Export result dict with file paths and counts
-        :raises ObjectDoesNotExist: If workflow does not exist
-        :raises PermissionError: If user may not view workflow playbook
-        :raises PermissionError: If directory not writable
-        """
-        logger.info(f"Exporting workflow {workflow_id} to {target_directory}")
-        
+        operation = uuid4()
+        trace = (
+            f"operation_uuid={operation} entity_type=workflow entity_id={workflow_id}"
+            f" actor_id={getattr(user, 'pk', None)}"
+        )
+        logger.info("%s | entry | %s", _EXPORT_LOG, trace)
+        service = WorkflowExportService
+        try:
+            workflow = service._load_workflow(workflow_id, user)
+            bundle = service._workflow_bundle(
+                workflow, folder_name, skip_rules=skip_rules
+            )
+        except (ObjectDoesNotExist, PermissionError):
+            logger.info(
+                "%s | error | %s reason=unavailable completed_file_count=0 receipt_sent=false",
+                _EXPORT_LOG,
+                trace,
+            )
+            raise
+        target = Path(target_directory).absolute()
+        result = service._write_workflow_export(bundle, target, trace)
+        service._record_completed_export(
+            user=user, workflow_id=workflow.pk, event_identity=operation
+        )
+        return result
+
+    @staticmethod
+    def _load_workflow(workflow_id: int, user: User | AnonymousUser | None) -> Workflow:
+        """Load the existing workflow under its normal read permission."""
         try:
             if user is not None:
-                workflow = WorkflowService.get_workflow_for_user(
+                return WorkflowService.get_workflow_for_user(
                     workflow_id, user, write=False, prefetch_activities=False
                 )
-            else:
-                workflow = Workflow.objects.select_related('playbook').get(pk=workflow_id)
-        except ObjectDoesNotExist:
-            logger.error(f"Workflow {workflow_id} not found")
-            raise ObjectDoesNotExist(f"Workflow with ID {workflow_id} does not exist")
-        except PermissionError:
-            raise
-        
-        # Fetch activities with agent, skill, artifacts, and rules
-        activities = list(
-            workflow.activities.select_related('agent').prefetch_related('skills', 'rules')
-            .prefetch_related(
-                'output_artifacts',
-                'input_artifacts__artifact',
-                'rules',
-            )
-            .order_by('order')
-        )
-        logger.info(f"Found {len(activities)} activities in workflow '{workflow.name}'")
-        
-        if not folder_name:
-            folder_name = WorkflowExportService._slugify(workflow.name)
-        
-        export_path = Path(target_directory) / folder_name
+            return Workflow.objects.select_related("playbook").get(pk=workflow_id)
+        except ObjectDoesNotExist as exc:
+            raise ObjectDoesNotExist(
+                f"Workflow with ID {workflow_id} does not exist"
+            ) from exc
+
+    @staticmethod
+    def _write_workflow_export(bundle: dict, target: Path, trace: str) -> dict:
+        """Validate all workflow/rule files, write them, and return the legacy summary."""
+        completed = 0
         try:
-            export_path.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Created export directory: {export_path}")
-        except OSError as e:
-            logger.error(f"Failed to create directory {export_path}: {e}")
-            raise PermissionError(f"Cannot create directory {export_path}: {e}")
-        
-        files_created = []
-        
-        workflow_md = WorkflowExportService._generate_workflow_metadata_md(workflow, len(activities))
-        workflow_file = export_path / "_workflow.md"
-        workflow_file.write_text(workflow_md, encoding='utf-8')
-        files_created.append("_workflow.md")
-        logger.info("Created _workflow.md")
-        
-        slug_prefix = folder_name
-        for activity in activities:
-            filename, content = WorkflowExportService._generate_activity_md(
-                activity, activity.order, slug_prefix
+            destinations = WorkflowExportService._validate_export_destinations(
+                bundle, target
             )
-            activity_file = export_path / filename
-            activity_file.write_text(content, encoding='utf-8')
-            files_created.append(filename)
-            logger.info(f"Created {filename}")
-
-        rules_dir = None
-        rule_files = []
-        if not skip_rules:
-            rules_dir, rule_files = WorkflowExportService._export_rules_for_workflow(
-                activities, Path(target_directory)
+            logger.info(
+                "%s | validation | %s destination_count=%s",
+                _EXPORT_LOG,
+                trace,
+                len(destinations),
             )
-            files_created.extend(rule_files)
+            for root, relative, content, path in destinations:
+                if confined_export_path(root, relative) != path:
+                    raise ValueError("Export destination changed after validation.")
+                try:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                except OSError as exc:
+                    raise PermissionError(
+                        f"Cannot create directory {path.parent}: {exc}"
+                    ) from exc
+                path.write_text(content, encoding="utf-8")
+                completed += 1
+        except (ValueError, OSError) as exc:
+            reason = (
+                "invalid_destination"
+                if isinstance(exc, ValueError)
+                else "filesystem_failure"
+            )
+            logger.info(
+                "%s | error | %s reason=%s completed_file_count=%s receipt_sent=false",
+                _EXPORT_LOG,
+                trace,
+                reason,
+                completed,
+            )
+            raise
+        logger.info(
+            "%s | processing | %s file_count=%s files_written=true",
+            _EXPORT_LOG,
+            trace,
+            completed,
+        )
+        return WorkflowExportService._workflow_export_result(bundle, target)
 
-        rule_export_paths = [
-            str((rules_dir / Path(name).name).absolute())
-            for name in rule_files
-        ] if rules_dir else []
-        result = {
-            'status': 'exported',
-            'workflow_id': workflow_id,
-            'workflow_name': workflow.name,
-            'export_path': str(export_path.absolute()),
-            'rules_export_path': str(rules_dir.absolute()) if rules_dir else '',
-            'files_created': files_created,
-            'rule_files_created': rule_files,
-            'rule_export_paths': rule_export_paths,
-            'message': (
-                f'Workflow exported to {export_path.absolute()}.'
+    @staticmethod
+    def _workflow_export_result(bundle: dict, target: Path) -> dict:
+        """Preserve filenames, rule paths and the existing export response shape."""
+        export_path = target / bundle["folder_name"]
+        rule_files = [f"rules/{entry['filename']}" for entry in bundle["rule_files"]]
+        rules_dir = target.resolve().parent / "rules" if rule_files else None
+        rule_export_paths = (
+            [str(rules_dir / Path(name).name) for name in rule_files]
+            if rules_dir
+            else []
+        )
+        return {
+            "status": "exported",
+            "workflow_id": bundle["workflow_id"],
+            "workflow_name": bundle["workflow_name"],
+            "export_path": str(export_path),
+            "rules_export_path": str(rules_dir) if rules_dir else "",
+            "files_created": [entry["filename"] for entry in bundle["workflow_files"]]
+            + rule_files,
+            "rule_files_created": rule_files,
+            "rule_export_paths": rule_export_paths,
+            "message": (
+                f"Workflow exported to {export_path}."
                 + (
-                    f' {len(rule_export_paths)} linked rules were written to '
-                    f'{rules_dir.absolute()} ({", ".join(rule_files)}).'
-                    if rule_export_paths
-                    else ' No linked rules.'
+                    f" {len(rule_export_paths)} linked rules were written to "
+                    f'{rules_dir} ({", ".join(rule_files)}).'
+                    if rule_files
+                    else " No linked rules."
                 )
-                + ' Edit files locally and use import_workflow_from_local to apply changes.'
+                + " Edit files locally and use import_workflow_from_local to apply changes."
             ),
         }
-        
-        logger.info(f"Export completed: {len(files_created)} files created at {export_path}")
-        return result
 
     @staticmethod
     def generate_workflow_files(
         workflow_id: int,
-        folder_name: Optional[str] = None,
+        folder_name: str | None = None,
     ) -> dict:
         """
         Generate workflow export file contents without filesystem I/O.
@@ -147,14 +184,14 @@ class WorkflowExportService:
         :return: Dict with workflow_files and rule_files content lists
         :raises ObjectDoesNotExist: If workflow does not exist
         """
-        logger.info(f"Generating workflow files for workflow {workflow_id}")
+        workflow = WorkflowExportService._load_workflow(workflow_id, None)
+        return WorkflowExportService._workflow_bundle(workflow, folder_name)
 
-        try:
-            workflow = Workflow.objects.select_related("playbook").get(pk=workflow_id)
-        except ObjectDoesNotExist:
-            logger.error(f"Workflow {workflow_id} not found")
-            raise ObjectDoesNotExist(f"Workflow with ID {workflow_id} does not exist")
-
+    @staticmethod
+    def _workflow_bundle(
+        workflow: Workflow, folder_name: str | None, *, skip_rules: bool = False
+    ) -> dict:
+        """Generate one consistent workflow plan for the bundle and filesystem paths."""
         activities = list(
             workflow.activities.select_related("agent")
             .prefetch_related("skills", "rules")
@@ -183,30 +220,24 @@ class WorkflowExportService:
             )
             workflow_files.append({"filename": filename, "content": content})
 
-        rule_files = WorkflowExportService._generate_rule_files_for_workflow(activities)
-
-        result = {
-            "workflow_id": workflow_id,
+        rule_files = (
+            []
+            if skip_rules
+            else WorkflowExportService._generate_rule_files_for_workflow(activities)
+        )
+        return {
+            "workflow_id": workflow.pk,
             "workflow_name": workflow.name,
             "folder_name": folder_name,
             "workflow_files": workflow_files,
             "rule_files": rule_files,
         }
-        logger.info(
-            "Generated %s workflow files and %s rule files for workflow %s",
-            len(workflow_files),
-            len(rule_files),
-            workflow_id,
-        )
-        return result
 
     @staticmethod
     def _generate_workflow_metadata_md(workflow, activity_count: int) -> str:
         """Generate _workflow.md content with metadata."""
-        from datetime import datetime
-
         playbook = workflow.playbook
-        export_date = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        export_date = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
         has_phases = any(a.phase_id for a in workflow.activities.all())
         phase_info = "Uses phases" if has_phases else "No phase organization"
 
@@ -355,46 +386,6 @@ No additional notes.
         return filename, content
 
     @staticmethod
-    def _export_rules_for_workflow(activities, workflows_root: Path):
-        """
-        Write distinct playbook rules referenced by activities into sibling ``rules/`` folder.
-
-        :returns: Tuple of (rules directory Path or None, list of relative paths created)
-        """
-        seen = {}
-        for activity in activities:
-            for rule in activity.rules.all():
-                seen[rule.id] = rule
-        if not seen:
-            logger.info("No rules linked to workflow activities; skipping rules export")
-            return None, []
-
-        try:
-            rules_parent = workflows_root.resolve().parent
-        except OSError:
-            rules_parent = workflows_root.parent
-        rules_dir = rules_parent / "rules"
-        try:
-            rules_dir.mkdir(parents=True, exist_ok=True)
-        except OSError as e:
-            logger.error("Failed to create rules directory %s: %s", rules_dir, e)
-            raise PermissionError(
-                f"Cannot create rules directory {rules_dir}: {e}"
-            ) from e
-
-        rel_created = []
-        for rule in sorted(seen.values(), key=lambda r: r.slug):
-            fname = f"{rule.slug}.mdc"
-            body = WorkflowExportService._format_rule_mdc(rule)
-            out = rules_dir / fname
-            out.write_text(body, encoding="utf-8")
-            rel = f"rules/{fname}"
-            rel_created.append(rel)
-            logger.info("Exported rule file %s", out)
-
-        return rules_dir, rel_created
-
-    @staticmethod
     def _generate_rule_files_for_workflow(activities) -> list:
         """
         Build rule file contents for activities without filesystem I/O.
@@ -439,37 +430,84 @@ No additional notes.
 
     @staticmethod
     def _validate_export_destinations(
-        workflow_id: int,
-        target_directory: str,
-        folder_name: str | None,
-        skip_rules: bool,
-    ) -> tuple[Path, ...]:
-        """Preflight actual legacy workflow and linked-rule destinations.
+        bundle: dict, target: Path
+    ) -> tuple[tuple[Path, str, str, Path], ...]:
+        """Preflight this workflow bundle and every requested linked-rule destination.
 
-        Use existing non-awarding generation and shared confinement guard.
-
-        :param workflow_id: Authorized workflow ID. Example: 6202.
-        :param target_directory: Explicit base root. Example: "/tmp/export".
-        :param folder_name: Optional relative name. Example: "BPE".
-        :param skip_rules: Preserve rule-export option. Example: False.
-        :return: Confined destinations. Example: (Path("/tmp/export/BPE/a.md"),).
-        :raises ValueError: If any destination escapes an approved root.
+        :param bundle: Existing authorized export content. Example: a workflow bundle.
+        :param target: Explicit base. Example: Path("/tmp/workflows").
+        :return: Ordered immutable file writes and their validated absolute paths.
+        :raises ValueError: If any destination escapes its approved root.
         """
-        raise NotImplementedError()
+        folder = bundle["folder_name"]
+        export_root = confined_export_path(target, folder)
+        writes = []
+        for entry in bundle["workflow_files"]:
+            name = entry["filename"]
+            confined_export_path(export_root, name)
+            writes.append((target, str(Path(folder) / name), entry["content"]))
+        if bundle["rule_files"]:
+            parent = target.resolve().parent
+            rules_root = parent / "rules"
+            if confined_export_path(parent, "rules") != rules_root:
+                raise ValueError(
+                    "Linked rules directory must remain a sibling of workflows."
+                )
+            writes.extend(
+                (rules_root, entry["filename"], entry["content"])
+                for entry in bundle["rule_files"]
+            )
+        approved = validate_export_destinations(
+            [(root, relative) for root, relative, _ in writes]
+        )
+        return tuple(
+            (*write, path) for write, path in zip(writes, approved, strict=True)
+        )
 
     @staticmethod
     def _record_completed_export(
-        *, user: User | None, workflow_id: int, event_identity: UUID
+        *, user: User | AnonymousUser | None, workflow_id: int, event_identity: UUID
     ) -> None:
         """Delegate a successful authenticated workflow export to S36.
-
-        Called once after every requested file succeeds; user=None awards none.
 
         :param user: Existing service actor. Example: Maria, or None.
         :param workflow_id: Exported workflow ID. Example: 6202.
         :param event_identity: Single invocation UUID. Example: UUID(int=42).
-        :return: None after shared domain decision. Example: None.
+        :return: None after shared domain decision.
         :raises PermissionError: If domain revalidation rejects the actor.
         :raises ValueError: If event identity or entity is invalid.
         """
-        raise NotImplementedError()
+        trace = (
+            f"operation_uuid={event_identity} entity_type=workflow entity_id={workflow_id}"
+            f" actor_id={getattr(user, 'pk', None)} channel=export"
+        )
+        try:
+            outcomes = (
+                KarmaService.award_successful_consumption(
+                    user, "workflow", workflow_id, event_identity, channel="export"
+                )
+                if user is not None
+                else ()
+            )
+        except (
+            ObjectDoesNotExist,
+            PermissionError,
+            ValueError,
+            ValidationError,
+            DatabaseError,
+        ):
+            logger.info(
+                "%s | error | %s files_written=true receipt_status=failed",
+                _EXPORT_LOG,
+                trace,
+            )
+            raise
+        created = sum(row.created for row in outcomes)
+        status = "awarded" if created else ("idempotent" if outcomes else "ineligible")
+        logger.info(
+            "%s | exit | %s outcome=%s created_count=%s",
+            _EXPORT_LOG,
+            trace,
+            status,
+            created,
+        )

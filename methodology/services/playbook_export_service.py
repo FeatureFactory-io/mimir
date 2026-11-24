@@ -2,21 +2,23 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from uuid import UUID
-    from django.contrib.auth.models import User
-
 import logging
 import re
-from datetime import datetime
+from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
+from uuid import UUID, uuid4
 
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db import DatabaseError
 
+from mcp_integration.facade.export_paths import (
+    confined_export_path,
+    validate_export_destinations,
+)
 from methodology.models import Agent, Artifact, Playbook, Rule, Skill, Workflow
+from methodology.services.karma_service import KarmaService
 from methodology.services.playbook_service import PlaybookService
 from methodology.services.rule_export_formatters import (
     build_ade_rule_files,
@@ -26,7 +28,11 @@ from methodology.services.rule_export_formatters import (
 )
 from methodology.services.workflow_export_service import WorkflowExportService
 
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AnonymousUser, User
+
 logger = logging.getLogger(__name__)
+_EXPORT_LOG = "PlaybookExportService.export_playbook_to_local"
 
 
 class PlaybookExportService:
@@ -36,124 +42,145 @@ class PlaybookExportService:
     def export_playbook_to_local(
         playbook_id: int,
         target_directory: str,
-        folder_name: Optional[str] = None,
-        additional_targets: Optional[list[str]] = None,
+        folder_name: str | None = None,
+        additional_targets: list[str] | None = None,
         sync_root_rules: bool = False,
-        ade_targets: Optional[list[str]] = None,
+        ade_targets: list[str] | None = None,
         force_apply: bool = False,
-        ade_target: Optional[str] = None,
-        user=None,
+        ade_target: str | None = None,
+        user: User | AnonymousUser | None = None,
     ) -> dict:
-        """
-        Export a playbook and all nested entities to markdown under ``target_directory``.
+        """Export a playbook tree and any requested IDE rule copies.
 
-        :param playbook_id: Playbook primary key
-        :param target_directory: Base directory (e.g. ``.cursor/playbooks``)
-        :param folder_name: Playbook folder name (defaults to slugified playbook name)
-        :param additional_targets: Optional extra roots receiving a copy of the tree
-        :param sync_root_rules: Copy apply-on rules to ADE load paths from ``ade_targets``
-        :param ade_targets: ADE keys (cursor, devin, claude, copilot); ≥1 when sync/force
-        :param force_apply: Apply-on frontmatter for ADE copies even when DB flag is false
-        :param ade_target: Singular alias normalized into ``ade_targets``
-        :param user: Authenticated user for read permission checks
-        :return: Summary dict with counts and file paths
+        :param playbook_id: Existing playbook ID. Example: 6201.
+        :param target_directory: Approved local base. Example: ".cursor/playbooks".
+        :param folder_name: Relative output folder. Example: "Cedar".
+        :param additional_targets: Extra roots for copies of the canonical tree.
+        :param sync_root_rules: Also write apply-on rules to the requested ADE paths.
+        :param ade_targets: ADE keys. Example: ["cursor", "devin"].
+        :param force_apply: Force apply-on for ADE copies while retaining canonical flags.
+        :param ade_target: Singular alias for an ADE target. Example: "cursor".
+        :param user: Existing read actor, or None for non-awarding export.
+        :return: Existing summary with export paths, counts and ADE content.
+        :raises PermissionError: If the actor cannot read the playbook.
+        :raises ValueError: If export options or destinations are invalid.
+        :raises OSError: If a filesystem operation fails.
         """
+        operation = uuid4()
+        trace = (
+            f"operation_uuid={operation} entity_type=playbook entity_id={playbook_id}"
+            f" actor_id={getattr(user, 'pk', None)}"
+        )
+        service = PlaybookExportService
+        bundle = service._prepare_export_bundle(
+            playbook_id,
+            folder_name,
+            sync_root_rules,
+            ade_targets,
+            force_apply,
+            ade_target,
+            user,
+            trace,
+        )
+        targets = tuple(
+            Path(path).absolute()
+            for path in [target_directory, *(additional_targets or [])]
+        )
+        result = service._write_bundle_to_disk(bundle, targets, sync_root_rules, trace)
+        service._record_completed_export(
+            user=user,
+            playbook_id=bundle["playbook_id"],
+            event_identity=operation,
+            ade_files=len(result["ade_rule_files"]),
+            inline=bool(result["inline_rules_markdown"]),
+        )
+        return result
+
+    @staticmethod
+    def _prepare_export_bundle(
+        playbook_id: int,
+        folder_name: str | None,
+        sync_root_rules: bool,
+        ade_targets: list[str] | None,
+        force_apply: bool,
+        ade_target: str | None,
+        user: User | AnonymousUser | None,
+        trace: str,
+    ) -> dict:
+        """Validate ADE options and generate content through the existing read boundary."""
         try:
-            normalized_targets = validate_ade_export_params(
+            normalized = validate_ade_export_params(
                 ade_targets=ade_targets,
                 sync_root_rules=sync_root_rules,
                 force_apply=force_apply,
                 ade_target=ade_target,
             )
-        except ValueError as exc:
+        except ValueError:
+            reason = (
+                "ade_targets required"
+                if not (ade_target or ade_targets)
+                else "invalid ADE options"
+            )
             logger.error(
-                "PlaybookExportService.export_playbook_to_local | error | "
-                "ade_targets required | %s",
-                exc,
+                "%s | error | %s reason=%s completed_file_count=0 receipt_sent=false",
+                _EXPORT_LOG,
+                trace,
+                reason,
             )
             raise
-        ade_targets_str = ",".join(normalized_targets) if normalized_targets else ""
         logger.info(
-            "PlaybookExportService.export_playbook_to_local | entry | "
-            "playbook_id=%s target=%s folder=%s sync_root_rules=%s "
-            "ade_targets=%s force_apply=%s",
-            playbook_id,
-            target_directory,
-            folder_name,
+            "%s | entry | %s sync_root_rules=%s ade_targets=%s force_apply=%s",
+            _EXPORT_LOG,
+            trace,
             sync_root_rules,
-            ade_targets_str,
+            ",".join(normalized),
             force_apply,
         )
-        bundle = PlaybookExportService.generate_playbook_export_bundle(
-            playbook_id=playbook_id,
-            folder_name=folder_name,
-            ade_targets=normalized_targets,
-            force_apply=force_apply,
-            user=user,
-        )
-        targets = [target_directory] + list(additional_targets or [])
-        export_paths = []
-        all_files: list[str] = []
-
-        for target in targets:
-            export_root = Path(target) / bundle["folder_name"]
-            export_root.mkdir(parents=True, exist_ok=True)
-            files_written = PlaybookExportService._write_bundle_to_disk(
-                bundle, export_root
-            )
-            export_paths.append(str(export_root.absolute()))
-            all_files.extend(files_written)
-            logger.info(
-                "Playbook export wrote playbook_id=%s path=%s files=%s",
-                playbook_id,
-                export_root,
-                len(files_written),
-            )
-
-        if sync_root_rules:
-            PlaybookExportService._sync_ade_root_rules(
-                bundle,
-                Path(target_directory),
+        try:
+            return PlaybookExportService.generate_playbook_export_bundle(
+                playbook_id=playbook_id,
+                folder_name=folder_name,
+                ade_targets=normalized,
                 force_apply=force_apply,
+                user=user,
             )
+        except (ObjectDoesNotExist, PermissionError):
+            logger.info(
+                "%s | error | %s reason=unavailable completed_file_count=0 receipt_sent=false",
+                _EXPORT_LOG,
+                trace,
+            )
+            raise
 
-        inline_md = bundle.get("inline_rules_markdown") or ""
-        ade_files = bundle.get("ade_rule_files") or []
-        result = {
+    @staticmethod
+    def _playbook_export_result(
+        bundle: dict, targets: tuple[Path, ...], files: list[str]
+    ) -> dict:
+        """Return the existing canonical/mirror summary without counting ADE copies twice."""
+        return {
             "status": "exported",
             "playbook_id": bundle["playbook_id"],
             "playbook_name": bundle["playbook_name"],
-            "export_paths": export_paths,
+            "export_paths": [str(target / bundle["folder_name"]) for target in targets],
             "workflows": bundle["counts"]["workflows"],
             "activities": bundle["counts"]["activities"],
             "rules": bundle["counts"]["rules"],
             "skills": bundle["counts"]["skills"],
             "agents": bundle["counts"]["agents"],
             "artifacts": bundle["counts"]["artifacts"],
-            "files_created": all_files,
-            "ade_rule_files": ade_files,
-            "inline_rules_markdown": inline_md,
+            "files_created": files,
+            "ade_rule_files": bundle.get("ade_rule_files") or [],
+            "inline_rules_markdown": bundle.get("inline_rules_markdown") or "",
             "message": "Playbook exported successfully.",
         }
-        logger.info(
-            "PlaybookExportService.export_playbook_to_local | exit | "
-            "playbook_id=%s workflows=%s rules=%s files=%s ade_files=%s inline=%s",
-            playbook_id,
-            result["workflows"],
-            result["rules"],
-            len(all_files),
-            len(ade_files),
-            bool(inline_md),
-        )
-        return result
 
     @staticmethod
     def generate_playbook_export_bundle(
         playbook_id: int,
-        folder_name: Optional[str] = None,
-        ade_targets: Optional[list[str]] = None,
+        folder_name: str | None = None,
+        ade_targets: list[str] | None = None,
         force_apply: bool = False,
-        ade_target: Optional[str] = None,
+        ade_target: str | None = None,
         sync_root_rules: bool = False,
         user=None,
     ) -> dict:
@@ -292,31 +319,69 @@ class PlaybookExportService:
             raise PermissionError(f"Cannot read playbook {playbook_id}") from None
 
     @staticmethod
-    def _write_bundle_to_disk(bundle: dict, export_root: Path) -> list[str]:
-        written: list[str] = []
+    def _write_bundle_to_disk(
+        bundle: dict, targets: tuple[Path, ...], sync_root_rules: bool, trace: str
+    ) -> dict:
+        """Write the planned files after preflight and report their legacy result."""
+        completed = 0
+        files: list[str] = []
+        try:
+            destinations = PlaybookExportService._validate_export_destinations(
+                bundle=bundle,
+                targets=targets,
+                sync_root_rules=sync_root_rules,
+            )
+            logger.info(
+                "%s | validation | %s destination_count=%s",
+                _EXPORT_LOG,
+                trace,
+                len(destinations),
+            )
+            for root, relative, content, summary_name, path in destinations:
+                if confined_export_path(root, relative) != path:
+                    raise ValueError("Export destination changed after validation.")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+                completed += 1
+                if summary_name is not None:
+                    files.append(summary_name)
+        except (ValueError, OSError) as exc:
+            reason = (
+                "invalid_destination"
+                if isinstance(exc, ValueError)
+                else "filesystem_failure"
+            )
+            logger.info(
+                "%s | error | %s reason=%s completed_file_count=%s receipt_sent=false",
+                _EXPORT_LOG,
+                trace,
+                reason,
+                completed,
+            )
+            raise
+        logger.info(
+            "%s | processing | %s file_count=%s files_written=true",
+            _EXPORT_LOG,
+            trace,
+            completed,
+        )
+        return PlaybookExportService._playbook_export_result(bundle, targets, files)
 
-        def _write(rel_dir: str, filename: str, content: str) -> None:
-            folder = export_root / rel_dir if rel_dir else export_root
-            folder.mkdir(parents=True, exist_ok=True)
-            path = folder / filename
-            path.write_text(content, encoding="utf-8")
-            rel = f"{rel_dir}/{filename}" if rel_dir else filename
-            written.append(rel)
-            logger.info("Playbook export file %s", path)
-
-        _write("", bundle["playbook_md"]["filename"], bundle["playbook_md"]["content"])
-        for rule in bundle["rule_files"]:
-            _write("rules", rule["filename"], rule["content"])
-        for agent in bundle["agent_files"]:
-            _write("agents", agent["filename"], agent["content"])
-        for skill in bundle["skill_files"]:
-            _write("skills", skill["filename"], skill["content"])
-        for artifact in bundle["artifact_files"]:
-            _write("artifacts", artifact["filename"], artifact["content"])
-        for wf in bundle["workflows"]:
-            for wf_file in wf["workflow_files"]:
-                _write(wf["folder_name"], wf_file["filename"], wf_file["content"])
-        return written
+    @staticmethod
+    def _bundle_files(bundle: dict) -> Iterator[tuple[str, dict[str, str]]]:
+        """Enumerate the canonical bundle in its established write order."""
+        yield "", bundle["playbook_md"]
+        for folder, key in (
+            ("rules", "rule_files"),
+            ("agents", "agent_files"),
+            ("skills", "skill_files"),
+            ("artifacts", "artifact_files"),
+        ):
+            for entry in bundle[key]:
+                yield folder, entry
+        for workflow in bundle["workflows"]:
+            for entry in workflow["workflow_files"]:
+                yield workflow["folder_name"], entry
 
     @staticmethod
     def _resolve_dev_root(target_directory: Path) -> Path:
@@ -327,26 +392,8 @@ class PlaybookExportService:
         return resolved.parent
 
     @staticmethod
-    def _sync_ade_root_rules(
-        bundle: dict, target_directory: Path, *, force_apply: bool = False
-    ) -> None:
-        dev_root = PlaybookExportService._resolve_dev_root(target_directory)
-        for entry in bundle.get("ade_rule_files") or []:
-            rel = entry["path"]
-            dest = dev_root / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(entry["content"], encoding="utf-8")
-            logger.info(
-                "PlaybookExportService._sync_ade_root_rules | processing | "
-                "path=%s slug=%s force_apply=%s",
-                rel,
-                entry.get("slug"),
-                force_apply,
-            )
-
-    @staticmethod
     def _generate_playbook_md(playbook, workflows, activity_count: int) -> str:
-        export_date = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        export_date = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
         wf_lines = (
             "\n".join(f"- **{wf.name}** (order {wf.order})" for wf in workflows)
             or "- _(no workflows)_"
@@ -409,36 +456,102 @@ class PlaybookExportService:
 
     @staticmethod
     def _validate_export_destinations(
-        *,
-        bundle: dict[str, object],
-        target_directory: str,
-        additional_targets: list[str] | None,
-        sync_root_rules: bool,
-    ) -> tuple[Path, ...]:
+        *, bundle: dict, targets: tuple[Path, ...], sync_root_rules: bool
+    ) -> tuple[tuple[Path, str, str, str | None, Path], ...]:
         """Preflight canonical, mirror and ADE paths for a legacy export.
 
-        :param bundle: Existing generated bundle. Example: {"folder_name": "Edda"}.
-        :param target_directory: Explicit base. Example: "/tmp/playbooks".
-        :param additional_targets: Extra approved roots. Example: ["/tmp/mirror"].
-        :param sync_root_rules: Include ADE copies. Example: True.
-        :return: All confined destinations. Example: (Path("/tmp/Edda/a.md"),).
+        :param bundle: Generated playbook bundle with paths and contents.
+        :param targets: Canonical target followed by explicitly approved mirror roots.
+        :param sync_root_rules: Include requested ADE copies. Example: True.
+        :return: Ordered immutable writes, summary names and validated absolute paths.
         :raises ValueError: If any requested destination escapes its root.
         """
-        raise NotImplementedError()
+        folder = bundle["folder_name"]
+        files = tuple(PlaybookExportService._bundle_files(bundle))
+        writes = []
+        for target in targets:
+            export_root = confined_export_path(target, folder)
+            for directory, entry in files:
+                file_root = (
+                    confined_export_path(export_root, directory)
+                    if directory
+                    else export_root
+                )
+                confined_export_path(file_root, entry["filename"])
+                name = (
+                    f"{directory}/{entry['filename']}"
+                    if directory
+                    else entry["filename"]
+                )
+                writes.append(
+                    (target, str(Path(folder) / name), entry["content"], name)
+                )
+        if sync_root_rules and bundle["ade_rule_files"]:
+            dev_root = PlaybookExportService._resolve_dev_root(targets[0])
+            writes.extend(
+                (dev_root, entry["path"], entry["content"], None)
+                for entry in bundle["ade_rule_files"]
+            )
+        approved = validate_export_destinations(
+            [(root, relative) for root, relative, _, _ in writes]
+        )
+        return tuple(
+            (*write, path) for write, path in zip(writes, approved, strict=True)
+        )
 
     @staticmethod
     def _record_completed_export(
-        *, user: User | None, playbook_id: int, event_identity: UUID
+        *,
+        user: User | AnonymousUser | None,
+        playbook_id: int,
+        event_identity: UUID,
+        ade_files: int,
+        inline: bool,
     ) -> None:
         """Delegate one fully successful authenticated playbook export to S36.
-
-        Nested workflows, canonical files and mirrors share this one event.
 
         :param user: Existing service actor. Example: Maria, or None.
         :param playbook_id: Source playbook ID. Example: 6201.
         :param event_identity: Single invocation UUID. Example: UUID(int=42).
-        :return: None after shared domain decision. Example: None.
+        :param ade_files: Count of formatted ADE file entries. Example: 1.
+        :param inline: Whether an inline rule section was generated. Example: False.
+        :return: None after shared domain decision.
         :raises PermissionError: If domain revalidation rejects the actor.
         :raises ValueError: If event identity or entity is invalid.
         """
-        raise NotImplementedError()
+        trace = (
+            f"operation_uuid={event_identity} entity_type=playbook entity_id={playbook_id}"
+            f" actor_id={getattr(user, 'pk', None)} channel=export"
+        )
+        try:
+            outcomes = (
+                KarmaService.award_successful_consumption(
+                    user, "playbook", playbook_id, event_identity, channel="export"
+                )
+                if user is not None
+                else ()
+            )
+        except (
+            ObjectDoesNotExist,
+            PermissionError,
+            ValueError,
+            ValidationError,
+            DatabaseError,
+        ):
+            logger.info(
+                "%s | error | %s files_written=true receipt_status=failed",
+                _EXPORT_LOG,
+                trace,
+            )
+            raise
+        created = sum(row.created for row in outcomes)
+        status = "awarded" if created else ("idempotent" if outcomes else "ineligible")
+        logger.info(
+            "%s | exit | %s outcome=%s created_count=%s ade_files=%s inline=%s",
+            _EXPORT_LOG,
+            trace,
+            status,
+            created,
+            ade_files,
+            inline,
+        )
