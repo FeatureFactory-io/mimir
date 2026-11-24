@@ -876,3 +876,14 @@ Beforeadditionalvoice/renderwork rootupdatesScene17'sscript/timing toincludethea
 ## Rejection feedback made a mandatory regression
 
 FreshS32viewownerdee2114addsnewstrictCSRF3-casefeedbackregressionandminimalexistingviewbranch. Actualoldred1rejectedfail/2acceptpartialpass retainswrongmessage; current3pass plusS35backend7/log6/admin12/fullS32backend61/AT1/browser1/log2 passonexact1990blobarchive. Parentregisters3newcasesinS35-backend (now10positive) andbothS32/S35testfootprints/plans; S35N4mustindependentlyreviewviewrepairandall10cases. FiveinheritedviewRuffcodesremainqualified, nofalseglobalLintpass. This isexisting49-contractcorrectness, no newdomainfeature/permission/productionpromotion.
+
+
+## S35 COMPLETE — nonaccepted proposals and truthful rejection feedback
+
+Fresh readonly N4 certifies exact340b4f3, all1990trackedblobs unchanged/zerooverlays. Canonical backend10/AT1/log6, original1scenario3steps, harness1/3 and37compatibilitychecks pass. Independent actualledger+1 andversion2.1 controls each fail finalunchangedThen aftertwo passing steps. Reproduced originalrejectionfeedback1fail/acceptedpartial2pass; mandatorycurrent3cases pass. All29ownedfunctions typed/Sphinx/max30;15unrelatedstepASTs and63shareddata definitions preserved. Five inheritedviewRufffindings qualified; full83AT/globalRufflint/staging/UAT/release/film remainpending. Verdict planning/MIN-S35-N4-independent-20261124/verification.json. Forty-three of49contracts accepted; S34unblocked.
+
+S41N2 a27a3c5 passesgenericAT1,wrapper1,N1filtered44,logs2,S39compatibility2,harness1/3, actualoriginalscenario1/4executedsteps includingBackground. The originalplan's3-step expectation was stale and failed honestly; sourcefeature unchanged. Rootcorrects N4success_requires inplan/manifest to4 includingBackground. Two realafterWhen unrelatedcategory/summary mutations failThen whiletotalsunchanged. FreshN3ownsoriginalstdio18 plusonlyexisting run_collection_stdio plannedsharedstub; allunusedsharedstubs/S39ASTs preserved.
+
+S40N1 functional22 and13actualcontent/ledgernegativecontrols pass, while11selectedlogcases exposemissingexistingserviceentry/zeroexit. FreshS36log-onlyowner repairsownservicefootprint plusdedicatedtest andexistingexactS38log expectation; reason=self_consumption remainswirecompatible, exclusion_role self_author/self_creator andactualpip_creator_id addroleobservability. No domain/API/permission/ledgerbehaviorchange. RootregistersdedicatedtestinS36backend/log, reconcilesfootprints andmarksS40inprogress. FreshS40N4 reviewsfollow-up.
+
+S41N3 sharedrun_collection_stdio helper extraction _assert_collection_stdio_boundary approved, preserving exactfacadeGET/legacyzeroHTTP/no detailreceiptsummary checks and30linebound. Scene17Page57/localHTMLprecisecamerashots updatedbeforeencoding65.42s withoriginalallsevenassets+sixsecondNoor/Elenaestablishing/foursecondexplicitreadinghold,60.72sAidenv4checkedvoice. NoexpandedjoinedcutclaimbeforeQA.

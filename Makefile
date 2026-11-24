@@ -997,7 +997,7 @@ test-experts-s35:
 
 .PHONY: test-experts-s36-backend
 test-experts-s36-backend:
-	$(PYTHON) -m pytest tests/integration/test_karma_copy.py::test_award_successful_consumption_with_other_author_creates_atomic_pair tests/integration/test_karma_copy.py::test_copy_receipt_with_authenticated_authorized_activity_credits_both tests/integration/test_karma_copy.py::test_copy_receipt_with_render_only_creates_no_awards tests/integration/test_karma_copy.py::test_copy_receipt_with_forbidden_fields_rejects_request tests/integration/test_karma_copy.py::test_copy_receipt_with_unauthorized_entity_creates_no_awards tests/integration/test_karma_copy.py::test_copy_receipt_with_missing_csrf_rejects_request tests/integration/test_karma_copy.py::test_copy_receipt_log_story_happy tests/integration/test_karma_copy.py::test_copy_receipt_log_story_reject -x
+	$(PYTHON) -m pytest tests/integration/test_karma_copy.py::test_award_successful_consumption_with_other_author_creates_atomic_pair tests/integration/test_karma_copy.py::test_copy_receipt_with_authenticated_authorized_activity_credits_both tests/integration/test_karma_copy.py::test_copy_receipt_with_render_only_creates_no_awards tests/integration/test_karma_copy.py::test_copy_receipt_with_forbidden_fields_rejects_request tests/integration/test_karma_copy.py::test_copy_receipt_with_unauthorized_entity_creates_no_awards tests/integration/test_karma_copy.py::test_copy_receipt_with_missing_csrf_rejects_request tests/integration/test_karma_copy.py::test_copy_receipt_log_story_happy tests/integration/test_karma_copy.py::test_copy_receipt_log_story_reject tests/integration/test_karma_consumption_log_completion.py -x
 
 .PHONY: test-experts-s36-browser
 test-experts-s36-browser:
@@ -1005,7 +1005,7 @@ test-experts-s36-browser:
 
 .PHONY: test-experts-s36-log
 test-experts-s36-log:
-	$(PYTHON) -m pytest tests/integration/test_karma_copy.py::test_copy_receipt_log_story_happy tests/integration/test_karma_copy.py::test_copy_receipt_log_story_reject -x
+	$(PYTHON) -m pytest tests/integration/test_karma_copy.py::test_copy_receipt_log_story_happy tests/integration/test_karma_copy.py::test_copy_receipt_log_story_reject tests/integration/test_karma_consumption_log_completion.py -x
 
 .PHONY: test-experts-s36-server
 test-experts-s36-server:

@@ -4255,6 +4255,7 @@ scenarios:
     skeleton_commit: 4d1cda411e711635805a07af8abcdd38ea014720
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/integration/test_karma_consumption_log_completion.py
     - docs/features/steps/experts_steps.py
     - tests/integration/test_experts_acceptance_runner.py
     - tests/support/experts_acceptance.py
@@ -8128,7 +8129,7 @@ scenarios:
       scenario_dependencies:
       - S32
     implementation_plan: docs/plans/iterations/experts/S35-karma-pip-04.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S32
@@ -8398,7 +8399,7 @@ scenarios:
       beat: branch
       trigger: Ordinary self-content or PIP self-case
       must_include:
-      - correct actor/author/creator IDs; `self_author` or `self_creator` reason
+      - correct actor/author/pip_creator IDs; `reason=self_consumption` with `exclusion_role=self_author` or `self_creator`
     - where: Same
       beat: exit
       trigger: Excluded consumption completes
@@ -8506,7 +8507,7 @@ scenarios:
       scenario_dependencies:
       - S39
     implementation_plan: docs/plans/iterations/experts/S40-karma-mcp-03.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S39
@@ -8635,6 +8636,7 @@ scenarios:
         - S41-N2-acceptance
         footprint:
         - tests/integration/test_karma_mcp_collections.py
+        - tests/support/karma_mcp.py
         gate:
           command: pytest tests/integration/test_karma_mcp_collections.py -k stdio_entrypoint -x
         guidance_bundle:
@@ -8662,7 +8664,7 @@ scenarios:
           - do-github-issues
         success_requires:
         - all_parameterized_cases_pass
-        - exact_AT_1_scenario_3_steps
+        - exact_AT_1_scenario_4_steps_including_Background
         - both_stdio_surfaces
         - log_story_pass
         title: Certify the complete collection contract

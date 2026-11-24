@@ -65,7 +65,7 @@ Use playbook 6201/workflow 6202/activity 6203 and S39’s real supplementary ent
 | `test_collection_with_empty_or_denied_scope_preserves_awards` — 3 cases × 2 entrypoints | Legitimate empty filter, unavailable parent, existing private/PIP restriction: preserve existing error/empty semantics; no private payload; unchanged invariants. |
 | `test_collection_with_stdio_entrypoint_preserves_protocol_and_state` — T3, 9 tools × 2 entrypoints | Actual facade/legacy subprocess initialize→tools/list→tools/call; clean JSON-RPC; actual metadata; unchanged isolated DB snapshots. |
 | `test_collection_log_story_happy` — 2 entrypoints | Existing list entry log; legacy activity-return log; no detail-wrapper/receipt/award/summary entry beats; no credentials in captured listing records. |
-| `test_collection_with_exact_acceptance_executes_one_contract` | Run only exact KARMA-MCP-02 using scoped real Behave runner; assert success, **one executed scenario and three executed steps**, no skips/undefined steps. |
+| `test_collection_with_exact_acceptance_executes_one_contract` | Run only exact KARMA-MCP-02 using scoped real Behave runner; assert success, **one executed scenario and four executed steps (one Background plus three scenario steps)**, no skips/undefined steps. |
 
 Global snapshots compare **all** KarmaAward rows and fields, total row count, every recipient total/category/source projection, and specifically global `learning`/`consumption` rows. Comparing only Maria/Mike totals is insufficient.
 
@@ -164,6 +164,7 @@ feature_execution_graph:
     - S41-N2-acceptance
     footprint:
     - tests/integration/test_karma_mcp_collections.py
+    - tests/support/karma_mcp.py
     gate:
       command: pytest tests/integration/test_karma_mcp_collections.py -k stdio_entrypoint -x
     guidance_bundle:
@@ -191,7 +192,7 @@ feature_execution_graph:
       - do-github-issues
     success_requires:
     - all_parameterized_cases_pass
-    - exact_AT_1_scenario_3_steps
+    - exact_AT_1_scenario_4_steps_including_Background
     - both_stdio_surfaces
     - log_story_pass
     title: Certify the complete collection contract

@@ -114,7 +114,7 @@ S40 asserts existing upstream-owned beats; it adds no production logging impleme
 |---|---|---|---|
 | `KarmaService.award_successful_consumption` | entry | Valid authenticated detail receipt | actor ID, entity kind/ID, stable identity, `channel=mcp_detail` |
 | Same | validation | Existing entity permission passes | actor ID, target playbook ID, authorized result |
-| Same | branch | Ordinary self-content or PIP self-case | correct actor/author/creator IDs; `self_author` or `self_creator` reason |
+| Same | branch | Ordinary self-content or PIP self-case | correct actor/author/pip_creator IDs; `reason=self_consumption` with `exclusion_role=self_author` or `self_creator` |
 | Same | exit | Excluded consumption completes | `created_count=0`, exclusion reason, stable identity |
 | Read/receipt boundary | error | Unauthorized PIP or forbidden actor input | safe denial/validation reason, zero awards, no private content |
 
@@ -252,3 +252,8 @@ Existing permission and self-consumption are separate decisions: creator-or-staf
 `docs/experts-replay/pin-evidence/S40.json`, `docs/features/steps/experts_mcp_self_steps.py`, `docs/plans/iterations/experts/S40-karma-mcp-03.md`, `tests/integration/test_karma_mcp_self_fetch.py`, `tests/support/experts_mcp_self.py`
 
 Skeleton: `a40a1d0a34cbce76db9404f465a514d84086d20a`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.
+
+
+## Upstream log completion
+
+The S36 owner supplies service entry and excluded zero-result exit. Existing wire and branch reason `self_consumption` remains compatible; the added safe `exclusion_role` distinguishes `self_author` from `self_creator`, with author precedence if both apply. Actual `author_id` and `pip_creator_id` identify relationships. No eligibility, return value, receipt JSON, permissions or ledger writer changes. Dedicated real-DB log cases are mandatory in S36 backend/log gates; S40 independent DoD reviews this follow-up too.
