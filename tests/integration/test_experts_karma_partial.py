@@ -14,6 +14,7 @@ from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core import mail
+from django.db import connection, transaction
 from django.db.models import Sum
 from django.http import HttpResponse
 from django.test import Client
@@ -52,6 +53,7 @@ _PIP_DECISION_FIELDS = frozenset(
 )
 _PARTIAL_NOTE = "Accepted ADD only; preserve the existing recovery step"
 _MAJOR_POINTS = 500
+_ROLLBACK_SIGNAL = "S34 deliberate outer rollback"
 
 
 @dataclass(frozen=True)
@@ -110,7 +112,15 @@ def test_finalize_partial_with_outer_commit_sends_one_normal_notification() -> N
     :return: None. Example: no mail inside atomic; one normal email after exit.
     :raises AssertionError: Delivery timing, recipient, decisions or version differ.
     """
-    raise NotImplementedError()
+    dataset, pip, before = _partial_setup()
+    started = timezone.now()
+    with transaction.atomic():
+        PIPAdminService.finalize_pip(pip, dataset.users_by_username["mchen"])
+        _assert_partial_outcome(dataset, pip, before, started)
+        _assert_partial_notification_pending()
+    assert not connection.in_atomic_block and not connection.run_on_commit
+    _assert_partial_outcome(dataset, pip, before, started)
+    _assert_partial_mail(pip)
 
 
 def test_finalize_partial_with_outer_rollback_preserves_baseline_and_sends_no_mail() -> (
@@ -121,7 +131,15 @@ def test_finalize_partial_with_outer_rollback_preserves_baseline_and_sends_no_ma
     :return: None. Example: reviewed fixture, Maria8200, target2.0, empty outbox.
     :raises AssertionError: Any rolled-back effect or notification survives.
     """
-    raise NotImplementedError()
+    dataset, pip, before = _partial_setup()
+    original = _partial_transaction_state()
+    started = timezone.now()
+    with pytest.raises(RuntimeError, match=_ROLLBACK_SIGNAL), transaction.atomic():
+        PIPAdminService.finalize_pip(pip, dataset.users_by_username["mchen"])
+        _assert_partial_outcome(dataset, pip, before, started)
+        _assert_partial_notification_pending()
+        raise RuntimeError(_ROLLBACK_SIGNAL)
+    _assert_partial_transaction_rolled_back(pip, before, original)
 
 
 def test_partial_decision_log_story_happy(caplog: LogCaptureFixture) -> None:
@@ -686,3 +704,83 @@ def _assert_partial_fixture_changes(pip: ProcessImprovementProposal) -> None:
         name=changes[0].name, workflow__playbook=book
     ).exists()
     assert not pip.playbook_versions.exists()
+
+
+def _partial_setup() -> tuple[CedarDataset, ProcessImprovementProposal, PartialState]:
+    """Save real mixed choices before the independently owned outer transaction.
+
+    :return: Restored data, reviewed PIP and before state. Example: Maria8200, ADD accept.
+    :raises AssertionError: If fixture, autocommit, callbacks or original mail differ.
+    """
+    assert not connection.in_atomic_block and not connection.run_on_commit
+    dataset = load_cedar_baseline()
+    pip = create_reviewed_partial_pip(dataset)
+    _assert_partial_fixture(dataset, pip)
+    PIPAdminService.save_decisions(
+        pip, dataset.users_by_username["mchen"], _partial_choices(pip)
+    )
+    assert not connection.in_atomic_block and not connection.run_on_commit
+    assert not getattr(mail, "outbox", [])
+    assert pip.status == ProcessImprovementProposal.STATUS_REVIEWED
+    for change_id, (decision, note) in _partial_choices(pip).items():
+        actual = PipChange.objects.values("admin_decision", "admin_note").get(
+            pk=change_id
+        )
+        assert actual == {"admin_decision": decision, "admin_note": note}
+    return dataset, pip, _partial_before(pip)
+
+
+def _assert_partial_notification_pending() -> None:
+    """Observe an actual pending callback without capturing or invoking it.
+
+    :return: None. Example: one queued callback and zero delivered decision messages.
+    :raises AssertionError: If finalization sends mail before the outer commit.
+    """
+    assert connection.in_atomic_block
+    assert len(connection.run_on_commit) == 1
+    assert not getattr(mail, "outbox", [])
+
+
+def _partial_transaction_state() -> DomainState:
+    """Fingerprint every actual database row with no mutable-field exclusions.
+
+    :return: Full model and M2M row digests. Example: reviewed proposal timestamps included.
+    :raises DatabaseError: If the isolated real test database cannot be read.
+    """
+    state = []
+    for model in sorted(
+        apps.get_models(include_auto_created=True),
+        key=lambda item: item._meta.label_lower,
+    ):
+        rows = list(model.objects.order_by("pk").values())
+        payload = json.dumps(rows, sort_keys=True, default=str).encode()
+        state.append(
+            (model._meta.label_lower, len(rows), hashlib.sha256(payload).hexdigest())
+        )
+    return tuple(state)
+
+
+def _assert_partial_transaction_rolled_back(
+    pip: ProcessImprovementProposal, before: PartialState, original: DomainState
+) -> None:
+    """Require exact original rows, choices and identities after the real rollback.
+
+    :param pip: The transient finalized object. Example: persisted state returns to reviewed.
+    :param before: Original identities and all-user totals. Example:2129 historical awards.
+    :param original: Unfiltered before digests. Example: every model/M2M field included.
+    :return: None. Example: no new Activity, award, receipt or mail, target2.0.
+    :raises AssertionError: If any rolled-back state or pending notification remains.
+    """
+    assert not connection.in_atomic_block and not connection.run_on_commit
+    assert not getattr(mail, "outbox", [])
+    assert _partial_transaction_state() == original
+    pip.refresh_from_db()
+    pip.playbook.refresh_from_db()
+    assert pip.status == ProcessImprovementProposal.STATUS_REVIEWED
+    assert pip.decided_at is None and pip.playbook.version == Decimal("2.0")
+    assert _partial_before(pip) == before
+    for change_id, (decision, note) in _partial_choices(pip).items():
+        actual = PipChange.objects.values("admin_decision", "admin_note").get(
+            pk=change_id
+        )
+        assert actual == {"admin_decision": decision, "admin_note": note}
