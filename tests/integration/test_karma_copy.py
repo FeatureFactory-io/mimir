@@ -374,7 +374,14 @@ def test_copy_receipt_log_story_happy(
 def test_copy_receipt_log_story_reject(
     client: Client, caplog: LogCaptureFixture, cedar_dataset: CedarDataset
 ) -> None:
-    """Prove safe malformed, denied and excluded branches write no awards."""
+    """Prove safe malformed, denied and excluded branches write no awards.
+
+    :param client: Actual Django session client. Example: authenticated Maria.
+    :param caplog: Real log capture. Example: denied receipt plus guest exclusion.
+    :param cedar_dataset: Owned historical fixture. Example: CedarDataset.
+    :return: None after exact denial/exclusion beats and unchanged award count.
+    :raises AssertionError: Missing rejection, unsafe exit or unexpected award.
+    """
     client.force_login(cedar_dataset.users_by_username["mrodriguez"])
     before = KarmaAward.objects.count()
     private_content = "private-clipboard-prompt-content"
@@ -626,7 +633,7 @@ def _self_copy_client(mike: User) -> tuple[Client, str]:
 
 
 def _assert_self_copy_log_story(caplog: LogCaptureFixture, actor_id: int) -> None:
-    """Require the five correlated log beats in order with only safe fields.
+    """Require the seven correlated log beats in order with only safe fields.
 
     :param caplog: Actual INFO capture. Example: the self-copy receipt request.
     :param actor_id: Persisted owner ID. Example: the PK of Cedar's Mike.
