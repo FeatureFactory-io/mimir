@@ -32,6 +32,7 @@ _TARGET_VERSION = Decimal("2.0")
 _CEDAR_ACTORS = ("mrodriguez", "hkim", "mchen")
 _RELATIONSHIP_OPERATIONS = (PipChange.CHANGE_LINK, PipChange.CHANGE_UNLINK)
 _ENTITY_FIELDS = {
+    "Activity": (Activity, "name", "guidance"),
     "Skill": (Skill, "title", "content"),
     "Artifact": (Artifact, "name", "description"),
     "Workflow": (Workflow, "name", "description"),
@@ -115,8 +116,8 @@ def create_reviewed_minor_pip(
             entity=entity,
             targets=targets,
             original_target_id=change.target_id,
-            expected_name=change.name,
-            expected_content=change.content,
+            expected_name=str(payload.get("name", "")),
+            expected_content=str(payload["content"]),
         )
 
 
@@ -291,5 +292,34 @@ def assert_minor_change_applied(case: MinorPipCase) -> None:
     :param case: Finalized real case. Example: accepted UNLINK skill_activity.
     :return: None. Example: the original Skill/Activity relationship is absent.
     :raises AssertionError: If the precise operation effect is missing.
+    :raises ObjectDoesNotExist: If either relationship endpoint is missing.
     """
-    raise NotImplementedError()
+    assert (case.operation, case.entity) in MINOR_CASES
+    if case.operation in _RELATIONSHIP_OPERATIONS:
+        _assert_skill_activity_effect(case)
+        return
+    model, name_field, content_field = _ENTITY_FIELDS[case.entity]
+    if case.operation == PipChange.CHANGE_DROP:
+        assert case.original_target_id is not None
+        assert not model.objects.filter(pk=case.original_target_id).exists()
+        return
+    playbook_path = "workflow__playbook_id" if model is Activity else "playbook_id"
+    owned = model.objects.filter(**{playbook_path: case.pip.playbook_id})
+    if case.operation == PipChange.CHANGE_ADD:
+        applied = owned.filter(**{name_field: case.expected_name})
+    else:
+        assert case.original_target_id is not None
+        applied = owned.filter(pk=case.original_target_id)
+    assert list(applied.values_list(name_field, content_field)) == [
+        (case.expected_name, case.expected_content)
+    ]
+
+
+def _assert_skill_activity_effect(case: MinorPipCase) -> None:
+    """Check the exact persisted pair and that both endpoints still belong to the target."""
+    playbook_id = case.pip.playbook_id
+    skill_id, activity_id = case.targets["Skill"].pk, case.targets["Activity"].pk
+    skill = Skill.objects.get(pk=skill_id, playbook_id=playbook_id)
+    activity = Activity.objects.get(pk=activity_id, workflow__playbook_id=playbook_id)
+    expected_link_count = 1 if case.operation == PipChange.CHANGE_LINK else 0
+    assert activity.skills.filter(pk=skill.pk).count() == expected_link_count
