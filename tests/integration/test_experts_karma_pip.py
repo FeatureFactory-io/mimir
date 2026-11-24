@@ -1,22 +1,31 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 from _pytest.logging import LogCaptureFixture
 from django.core.exceptions import ValidationError
+from django.core.mail import EmailMessage
+from django.db import DatabaseError, connection, transaction
 from django.db.models import Sum
 from django.test import Client
+from django.urls import reverse
 from django.utils import timezone
 
 from methodology.models import (
+    Activity,
+    Artifact,
     EventChannel,
     KarmaAward,
     PipChange,
     Playbook,
     PlaybookVersion,
     ProcessImprovementProposal,
+    Skill,
     VersionSource,
 )
 from methodology.services.karma_service import AwardOutcome, KarmaService
@@ -30,10 +39,12 @@ from tests.support.experts_data import (
     create_reviewed_major_add_pip,
     load_cedar_baseline,
 )
+from tests.support.experts_logs import capture_experts_logs
 from tests.support.log_story import assert_log_story
 
 _CORRELATION_ID = "pip_policy:s32"
 _POLICY_LOGGER = "methodology.services.karma_service"
+_ADMIN_LOGGER = "methodology.services.pip_admin_service"
 _ENTRY = "KarmaService.award_accepted_changes"
 _PRIVATE_CHANGE_BODY = "Private decision text: hidden@example.test cedar-test-token"
 
@@ -44,8 +55,7 @@ def _record_policy_fixture(
     """Apply and publish real ORM rows below the N2 admin orchestration boundary."""
     pip = create_reviewed_major_add_pip(dataset, entity_type)
     first = pip.changes.get()
-    first.admin_decision = PipChange.ADMIN_ACCEPT
-    first.save(update_fields=["admin_decision"])
+    _accept_change(first)
     if second_decision:
         PipChange.objects.create(
             pip=pip,
@@ -72,14 +82,7 @@ def _record_policy_fixture(
     PIPAdminService._apply_terminal_status(
         pip, len(accepted), len(changes) - len(accepted)
     )
-    receipt = pip.playbook_versions.get()
-    # Supply the acceptance attestation that N2 will write in the transaction.
-    receipt.snapshot_data.update(
-        accepted_change_ids=[change.pk for change in accepted],
-        category=pip.playbook.category,
-    )
-    receipt.save(update_fields=["snapshot_data"])
-    return pip, changes, receipt
+    return pip, changes, pip.playbook_versions.get()
 
 
 def _record_policy_awards(pip: ProcessImprovementProposal) -> tuple[AwardOutcome, ...]:
@@ -95,19 +98,120 @@ def _ledger_totals(recipient_id: int) -> dict[str, int]:
     )
 
 
+def _added_content_exists(change: PipChange) -> bool:
+    """Confirm the proposed content and owning relationship were really created."""
+    playbook_id = change.pip.playbook_id
+    if change.entity_type == PipChange.ENTITY_ACTIVITY:
+        return Activity.objects.filter(
+            workflow_id=change.parent_workflow_id,
+            workflow__playbook_id=playbook_id,
+            name=change.name,
+            guidance=change.content,
+        ).exists()
+    if change.entity_type == PipChange.ENTITY_SKILL:
+        return Skill.objects.filter(
+            playbook_id=playbook_id, title=change.name, content=change.content
+        ).exists()
+    assert change.entity_type == PipChange.ENTITY_ARTIFACT
+    return Artifact.objects.filter(
+        playbook_id=playbook_id,
+        produced_by_id=change.produced_by_activity_ref,
+        name=change.name,
+        description=change.content,
+    ).exists()
+
+
+def _accept_change(change: PipChange) -> None:
+    """Persist a real prior admin choice for direct finalization service tests."""
+    change.admin_decision = PipChange.ADMIN_ACCEPT
+    change.save(update_fields=["admin_decision"])
+
+
+def _assert_unpublished(pip: ProcessImprovementProposal, award_count: int) -> None:
+    """Assert finalization did not persist the decision, history, version or ledger."""
+    pip.refresh_from_db()
+    assert pip.status == pip.STATUS_REVIEWED and pip.decided_at is None
+    assert pip.playbook.version == Decimal("2.0")
+    assert not pip.playbook_versions.exists()
+    assert KarmaAward.objects.count() == award_count
+
+
+def _assert_major_publication(
+    pip: ProcessImprovementProposal, change: PipChange
+) -> None:
+    """Verify the version owner's receipt and the ledger event refer to the applied ADD."""
+    receipt = pip.playbook_versions.get()
+    assert receipt.playbook_id == pip.playbook_id
+    assert receipt.version_number == pip.playbook.version == Decimal("3.0")
+    assert receipt.source == VersionSource.PIP_SOURCE and receipt.is_major
+    assert receipt.snapshot_data == {
+        "pip_id": pip.pk,
+        "playbook_name": pip.playbook.name,
+        "version_before": "2.0",
+        "version_after": "3.0",
+        "accepted_change_ids": [change.pk],
+        "category": "design",
+    }
+    award = KarmaAward.objects.get(event_identity=f"accepted_change:{change.pk}")
+    assert award.recipient_id == pip.created_by_id
+    assert award.playbook_id_snapshot == pip.playbook_id
+    assert award.change_id_snapshot == change.pk
+    assert award.event_channel == EventChannel.ACCEPTED_CHANGE
+    assert (award.source_kind, award.points, award.category) == ("major", 500, "design")
+    assert award.occurred_at == pip.decided_at and timezone.is_aware(award.occurred_at)
+
+
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize("entity_type", ["Activity", "Skill", "Artifact"])
 def test_finalize_pip_with_major_add_awards_submitter_and_publishes_once(
-    client: Client, entity_type: str
+    client: Client, entity_type: str, mailoutbox: list[EmailMessage]
 ) -> None:
     """Prove real finalization, exact totals, publication and local decision email.
 
     :param client: Real Django client. Example: authenticated staff client.
     :param entity_type: Independently restored outline entity. Example: "Skill".
+    :param mailoutbox: Django's local decision mail capture.
     :return: None. Example: all persisted effects match the acceptance oracle.
     :raises AssertionError: If recipient, totals, content, version or email differs.
     """
-    raise NotImplementedError()
+    dataset = load_cedar_baseline()
+    pip = create_reviewed_major_add_pip(dataset, entity_type)
+    change = pip.changes.get()
+    maria, staff = pip.created_by, dataset.users_by_username["mchen"]
+    assert not maria.is_staff and staff.is_staff
+    unaffected = (pip.playbook.author_id, staff.pk)
+    prior_totals = [_ledger_totals(user_id) for user_id in unaffected]
+    assert _ledger_totals(maria.pk) == {"design": 7200, "development": 1000}
+    prior_count = KarmaAward.objects.count()
+    release_awards = KarmaAward.objects.filter(
+        source_kind=KarmaAward.SourceKind.RELEASE
+    )
+    release_count = release_awards.count()
+    prior_history_count = pip.playbook.versions.count()
+    assert not _added_content_exists(change)
+    url = reverse("pip_admin_review", kwargs={"pk": pip.pk})
+    post_data = {"action": "finalize", f"decision_{change.pk}": PipChange.ADMIN_ACCEPT}
+    client.force_login(maria)
+    assert client.post(url, post_data).status_code == 403
+    _assert_unpublished(pip, prior_count)
+    assert not _added_content_exists(change) and not mailoutbox
+    client.force_login(staff)
+    detail_url = reverse("pip_detail", kwargs={"pk": pip.pk})
+    assert client.post(url, post_data).url == detail_url
+    assert client.post(url, post_data).url == detail_url
+    pip.refresh_from_db()
+    assert pip.status == pip.STATUS_ACCEPTED and _added_content_exists(change)
+    _assert_major_publication(pip, change)
+    assert _ledger_totals(maria.pk) == {"design": 7700, "development": 1000}
+    assert [_ledger_totals(user_id) for user_id in unaffected] == prior_totals
+    assert KarmaAward.objects.count() == prior_count + 1
+    assert release_awards.count() == release_count
+    assert pip.playbook.versions.count() == prior_history_count + 1
+    (sent,) = mailoutbox
+    assert sent.to == [maria.email]
+    assert "Accepted" in sent.subject
+    assert f'ADD {entity_type} "{change.name}"' in sent.body
+    assert "Decision: ACCEPT" in sent.body and "is now v3.0" in sent.body
 
 
 @pytest.mark.django_db
@@ -162,25 +266,125 @@ def test_award_accepted_changes_with_retry_preserves_original_event(
 
 
 @pytest.mark.django_db(transaction=True)
-def test_finalize_pip_with_outer_rollback_restores_content_version_decision_and_awards() -> (
-    None
-):
+def test_finalize_pip_with_outer_rollback_restores_content_version_decision_and_awards(
+    mailoutbox: list[EmailMessage],
+) -> None:
     """Prove all domain effects and deferred mail obey the real outer transaction.
 
+    :param mailoutbox: Django's local decision mail capture.
     :return: None. Example: no new content, version, award or email after rollback.
     :raises AssertionError: If any rolled-back effect remains.
     """
-    raise NotImplementedError()
+    dataset = load_cedar_baseline()
+    pip = create_reviewed_major_add_pip(dataset, PipChange.ENTITY_ACTIVITY)
+    change = pip.changes.get()
+    _accept_change(change)
+    prior_count = KarmaAward.objects.count()
+    with transaction.atomic():
+        result = PIPAdminService.finalize_pip(pip, dataset.users_by_username["mchen"])
+        assert result.pk == pip.pk and result.status == pip.STATUS_ACCEPTED
+        assert _added_content_exists(change)
+        _assert_major_publication(result, change)
+        assert not mailoutbox
+        transaction.set_rollback(True)
+
+    _assert_unpublished(pip, prior_count)
+    assert not _added_content_exists(change) and not mailoutbox
 
 
 @pytest.mark.django_db(transaction=True)
-def test_finalize_pip_with_invalid_apply_creates_no_award_or_email() -> None:
+def test_finalize_pip_with_invalid_apply_creates_no_award_or_email(
+    client: Client, mailoutbox: list[EmailMessage]
+) -> None:
     """Prove a real invalid reference prevents committed finalization and awards.
 
+    :param client: Real Django client for the staff review POST.
+    :param mailoutbox: Django's local decision mail capture.
     :return: None. Example: target remains 2.0 with baseline totals.
     :raises AssertionError: If failed application creates an award or notification.
     """
-    raise NotImplementedError()
+    dataset = load_cedar_baseline()
+    pip = create_reviewed_major_add_pip(dataset, PipChange.ENTITY_SKILL)
+    skill = pip.changes.get()
+    broken_artifact = PipChange.objects.create(
+        pip=pip,
+        change_type=PipChange.CHANGE_ADD,
+        entity_type=PipChange.ENTITY_ARTIFACT,
+        order=2,
+        name="Artifact with missing producer",
+        produced_by_activity_ref="#missing-producer",
+    )
+    prior_count = KarmaAward.objects.count()
+    assert not _added_content_exists(skill)
+    client.force_login(dataset.users_by_username["mchen"])
+    url = reverse("pip_admin_review", kwargs={"pk": pip.pk})
+    response = client.post(
+        url,
+        {
+            "action": "finalize",
+            f"decision_{skill.pk}": PipChange.ADMIN_ACCEPT,
+            f"decision_{broken_artifact.pk}": PipChange.ADMIN_ACCEPT,
+        },
+        follow=True,
+    )
+    assert response.redirect_chain == [(url, 302)]
+    assert b"Unresolved internal reference" in response.content
+    _assert_unpublished(pip, prior_count)
+    assert not _added_content_exists(skill) and not mailoutbox
+
+
+@contextmanager
+def _fail_accepted_change_insert() -> Iterator[None]:
+    """Fail the real ledger insert without substituting application services."""
+    table = KarmaAward._meta.db_table
+    trigger = "s32_fail_accepted_award_insert"
+    with connection.cursor() as cursor:
+        if connection.vendor == "postgresql":
+            cursor.execute(
+                "CREATE FUNCTION pg_temp.s32_reject_award() RETURNS trigger LANGUAGE plpgsql AS "
+                "$$ BEGIN RAISE EXCEPTION 's32 award storage failure'; END; $$"
+            )
+            cursor.execute(
+                f"CREATE TRIGGER {trigger} BEFORE INSERT ON {table} FOR EACH ROW "
+                "WHEN (NEW.event_channel = 'accepted_change') "
+                "EXECUTE FUNCTION pg_temp.s32_reject_award()"
+            )
+        else:
+            assert connection.vendor == "sqlite"
+            cursor.execute(
+                f"CREATE TEMP TRIGGER {trigger} BEFORE INSERT ON {table} "
+                "WHEN NEW.event_channel = 'accepted_change' BEGIN "
+                "SELECT RAISE(ABORT, 's32 award storage failure'); END"
+            )
+    try:
+        yield
+    finally:
+        with connection.cursor() as cursor:
+            if connection.vendor == "postgresql":
+                cursor.execute(f"DROP TRIGGER {trigger} ON {table}")
+                cursor.execute("DROP FUNCTION pg_temp.s32_reject_award()")
+            else:
+                cursor.execute(f"DROP TRIGGER {trigger}")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_finalize_pip_with_award_storage_failure_rolls_back_publication(
+    mailoutbox: list[EmailMessage],
+) -> None:
+    """A real failed ledger insert aborts the owning finalization and its email."""
+    dataset = load_cedar_baseline()
+    pip = create_reviewed_major_add_pip(dataset, PipChange.ENTITY_ACTIVITY)
+    change = pip.changes.get()
+    _accept_change(change)
+    prior_count = KarmaAward.objects.count()
+    with (
+        _fail_accepted_change_insert(),
+        pytest.raises(DatabaseError, match="s32 award storage failure"),
+    ):
+        PIPAdminService.finalize_pip(pip, dataset.users_by_username["mchen"])
+
+    _assert_unpublished(pip, prior_count)
+    assert not _added_content_exists(change) and not mailoutbox
 
 
 @pytest.mark.django_db
@@ -467,9 +671,14 @@ def test_award_accepted_changes_with_historical_retry_keeps_original_rows() -> N
 def test_accepted_change_log_story_happy(caplog: LogCaptureFixture) -> None:
     """Prove ordered policy processing, persistence and safe transaction-local counts."""
     dataset = load_cedar_baseline()
-    pip, (change,), _ = _record_policy_fixture(dataset)
-    with caplog.at_level(logging.INFO, logger=_POLICY_LOGGER):
-        _record_policy_awards(pip)
+    pip = create_reviewed_major_add_pip(dataset, PipChange.ENTITY_ACTIVITY)
+    change = pip.changes.get()
+    change.content = _PRIVATE_CHANGE_BODY
+    change.save(update_fields=["content"])
+    _accept_change(change)
+    staff = dataset.users_by_username["mchen"]
+    with capture_experts_logs(caplog, (_POLICY_LOGGER, _ADMIN_LOGGER)):
+        PIPAdminService.finalize_pip(pip, staff)
         _record_policy_awards(pip)
     assert_log_story(
         caplog,
@@ -478,7 +687,7 @@ def test_accepted_change_log_story_happy(caplog: LogCaptureFixture) -> None:
             "entry": (
                 "| entry |",
                 f"pip_id={pip.pk}",
-                f"correlation_id={_CORRELATION_ID}",
+                f"correlation_id=pip_finalize:{pip.pk}",
             ),
             "created": (
                 "| exit |",
@@ -518,11 +727,31 @@ def test_accepted_change_log_story_happy(caplog: LogCaptureFixture) -> None:
                 "| exit |",
                 "award_count=1",
                 "created_count=1",
-                f"correlation_id={_CORRELATION_ID}",
+                f"correlation_id=pip_finalize:{pip.pk}",
             ),
         },
     )
-    assert change.content not in caplog.text and pip.created_by.email not in caplog.text
+    assert_log_story(
+        caplog,
+        where="PIPAdminService._award_finalized_pip",
+        beats={
+            "hook_completed": (
+                "| exit |",
+                f"pip_id={pip.pk}",
+                f"actor_id={staff.pk}",
+                f"recipient_id={pip.created_by_id}",
+                f"correlation_id=pip_finalize:{pip.pk}",
+                "transaction=pending",
+            ),
+        },
+    )
+    for private_data in (
+        _PRIVATE_CHANGE_BODY,
+        "hidden@example.test",
+        "cedar-test-token",
+        pip.created_by.email,
+    ):
+        assert private_data not in caplog.text
 
 
 @pytest.mark.django_db

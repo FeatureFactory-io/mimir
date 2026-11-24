@@ -17,8 +17,10 @@ from methodology.models import (
     ArtifactInput,
     Phase,
     PipChange,
+    PlaybookVersion,
     Rule,
     Skill,
+    VersionSource,
     Workflow,
 )
 from methodology.services.activity_service import ActivityService
@@ -32,6 +34,8 @@ from methodology.services.pip_link_service import (
 from methodology.services.workflow_service import WorkflowService
 
 if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractBaseUser
+
     from methodology.models import Playbook, ProcessImprovementProposal
 
 logger = logging.getLogger(__name__)
@@ -39,6 +43,7 @@ logger = logging.getLogger(__name__)
 _VALID_ARTIFACT_TYPES = {choice[0] for choice in Artifact.ARTIFACT_TYPES}
 
 _APPEND_PREFIX = "APPEND TO GUIDANCE:"
+_VERSION_SUMMARY_LENGTH = 500
 
 
 def _normalize_artifact_type(raw: str | None) -> str:
@@ -757,35 +762,33 @@ def _renormalize_activity_orders(workflow_id: int) -> None:
 def bump_playbook_major_version_after_pip_apply(
     *,
     pip: ProcessImprovementProposal,
-    playbook,
-    actor,
+    playbook: Playbook,
+    actor: AbstractBaseUser,
     summary_line: str,
 ) -> Decimal:
-    """
-    Record Playbook history line and bump to next major revision.
+    """Publish the applied proposal on the next major playbook version.
 
-    Examples: ``1.0 -> 2.0``, ``1.9 -> 2.0``.
+    :param pip: Proposal whose accepted changes were applied. Example: PIP 42.
+    :param playbook: Applied target playbook. Example: Accessible Forms Review.
+    :param actor: Staff user recording publication. Example: mchen.
+    :param summary_line: Description of the accepted edits. Example: "ADD Activity".
+    :return: New major version. Example: Decimal("3.0") after version 2.0.
+    :raises IntegrityError: If the playbook and publication history cannot be saved.
     """
-    from methodology.models import PlaybookVersion
-    from methodology.models.playbook_version import VersionSource
-
     playbook.refresh_from_db()
     previous = playbook.version
     next_ver = playbook.compute_next_major_line_version()
     playbook.version = next_ver
     playbook.save(update_fields=["version", "updated_at"])
-    summary = summary_line.strip() or "PIP applied — playbook revised."
+    summary = (summary_line.strip() or "PIP applied — playbook revised.")[
+        :_VERSION_SUMMARY_LENGTH
+    ]
     PlaybookVersion.objects.create(
         playbook=playbook,
         version_number=next_ver,
-        snapshot_data={
-            "pip_id": pip.pk,
-            "playbook_name": playbook.name,
-            "version_before": str(previous),
-            "version_after": str(next_ver),
-        },
-        change_summary=summary[:500],
-        description=summary[:500],
+        snapshot_data=_pip_publication_snapshot(pip, playbook, previous),
+        change_summary=summary,
+        description=summary,
         is_major=True,
         source=VersionSource.PIP_SOURCE,
         pip=pip,
@@ -799,3 +802,28 @@ def bump_playbook_major_version_after_pip_apply(
         pip.pk,
     )
     return next_ver
+
+
+def _pip_publication_snapshot(
+    pip: ProcessImprovementProposal, playbook: Playbook, previous: Decimal
+) -> dict[str, str | int | list[int]]:
+    """Attest the applied approvals and category in the publication receipt.
+
+    :param pip: Proposal with its persisted admin decisions. Example: PIP 42.
+    :param playbook: Refreshed and updated target. Example: released Design playbook v3.
+    :param previous: Version immediately before publication. Example: Decimal("2.0").
+    :return: One snapshot binding the revision, approved change IDs and category.
+    """
+    accepted_change_ids = list(
+        pip.changes.filter(admin_decision=PipChange.ADMIN_ACCEPT)
+        .order_by("order", "pk")
+        .values_list("pk", flat=True)
+    )
+    return {
+        "pip_id": pip.pk,
+        "playbook_name": playbook.name,
+        "version_before": str(previous),
+        "version_after": str(playbook.version),
+        "accepted_change_ids": accepted_change_ids,
+        "category": playbook.category,
+    }
