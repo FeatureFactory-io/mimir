@@ -468,3 +468,8 @@ The stale prose-baseline instruction was contradicted by the actual Cedar source
 `docs/experts-replay/pin-evidence/S26.json`, `docs/features/steps/experts_summary_steps.py`, `docs/plans/iterations/experts/S26-galdr-summary-04.md`, `tests/e2e/test_experts_numeric_fallback.py`, `tests/integration/test_experts_numeric_fallback.py`
 
 Skeleton: `24a08d9789e699bc963dbe95cc9e0fcc2595fdef`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.
+
+
+## Runtime source and log reconciliation
+
+The original real six-proof module found an actual own-profile missing-fallback gap after three passes. Upstream S10 owns the bounded source repair and six dedicated real regressions in `tests/integration/test_profile_numeric_fallback_repair.py`; the whole module is mandatory in `make test-experts-s26-backend`. S26 retains its tests-only footprint. Actual query logs are ExpertsService.list_leaders entry/exit, presenter `hint_source=live_counts` with subject/correlation, then experts_list status200. Assertions independently query exact live counts; nonexistent projection-count log fields are not invented. Existing global83caseAT/agent/lint gates remain iteration-final, after unfinished contracts; named local scenario gates retain positive selection.

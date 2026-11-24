@@ -1041,6 +1041,7 @@ scenarios:
     skeleton_commit: 26d29adfc227baf6a39309dcdd1622a7ae5b8935
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/integration/test_profile_numeric_fallback_repair.py
     - Makefile
     - accounts/views.py
     - docs/experts-replay/pin-evidence/S10.json

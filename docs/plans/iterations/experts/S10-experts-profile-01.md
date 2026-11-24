@@ -327,3 +327,8 @@ Lessons Learned:
 `accounts/views.py`, `docs/experts-replay/pin-evidence/S10.json`, `docs/features/steps/experts_profile_steps.py`, `docs/plans/iterations/experts/S10-experts-profile-01.md`, `static/css/mimir-app.css`, `templates/accounts/profile.html`, `tests/e2e/test_experts_own_profile.py`, `tests/integration/test_experts_own_profile.py`
 
 Skeleton: `26d29adfc227baf6a39309dcdd1622a7ae5b8935`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.
+
+
+## Bounded numeric-fallback source follow-up
+
+S26's real three-surface proof exposed that missing prose had no own-profile paragraph, despite the contracted2released/47GUI-author-copy fallback on list/detail. The S10 source owner adds one pure `_profile_numeric_fallback_context(projection, summary)` helper in accounts/views.py and an optional missing-only TypedDict field, preserving the exact stored-summary context. The shared formatter and existing live projection remain the sole calculation/formatting owners; no new query, award or generation. The missing-summary template branch renders a semantic `profile-numeric-fallback` paragraph with no expansion control. Dedicated real regression module `tests/integration/test_profile_numeric_fallback_repair.py` is mandatory in S26backend beside its six original proofs. This follow-up owns only accounts/views.py, templates/accounts/profile.html and that new dedicated module; S26testWIP remains its original worker's.
