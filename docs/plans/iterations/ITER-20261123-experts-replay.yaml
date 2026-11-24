@@ -4662,6 +4662,30 @@ scenarios:
           rules:
           - do-test-first
           - do-assert-log-story
+      - id: R2-portable-and-strict-visual-gates
+        title: Preserve strict artifact validation while making ordinary repository CI portable
+        bpe: BPE-05
+        depends_on:
+        - N5-card-done
+        footprint:
+        - tests/integration/test_expert_card_visual_evidence.py
+        - Makefile
+        gate:
+          command: make test-experts-s04
+        authority: First targeted repair of the independent CI portability finding; test/config paths only
+        constraints:
+        - Ordinary repository-only checks verify committed manifest, complete matrix, review declarations and current source digests.
+        - Named S04 gates explicitly require strict external artifact verification and fail closed when that package is missing.
+        - Preserve all twenty-nine actual browser cases and all existing PNG, trace, font and provenance checks without skips.
+      - id: N6-portability-and-card-review
+        title: Independently certify portable checks and mandatory complete visual evidence
+        bpe: BPE-06
+        depends_on:
+        - R2-portable-and-strict-visual-gates
+        footprint: []
+        gate:
+          command: make test-experts-s04
+          log_story_command: pytest tests/integration/test_expert_card_presentation.py -k log_story -x
       scenario_dependencies:
       - S03
       - S17
