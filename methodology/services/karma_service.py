@@ -20,16 +20,17 @@ from django.utils.module_loading import import_string
 from methodology.models import (
     EventChannel,
     KarmaAward,
+    PipChange,
     Playbook,
     PlaybookVersion,
+    ProcessImprovementProposal,
     VersionSource,
 )
 from methodology.models.karma_award import CATEGORY_SLUGS, first_release_identity
+from methodology.services.pip_link_service import relationship_endpoint_types
 
 if TYPE_CHECKING:
     from django.db import OperationalError
-
-    from methodology.models import PipChange, ProcessImprovementProposal
 
 logger = logging.getLogger(__name__)
 KarmaSource = Literal["release", "major", "minor", "consumption", "learning"]
@@ -39,6 +40,28 @@ AWARD_CORRELATION_ID = re.compile(r"[A-Za-z0-9._:-]{1,100}")
 
 _RELEASE_LOG = "KarmaService.award_first_release"
 _PERSIST_LOG = "KarmaService.persist_awards"
+_ACCEPTED_CHANGE_LOG = "KarmaService.award_accepted_changes"
+_ACCEPTED_POLICY_LOG = "KarmaService._accepted_change_policy"
+_ACCEPTED_MAJOR_POINTS = 500
+_ACCEPTED_MINOR_POINTS = 100
+_VERSION_NUMBER = re.compile(r"[0-9]{1,4}\.[0-9]")
+_MAJOR_ADD_ENTITIES = frozenset(
+    {PipChange.ENTITY_ACTIVITY, PipChange.ENTITY_SKILL, PipChange.ENTITY_ARTIFACT}
+)
+_MINOR_ADD_ENTITIES = frozenset(
+    {
+        PipChange.ENTITY_WORKFLOW,
+        PipChange.ENTITY_PHASE,
+        PipChange.ENTITY_AGENT,
+        PipChange.ENTITY_RULE,
+    }
+)
+_EDITABLE_ENTITIES = _MAJOR_ADD_ENTITIES | _MINOR_ADD_ENTITIES
+_RELATIONSHIP_OPERATIONS = frozenset({PipChange.CHANGE_LINK, PipChange.CHANGE_UNLINK})
+_ACCEPTED_STATES = (
+    ProcessImprovementProposal.STATUS_ACCEPTED,
+    ProcessImprovementProposal.STATUS_ACCEPTED_PARTIAL,
+)
 _FIRST_RELEASE_POLICY = f"source_kind=release points={FIRST_RELEASE_POINTS}"
 _PAIRED_SOURCES = (KarmaAward.SourceKind.CONSUMPTION, KarmaAward.SourceKind.LEARNING)
 _AWARD_IDENTITY_COLLISIONS = frozenset(
@@ -619,66 +642,312 @@ class KarmaService:
         return learner_spec, author_spec
 
     @staticmethod
+    @transaction.atomic
     def award_accepted_changes(
         *, pip: ProcessImprovementProposal, correlation_id: str
     ) -> tuple[AwardOutcome, ...]:
-        """Award persisted accepted changes inside the finalization transaction.
+        """Award approved changes from a persisted PIP publication.
 
-        :param pip: Persisted proposal. Example: reviewed PIP targeting playbook 6106.
+        :param pip: Persisted proposal. Example: accepted PIP targeting playbook 6106.
         :param correlation_id: Safe operation identifier. Example: "pip_finalize:42".
         :return: Immutable persistence outcomes. Example: one created 500-point outcome.
-        :raises ValueError: For an unsaved proposal or invalid correlation identifier.
-        :raises ValidationError: For contradictory immutable event data.
+        :raises ValueError: If the proposal is unsaved.
+        :raises ValidationError: If the trace ID or recorded award batch conflicts.
         """
-        raise NotImplementedError()
+        KarmaService._validate_batch((), correlation_id)
+        pip = KarmaService._load_awardable_accepted_pip(pip)
+        trace = f"pip_id={pip.pk} correlation_id={correlation_id}"
+        logger.info("%s | entry | %s", _ACCEPTED_CHANGE_LOG, trace)
+        try:
+            specifications = KarmaService._accepted_change_specs(pip, trace=trace)
+            outcomes = (
+                KarmaService.persist_awards(
+                    specifications, correlation_id=correlation_id
+                )
+                if specifications
+                else ()
+            )
+        except (ValidationError, IntegrityError):
+            logger.error(
+                "%s | error | reason=award_batch_failed %s", _ACCEPTED_CHANGE_LOG, trace
+            )
+            raise
+        created_count = sum(outcome.created for outcome in outcomes)
+        logger.info(
+            "%s | exit | created_count=%s existing_count=%s transaction=pending %s",
+            _ACCEPTED_CHANGE_LOG,
+            created_count,
+            len(outcomes) - created_count,
+            trace,
+        )
+        return outcomes
 
     @staticmethod
     def _load_awardable_accepted_pip(
         pip: ProcessImprovementProposal,
-    ) -> ProcessImprovementProposal | None:
-        """Reload and lock an eligible successfully published terminal proposal.
+    ) -> ProcessImprovementProposal:
+        """Reload and lock the proposal while validating publication and recording awards.
 
         :param pip: Persisted input proposal. Example: PIP 42.
-        :return: Locked accepted/partial proposal or None. Example: accepted PIP 42.
+        :return: Locked proposal and current target. Example: accepted PIP 42.
         :raises ValueError: If the input is unsaved or malformed.
         :raises ProcessImprovementProposal.DoesNotExist: If the proposal was deleted.
         """
-        raise NotImplementedError()
+        if (
+            not isinstance(pip, ProcessImprovementProposal)
+            or pip._state.adding
+            or not pip.pk
+        ):
+            raise ValueError("A persisted proposal is required.")
+        return (
+            ProcessImprovementProposal.objects.select_for_update(of=("self",))
+            .select_related("playbook")
+            .get(pk=pip.pk)
+        )
 
     @staticmethod
     def _accepted_change_specs(
         pip: ProcessImprovementProposal,
+        *,
+        trace: str,
     ) -> tuple[AwardSpec, ...]:
-        """Build specifications only for this proposal's persisted ACCEPT changes.
+        """Build a complete immutable batch from the proposal's published ACCEPT rows.
 
-        :param pip: Reloaded eligible proposal. Example: accepted PIP 42.
+        :param pip: Reloaded locked proposal. Example: accepted PIP 42.
+        :param trace: Safe proposal and correlation identifiers for logs.
         :return: Immutable complete batch. Example: (Activity ADD specification,).
-        :raises ValidationError: If decision timestamp or attribution is invalid.
+        :raises ValidationError: If existing ledger data is incomplete or contradictory.
         """
-        raise NotImplementedError()
+        eligibility = KarmaService._accepted_publication(pip)
+        if isinstance(eligibility, str):
+            logger.info(
+                "%s | branch | reason=%s %s", _ACCEPTED_CHANGE_LOG, eligibility, trace
+            )
+            return ()
+        category, changes = eligibility
+        specifications = []
+        for change in changes:
+            spec = KarmaService._accepted_change_spec(pip, change, category=category)
+            if spec is None:
+                logger.info(
+                    "%s | branch | reason=unsupported_change change_id=%s %s",
+                    _ACCEPTED_CHANGE_LOG,
+                    change.pk,
+                    trace,
+                )
+            else:
+                specifications.append(spec)
+        recorded_identities = set(
+            KarmaAward.objects.filter(
+                event_identity__in=[
+                    f"accepted_change:{change.pk}" for change in changes
+                ]
+            ).values_list("event_identity", flat=True)
+        )
+        if recorded_identities and recorded_identities != {
+            spec.event_identity for spec in specifications
+        }:
+            raise ValidationError(
+                "The accepted-change award batch is partially recorded."
+            )
+        return tuple(specifications)
+
+    @staticmethod
+    def _accepted_publication(
+        pip: ProcessImprovementProposal,
+    ) -> tuple[str, tuple[PipChange, ...]] | str:
+        """Find authoritative applied changes and their category, or a safe skip reason.
+
+        :param pip: Persisted proposal locked by the caller.
+        :return: Receipt category and applied changes or a stable reason. Example: "decision_ineligible".
+        """
+        if pip.status not in _ACCEPTED_STATES or pip.decided_at is None:
+            return "decision_ineligible"
+        if pip.created_by_id is None:
+            return "missing_submitter"
+        changes = tuple(pip.changes.select_for_update().order_by("order", "pk"))
+        accepted = tuple(
+            change
+            for change in changes
+            if change.admin_decision == PipChange.ADMIN_ACCEPT
+        )
+        rejected_count = sum(
+            change.admin_decision == PipChange.ADMIN_REJECT for change in changes
+        )
+        if (
+            not accepted
+            or len(accepted) + rejected_count != len(changes)
+            or (pip.status == pip.STATUS_ACCEPTED_PARTIAL) != bool(rejected_count)
+        ):
+            return "decisions_inconsistent"
+        category = KarmaService._accepted_publication_category(pip, accepted)
+        if category is None:
+            return "publication_ineligible"
+        return category, accepted
+
+    @staticmethod
+    def _accepted_publication_category(
+        pip: ProcessImprovementProposal,
+        accepted: tuple[PipChange, ...],
+    ) -> str | None:
+        """Verify the original major publication and its entire applied change set.
+
+        :param pip: Persisted proposal locked by the caller.
+        :param accepted: Ordered stored approvals from that proposal.
+        :return: Canonical receipt category, if valid. Example: "design".
+        """
+        receipts = tuple(
+            pip.playbook_versions.select_for_update().filter(
+                source=VersionSource.PIP_SOURCE
+            )[:2]
+        )
+        if len(receipts) != 1:
+            return None
+        (receipt,) = receipts
+        snapshot = receipt.snapshot_data
+        if (
+            receipt.playbook_id != pip.playbook_id
+            or not receipt.is_major
+            or receipt.version_number > pip.playbook.version
+            or receipt.created_at > pip.decided_at
+            or not isinstance(snapshot, dict)
+            or type(snapshot.get("pip_id")) is not int
+            or snapshot["pip_id"] != pip.pk
+            or snapshot.get("version_after") != str(receipt.version_number)
+        ):
+            return None
+        before = snapshot.get("version_before")
+        if not isinstance(before, str) or not _VERSION_NUMBER.fullmatch(before):
+            return None
+        previous_version = Decimal(before)
+        if (
+            previous_version < FIRST_RELEASE_VERSION
+            or int(previous_version) + 1 != receipt.version_number
+        ):
+            return None
+        applied_ids = snapshot.get("accepted_change_ids")
+        expected_ids = {change.pk for change in accepted}
+        if (
+            not isinstance(applied_ids, list)
+            or any(type(change_id) is not int for change_id in applied_ids)
+            or len(applied_ids) != len(expected_ids)
+            or set(applied_ids) != expected_ids
+        ):
+            return None
+        category = snapshot.get("category")
+        return category if category in CATEGORY_SLUGS else None
 
     @staticmethod
     def _accepted_change_spec(
-        pip: ProcessImprovementProposal, change: PipChange
+        pip: ProcessImprovementProposal,
+        change: PipChange,
+        *,
+        category: str,
     ) -> AwardSpec | None:
-        """Reuse an existing event or snapshot a newly eligible accepted change.
+        """Reuse a matching event or snapshot a newly eligible accepted change.
 
-        :param pip: Eligible parent proposal. Example: PIP 42 submitted by Maria.
+        :param pip: Eligible proposal. Example: PIP 42 submitted by Maria.
         :param change: Persisted accepted child. Example: ADD Activity change 81.
-        :return: Immutable accepted_change specification or None. Example: 500 Design points.
-        :raises ValidationError: If the child belongs to another proposal or lacks a timestamp.
+        :param category: Category declared by the original publication. Example: "design".
+        :return: Immutable specification or None. Example: 500 Design points.
+        :raises ValidationError: If existing award data conflicts with the publication.
         """
-        raise NotImplementedError()
+        policy = KarmaService._accepted_change_policy(change)
+        if policy is None:
+            return None
+        source_kind, points = policy
+        event_identity = f"accepted_change:{change.pk}"
+        recorded = KarmaService._recorded_accepted_change_spec(
+            event_identity=event_identity,
+            recipient_id=pip.created_by_id,
+        )
+        # ADD does not populate its new entity ID. Historical imports can attest a known one.
+        has_target = change.change_type in (
+            PipChange.CHANGE_ALTER,
+            PipChange.CHANGE_DROP,
+        )
+        if recorded is not None and recorded.entity_id_snapshot is not None:
+            has_target = True
+        target_id = change.target_id if has_target else None
+        spec = AwardSpec(
+            recipient_id=pip.created_by_id,
+            source_kind=source_kind,
+            points=points,
+            category=category,
+            event_identity=event_identity,
+            playbook_id_snapshot=pip.playbook_id,
+            change_id_snapshot=change.pk,
+            occurred_at=pip.decided_at,
+            event_channel=EventChannel.ACCEPTED_CHANGE,
+            entity_type_snapshot=change.entity_type if target_id else None,
+            entity_id_snapshot=target_id,
+        )
+        if recorded is None:
+            return spec
+        if recorded != replace(spec, occurred_at=recorded.occurred_at):
+            raise ValidationError(
+                "The accepted-change award conflicts with its publication."
+            )
+        return recorded
 
     @staticmethod
-    def _accepted_change_policy(change: PipChange) -> tuple[str, int] | None:
-        """Classify the complete supported operation/entity/relationship matrix.
+    def _accepted_change_policy(
+        change: PipChange,
+    ) -> tuple[Literal["major", "minor"], int] | None:
+        """Classify the supported operation, entity and relationship matrix.
 
         :param change: Persisted typed change. Example: ADD Activity change 81.
         :return: Source and points or None. Example: ("major", 500).
-        :raises ValueError: If change is not a PipChange.
+        :raises TypeError: If change is not a PipChange.
         """
-        raise NotImplementedError()
+        if not isinstance(change, PipChange):
+            raise TypeError("A PIP change is required.")
+        operation, entity = change.change_type, change.entity_type
+        relationship = change.relationship_type
+        source_kind: Literal["major", "minor"] = "minor"
+        points = _ACCEPTED_MINOR_POINTS
+        if operation in _RELATIONSHIP_OPERATIONS:
+            if not KarmaService._has_awardable_relationship(change):
+                return None
+        elif relationship:
+            return None
+        elif operation == PipChange.CHANGE_ADD and entity in _MAJOR_ADD_ENTITIES:
+            source_kind, points = "major", _ACCEPTED_MAJOR_POINTS
+        elif not (
+            (operation == PipChange.CHANGE_ADD and entity in _MINOR_ADD_ENTITIES)
+            or (
+                operation in (PipChange.CHANGE_ALTER, PipChange.CHANGE_DROP)
+                and entity in _EDITABLE_ENTITIES
+            )
+        ):
+            return None
+        logger.info(
+            "%s | processing | pip_id=%s change_id=%s operation=%s entity=%s relationship_type=%s source_kind=%s points=%s",
+            _ACCEPTED_POLICY_LOG,
+            change.pip_id,
+            change.pk,
+            operation,
+            entity,
+            relationship,
+            source_kind,
+            points,
+        )
+        return source_kind, points
+
+    @staticmethod
+    def _has_awardable_relationship(change: PipChange) -> bool:
+        """Check the canonical relationship and endpoint type shape used by PIP apply.
+
+        :param change: LINK or UNLINK change. Example: skill_activity LINK.
+        :return: Whether the relationship type and endpoint types are supported.
+        """
+        if change.entity_type:
+            return False
+        try:
+            endpoints = relationship_endpoint_types(change.relationship_type)
+        except ValidationError:
+            return False
+        return endpoints == (change.source_entity_type, change.target_entity_type)
 
     @staticmethod
     def _recorded_accepted_change_spec(
@@ -689,9 +958,24 @@ class KarmaService:
         :param event_identity: Stable change event. Example: "accepted_change:81".
         :param recipient_id: Submitter account identifier. Example: Maria's actual user pk.
         :return: Original specification or None. Example: original Design event and timestamp.
-        :raises ValidationError: For contradictory source/channel/snapshot data.
+        :raises ValidationError: For a conflicting event identity, recipient or channel.
         """
-        raise NotImplementedError()
+        rows = tuple(
+            KarmaAward.objects.filter(event_identity=event_identity).values(
+                *AwardSpec.__dataclass_fields__
+            )[:2]
+        )
+        if not rows:
+            return None
+        if (
+            len(rows) != 1
+            or rows[0]["recipient_id"] != recipient_id
+            or rows[0]["event_channel"] != EventChannel.ACCEPTED_CHANGE
+        ):
+            raise ValidationError(
+                "The accepted-change identity has a conflicting award."
+            )
+        return AwardSpec(**rows[0])
 
     @staticmethod
     def _partition_event_specs(

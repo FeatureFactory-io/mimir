@@ -22,6 +22,7 @@ from django.core.validators import validate_email
 from django.db import IntegrityError, connection, models, transaction
 from django.db.backends.base.creation import TEST_DATABASE_PREFIX
 from django.db.models import Prefetch, Q, prefetch_related_objects
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
 from accounts.models import get_or_create_email_verification, mark_email_verified
@@ -46,6 +47,7 @@ from methodology.services.experts_service import (
     LiveContributionCounts,
     resolve_primary_category,
 )
+from methodology.services.pip_service import PIPService
 
 CEDAR_PASSWORD = "Cedar-fictional-tests-only-2026"
 CEDAR_BASELINE_TIME_ISO = "2026-11-22T00:00:00+00:00"
@@ -1480,7 +1482,29 @@ def create_reviewed_major_add_pip(
     :return: Real reviewed proposal with one undecided change. Example: ADD Artifact PIP.
     :raises ValueError: For unsupported entity or missing target structure.
     """
-    raise NotImplementedError()
+    payload = _major_add_change_payload(dataset, entity_type)
+    book = dataset.playbooks_by_pk[6106]
+    if book.version != Decimal("2.0") or book.category != "design":
+        raise ValueError(
+            "The Cedar major ADD case requires Hana's Design playbook v2.0."
+        )
+    maria = dataset.users_by_username["mrodriguez"]
+    pip = PIPService.create_draft_for_playbook(
+        actor=maria,
+        playbook_id=book.pk,
+        title=f"Add an accessibility {entity_type}",
+        summary="Strengthen the form review for assistive technology.",
+    )
+    change = PIPService.add_change(actor=maria, pip=pip, **payload)
+    # The reviewed boundary is a real ORM fixture. This case does not run Galdr.
+    now = timezone.now()
+    pip.status = ProcessImprovementProposal.STATUS_REVIEWED
+    pip.submitted_at = now
+    pip.reviewed_at = now
+    pip.save(update_fields=["status", "submitted_at", "reviewed_at", "updated_at"])
+    change.galdr_recommendation = PipChange.GALDR_ACCEPT
+    change.save(update_fields=["galdr_recommendation", "updated_at"])
+    return pip
 
 
 def _major_add_change_payload(
@@ -1493,7 +1517,36 @@ def _major_add_change_payload(
     :return: Existing PIPService.add_change keyword payload. Example: parent_workflow_id.
     :raises ValueError: If a required workflow or producer cannot be resolved.
     """
-    raise NotImplementedError()
+    if entity_type not in (
+        PipChange.ENTITY_ACTIVITY,
+        PipChange.ENTITY_SKILL,
+        PipChange.ENTITY_ARTIFACT,
+    ):
+        raise ValueError(
+            "The Cedar major ADD case requires Activity, Skill or Artifact."
+        )
+    payload: dict[str, object] = {
+        "change_type": PipChange.CHANGE_ADD,
+        "entity_type": entity_type,
+        "name": f"Assistive Technology Check {entity_type}",
+        "content": "Use a screen reader to verify recovery after a form error.",
+    }
+    book = dataset.playbooks_by_pk[6106]
+    if entity_type == PipChange.ENTITY_ACTIVITY:
+        workflow = book.workflows.order_by("order", "pk").first()
+        if workflow is None:
+            raise ValueError("The Cedar major ADD Activity requires a parent workflow.")
+        payload["parent_workflow_id"] = workflow.pk
+    elif entity_type == PipChange.ENTITY_ARTIFACT:
+        producer = (
+            Activity.objects.filter(workflow__playbook=book).order_by("pk").first()
+        )
+        if producer is None:
+            raise ValueError(
+                "The Cedar major ADD Artifact requires a producer activity."
+            )
+        payload["produced_by_activity_ref"] = str(producer.pk)
+    return payload
 
 
 def create_nonaccepted_pip_case(
