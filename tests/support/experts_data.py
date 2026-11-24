@@ -52,6 +52,7 @@ from methodology.services.experts_service import (
     LiveContributionCounts,
     resolve_primary_category,
 )
+from methodology.services.pip_admin_service import PIPAdminService
 from methodology.services.pip_service import PIPService
 
 if TYPE_CHECKING:
@@ -1744,7 +1745,90 @@ def create_nonaccepted_pip_case(
     :raises ValueError: If status is outside the five contracted states.
     :raises ValidationError: If real creation or rejected finalization fails.
     """
-    raise NotImplementedError()
+    states = (
+        ProcessImprovementProposal.STATUS_DRAFT,
+        ProcessImprovementProposal.STATUS_SUBMITTED,
+        ProcessImprovementProposal.STATUS_PROCESSING_GALDR,
+        ProcessImprovementProposal.STATUS_REVIEWED,
+        ProcessImprovementProposal.STATUS_REJECTED,
+    )
+    if (
+        not isinstance(dataset, CedarDataset)
+        or not isinstance(status, str)
+        or status not in states
+    ):
+        raise ValueError("Provide Cedar data and one of the five nonaccepted states.")
+    with transaction.atomic():
+        pip = _create_nonaccepted_draft(dataset)
+        return _stage_nonaccepted_pip(dataset, pip, status)
+
+
+def _create_nonaccepted_draft(dataset: CedarDataset) -> ProcessImprovementProposal:
+    """Use normal draft/change builders for Hana's unchanged Design v2.0 target.
+
+    :param dataset: Restored Cedar data. Example: Maria and Hana6106.
+    :return: Actual draft with one unapplied ADD Activity. Example: draft PIP42.
+    :raises ValueError: If the required released target is not the Cedar baseline.
+    """
+    book = dataset.playbooks_by_pk[6106]
+    if (
+        book.status != "released"
+        or book.version != Decimal("2.0")
+        or book.category != "design"
+    ):
+        raise ValueError("Nonaccepted Cedar cases require Hana's released Design v2.0.")
+    pip = PIPService.create_draft_for_playbook(
+        actor=dataset.users_by_username["mrodriguez"],
+        playbook_id=book.pk,
+        title="Check form recovery before accepting",
+        summary="Unpublished recovery proposal for the Cedar fixture.",
+    )
+    PIPService.add_change(
+        actor=dataset.users_by_username["mrodriguez"],
+        pip=pip,
+        **_major_add_change_payload(dataset, PipChange.ENTITY_ACTIVITY),
+    )
+    return pip
+
+
+def _stage_nonaccepted_pip(
+    dataset: CedarDataset, pip: ProcessImprovementProposal, status: str
+) -> ProcessImprovementProposal:
+    """Establish explicit ORM eligibility states; rejection uses actual staff finalization.
+
+    :param dataset: Cedar users. Example: existing Mike staff reviewer.
+    :param pip: Normal newly created draft. Example: draft ADD Activity42.
+    :param status: Supported boundary. Example: "reviewed" with saved ACCEPT choice.
+    :return: Persisted ineligible proposal. Example: genuinely rejected PIP42.
+    :raises ValidationError: If real staff decision or finalization rejects the fixture.
+    """
+    if status == ProcessImprovementProposal.STATUS_DRAFT:
+        return pip
+    now = timezone.now()
+    pip.status = pip.STATUS_REVIEWED if status == pip.STATUS_REJECTED else status
+    pip.submitted_at = now
+    pip.reviewed_at = now if pip.status == pip.STATUS_REVIEWED else None
+    pip.save(update_fields=["status", "submitted_at", "reviewed_at", "updated_at"])
+    if pip.status != pip.STATUS_REVIEWED:
+        return pip
+    change = pip.changes.get()
+    change.galdr_recommendation = PipChange.GALDR_ACCEPT
+    change.save(update_fields=["galdr_recommendation", "updated_at"])
+    reviewer = dataset.users_by_username["mchen"]
+    if status == pip.STATUS_REJECTED:
+        return PIPAdminService.finalize_pip(
+            pip,
+            reviewer,
+            decisions={
+                change.pk: (PipChange.ADMIN_REJECT, "Rejected eligibility fixture")
+            },
+        )
+    PIPAdminService.save_decisions(
+        pip,
+        reviewer,
+        {change.pk: (PipChange.ADMIN_ACCEPT, "Saved choice, not finalization")},
+    )
+    return pip
 
 
 def create_reviewed_partial_pip(dataset: CedarDataset) -> ProcessImprovementProposal:
