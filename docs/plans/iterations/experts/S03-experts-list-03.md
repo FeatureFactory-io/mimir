@@ -11,7 +11,7 @@ primary_execution_layer: at
 expanded_case_count: 1
 dependencies: []
 system_dependencies: []
-status: implementation_in_progress
+status: complete
 source_report_sha256:
 - 10fff3e8ff8aedf25adf29450bec209cc841ceabfd89c095d08f7358be3d97b3
 - 98551b6d4009438fee244e3d25b50c4a7e5303954efac19e1a6c87dc855ef5d0
@@ -393,3 +393,19 @@ See `docs/experts-replay/pin-evidence/S03.json`. All new callable bodies raise. 
 `Makefile`, `docs/experts-replay/pin-evidence/S03.json`, `docs/features/CATALOG.md`, `docs/features/steps/experts_steps.py`, `docs/plans/iterations/experts/S03-experts-list-03.md`, `methodology/expert_views.py`, `methodology/migrations/0027_experts_schema.py`, `methodology/models/__init__.py`, `methodology/models/expert_profile.py`, `methodology/models/karma_award.py`, `methodology/services/expert_text.py`, `methodology/services/experts_service.py`, `mimir.db`, `mimir/urls.py`, `templates/experts/_breakdown.html`, `templates/experts/list.html`, `tests/conftest.py`, `tests/e2e/conftest.py`, `tests/e2e/test_experts_list_s03.py`, `tests/fixtures/CATALOG.md`, `tests/integration/test_experts_acceptance_runner.py`, `tests/integration/test_experts_data.py`, `tests/integration/test_experts_list_s03.py`, `tests/integration/test_experts_schema.py`, `tests/support/experts_acceptance.py`, `tests/support/experts_data.py`, `tests/support/experts_fixtures.py`, `tests/support/experts_html.py`, `tests/support/experts_logs.py`, `tests/unit/test_experts_html.py`, `tests/unit/test_experts_projection.py`, `tests/unit/test_experts_text.py`
 
 Skeleton: `2e78cb52812d05889185604865c91dd620a93c79`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.
+
+## Delivery evidence
+
+S03 accepted after independent review at local handoff e761ea6, with repaired
+implementation d641e27 and profile validator cleanup c4593cb. Final rollup:
+132 backend cases, one exact living-spec scenario with nine executed steps,
+one real Chromium category-switch case, and five log-story cases. Post-repair
+pre-Experts CI selection: 1,636 passed and three inherited skips.
+
+The first DoD review found an actual legacy seed combination absent from the
+Cedar baseline: an already released blank/retired-category book plus valid
+recipient awards caused HTTP 500. The owned real-DB regression and tie-count
+query fix preserve strict explicit input validation, private recognized release
+ties and independent public counts. Original failure footage is retained.
+S04's full card/action certification still owns the Analytics control overlap;
+this partial ranking scenario does not certify all future interactions.

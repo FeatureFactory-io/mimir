@@ -100,3 +100,24 @@ All 49 contracts were scaffolded together, so unrelated future test bodies are s
 - Only four assigned backend/test paths. Allowlisted public detail and generic HTTP 404 have no email/private evidence; GET is read-only. Generic rejection renders the same detail template without `person` so the N2 template can preserve the navigable shell. This is an implementation of the agreed generic 404, with no signature or footprint expansion.
 - Existing request middleware logs paths app-wide; feature privacy assertions target S17's actual loggers. No global middleware change or hardening claim.
 - Fresh N2 template-graduation worker dispatched. Root approved S30's recognized-category validation only for otherwise award-eligible first publication, using existing caught ValidationError. Real rejection/atomicity tests must prove it; no silent missing award or inferred category.
+
+## Parallel node handoffs after S03
+
+- S17/N2 a5c347a8d27318f1b208a11683c389ba42079aef: full escaped public paragraph, breakdown, public evidence links and generic navigable 404; 13 real HTTP cases. Contact stays for S14. Its future contact seam must remain request-local, without adding email/contact to the immutable public DTO.
+- S17/N3 d7df811d3172e4b467ba82770b4532d05f1af6a0: exact EXPERTS-VIEW-01, 1 scenario/7 steps, zero selected skips/undefined; 13 HTTP cases. Test-only footprint added the existing shared profile-step registrations, preserving later own-profile branches. Conflict map now serializes S10 after S17; no overlapping decorators or registration-order workaround.
+- S27/N1 9b6250f: real published public evidence query, modern partial/legacy aggregate/Cedar receipts; 27 behavior and 2 log cases. S27/N2 d07a7505b883598d27bfe83c40a2793a43c6eb1c: bounded layered prompt and plain-prose response validator, 45 behavior and 4 log cases. Model completion and persistence were not invoked; N3 boundary/proof worker is active.
+- S30/N1 0deb13227c926bebf16d6ef9c4bf40042ed9a860: first-release atomic award once, 37 real behavior and 3 log cases; one targeted retry fixed nested Django field-error code logging. S45 pair/race helpers stay pending. S30/N2 e77602fbe6431daaef0d80fa6a31d49134f6c5bc: actual first-release earned alert and no later earned alert; 8 HTTP and 4 log cases. S30/N3 52dd232e0e7e57e1ba4375dda54b9455193669a4: exact KARMA-RELEASE-01, 1 scenario/6 steps with actual authenticated CSRF-checked POST, zero selected skips/undefined; 8 HTTP cases.
+
+## S17 / N4-browser — NODE_FAIL; shared-style decision requested
+
+- Six Chromium cases passed: complete signed-in paragraph plus five desktop/tablet widths. Both phone layouts stacked correctly and had no horizontal overflow, but the existing fixed Analytics preference control obscures text after consent dismissal.
+- 390×844: 5×19 CSS-pixel overlap; 360×800: approximately 18×17. Actual hit-testing returned the Analytics control. Evidence retained under traces/MIN-S17-N4/phone and minimum-phone PNG/ZIP plus viewport-evidence.jsonl. The test module remains uncommitted for the failing assertions; no source workaround applied.
+- Prepared one-line proposal outside the source tree: review/UX02-analytics-shared-style.patch in the recording package. It moves the shared settings button into document flow after content. Consent controls and behavior stay present.
+<!-- ESCALATE -->
+type: scope_expansion
+severity: escalated
+evidence: S17 N4 needs static/css/mimir-app.css, outside its production footprint; fixed Analytics button covers real phone prose and the list action.
+jedao_recommendation: A: approve the prepared one-line shared-style fix and add the path to a bounded S17 repair node
+await_human_decision: true
+<!-- /ESCALATE -->
+- User question was submitted through the async input tool. No answer is assumed. S17 source fixes stop while S27, S30 and independent S01 work continue. No GitHub record was created, per the user's publication waiver.
