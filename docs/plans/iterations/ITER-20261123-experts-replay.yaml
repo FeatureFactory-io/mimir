@@ -52,7 +52,7 @@ iteration:
     candidate_deployment_status: Held pending SAO compatibility review and owned PostgreSQL scope proof.
     owned_postgres_scope_followup:
       owner_scenario: S45
-      status: implementation_in_progress
+      status: local_pass_pending_real_postgres_ci
       purpose: Explicit verified disposable PostgreSQL test data scope; existing SQLite and pytest/ambient denial guards preserved.
       footprint:
       - tests/support/experts_data.py
@@ -63,6 +63,16 @@ iteration:
       database_role_pattern: experts_cedar_<32-lowerhex-nonce>
       ownership: Private matching file marker plus live database/session user, database owner/comment and nonprivileged role verification before fixture writes.
       authorization: Necessary bounded data-isolation prerequisite inside approved S45 footprint under user autonomy; no product feature, visibility, ambient database or cloud platform change.
+    release_compatibility_followup:
+      owner_scenarios: [S39, S42]
+      status: repair_in_progress_release_blocked
+      architecture_basis: SAO implicit API v1 and distributed MCP facade compatibility.
+      actual_failure: Real baseline FOB detailGET200 then new receiptPOST404 fails; exportPOST200 writes two matching files then receipt404 fails.
+      repair: API response advertises versioned receipt support; absent advertisement preserves legacy content/export, v1 retains strict receipts, unknown version fails explicitly.
+      required_matrix: Real old-client/new-server, new-client/old-server, new-client/new-server, authorization/retry and unknown-version failures; no HTTP or ORM mocks.
+      ci_proof: Full Git history and MIMIR_REQUIRE_FOB_COMPAT=1 require actual baseline sources before image build.
+      restriction: No new discovery calls, global capability cache, native payload changes or swallowing current-server 404 revalidation errors.
+      authority: Necessary preservation of existing supported FOB behavior under approved scope autonomy; no new product capability.
   required_iteration_final_gates:
   - make test-at-harness
   - make test-at-experts
@@ -6149,6 +6159,11 @@ scenarios:
     skeleton_commit: 2b1a5946b52ccbaf22c519b166f4dfe58f85054e
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - mimir/middleware.py
+    - mimir/settings/base.py
+    - tests/integration/test_mcp_receipt_capabilities.py
+    - tests/support/fob_compatibility_probe.py
+    - tests/support/legacy_fob_compatibility_case.py
     - docs/experts-replay/pin-evidence/S39.json
     - docs/features/steps/karma_mcp_steps.py
     - docs/plans/iterations/experts/S39-karma-mcp-01.md
@@ -8717,6 +8732,11 @@ scenarios:
     skeleton_commit: f16474cfae587db99d4845f2fa265dae24a597e6
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - mimir/middleware.py
+    - mimir/settings/base.py
+    - tests/integration/test_mcp_receipt_capabilities.py
+    - tests/support/fob_compatibility_probe.py
+    - tests/support/legacy_fob_compatibility_case.py
     - Makefile
     - docs/features/steps/karma_mcp_steps.py
     - tests/unit/test_facade_tools_mount.py

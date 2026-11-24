@@ -3880,6 +3880,17 @@ of file count. The facade forwards authenticated context and stable operation
 identity to Django; business rules and ledger persistence remain in the shared
 service layer. Repeated independent successful calls are distinct events.
 
+Distributed-facade compatibility uses the capability header on each actual API
+response: `X-Mimir-Consumption-Receipts: v1`. A facade sends a receipt only when
+that response explicitly advertises v1. An absent header preserves the native
+read/export result against older FOBs, without claiming a receipt or award. An
+unknown advertised version fails clearly; exports reject it before writing
+files. With v1 advertised, receipt authorization, target deletion/privacy races,
+stable-identity retry and paired-award atomicity remain strict; a receipt 404 is
+not treated as evidence of an older server. The capability does not change native
+JSON shapes or require a probe request. This preserves the independently
+distributed Docker facade across the existing staged server rollout.
+
 Query projections sum source/category totals from the ledger. Select positive
 total users by primary category, then sort overall total descending, username
 ascending; limit five. Primary category ties use released-playbook counts in

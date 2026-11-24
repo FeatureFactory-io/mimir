@@ -970,3 +970,61 @@ FreshN4 exactead10acf63d6b46026d03498c8e289c95e14215d/all1991beforeafterzeroover
 ## SAO compatibility recheck before candidate deployment
 
 Denisexplicitly asks rereadSAO andprotectexistingbehavior. Rootrereadsactual architecture principles, access/privacy, Experts/AI anddeploymentsections. SAO2250/2423 explicitlysharedhuginn-db/logicalmimir forliveandidle. Noambientmigration/fixtureseed beforeconcreterelease review. Exactbaselinegitdiffzero forinfra/,existingidlepower/deploy/backup/promote scripts,entrypoint andprodsettings. NoCDK/newRDS/VPC/securitygroup/CNAME changes. Candidate deploymentheldpendingindependentread-onlyarchitecturereview; boundedqualityreviewer takesfreshSAOsubtaskaftersealing13style/5intentionalexceptions and50strictASTformatterproof. All893remainingRufffindings independentlyprovedinheritedsubsetof923baseline/30resolved; noglobalpass.
+
+
+## SAO audit found real distributed-client compatibility blocker
+
+IndependentreviewreadfullsubstantiveSAO and73production/configpaths, ran104focusedboundarychecks(+1explicitliveSESskip), independentlysealedexactsource. Actualbaseline333FOB plusrealold/newfacades reproducesoldclientdetail/exportsuccess versusnewGET200→receipt404PermissionError andexport200/twobyte-identicalfiles→receipt404PermissionError. Releasepublishesdistributedclientbeforeprodpromotion andolderFOBinstallationsalsoaffected. Baselinehealthhasnocapabilityadvertisement; blanketreceipt404swallowwouldbreakstrictcurrentrevalidation. Releaseblocked; branchCIonlylatestfalse/deployfalse. ReviewSHA6e6502318ca4c48486cc0edfe05bb195cdbe265854a6f1efd6ff73a509e23ed2. FreshS39/S42owner implementsversionedactualresponsecapabilityheader,legacyabsentfallbackandstrictv1/unknownversionchecks withrealold/newservermatrix. Parentreconcilesfiveproduction/testsharedpaths andCItestcheckoutfullhistory/requiredproof; no newdomainfeature/authrelaxation.
+
+WholeMakeAT nowpositivelypasses7features/83scenarios/410stepszero skips at exacte2ff5fc;24agent/harnessalsoPASS. WholeMakeTest3156casesstillrunning andhas8observedfailures:6staleS04capturemetadatachecksafterformatterchangedexpert_views/test_expert_cards, and2staleS02/S06prefixselectorscountinginitials/hintsasactualcards. Independentactual2caseRED confirmslattertestdebt; freshownerrepairscontainerselectorwhilekeepingexactorder/cardcount. Rootactual29-browserrecapturePASS182.46s atfrozend291worktree/all1993sourceblobsrecorded; fourCDNfontmissesgetseparaterealcaptureprovenance, originalsunchanged. No metadatahashfaking/oldcaptureoverwrite.
+
+CI45507315886failedcollectionbeforetest/imagebuild/deploybecauseSettingsWrapperruntimeimportremovedbyinstalleddependency. SoleS23annotation-onlyfixc45b036movesimportunderTYPE_CHECKING;20callableASTs unchanged,missing-exportprobeRED→GREEN,67focused+canonicalS23(39/1/3/7)PASS. ActualCIretry45508236061atc45build-onlydeployfalse/wakefalse;ownedPG9actualcasesandwholeCIstillpending. LOCAL_PASS_PENDING_CI for603cS45guard/adff03659104e4ac354a42298a578d51bbadd37e40b6380d01949e37e72dd950 isnotlivePostgresPASS.
+
+### 2026-11-24 — SAO compatibility and whole-suite convergence
+
+The governing SAO was reread, including AWS/environment and release sequencing,
+shared data, authentication/guest access, Experts ledger/summary boundaries and
+the distributed facade contract. The independent architecture review is retained
+in the production package under `planning/SAO-compatibility-review-20261124`.
+It found a real release blocker: the new independently distributed facade treated
+an older FOB's missing receipt endpoint as a failed native read/export. Actual
+baseline `333c36d` reproduction, including files already written before the
+failure, is retained. The bounded repair `694b9ac` advertises receipt capability
+on actual API responses and preserves older-FOB native behavior when absent;
+unknown versions fail explicitly and advertised-v1 failures remain strict.
+Actual older/newer server/client compatibility matrix: 16 passed. Independent
+repair review remains required; no candidate deployment has been performed.
+SAO now records this explicit version-negotiation boundary. Normal idle deployment
+shares production's logical RDS database; no Cedar import or demo reset is allowed
+there. Existing idle wake is not represented as proof of zero startup DB writes.
+
+The first actual complete `make test` at `e2ff5fc` failed: 192 failed, 2,948 passed,
+3 skipped and 13 errors. The untouched baseline `333c36d` passes 1,636 tests with
+3 skipped under the same local dependencies; the new failures are not dismissed
+as inherited. Eight were stale visual metadata/card test selectors. The other
+failure clusters have real ordered reproductions: an async SQLite fixture leaked
+a private connection into the shared executor, and an older migration test left
+the schema at 0013 before newer Karma tests. Narrow test-fixture repairs are
+under verification, with original failure evidence retained. A full rerun on a
+stable committed source is required; no whole-suite pass is claimed.
+
+S02/S06 selector repair `7541c43` retains exact five-card count and ranking checks,
+uses actual article containers and rejects inserted/missing/misordered cards.
+The previous S04 evidence manifest is retained externally before replacement.
+Fresh actual source `d291f42` passed the full 29-case browser matrix; four external
+icon-font misses were subsequently recaptured against identical input hashes.
+All original captures remain. Eight actual-pixel comparison sheets were visually
+reviewed against the unchanged approved ESM reference images (seven viewport
+matrices and minimum-phone detail); this is not a claim of 29 individual
+full-resolution inspections. Portable recapture copies preserve bytes and are
+mapped to their original acquisition paths. Fresh manifest checks: 9 passed.
+Actual external evidence gate: 29 screenshot/trace pairs and 4 recapture runs
+verified, including source acquisition records and genuine CLI casts. The
+saved-refusal consent-handler limitation remains recorded; no repair/pass claim
+was added for it.
+
+CI build-only run 45507315886 failed collection due to a removed annotation-only
+pytest-django export; `c45b036` removes that runtime dependency with no test-body
+change. Retry 45508236061 is still pending at this journal entry. The nine real
+Postgres-owned-scope checks have not yet been counted as passed. Candidate
+build/deploy, staging Saga/UAT and reviewed main merge/release remain open.

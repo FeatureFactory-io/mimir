@@ -3,11 +3,11 @@
   "owner": "S04",
   "contract": "EXPERTS-LIST-04",
   "evidence_observed": true,
-  "source_revision": "b5bb73e23a8592690ba9af51dc535cc3e27d85ba",
+  "source_revision": "d291f420a0f80985d27000849fc551624b2b3cd9",
   "source_sha256": {
     "docs/ux/IA_guidelines.md": "5806c0d073419f7bd9ed3e17c9f9a7a1780a73aef3ecfa84c6aa77d13251386a",
     "docs/ux/experts-responsive-evidence.json": "2711f4c5451b98d21f6530fd3469ea694f38105bfd11944d301512fca09b12e4",
-    "methodology/expert_views.py": "3ce5b0ebe862db8796649390993048e41b8c25a454b95b308d1f8bf255153f09",
+    "methodology/expert_views.py": "dc62b5e03ac0b2c6ded684e255b7e56bdb1263a833d5348706da2763ceb9613f",
     "methodology/services/expert_card_presentation.py": "c5126e211a1d250298eb35d91af4fc49a9eb70aa0f25b9013beacb0489081a2a",
     "static/css/design-system.css": "3563705e7c4e6ccf327bc4ce0804ce15231a962ca6767b0b65f094ebd36ea9c6",
     "static/css/mimir-app.css": "0e9beed166f4277060ca7f5b5a73462e1ab0838da8e3d076baccde865f8c0774",
@@ -19,7 +19,7 @@
     "templates/mockups/experts/base.html": "2f8b19601e3a4100d513ba8f3914f8dea247c2b8d254a9cd6e1a615a4d2465a9",
     "templates/mockups/experts/list.html": "81eeb9f2351153be714cc60a7c1be4273f314243f837f202a8bbe520c30cf67a",
     "test-data/experts/cedar-rfp-01.json": "ecac2f4494984eecd7216e94d3dcd3d75512359f8d50d06f712c4cd7d47dfbfb",
-    "tests/e2e/test_expert_cards.py": "480e0b6081c789d04356efbf326871e310bdef2c0c740b2d4b99b4fb689df83f"
+    "tests/e2e/test_expert_cards.py": "896285a8b9281e28cda5f66515c7e09a5c3bbcab96caa0d3f5e712046abac379"
   },
   "environment": {
     "scope": "Local production-route certification",
@@ -34,108 +34,58 @@
     "passed": 29,
     "failed": 0,
     "skipped": 0,
-    "transcript": "cli/MIN-S04-N4-browser-repaired-observer-final.txt",
-    "source_head": "traces/MIN-S04-N4/repaired-observer-final/source-head.txt",
-    "source_hashes": "traces/MIN-S04-N4/repaired-observer-final/source-sha256.json",
+    "transcript": "cli/S04-final-browser-recapture-d291f42-20261124.txt",
+    "source_head": "traces/S04-final-recapture-20261124/source-head.txt",
+    "source_hashes": "traces/S04-final-recapture-20261124/source-sha256.json",
     "asset_recaptures": [
       {
         "cases": [
-          "guest-1512-982"
+          "missing_summary-390-844"
         ],
-        "directory": "traces/MIN-S04-N4/recheck-asset-guest-1512-982-1",
-        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
-        "transcript": "cli/MIN-S04-N4-recheck-asset-guest-1512-982-1.txt",
-        "original_report": "traces/MIN-S04-N4/repaired-observer-final/guest-1512-982.json",
-        "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
+        "directory": "traces/S04-final-recheck-asset-missing_summary-390-844-1",
+        "source_revision": "d291f420a0f80985d27000849fc551624b2b3cd9",
+        "transcript": "cli/S04-final-recheck-asset-missing_summary-390-844-1.txt",
+        "original_report": "traces/S04-final-recapture-20261124/missing_summary-390-844.json",
+        "reason": "The full genuine browser case passed, but its original capture lacked the external icon font. This later real-browser capture has matching source inputs and both required fonts."
       },
       {
         "cases": [
-          "long_identity_and_prose-1512-982"
+          "missing_summary-1920-1080"
         ],
-        "directory": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-1512-982-1",
-        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
-        "transcript": "cli/MIN-S04-N4-recheck-asset-long_identity_and_prose-1512-982-1.txt",
-        "original_report": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-1512-982.json",
-        "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
+        "directory": "traces/S04-final-recheck-asset-missing_summary-1920-1080-1",
+        "source_revision": "d291f420a0f80985d27000849fc551624b2b3cd9",
+        "transcript": "cli/S04-final-recheck-asset-missing_summary-1920-1080-1.txt",
+        "original_report": "traces/S04-final-recapture-20261124/missing_summary-1920-1080.json",
+        "reason": "The full genuine browser case passed, but its original capture lacked the external icon font. This later real-browser capture has matching source inputs and both required fonts."
       },
       {
         "cases": [
           "long_identity_and_prose-1920-1080"
         ],
-        "directory": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-1920-1080-1",
-        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
-        "transcript": "cli/MIN-S04-N4-recheck-asset-long_identity_and_prose-1920-1080-1.txt",
-        "original_report": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-1920-1080.json",
-        "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
-      },
-      {
-        "cases": [
-          "long_identity_and_prose-768-1024"
-        ],
-        "directory": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-768-1024-3",
-        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
-        "transcript": "cli/MIN-S04-N4-recheck-asset-long_identity_and_prose-768-1024-3.txt",
-        "original_report": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-768-1024.json",
-        "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
-      },
-      {
-        "cases": [
-          "missing_summary-1280-800"
-        ],
-        "directory": "traces/MIN-S04-N4/recheck-asset-missing_summary-1280-800-1",
-        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
-        "transcript": "cli/MIN-S04-N4-recheck-asset-missing_summary-1280-800-1.txt",
-        "original_report": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1280-800.json",
-        "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
-      },
-      {
-        "cases": [
-          "missing_summary-360-800"
-        ],
-        "directory": "traces/MIN-S04-N4/recheck-asset-missing_summary-360-800-2",
-        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
-        "transcript": "cli/MIN-S04-N4-recheck-asset-missing_summary-360-800-2.txt",
-        "original_report": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-360-800.json",
-        "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
-      },
-      {
-        "cases": [
-          "missing_summary-390-844"
-        ],
-        "directory": "traces/MIN-S04-N4/recheck-asset-missing_summary-390-844-1",
-        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
-        "transcript": "cli/MIN-S04-N4-recheck-asset-missing_summary-390-844-1.txt",
-        "original_report": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-390-844.json",
-        "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
+        "directory": "traces/S04-final-recheck-asset-long_identity_and_prose-1920-1080-1",
+        "source_revision": "d291f420a0f80985d27000849fc551624b2b3cd9",
+        "transcript": "cli/S04-final-recheck-asset-long_identity_and_prose-1920-1080-1.txt",
+        "original_report": "traces/S04-final-recapture-20261124/long_identity_and_prose-1920-1080.json",
+        "reason": "The full genuine browser case passed, but its original capture lacked the external icon font. This later real-browser capture has matching source inputs and both required fonts."
       },
       {
         "cases": [
           "normal-1920-1080"
         ],
-        "directory": "traces/MIN-S04-N4/recheck-asset-normal-1920-1080-2",
-        "source_revision": "8efa1bca78aa7844cca02db46846b53a96cccaad",
-        "transcript": "cli/MIN-S04-N4-recheck-asset-normal-1920-1080-2.txt",
-        "original_report": "traces/MIN-S04-N4/repaired-observer-final/normal-1920-1080.json",
-        "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
-      },
-      {
-        "cases": [
-          "normal-768-1024"
-        ],
-        "directory": "traces/MIN-S04-N4/recheck-asset-normal-768-1024-2",
-        "source_revision": "8efa1bca78aa7844cca02db46846b53a96cccaad",
-        "transcript": "cli/MIN-S04-N4-recheck-asset-normal-768-1024-2.txt",
-        "original_report": "traces/MIN-S04-N4/repaired-observer-final/normal-768-1024.json",
-        "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
+        "directory": "traces/S04-final-recheck-asset-normal-1920-1080-1",
+        "source_revision": "d291f420a0f80985d27000849fc551624b2b3cd9",
+        "transcript": "cli/S04-final-recheck-asset-normal-1920-1080-1.txt",
+        "original_report": "traces/S04-final-recapture-20261124/normal-1920-1080.json",
+        "reason": "The full genuine browser case passed, but its original capture lacked the external icon font. This later real-browser capture has matching source inputs and both required fonts."
       }
     ]
   },
   "review_basis": {
     "guide": "docs/ux/IA_guidelines.md#11-experts-replay-recipe-and-responsive-coverage-contract",
     "approved_index": "docs/ux/experts-responsive-evidence.json",
-    "reviewer": "Codex S04 browser evidence reviewer",
-    "notes": "Compared implementation captures with approved ESM-06 views. The browser trace records actual keyboard focus and pointer actionability before the full-page screenshot is composed at the top of the route. The guest consent panel stayed open with no stored preference throughout all guest card checks. The approved Mike detail frames show the exact fallback string; the approved leaderboard is the layout reference for both signed-in list variants.",
-    "contact_sheets": "traces/MIN-S04-N4/repaired-observer-final/review-sheets"
+    "reviewer": "Codex visual review",
+    "notes": "All 29 selected captures were compared with the unchanged approved ESM references through eight actual-pixel comparison sheets (seven viewport matrices plus the minimum-phone detail). This is a contact-sheet visual review, supported by the genuine 29-case keyboard, pointer, geometry and route checks; it does not claim full-size individual inspection of every screenshot. Four external-font misses were recaptured; all original acquisitions remain retained. The guest consent panel was open with no stored preference during the card checks; this does not certify saved-refusal behavior.",
+    "contact_sheets": "traces/S04-final-recapture-20261124/review-sheets"
   },
   "captures": [
     {
@@ -159,14 +109,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/normal-1280-800.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/normal-1280-800.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/normal-1280-800.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/normal-1280-800.png",
+      "trace": "traces/S04-final-recapture-20261124/normal-1280-800.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/normal-1280-800.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-wide-low.png",
-        "notes": "The sidebar and one-row Design tabs match the wide-low reference. Maria is the second card with 8,200; all five cards place distinct actions beside the score. Hana’s focused Reach out remains visible lower in the document."
+        "notes": "Five Design cards retain Sofia, Maria, Priya, Daniel and Hana order. The navy, gold and grey palette, Montserrat header, ranks, scores and separate actions match the approved layout. Narrow layouts stack actions within their card; controls remain visible. Compared in the wide-low review sheet."
       },
       "defects": []
     },
@@ -191,14 +141,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-1280-800.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-1280-800.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-1280-800.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/long_identity_and_prose-1280-800.png",
+      "trace": "traces/S04-final-recapture-20261124/long_identity_and_prose-1280-800.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/long_identity_and_prose-1280-800.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-wide-low.png",
-        "notes": "Maria’s long identity wraps into two lines and expands the second card. Only the contribution hint has an ellipsis; the score and two buttons retain their own space on the right."
+        "notes": "The long identity and prose wrap within the card at narrow widths. Cards grow vertically without covering the score or actions. Header, palette, typography and five-card order match the approved layout. Compared in the wide-low review sheet."
       },
       "defects": []
     },
@@ -223,14 +173,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/recheck-asset-missing_summary-1280-800-1/missing_summary-1280-800.png",
-      "trace": "traces/MIN-S04-N4/recheck-asset-missing_summary-1280-800-1/missing_summary-1280-800.zip",
-      "capture_report": "traces/MIN-S04-N4/recheck-asset-missing_summary-1280-800-1/missing_summary-1280-800.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/missing_summary-1280-800.png",
+      "trace": "traces/S04-final-recapture-20261124/missing_summary-1280-800.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/missing_summary-1280-800.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-missing-summary-wide-low.png",
-        "notes": "Development shows two ranked cards. Mike’s numeric hint appears below his badge and reads 2 released playbooks · 47 copies; 12,450 and the action pair stay aligned right."
+        "notes": "The Development list shows Mike at 12,450 with the exact fallback “2 released playbooks · 47 copies” and Jordan at 6,100. The two-card layout retains the approved spacing, typography and actions. Compared in the wide-low review sheet."
       },
       "defects": []
     },
@@ -255,14 +205,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/guest-1280-800.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/guest-1280-800.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/guest-1280-800.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/guest-1280-800.png",
+      "trace": "traces/S04-final-recapture-20261124/guest-1280-800.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/guest-1280-800.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-guest-list-wide-low.png",
-        "notes": "The sign-in banner precedes the Design pills and all five ranked cards. Disabled Reach out sits beside each enabled View profile. The open consent choices appear below the footer, away from the scrollable action rows."
+        "notes": "The guest banner, five public Design cards and disabled contact actions match the approved guest layout. The first-visit consent panel follows the content and does not cover card actions; stored consent is outside this visual claim. Compared in the wide-low review sheet."
       },
       "defects": []
     },
@@ -287,14 +237,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/recheck-asset-normal-1920-1080-2/normal-1920-1080.png",
-      "trace": "traces/MIN-S04-N4/recheck-asset-normal-1920-1080-2/normal-1920-1080.zip",
-      "capture_report": "traces/MIN-S04-N4/recheck-asset-normal-1920-1080-2/normal-1920-1080.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recheck-asset-normal-1920-1080-1/normal-1920-1080.png",
+      "trace": "traces/S04-final-recheck-asset-normal-1920-1080-1/normal-1920-1080.zip",
+      "capture_report": "traces/S04-final-recheck-asset-normal-1920-1080-1/normal-1920-1080.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-large-desktop.png",
-        "notes": "The five wide rows keep names and hints to the left and totals and actions aligned right. Maria’s 8,200 is visibly separate from the buttons and the Feedback tab touches only the outer card margin."
+        "notes": "Five Design cards retain Sofia, Maria, Priya, Daniel and Hana order. The navy, gold and grey palette, Montserrat header, ranks, scores and separate actions match the approved layout. Narrow layouts stack actions within their card; controls remain visible. Compared in the large-desktop review sheet."
       },
       "defects": []
     },
@@ -319,14 +269,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-1920-1080-1/long_identity_and_prose-1920-1080.png",
-      "trace": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-1920-1080-1/long_identity_and_prose-1920-1080.zip",
-      "capture_report": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-1920-1080-1/long_identity_and_prose-1920-1080.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recheck-asset-long_identity_and_prose-1920-1080-1/long_identity_and_prose-1920-1080.png",
+      "trace": "traces/S04-final-recheck-asset-long_identity_and_prose-1920-1080-1/long_identity_and_prose-1920-1080.zip",
+      "capture_report": "traces/S04-final-recheck-asset-long_identity_and_prose-1920-1080-1/long_identity_and_prose-1920-1080.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-large-desktop.png",
-        "notes": "The full long identity fits across Maria’s row. The extended paragraph actually exceeds the available two hint lines and the visual excerpt ends before 8,200 and the two actions."
+        "notes": "The long identity and prose wrap within the card at narrow widths. Cards grow vertically without covering the score or actions. Header, palette, typography and five-card order match the approved layout. Compared in the large-desktop review sheet."
       },
       "defects": []
     },
@@ -351,14 +301,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1920-1080.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1920-1080.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1920-1080.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recheck-asset-missing_summary-1920-1080-1/missing_summary-1920-1080.png",
+      "trace": "traces/S04-final-recheck-asset-missing_summary-1920-1080-1/missing_summary-1920-1080.zip",
+      "capture_report": "traces/S04-final-recheck-asset-missing_summary-1920-1080-1/missing_summary-1920-1080.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-missing-summary-large-desktop.png",
-        "notes": "Mike’s compact first row shows the complete two-count hint, with Jordan following at rank two. The two distinct actions for both cards remain isolated at the far right."
+        "notes": "The Development list shows Mike at 12,450 with the exact fallback “2 released playbooks · 47 copies” and Jordan at 6,100. The two-card layout retains the approved spacing, typography and actions. Compared in the large-desktop review sheet."
       },
       "defects": []
     },
@@ -383,14 +333,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/guest-1920-1080.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/guest-1920-1080.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/guest-1920-1080.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/guest-1920-1080.png",
+      "trace": "traces/S04-final-recapture-20261124/guest-1920-1080.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/guest-1920-1080.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-guest-list-large-desktop.png",
-        "notes": "The leaderboard extends across the desktop, with cards keeping their aligned icon buttons and scores. The sign-in banner remains prominent and the open prompt sits in the footer area, below Hana’s actions."
+        "notes": "The guest banner, five public Design cards and disabled contact actions match the approved guest layout. The first-visit consent panel follows the content and does not cover card actions; stored consent is outside this visual claim. Compared in the large-desktop review sheet."
       },
       "defects": []
     },
@@ -415,14 +365,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/normal-1512-982.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/normal-1512-982.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/normal-1512-982.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/normal-1512-982.png",
+      "trace": "traces/S04-final-recapture-20261124/normal-1512-982.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/normal-1512-982.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-laptop.png",
-        "notes": "Design is selected beneath the icon/title and all five ranks are visible in sequence. Maria’s two-line hint ends separately from 8,200 and the adjacent View profile and Reach out buttons."
+        "notes": "Five Design cards retain Sofia, Maria, Priya, Daniel and Hana order. The navy, gold and grey palette, Montserrat header, ranks, scores and separate actions match the approved layout. Narrow layouts stack actions within their card; controls remain visible. Compared in the laptop review sheet."
       },
       "defects": []
     },
@@ -447,14 +397,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-1512-982-1/long_identity_and_prose-1512-982.png",
-      "trace": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-1512-982-1/long_identity_and_prose-1512-982.zip",
-      "capture_report": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-1512-982-1/long_identity_and_prose-1512-982.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/long_identity_and_prose-1512-982.png",
+      "trace": "traces/S04-final-recapture-20261124/long_identity_and_prose-1512-982.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/long_identity_and_prose-1512-982.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-laptop.png",
-        "notes": "The last word of Maria’s expanded name wraps onto a second line. The prose stops at the two-line hint and her aligned action pair and 8,200 stay clear."
+        "notes": "The long identity and prose wrap within the card at narrow widths. Cards grow vertically without covering the score or actions. Header, palette, typography and five-card order match the approved layout. Compared in the laptop review sheet."
       },
       "defects": []
     },
@@ -479,14 +429,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1512-982.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1512-982.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1512-982.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/missing_summary-1512-982.png",
+      "trace": "traces/S04-final-recapture-20261124/missing_summary-1512-982.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/missing_summary-1512-982.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-missing-summary-laptop.png",
-        "notes": "The selected Development pill and the two Cedar ranks are clear. The complete one-line numeric hint matches the approved Mike profile reference; both action pairs sit on their score rows."
+        "notes": "The Development list shows Mike at 12,450 with the exact fallback “2 released playbooks · 47 copies” and Jordan at 6,100. The two-card layout retains the approved spacing, typography and actions. Compared in the laptop review sheet."
       },
       "defects": []
     },
@@ -511,14 +461,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/recheck-asset-guest-1512-982-1/guest-1512-982.png",
-      "trace": "traces/MIN-S04-N4/recheck-asset-guest-1512-982-1/guest-1512-982.zip",
-      "capture_report": "traces/MIN-S04-N4/recheck-asset-guest-1512-982-1/guest-1512-982.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/guest-1512-982.png",
+      "trace": "traces/S04-final-recapture-20261124/guest-1512-982.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/guest-1512-982.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-guest-list-laptop.png",
-        "notes": "Sign In and Register are readable in the banner above the active Design tab. Maria’s score and both controls remain clear. The Analytics button and first-visit choices are separately visible below the footer."
+        "notes": "The guest banner, five public Design cards and disabled contact actions match the approved guest layout. The first-visit consent panel follows the content and does not cover card actions; stored consent is outside this visual claim. Compared in the laptop review sheet."
       },
       "defects": []
     },
@@ -543,14 +493,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/recheck-asset-normal-768-1024-2/normal-768-1024.png",
-      "trace": "traces/MIN-S04-N4/recheck-asset-normal-768-1024-2/normal-768-1024.zip",
-      "capture_report": "traces/MIN-S04-N4/recheck-asset-normal-768-1024-2/normal-768-1024.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/normal-768-1024.png",
+      "trace": "traces/S04-final-recapture-20261124/normal-768-1024.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/normal-768-1024.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-tablet-portrait.png",
-        "notes": "The sidebar collapses and category pills remain on one row. The action pair wraps below each card’s identity while the right-aligned scores remain readable beside the hints."
+        "notes": "Five Design cards retain Sofia, Maria, Priya, Daniel and Hana order. The navy, gold and grey palette, Montserrat header, ranks, scores and separate actions match the approved layout. Narrow layouts stack actions within their card; controls remain visible. Compared in the tablet-portrait review sheet."
       },
       "defects": []
     },
@@ -575,14 +525,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-768-1024-3/long_identity_and_prose-768-1024.png",
-      "trace": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-768-1024-3/long_identity_and_prose-768-1024.zip",
-      "capture_report": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-768-1024-3/long_identity_and_prose-768-1024.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/long_identity_and_prose-768-1024.png",
+      "trace": "traces/S04-final-recapture-20261124/long_identity_and_prose-768-1024.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/long_identity_and_prose-768-1024.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-tablet-portrait.png",
-        "notes": "Long identity occupies two lines above its excerpt. The score remains at right and both actions stay in a separate row beneath, with the narrow sidebar collapsed."
+        "notes": "The long identity and prose wrap within the card at narrow widths. Cards grow vertically without covering the score or actions. Header, palette, typography and five-card order match the approved layout. Compared in the tablet-portrait review sheet."
       },
       "defects": []
     },
@@ -607,14 +557,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-768-1024.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-768-1024.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-768-1024.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/missing_summary-768-1024.png",
+      "trace": "traces/S04-final-recapture-20261124/missing_summary-768-1024.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/missing_summary-768-1024.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-missing-summary-tablet-portrait.png",
-        "notes": "Below the single pill row, Mike’s one-line fallback is visible before the action row. Mike and Jordan each keep a clear right-aligned score and paired buttons beneath."
+        "notes": "The Development list shows Mike at 12,450 with the exact fallback “2 released playbooks · 47 copies” and Jordan at 6,100. The two-card layout retains the approved spacing, typography and actions. Compared in the tablet-portrait review sheet."
       },
       "defects": []
     },
@@ -639,14 +589,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/guest-768-1024.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/guest-768-1024.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/guest-768-1024.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/guest-768-1024.png",
+      "trace": "traces/S04-final-recapture-20261124/guest-768-1024.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/guest-768-1024.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-guest-list-tablet-portrait.png",
-        "notes": "With the sidebar collapsed, the banner and all five pills remain legible. Enabled View profile and disabled Reach out sit beneath each contributor’s identity. Both consent buttons fit below the document footer."
+        "notes": "The guest banner, five public Design cards and disabled contact actions match the approved guest layout. The first-visit consent panel follows the content and does not cover card actions; stored consent is outside this visual claim. Compared in the tablet-portrait review sheet."
       },
       "defects": []
     },
@@ -671,14 +621,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/normal-1024-768.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/normal-1024-768.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/normal-1024-768.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/normal-1024-768.png",
+      "trace": "traces/S04-final-recapture-20261124/normal-1024-768.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/normal-1024-768.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-tablet-landscape.png",
-        "notes": "The sidebar remains open and each card’s two actions move beneath the identity and total. The low-height layout scrolls through all five ranks without covering the controls."
+        "notes": "Five Design cards retain Sofia, Maria, Priya, Daniel and Hana order. The navy, gold and grey palette, Montserrat header, ranks, scores and separate actions match the approved layout. Narrow layouts stack actions within their card; controls remain visible. Compared in the tablet-landscape review sheet."
       },
       "defects": []
     },
@@ -703,14 +653,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-1024-768.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-1024-768.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-1024-768.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/long_identity_and_prose-1024-768.png",
+      "trace": "traces/S04-final-recapture-20261124/long_identity_and_prose-1024-768.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/long_identity_and_prose-1024-768.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-tablet-landscape.png",
-        "notes": "The long second card grows vertically with no change to rank. Maria’s full wrapped name, badge and two-line hint stay apart from the 8,200 score and lower pair of controls."
+        "notes": "The long identity and prose wrap within the card at narrow widths. Cards grow vertically without covering the score or actions. Header, palette, typography and five-card order match the approved layout. Compared in the tablet-landscape review sheet."
       },
       "defects": []
     },
@@ -735,14 +685,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1024-768.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1024-768.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1024-768.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/missing_summary-1024-768.png",
+      "trace": "traces/S04-final-recapture-20261124/missing_summary-1024-768.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/missing_summary-1024-768.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-missing-summary-tablet-landscape.png",
-        "notes": "With the sidebar open, the Development list puts action pairs underneath each contributor. Mike’s 12,450 aligns to the right and his live fallback appears intact above the buttons."
+        "notes": "The Development list shows Mike at 12,450 with the exact fallback “2 released playbooks · 47 copies” and Jordan at 6,100. The two-card layout retains the approved spacing, typography and actions. Compared in the tablet-landscape review sheet."
       },
       "defects": []
     },
@@ -767,14 +717,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/guest-1024-768.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/guest-1024-768.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/guest-1024-768.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/guest-1024-768.png",
+      "trace": "traces/S04-final-recapture-20261124/guest-1024-768.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/guest-1024-768.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-guest-list-tablet-landscape.png",
-        "notes": "The sidebar and wrapped-under action rows match the landscape recipe. Scrolling through the complete ranking reaches Hana’s buttons before the footer and open consent prompt, which covers none of the card controls."
+        "notes": "The guest banner, five public Design cards and disabled contact actions match the approved guest layout. The first-visit consent panel follows the content and does not cover card actions; stored consent is outside this visual claim. Compared in the tablet-landscape review sheet."
       },
       "defects": []
     },
@@ -799,14 +749,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/normal-390-844.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/normal-390-844.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/normal-390-844.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/normal-390-844.png",
+      "trace": "traces/S04-final-recapture-20261124/normal-390-844.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/normal-390-844.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-phone.png",
-        "notes": "The category pills use two rows. All five cards put totals and the adjacent action pair underneath the content, keeping Maria’s full name and 8,200 readable."
+        "notes": "Five Design cards retain Sofia, Maria, Priya, Daniel and Hana order. The navy, gold and grey palette, Montserrat header, ranks, scores and separate actions match the approved layout. Narrow layouts stack actions within their card; controls remain visible. Compared in the phone review sheet."
       },
       "defects": []
     },
@@ -831,14 +781,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-390-844.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-390-844.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-390-844.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/long_identity_and_prose-390-844.png",
+      "trace": "traces/S04-final-recapture-20261124/long_identity_and_prose-390-844.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/long_identity_and_prose-390-844.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-phone.png",
-        "notes": "The long first name breaks across lines without ellipsis. The two-line excerpt alone clamps; 8,200 and the adjacent icon buttons appear below the expanded identity."
+        "notes": "The long identity and prose wrap within the card at narrow widths. Cards grow vertically without covering the score or actions. Header, palette, typography and five-card order match the approved layout. Compared in the phone review sheet."
       },
       "defects": []
     },
@@ -863,14 +813,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/recheck-asset-missing_summary-390-844-1/missing_summary-390-844.png",
-      "trace": "traces/MIN-S04-N4/recheck-asset-missing_summary-390-844-1/missing_summary-390-844.zip",
-      "capture_report": "traces/MIN-S04-N4/recheck-asset-missing_summary-390-844-1/missing_summary-390-844.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recheck-asset-missing_summary-390-844-1/missing_summary-390-844.png",
+      "trace": "traces/S04-final-recheck-asset-missing_summary-390-844-1/missing_summary-390-844.zip",
+      "capture_report": "traces/S04-final-recheck-asset-missing_summary-390-844-1/missing_summary-390-844.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-missing-summary-phone.png",
-        "notes": "The fallback wraps onto two complete lines with copies visible. The 12,450 total and two side-by-side actions remain distinct below Mike’s identity."
+        "notes": "The Development list shows Mike at 12,450 with the exact fallback “2 released playbooks · 47 copies” and Jordan at 6,100. The two-card layout retains the approved spacing, typography and actions. Compared in the phone review sheet."
       },
       "defects": []
     },
@@ -895,14 +845,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/guest-390-844.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/guest-390-844.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/guest-390-844.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/guest-390-844.png",
+      "trace": "traces/S04-final-recapture-20261124/guest-390-844.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/guest-390-844.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-guest-list-phone.png",
-        "notes": "The banner links and category pills wrap cleanly. The two card buttons fit beside one another after the score; the open prompt beneath the footer uses a vertical layout with both choices visible."
+        "notes": "The guest banner, five public Design cards and disabled contact actions match the approved guest layout. The first-visit consent panel follows the content and does not cover card actions; stored consent is outside this visual claim. Compared in the phone review sheet."
       },
       "defects": []
     },
@@ -927,14 +877,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/normal-360-800.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/normal-360-800.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/normal-360-800.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/normal-360-800.png",
+      "trace": "traces/S04-final-recapture-20261124/normal-360-800.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/normal-360-800.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-minimum-phone.png",
-        "notes": "Maria’s ordinary name wraps across two lines. The score and the two separate action rows stay readable, including the last Reach out focus ring. The repaired signed-in contact control leaves View profile clear."
+        "notes": "Five Design cards retain Sofia, Maria, Priya, Daniel and Hana order. The navy, gold and grey palette, Montserrat header, ranks, scores and separate actions match the approved layout. Narrow layouts stack actions within their card; controls remain visible. Compared in the minimum-phone review sheet."
       },
       "defects": []
     },
@@ -959,14 +909,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-360-800.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-360-800.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-360-800.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/long_identity_and_prose-360-800.png",
+      "trace": "traces/S04-final-recapture-20261124/long_identity_and_prose-360-800.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/long_identity_and_prose-360-800.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-leaderboard-minimum-phone.png",
-        "notes": "Maria’s long name uses several lines within its card. The card grows downward, showing a two-line excerpt followed by 8,200 and two individually readable stacked controls."
+        "notes": "The long identity and prose wrap within the card at narrow widths. Cards grow vertically without covering the score or actions. Header, palette, typography and five-card order match the approved layout. Compared in the minimum-phone review sheet."
       },
       "defects": []
     },
@@ -991,14 +941,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/recheck-asset-missing_summary-360-800-2/missing_summary-360-800.png",
-      "trace": "traces/MIN-S04-N4/recheck-asset-missing_summary-360-800-2/missing_summary-360-800.zip",
-      "capture_report": "traces/MIN-S04-N4/recheck-asset-missing_summary-360-800-2/missing_summary-360-800.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/missing_summary-360-800.png",
+      "trace": "traces/S04-final-recapture-20261124/missing_summary-360-800.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/missing_summary-360-800.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-missing-summary-minimum-phone.png",
-        "notes": "The full 2 released playbooks · 47 copies message wraps onto two lines. Both Mike and Jordan have stacked, individually readable View profile and Reach out actions."
+        "notes": "The Development list shows Mike at 12,450 with the exact fallback “2 released playbooks · 47 copies” and Jordan at 6,100. The two-card layout retains the approved spacing, typography and actions. Compared in the minimum-phone review sheet."
       },
       "defects": []
     },
@@ -1023,14 +973,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/guest-360-800.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/guest-360-800.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/guest-360-800.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/guest-360-800.png",
+      "trace": "traces/S04-final-recapture-20261124/guest-360-800.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/guest-360-800.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-guest-list-minimum-phone.png",
-        "notes": "Each card places View profile and disabled Reach out on distinct stacked rows. The sign-in links wrap within the banner and both analytics choices sit below the footer. No overlay covers the stacked card actions."
+        "notes": "The guest banner, five public Design cards and disabled contact actions match the approved guest layout. The first-visit consent panel follows the content and does not cover card actions; stored consent is outside this visual claim. Compared in the minimum-phone review sheet."
       },
       "defects": []
     },
@@ -1055,14 +1005,14 @@
         "Font Awesome 6 Pro",
         "Montserrat"
       ],
-      "screenshot": "traces/MIN-S04-N4/repaired-observer-final/detail-minimum-phone.png",
-      "trace": "traces/MIN-S04-N4/repaired-observer-final/detail-minimum-phone.zip",
-      "capture_report": "traces/MIN-S04-N4/repaired-observer-final/detail-minimum-phone.json",
-      "reviewer": "Codex S04 browser evidence reviewer",
+      "screenshot": "traces/S04-final-recapture-20261124/detail-minimum-phone.png",
+      "trace": "traces/S04-final-recapture-20261124/detail-minimum-phone.zip",
+      "capture_report": "traces/S04-final-recapture-20261124/detail-minimum-phone.json",
+      "reviewer": "Codex visual review",
       "visual_review": {
         "status": "reviewed",
         "approved_reference": "ESM06-v3-public-profile-minimum-phone.png",
-        "notes": "The actual View profile click lands on Maria’s public record. The full paragraph runs through the project-fit caveat before the vertically stacked source table, category breakdown and public playbook. The header shows Maria, Design and 8,200 with an icon on Reach out."
+        "notes": "The full minimum-phone profile retains all nine summary sentences, Maria’s 8,200 total, source amounts 5,000 / 1,600 / 1,200 / 400, Design 7,200 and Development 1,000, and public playbook v1.0. The 8+4 recipe collapses to a readable single column. Compared in the minimum-phone review sheet."
       },
       "defects": []
     }
