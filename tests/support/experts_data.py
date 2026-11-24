@@ -1837,5 +1837,80 @@ def create_reviewed_partial_pip(dataset: CedarDataset) -> ProcessImprovementProp
     :param dataset: Restored Cedar data. Example: Hana6106 at version2.0.
     :return: Reviewed proposal with undecided ADD/ALTER. Example: new PIP42.
     :raises ValueError: Missing target workflow/activity or incompatible baseline.
+    :raises ValidationError: If normal draft/change authorization rejects fixture inputs.
     """
-    raise NotImplementedError()
+    if not isinstance(dataset, CedarDataset) or 6106 not in dataset.playbooks_by_pk:
+        raise ValueError("The partial decision fixture requires restored Cedar data.")
+    book = dataset.playbooks_by_pk.get(6106)
+    if book is None or (book.status, book.version, book.category) != (
+        "released",
+        Decimal("2.0"),
+        "design",
+    ):
+        raise ValueError("Partial decisions require Hana's released Design v2.0.")
+    target = Activity.objects.filter(workflow__playbook=book).order_by("pk").first()
+    if target is None:
+        raise ValueError("Partial decisions require an existing workflow Activity.")
+    with transaction.atomic():
+        pip = _create_partial_draft(dataset, target)
+        return _stage_partial_review(pip)
+
+
+def _create_partial_draft(
+    dataset: CedarDataset, target: Activity
+) -> ProcessImprovementProposal:
+    """Build both unapplied changes through normal service authorization while draft.
+
+    :param dataset: Restored original actors. Example: Maria as nonstaff submitter.
+    :param target: Real existing Hana Activity. Example: one Activity of playbook6106.
+    :return: Actual draft with ADD/ALTER in order. Example: two undecided changes.
+    :raises ValidationError: If normal draft/change creation rejects the real inputs.
+    """
+    maria = dataset.users_by_username["mrodriguez"]
+    pip = PIPService.create_draft_for_playbook(
+        actor=maria,
+        playbook_id=target.workflow.playbook_id,
+        title="Add recovery coverage, retain the existing review",
+        summary="Two independent staff choices in the Cedar partial decision case.",
+    )
+    PIPService.add_change(
+        actor=maria,
+        pip=pip,
+        **_major_add_change_payload(dataset, PipChange.ENTITY_ACTIVITY),
+    )
+    PIPService.add_change(
+        actor=maria,
+        pip=pip,
+        change_type=PipChange.CHANGE_ALTER,
+        entity_type=PipChange.ENTITY_ACTIVITY,
+        target_id=target.pk,
+        name="S34 Rejected recovery rewrite",
+        content="S34 rejected ALTER sentinel: replace the published recovery guidance.",
+    )
+    return pip
+
+
+def _stage_partial_review(
+    pip: ProcessImprovementProposal,
+) -> ProcessImprovementProposal:
+    """Establish an explicit reviewed ORM boundary without simulating assessment.
+
+    :param pip: Actual two-change draft. Example: ADD then ALTER, both choices unset.
+    :return: Persisted reviewed fixture. Example: submission/review timestamps, no decision.
+    :raises ValueError: If normal draft construction did not produce the exact fixture.
+    """
+    changes = tuple(pip.changes.order_by("order", "pk"))
+    if (
+        pip.status != pip.STATUS_DRAFT
+        or tuple(c.change_type for c in changes)
+        != (PipChange.CHANGE_ADD, PipChange.CHANGE_ALTER)
+        or any(c.admin_decision != PipChange.ADMIN_UNSET for c in changes)
+    ):
+        raise ValueError(
+            "Stage only the two undecided draft changes for partial review."
+        )
+    pip.status = pip.STATUS_REVIEWED
+    pip.submitted_at = pip.reviewed_at = timezone.now()
+    pip.save(update_fields=["status", "submitted_at", "reviewed_at", "updated_at"])
+    pip.changes.update(galdr_recommendation=PipChange.GALDR_ACCEPT)
+    return pip
