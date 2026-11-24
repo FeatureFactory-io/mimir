@@ -6,6 +6,7 @@ import logging
 import re
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TypedDict
 
@@ -33,7 +34,11 @@ SOURCE_BUCKET_BY_KIND = {
     KarmaAward.SourceKind.LEARNING: "Learning",
 }
 _CORRELATION_ID = re.compile(r"[A-Za-z0-9._:-]{1,100}")
+_LEADERBOARD_CORRELATION_ID: ContextVar[str | None] = ContextVar(
+    "experts_leaderboard_correlation_id", default=None
+)
 _LIST_LOG = "ExpertsService.list_leaders"
+_CATEGORY_LOG = "resolve_primary_category"
 _DETAIL_LOG = "ExpertsService.public_detail"
 _DETAIL_SOURCE_LABELS = {"Released": "Released playbooks", "PIP": "PIP contributions"}
 
@@ -133,12 +138,14 @@ class ExpertsService:
             f"{_LIST_LOG} | processing | scope=all_categories recipients={len(totals)} {request_tag}"
         )
         user_ids = tuple(totals)
-        people = self._project_candidates(
-            totals,
-            self._load_released_counts(user_ids),
-            self._load_identities(user_ids),
-            self._load_live_counts(user_ids),
-        )
+        releases = self._load_released_counts(user_ids)
+        identities = self._load_identities(user_ids)
+        counts = self._load_live_counts(user_ids)
+        token = _LEADERBOARD_CORRELATION_ID.set(correlation_id)
+        try:
+            people = self._project_candidates(totals, releases, identities, counts)
+        finally:
+            _LEADERBOARD_CORRELATION_ID.reset(token)
         eligible_count = sum(person.primary_category == category for person in people)
         logger.info(
             f"{_LIST_LOG} | branch | primary_category={category} eligible_count={eligible_count} {request_tag}"
@@ -327,7 +334,7 @@ class ExpertsService:
         identities: Mapping[int, tuple[str, str]],
         live_counts: Mapping[int, LiveContributionCounts],
     ) -> tuple[ExpertProjection, ...]:
-        """Build immutable projections without additional database reads.
+        """Build immutable projections and trace correlated primary-category ties.
 
         :param totals: Complete award aggregates. Example: {}.
         :param release_counts: Primary-category tie counts. Example: {}.
@@ -336,6 +343,7 @@ class ExpertsService:
         :return: Unranked positive-contribution projections. Example: ().
         :raises ValueError: For inconsistent aggregate/account references.
         """
+        correlation_id = _LEADERBOARD_CORRELATION_ID.get()
         projections: list[ExpertProjection] = []
         for user_id, award in totals.items():
             if user_id not in identities or user_id not in live_counts:
@@ -346,20 +354,52 @@ class ExpertsService:
                 continue
             username, display_name = identities[user_id]
             counts = live_counts[user_id]
+            category_points = dict(award.category_points)
+            releases = release_counts.get(user_id, {})
+            primary_category = resolve_primary_category(category_points, releases)
             projections.append(
                 ExpertProjection(
                     user_id=user_id,
                     username=username,
                     display_name=display_name,
                     total_points=award.total_points,
-                    primary_category=resolve_primary_category(
-                        dict(award.category_points), release_counts.get(user_id, {})
-                    ),
+                    primary_category=primary_category,
                     category_points=award.category_points,
                     source_points=award.source_points,
                     released_public_playbook_count=counts.released_public_playbook_count,
                     successful_gui_copy_count=counts.successful_gui_copy_count,
                 )
+            )
+            if correlation_id is None or primary_category is None:
+                continue
+            winning_points = category_points[primary_category]
+            tied_categories = tuple(
+                slug
+                for slug, points in category_points.items()
+                if points == winning_points
+            )
+            if len(tied_categories) < 2:
+                continue
+            winning_releases = releases.get(primary_category, 0)
+            release_count_tied = any(
+                releases.get(slug, 0) == winning_releases
+                for slug in tied_categories
+                if slug != primary_category
+            )
+            reason = "alphabetical" if release_count_tied else "released_count"
+            log_context = f"account_id={user_id} correlation_id={correlation_id}"
+            logger.info(f"{_CATEGORY_LOG} | entry | {log_context}")
+            logger.info(
+                f"{_CATEGORY_LOG} | processing | total={award.total_points} "
+                f"tied_candidates={len(tied_categories)} {log_context}"
+            )
+            logger.info(
+                f"{_CATEGORY_LOG} | branch | reason={reason} "
+                f"category={primary_category} {log_context}"
+            )
+            logger.info(
+                f"{_CATEGORY_LOG} | exit | category={primary_category} "
+                f"total={award.total_points} {log_context}"
             )
         return tuple(projections)
 
