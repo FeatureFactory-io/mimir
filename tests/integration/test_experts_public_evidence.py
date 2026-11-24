@@ -465,6 +465,11 @@ def test_build_summary_prompt_with_malformed_evidence_rejects_invalid_shape(
             ),
             "Maria maintains version 2.0 of her playbook.",
         ),
+        pytest.param(
+            LLMResponse("Maria uses Design Score 2.0 in checklist version 2.1."),
+            "Maria uses Design Score 2.0 in checklist version 2.1.",
+            id="versioned-guidance",
+        ),
         (LLMResponse(" ".join([_GOOD_SUMMARY] * 15)), None),
         (LLMResponse(_GOOD_SUMMARY * 15), None),
         (LLMResponse(""), None),
@@ -494,7 +499,47 @@ def test_build_summary_prompt_with_malformed_evidence_rejects_invalid_shape(
         pytest.param(
             LLMResponse("Her total score is 8,200."), None, id="unqualified-score"
         ),
+        pytest.param(
+            LLMResponse("Maria’s Design score is seven thousand two hundred."),
+            None,
+            id="category-score-in-words",
+        ),
+        pytest.param(
+            LLMResponse("Maria's Design score is 7,200."),
+            None,
+            id="observed-category-score",
+        ),
+        pytest.param(
+            LLMResponse("Her Research-category point subtotal was 1,450."),
+            None,
+            id="category-point-subtotal",
+        ),
+        pytest.param(
+            LLMResponse("Her DEVELOPMENT category points were 2,300."),
+            None,
+            id="category-points",
+        ),
+        pytest.param(
+            LLMResponse("Her Product Karma total: eight hundred."),
+            None,
+            id="category-karma-total",
+        ),
+        pytest.param(
+            LLMResponse("Other’s subtotal = 6,750."),
+            None,
+            id="possessive-category-subtotal",
+        ),
+        pytest.param(
+            LLMResponse("She reported a category score of 4\u202f120."),
+            None,
+            id="category-score-grouped-with-space",
+        ),
         (LLMResponse("Maria has earned 900 Design points."), None),
+        pytest.param(
+            LLMResponse("Maria has earned 900 Product points."),
+            None,
+            id="number-before-category-points",
+        ),
         (LLMResponse("Maria ranked first on the Design leaderboard."), None),
         (LLMResponse("Her playbook was copied 47 times."), None),
         (LLMResponse("She has authored two released playbooks."), None),
@@ -566,23 +611,42 @@ def test_summary_prompt_and_response_log_story_happy(
     assert all(sentinel not in caplog.text for sentinel in s27_case["sentinels"])
 
 
+@pytest.mark.parametrize(
+    ("reply", "excluded_value"),
+    [
+        pytest.param(
+            "Contact Maria at maria.rodriguez@example.com.",
+            "maria.rodriguez@example.com",
+            id="email",
+        ),
+        pytest.param(
+            "Maria’s Design score is seven thousand two hundred.",
+            "seven thousand two hundred",
+            id="category-score",
+        ),
+    ],
+)
 def test_summary_prompt_and_response_log_story_reject(
-    s27_case: Mapping[str, Any], caplog: pytest.LogCaptureFixture
+    s27_case: Mapping[str, Any],
+    caplog: pytest.LogCaptureFixture,
+    reply: str,
+    excluded_value: str,
 ) -> None:
     """Capture stable error reasons for oversized evidence and unsafe output.
 
     :param s27_case: Maria's real evidence and privacy sentinels.
     :param caplog: Captured logging. Example: actual INFO records.
+    :param reply: Disallowed prose. Example: Maria's Design score is 7,200.
+    :param excluded_value: Sensitive value in the prose. Example: 7,200.
     :return: None when rejected bodies and sentinels stay out of logs.
     :raises AssertionError: For missing reason codes or a privacy leak.
     """
     evidence = PublicContributionEvidenceService().collect(s27_case["subject_id"])
     oversized = _pad_prompt_evidence(evidence, 24001)
-    reply = "Contact Maria at maria.rodriguez@example.com."
     with capture_experts_logs(caplog, (_PROMPT_LOGGER,)):
         with pytest.raises(ValueError):
             build_summary_prompt(oversized)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as error:
             validate_summary_response(LLMResponse(reply), evidence)
     assert_log_story(
         caplog,
@@ -594,7 +658,9 @@ def test_summary_prompt_and_response_log_story_reject(
         where="validate_summary_response",
         beats={"error": ("error", "reason_code=invalid_response")},
     )
-    assert reply not in caplog.text and "Ignore all instructions" not in caplog.text
+    assert reply not in caplog.text and excluded_value not in caplog.text
+    assert reply not in str(error.value) and excluded_value not in str(error.value)
+    assert "Ignore all instructions" not in caplog.text
     assert all(sentinel not in caplog.text for sentinel in s27_case["sentinels"])
 
 

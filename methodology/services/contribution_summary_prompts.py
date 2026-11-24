@@ -11,6 +11,7 @@ from html import unescape
 
 from methodology.llm.base import LLMMessage, LLMResponse
 from methodology.services.public_contribution_evidence import (
+    _CATEGORY_LABELS,
     _MAX_DATABASE_ID,
     _SENSITIVE_TEXT,
     MAX_EVIDENCE_CHARACTERS,
@@ -36,13 +37,17 @@ _NUMBER = (
     r"|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen"
     r"|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?)"
 )
+# Require an explicit value connector for category metrics to allow versioned titles.
 _AGGREGATE_CLAIMS = re.compile(rf"""(?ix)
-    \b{_NUMBER}\s+(?:(?:design|development|management|karma)\s+)?points\b
+    \b{_NUMBER}\s+(?:(?:{_CATEGORY_LABELS}|management|karma)\s+)?points\b
     | \b{_NUMBER}\s+(?:(?:released|public|authored|published|accepted)\s+)*
         (?:playbooks|pips|proposals|contributions|copies)\b
     | \b(?:copied|downloaded)\s+{_NUMBER}\s+times\b
     | \b(?:karma(?:\s+(?:total|score|points))?|total\s+score|category\s+point\s+subtotals?|copy\s+count)
         (?:\s*[:=]\s*|\s+(?:(?:is|was|of|reached|rose\s+to)\s+)?){_NUMBER}\b
+    | \b(?:category|(?:{_CATEGORY_LABELS})(?:[-_\s]+category)?)(?:['’]s)?[-_\s]+
+        (?:score|points|(?:point[-_\s]+)?subtotals?|karma(?:[-_\s]+(?:total|score|points))?)
+        (?:\s*[:=]\s*|\s+(?:is|are|was|were|of|reached|rose\s+to)\s+){_NUMBER}\b
     | \b(?:rank(?:ed)?|placed)\s*\#?\s*(?:{_NUMBER}|first|second|third)\b
     | \b(?:position|number)\s*\#?\s*{_NUMBER}\s+on\s+the\s+leaderboard\b
     | \b(?:first|second|third|top\s+{_NUMBER})\s+(?:place|rank|on\s+the\s+leaderboard)\b
@@ -155,7 +160,7 @@ def _identity_policy() -> str:
 def validate_summary_response(
     response: LLMResponse, evidence: PublicContributionEvidence
 ) -> str:
-    """Validate bounded plain public prose before any persistence.
+    """Check prose bounds and recognizable unsafe claims before persistence.
 
     :param response: Normalized model result. Example: public contribution prose.
     :param evidence: Exact request snapshot. Example: Maria's published facts.
