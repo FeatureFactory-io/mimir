@@ -32,6 +32,10 @@ iteration:
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
     exact-AT runner implementation is N4. No product or scenario footprint expanded.
 conflict_map:
+  tests/integration/test_pip_admin_review_view.py:
+  - S32
+  templates/pips/admin_review.html:
+  - S32
   tests/unit/test_facade_tools_mount.py:
   - S42
   tests/integration/test_experts_acceptance_runner.py:
@@ -5570,6 +5574,8 @@ scenarios:
     skeleton_commit: 12f17b598a1c758b6c55d6b8acd879b9c8fbcd94
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/integration/test_pip_admin_review_view.py
+    - templates/pips/admin_review.html
     - methodology/services/pip_apply_changes_service.py
     - docs/experts-replay/pin-evidence/S32.json
     - docs/features/steps/experts_karma_pip_steps.py
@@ -5740,11 +5746,27 @@ scenarios:
           rules:
           - do-test-first
           - do-not-mock-in-integration-tests
+      - id: N3a-review-ui-accessibility
+        title: Name the existing review decisions and confirmation dialog
+        bpe: BPE-03
+        depends_on:
+        - N3-living-at
+        footprint:
+        - templates/pips/admin_review.html
+        - tests/integration/test_pip_admin_review_view.py
+        gate:
+          command: pytest tests/integration/test_pip_admin_review_view.py -x
+        guidance_bundle:
+          activity: BPE/BPE-03-Implement_Frontend.md
+          rules:
+          - do-test-first
+          - do-not-mock-in-integration-tests
+        notes: Actual composed browser review discovered unnamed per-change selects, confirmation dialog and icon-only close control. Add accurate accessible labels using the existing Bootstrap template; preserve decisions, copy, styling and finalization behavior. This is a necessary in-scope repair under approved engineering autonomy.
       - id: N4-browser-finalization
         title: Certify administrator finalization in the existing browser UI
         bpe: BPE-05
         depends_on:
-        - N3-living-at
+        - N3a-review-ui-accessibility
         footprint:
         - tests/e2e/test_experts_karma_pip.py
         gate:

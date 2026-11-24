@@ -448,3 +448,8 @@ The owned recording server has been refreshed to detached immutable `244ecfc1418
 
 
 S42 N2 adds existing `tests/unit/test_facade_tools_mount.py` to its test footprint. Its old unit HTTP double returned a bundle for every POST, so it must distinguish the new receipt response. An old outside-mirror case expected canonical files to be written before rejecting the other destination; approved all-destination preflight instead requires zero writes. This test-only reconciliation preserves valid overwrite/copy behavior and remaining unit assertions. Real integration tests still use actual HTTP, ORM and filesystem operations. No production scope extension or new user confirmation is required.
+
+
+## S32 real browser exposes existing unnamed review controls
+
+N4’s first composed Chromium case passes the functional C01–C05 path, including Maria’s actual submission, two declared scripted model turns, Mike’s real finalization, accepted 3.0 publication, 8,700 totals and local mail. Source inspection found the existing per-change select without a label, confirmation modal without a title association and icon-only close button without an accessible name. Native accessibility diagnosis is retained before repair. A fresh N3a component worker owns a minimal repair in `templates/pips/admin_review.html` and the existing real HTTP integration module. These two paths are reconciled into S32; decisions, visual style and finalization behavior stay intact. N4 final certification follows this repair on stable inputs. No new feature contract or user confirmation is required.
