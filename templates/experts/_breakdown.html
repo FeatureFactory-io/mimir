@@ -2,7 +2,7 @@
   <div class="card-body">
     <h2 class="h5">Karma by source</h2>
     <div class="table-responsive">
-      <table class="table table-sm mb-0" data-testid="karma-source-breakdown">
+      <table class="table table-sm mb-0" data-testid="{{ source_breakdown_test_id|default:'karma-source-breakdown' }}">
         <caption class="visually-hidden">Contribution sources sum to {{ person.formatted_karma }}</caption>
         <thead>
           <tr><th scope="col">Source</th><th scope="col" class="text-end">Karma</th></tr>
@@ -22,7 +22,7 @@
 <div class="card hg-card mt-3">
   <div class="card-body">
     <h2 class="h5">Karma by playbook category</h2>
-    <dl class="row mb-0" data-testid="karma-category-breakdown">
+    <dl class="row mb-0" data-testid="{{ category_breakdown_test_id|default:'karma-category-breakdown' }}">
       {% for row in person.category_rows %}
       <dt class="col-7 fw-normal">{{ row.label }}</dt><dd class="col-5 text-end">{{ row.points }}</dd>
       {% endfor %}
