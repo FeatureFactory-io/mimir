@@ -42,6 +42,8 @@ iteration:
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
     exact-AT runner implementation is N4. No product or scenario footprint expanded.
 conflict_map:
+  tests/unit/test_experts_database_scope.py:
+  - S45
   tests/support/karma_mcp.py:
   - S43
   tests/integration/test_pip_lifecycle_integrity.py:
@@ -69,6 +71,7 @@ conflict_map:
   tests/support/experts_acceptance.py:
   - S36
   Makefile:
+  - S45
   - S43
   - S32
   - S42
@@ -174,6 +177,7 @@ conflict_map:
   - S42
   - S43
   tests/support/experts_data.py:
+  - S45
   - S03
   - S27
   - S32
@@ -6309,6 +6313,9 @@ scenarios:
     skeleton_commit: 923582242ec3446be65478594ac67b54ed913278
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - Makefile
+    - tests/unit/test_experts_database_scope.py
+    - tests/support/experts_data.py
     - docs/experts-replay/pin-evidence/S45.json
     - docs/features/steps/karma_event_steps.py
     - docs/plans/iterations/experts/S45-karma-event-01.md
@@ -6441,10 +6448,15 @@ scenarios:
         depends_on:
         - S45-N1-event-validation
         footprint:
+        - Makefile
+        - tests/unit/test_experts_database_scope.py
+        - tests/support/experts_data.py
         - methodology/services/karma_service.py
         - tests/integration/karma_event/conftest.py
         - tests/integration/karma_event/test_retry.py
         tests:
+        - test_consumption_with_new_uuid_creates_new_complete_pair
+        - test_copy_receipt_with_retry_and_changed_target_enforces_identity
         - test_event_with_outer_rollback_preserves_atomicity
         - test_event_with_concurrent_writers_preserves_one_complete_event
         - test_event_with_database_constraints_rejects_changed_recipient
@@ -6457,8 +6469,8 @@ scenarios:
         - KarmaService.persist_awards:branch
         - KarmaService.persist_awards:error
         gate:
-          command: pytest tests/integration/karma_event/test_retry.py -k 'outer_rollback or concurrent_writers
-            or database_constraints or historical_marker or log_story' -x
+          command: pytest tests/integration/karma_event/test_retry.py -x
+          ownership_command: pytest tests/unit/test_experts_database_scope.py -x
           log_story_command: pytest tests/integration/karma_event/test_retry.py -k log_story -x
         guidance_bundle:
           activity: BPE/BPE-02-Implement_Backend.md
@@ -6468,6 +6480,7 @@ scenarios:
           - do-assert-log-story
           - do-informative-logging
           - pytest
+        ownership_reconciliation: Keep the in-memory/PG/owned-demo guards unchanged. The SQLite file lane requires real pytest/test settings, declared runner TEST.NAME matching the effective database, private temp ownership evidence and nonsymlink owner/path checks outside seed/checkouts, plus actual PRAGMA main path equality before any fixture writes. Add positive and negative ownership cases; never infer ownership from a filename alone.
       - id: S45-N3-acceptance
         title: Bind exact retry contract and real receipt boundary
         bpe: BPE-04
@@ -7775,6 +7788,7 @@ scenarios:
         tests:
         - test_minor_case_matrix_with_literal_examples_matches_all_twenty_rows
         - test_minor_fixture_with_unknown_or_major_row_rejects_before_writes
+        - test_minor_fixture_with_each_literal_row_persists_independent_reviewed_change
         gate:
           command: pytest tests/integration/test_experts_karma_minor_pip.py -k 'matrix or fixture' -x
         guidance_bundle:
@@ -7791,6 +7805,7 @@ scenarios:
         depends_on:
         - N1-minor-fixtures
         footprint:
+        - tests/support/experts_pip_minor.py
         - tests/integration/test_experts_karma_minor_pip.py
         tests:
         - test_finalize_pip_with_each_minor_change_applies_once_and_awards_submitter

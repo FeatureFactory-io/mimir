@@ -1173,7 +1173,7 @@ test-experts-s44:
 
 .PHONY: test-experts-s45-backend
 test-experts-s45-backend:
-	$(PYTHON) -m pytest tests/integration/karma_event/test_retry.py::test_record_event_with_repeated_write_preserves_original_event tests/integration/karma_event/test_retry.py::test_consumption_with_new_uuid_creates_new_complete_pair tests/integration/karma_event/test_retry.py::test_persist_awards_with_changed_payload_rejects_entire_batch tests/integration/karma_event/test_retry.py::test_event_with_outer_rollback_preserves_atomicity tests/integration/karma_event/test_retry.py::test_event_with_partial_existing_pair_rejects_without_repair tests/integration/karma_event/test_retry.py::test_event_with_concurrent_writers_preserves_one_complete_event tests/integration/karma_event/test_retry.py::test_event_with_database_constraints_rejects_changed_recipient tests/integration/karma_event/test_retry.py::test_first_release_with_historical_marker_preserves_singleton tests/integration/karma_event/test_retry.py::test_copy_receipt_with_retry_and_changed_target_enforces_identity tests/integration/karma_event/test_retry.py::test_karma_event_log_story_happy tests/integration/karma_event/test_retry.py::test_karma_event_log_story_reject -x
+	$(PYTHON) -m pytest tests/integration/karma_event/test_retry.py tests/unit/test_experts_database_scope.py -x
 
 .PHONY: test-experts-s45-log
 test-experts-s45-log:
