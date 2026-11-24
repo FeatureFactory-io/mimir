@@ -1,19 +1,109 @@
 from __future__ import annotations
 
-from behave import given, then, when
+import json
+import re
+from pathlib import Path
 
+from behave import given, then, when
 from behave.runner import Context
+
+from methodology.llm.base import LLMResponse
+from methodology.models import Activity, PipChange, Playbook, ProcessImprovementProposal
+from methodology.services.contribution_summary_boundary import (
+    PublicContributionSummaryBoundary,
+)
+from methodology.services.public_contribution_evidence import (
+    PublicContributionEvidenceService,
+)
+from tests.support.experts_data import seed_s27_summary_privacy_variant
+from tests.support.scripted_llm import ScriptedLLM
+
+_S27_SCRIPT = (
+    Path(__file__).resolve().parents[3]
+    / "tests/fixtures/llm_scripts/PRF-EXPERTS-03/happy.json"
+)
+_S27_COUNT_SENTINEL = "117 copies"
+_S27_SCORE_VALUES = re.compile(r"\b(?:8,?200|7,?200|1,?000)\b")
+_S27_FACT_FIELDS = frozenset(
+    {
+        "playbook_id",
+        "playbook_name",
+        "category",
+        "kind",
+        "entity_type",
+        "operation",
+        "title",
+        "text",
+    }
+)
+_S27_AUTHORED_PLAYBOOK = "Accessibility Audit Playbook"
+_S27_AUTHORED_TITLES = frozenset(
+    {
+        _S27_AUTHORED_PLAYBOOK,
+        "Lead an Accessibility Review",
+        "Trace Keyboard Focus",
+        "Review Form Feedback",
+        "Document Recovery Paths",
+    }
+)
+_S27_PUBLISHED_CHANGES = frozenset(
+    {
+        ("Accessible Forms Review", "ADD", "Keyboard Navigation Audit"),
+        ("Accessible Forms Review", "ALTER", "Error Message Review"),
+        ("React Frontend Development", "ADD", "Accessible component fixture"),
+        ("React Frontend Development", "ADD", "Focus regression checklist"),
+    }
+)
 
 
 @when("a contribution-summary request is assembled for Maria")
 def assemble_maria_public_summary_request(context: Context) -> None:
-    """Assemble the real public snapshot and prompt without calling a provider.
+    """Capture one actual request with only the model transport scripted.
 
     :param context: Actual Cedar AT context. Example: Maria's baseline rows.
-    :return: None; retain actual evidence and request for subsequent assertions.
-    :raises ValueError: If real request assembly fails.
+    :return: None. Retain the captured model request and its decoded evidence.
+    :raises AssertionError: If the call count, request envelope or subject differs.
     """
-    raise NotImplementedError()
+    case = seed_s27_summary_privacy_variant()
+    subject_id = context.cedar_dataset.user_ids["mrodriguez"]
+    assert case["subject_id"] == subject_id
+    focus = Activity.objects.get(
+        workflow__playbook_id=context.cedar_dataset.playbook_ids[6101],
+        name="Trace Keyboard Focus",
+    )
+    focus.guidance += f"\n{_S27_COUNT_SENTINEL}."
+    focus.save(update_fields=["guidance"])
+    llm = _s27_scripted_model()
+    PublicContributionSummaryBoundary(PublicContributionEvidenceService()).complete(
+        subject_id, llm=llm, correlation_id="galdr-summary-05-at"
+    )
+    (call,) = llm.calls
+    (message,) = call.messages
+    assert message.role == "user" and call.max_tokens == 1024
+    begin, payload, end = message.content.splitlines()
+    assert (begin, end) == ("BEGIN PUBLIC EVIDENCE JSON", "END PUBLIC EVIDENCE JSON")
+    context.s27_evidence = json.loads(payload)
+    assert context.s27_evidence["subject_id"] == subject_id
+    context.s27_system_prompt = call.system
+    context.s27_request_text = f"{call.system}\n{message.content}"
+    context.s27_privacy_case = case
+
+
+def _s27_scripted_model() -> ScriptedLLM:
+    """Load the one-turn PRF-EXPERTS-03 script for the request inspection.
+
+    :return: Finite ScriptedLLM queue. Example: Maria's valid public paragraph.
+    :raises AssertionError: If the turn is not a successful scripted response.
+    """
+    (turn,) = json.loads(_S27_SCRIPT.read_text(encoding="utf-8"))["responses"]
+    assert turn["kind"] == "response"
+    response = LLMResponse(
+        content=turn["content"],
+        model=turn["model"],
+        usage=turn["usage"],
+        stop_reason=turn["stop_reason"],
+    )
+    return ScriptedLLM((response,))
 
 
 @then(
@@ -26,7 +116,32 @@ def assert_summary_evidence_is_published_public(context: Context) -> None:
     :return: None when eligible facts survive and ineligible rows are absent.
     :raises AssertionError: If evidence selection is incorrect.
     """
-    raise NotImplementedError()
+    facts = context.s27_evidence["facts"]
+    book_ids = {fact["playbook_id"] for fact in facts}
+    public_books = dict(
+        Playbook.objects.filter(
+            pk__in=book_ids, visibility="public", status="released"
+        ).values_list("pk", "name")
+    )
+    assert all(
+        public_books.get(fact["playbook_id"]) == fact["playbook_name"] for fact in facts
+    )
+    assert {
+        (fact["playbook_name"], fact["title"])
+        for fact in facts
+        if fact["kind"] == "authored"
+    } == {(_S27_AUTHORED_PLAYBOOK, title) for title in _S27_AUTHORED_TITLES}
+    assert {
+        (fact["playbook_name"], fact["operation"], fact["title"])
+        for fact in facts
+        if fact["kind"] == "published_change"
+    } == _S27_PUBLISHED_CHANGES
+    assert len(facts) == len(_S27_AUTHORED_TITLES) + len(_S27_PUBLISHED_CHANGES)
+    assert any(
+        fact["title"] == "Error Message Review"
+        and fact["text"] == "Use the real published activity guidance."
+        for fact in facts
+    )
 
 
 @then("it excludes private playbooks, private PIPs, API tokens and email addresses")
@@ -37,7 +152,11 @@ def assert_summary_excludes_private_material(context: Context) -> None:
     :return: None when private material is absent.
     :raises AssertionError: If any protected byte enters the assembled request.
     """
-    raise NotImplementedError()
+    assert all(
+        sentinel not in context.s27_request_text
+        for sentinel in context.s27_privacy_case["sentinels"]
+    ), "The captured request contains protected Cedar data."
+    assert "Check the focus order." in context.s27_request_text
 
 
 @then("it instructs the generator to omit Karma totals and category point subtotals")
@@ -48,7 +167,18 @@ def assert_summary_prompt_excludes_scores(context: Context) -> None:
     :return: None when instructions and data satisfy the score exclusion.
     :raises AssertionError: If score instructions/data are wrong.
     """
-    raise NotImplementedError()
+    foundation, identity = context.s27_system_prompt.split("\n\n", maxsplit=1)
+    assert foundation.startswith("Foundation policy:") and "quoted data" in foundation
+    assert "Omit private or unpublished material" in foundation
+    assert (
+        "Karma totals, category point subtotals, ranks and aggregate counts"
+        in foundation
+    )
+    assert identity.startswith("Identity: You are the public contribution summarizer.")
+    assert set(context.s27_evidence) == {"subject_id", "facts"}
+    assert all(set(fact) == _S27_FACT_FIELDS for fact in context.s27_evidence["facts"])
+    assert not _S27_SCORE_VALUES.search(context.s27_request_text)
+    assert _S27_COUNT_SENTINEL not in context.s27_request_text
 
 
 @then("submitting a PIP does not make its unpublished title or content public")
@@ -59,7 +189,17 @@ def assert_submission_is_not_publication(context: Context) -> None:
     :return: None when submission grants no publication.
     :raises AssertionError: If unpublished title/content enters public evidence.
     """
-    raise NotImplementedError()
+    pip = context.s27_privacy_case["submitted_pip"]
+    pip.refresh_from_db()
+    assert pip.status == ProcessImprovementProposal.STATUS_SUBMITTED
+    assert (pip.playbook.visibility, pip.playbook.status) == ("public", "released")
+    change = pip.changes.get()
+    assert change.admin_decision == PipChange.ADMIN_UNSET
+    assert not pip.playbook_versions.exists()
+    assert all(
+        value and value not in context.s27_request_text
+        for value in (pip.title, pip.summary, change.content)
+    ), "The captured request contains unpublished proposal content."
 
 
 @given("Maria's PIP has reached Reviewed")

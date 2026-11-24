@@ -1,9 +1,16 @@
 """S23 normal submission steps; real Django domain and captured provider seam."""
+
 from __future__ import annotations
-from behave import given, when, then
+
+from decimal import Decimal
+
+from behave import given, then, when
 from behave.runner import Context
 
-@given('Hana owns Accessible Forms Review at version 2.0')
+from methodology.models import PipChange, Playbook, VersionSource
+
+
+@given("Hana owns Accessible Forms Review at version 2.0")
 def hana_target_has_original_publication(context: Context) -> None:
     """Verify real Hana authorship, current v2.0 and historical accepted-change receipts.
 
@@ -11,7 +18,27 @@ def hana_target_has_original_publication(context: Context) -> None:
     :return: None when the described real observation holds. Example: None.
     :raises AssertionError: Actual domain, response or recorded boundary differs.
     """
-    raise NotImplementedError()
+    cedar = context.cedar_dataset
+    hana = cedar.users_by_username["hkim"]
+    target = Playbook.objects.get(pk=cedar.playbook_ids[6106])
+    assert (target.author_id, target.name, target.version) == (
+        hana.pk,
+        "Accessible Forms Review",
+        Decimal("2.0"),
+    )
+    assert (target.visibility, target.status) == ("public", "released")
+    historical_pip = cedar.pips_by_key["HIST-MARIA-DESIGN-01"]
+    receipt = target.versions.get(
+        pip=historical_pip,
+        source=VersionSource.PIP_SOURCE,
+        version_number=target.version,
+    )
+    accepted = historical_pip.changes.filter(admin_decision=PipChange.ADMIN_ACCEPT)
+    assert set(receipt.snapshot_data["accepted_change_ids"]) == {
+        change.pk for change in accepted
+    }
+    assert receipt.snapshot_data["accepted_change_ids"]
+
 
 @given('Maria drafts Screen Reader Error Recovery with one ADD Activity change')
 def maria_drafts_error_recovery_activity(context: Context) -> None:
