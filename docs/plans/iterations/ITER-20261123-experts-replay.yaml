@@ -2257,7 +2257,7 @@ scenarios:
       - S03
       - S01
     implementation_plan: docs/plans/iterations/experts/S02-experts-list-02.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
@@ -4175,7 +4175,7 @@ scenarios:
       - S03
       - S30
     implementation_plan: docs/plans/iterations/experts/S36-karma-copy-01.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
