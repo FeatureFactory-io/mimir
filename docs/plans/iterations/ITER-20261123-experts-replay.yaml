@@ -69,6 +69,7 @@ conflict_map:
   tests/support/experts_acceptance.py:
   - S36
   Makefile:
+  - S43
   - S32
   - S42
   - S36
@@ -9204,6 +9205,7 @@ scenarios:
     skeleton_commit: b4ecca6a499524fdfbad94bc47d023c50ad93587
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - Makefile
     - tests/support/karma_mcp.py
     - tests/integration/test_karma_copy.py
     - methodology/services/karma_service.py
@@ -9332,6 +9334,7 @@ scenarios:
         depends_on:
         - S43-N2-acceptance
         footprint:
+        - Makefile
         - tests/support/karma_mcp.py
         - tests/integration/test_karma_exports.py
         tests:

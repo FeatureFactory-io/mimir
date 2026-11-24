@@ -1143,6 +1143,10 @@ test-experts-s43-log:
 test-experts-s43-at:
 	$(PYTHON) -m pytest tests/integration/test_experts_acceptance_runner.py -k S43 -x
 
+# Exact self-export acceptance alias required by the definition-of-done gate.
+.PHONY: test-at-karma-self-export
+test-at-karma-self-export: test-experts-s43-at
+
 .PHONY: test-experts-s43
 test-experts-s43:
 	+$(MAKE) test-experts-s43-backend
