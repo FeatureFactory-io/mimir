@@ -2,11 +2,15 @@ from __future__ import annotations
 
 """Ten-row real MCP/HTTP/database self-fetch proofs."""
 import json
+import re
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from uuid import UUID
 
 import pytest
+from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.test import Client
@@ -19,17 +23,33 @@ from methodology.services.karma_service import KarmaService
 from tests.support.experts_data import load_cedar_baseline
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.experts_mcp_self import (
+    KarmaSnapshot,
     SelfFetchCase,
     assert_self_fetch_content,
     assert_self_fetch_unchanged,
     resolve_self_fetch_case,
     snapshot_karma_state,
 )
+from tests.support.karma_mcp import (
+    MCPCase,
+    MCPClientFactory,
+    MCPDataset,
+    MCPEntrypoint,
+    MCPInvariantSnapshot,
+    StdioMCPClient,
+    _capture_mcp_runtime,
+    decode_tool_payload,
+    karma_snapshot,
+)
 from tests.support.log_story import assert_log_story
 
 ACTION_ID = UUID("ed59b358-59c8-4664-bd47-d1ff63f52040")
 PRIVATE_SENTINEL = "private-forged-self-fetch-payload"
 SERVICE_LOG = "KarmaService.award_successful_consumption"
+type ProtocolState = tuple[
+    KarmaSnapshot, MCPInvariantSnapshot, tuple[tuple[int, bool, bool, bool], ...]
+]
+
 LOGGERS = ("methodology.services.karma_service", "methodology.api.consumption_views")
 SELF_ROWS = (
     ("Mike", "Mike's Playbook"),
@@ -89,7 +109,7 @@ async def test_self_fetch_with_registered_facade_returns_content_without_awards(
     :return: None. Example: authorized content, unchanged complete ledger.
     :raises AssertionError: Registration, content or award invariant fails.
     """
-    raise NotImplementedError()
+    await _run_registered_self_fetch(case_index, "facade", live_server.url)
 
 
 @pytest.mark.parametrize("case_index", range(10))
@@ -121,7 +141,7 @@ async def test_self_fetch_with_registered_legacy_returns_content_without_awards(
     :return: None. Example: content returned, server context cleared.
     :raises AssertionError: Registration, actual wrapper or awards differ.
     """
-    raise NotImplementedError()
+    await _run_registered_self_fetch(case_index, "legacy", "")
 
 
 @pytest.mark.parametrize("case_index", range(10))
@@ -136,7 +156,29 @@ def test_self_fetch_with_facade_stdio_returns_clean_protocol_without_awards(
     :return: None. Example: JSON-RPC success with zero ledger changes.
     :raises AssertionError: Protocol noise, content error or award appears.
     """
-    raise NotImplementedError()
+    case, dataset = _protocol_setup(case_index)
+    before = _protocol_state()
+    with (
+        TemporaryDirectory(prefix="mimir-self-fetch-") as directory,
+        StdioMCPClient(
+            entrypoint="facade",
+            actor_username=case.actor.username,
+            dataset=dataset,
+            server_url=live_server.url,
+            root=Path(directory),
+            include_summaries=True,
+        ) as wire,
+    ):
+        schemas = {tool["name"]: tool["inputSchema"] for tool in wire.list_tools()}
+        _assert_self_schema(schemas[case.tool_name], case)
+        assert wire.snapshot() == before[1]
+        _assert_protocol_state(before, case)
+        payload = wire.call(_self_invocation(case))
+        assert wire.snapshot() == before[1]
+    wire.assert_protocol_clean()
+    _assert_stdio_self_fetch(wire, case, live_server.url)
+    assert_self_fetch_content(payload, case)
+    _assert_protocol_state(before, case)
 
 
 @pytest.mark.parametrize("case_index", range(10))
@@ -409,3 +451,206 @@ def _assert_safe_logs(caplog: LogCaptureFixture, case: SelfFetchCase) -> None:
         value = case.expected_content.get(field)
         if isinstance(value, str) and value:
             assert value not in caplog.text
+
+
+def _protocol_setup(case_index: int) -> tuple[SelfFetchCase, MCPDataset]:
+    """Resolve actual fixtures once and adapt them to the existing real clients.
+
+    :param case_index: Literal row position. Example: 8 for target-author PIP.
+    :return: Actual case and dataset references. Example: Mike plus real PIP ID.
+    :raises ValueError: The row is outside the exact ten-case outline.
+    """
+    if type(case_index) is not int or not 0 <= case_index < len(SELF_ROWS):
+        raise ValueError("An exact self-fetch row index is required.")
+    dataset = load_cedar_baseline()
+    case = resolve_self_fetch_case(dataset, *SELF_ROWS[case_index])
+    key = f"self_{case.entity_type}"
+    return case, MCPDataset(
+        dataset, {key: case.entity_id}, {key: case.expected_content}
+    )
+
+
+def _self_invocation(case: SelfFetchCase) -> MCPCase:
+    """Pass only the actual entity ID and stable optional operation identity.
+
+    :param case: Real authorized outline target. Example: Maria's historical PIP.
+    :return: Existing client's request object. Example: get_pip with actual PK.
+    :raises AssertionError: The target has no positive persisted identity.
+    """
+    assert case.entity_id > 0
+    return MCPCase(
+        case.tool_name,
+        case.actor.username,
+        case.tool_name,
+        f"self_{case.entity_type}",
+        {f"{case.entity_type}_id": case.entity_id, "event_identity": str(ACTION_ID)},
+        reverse(f"api-{case.entity_type}-detail", args=[case.entity_id]),
+        case.expected_content,
+    )
+
+
+def _assert_self_schema(schema: Mapping[str, object], case: SelfFetchCase) -> None:
+    """Require the shipped detail schema and no caller-supplied award fields.
+
+    :param schema: Actual tools/list input schema. Example: get_activity schema.
+    :param case: Requested real entity. Example: Mike's Activity.
+    :return: None. Example: only entity, optional event identity and playbook flags.
+    :raises AssertionError: Registry/schema is missing or exposes award overrides.
+    """
+    entity_parameter = f"{case.entity_type}_id"
+    optional = (
+        {"include_history", "version"} if case.entity_type == "playbook" else set()
+    )
+    assert schema["type"] == "object"
+    assert set(schema["properties"]) == {entity_parameter, "event_identity"} | optional
+    assert schema["properties"][entity_parameter]["type"] == "integer"
+    assert schema.get("required", []) == [entity_parameter]
+    assert schema["properties"]["event_identity"]["default"] is None
+
+
+def _protocol_state() -> ProtocolState:
+    """Capture every award/projection/profile/interaction and existing actor roles.
+
+    :return: Immutable real snapshots. Example: all 2129 historical ledger rows.
+    :raises AssertionError: The real seeded ledger or projection is inconsistent.
+    """
+    roles = tuple(
+        User.objects.order_by("pk").values_list(
+            "pk", "is_active", "is_staff", "is_superuser"
+        )
+    )
+    return snapshot_karma_state(), karma_snapshot(include_summaries=True), roles
+
+
+def _assert_protocol_state(before: ProtocolState, case: SelfFetchCase) -> None:
+    """Reject any persisted award, public/private profile, interaction or role drift.
+
+    :param before: Complete pre-operation copies. Example: real baseline state.
+    :param case: Expected actor total. Example: Maria remains 8200.
+    :return: None. Example: exact full-row and timestamp equality.
+    :raises AssertionError: Any tracked state or total differs.
+    """
+    assert_self_fetch_unchanged(before[0], case)
+    assert before == _protocol_state(), "Self-fetch changed full state or actor roles."
+
+
+async def _run_registered_self_fetch(
+    case_index: int, entrypoint: MCPEntrypoint, server_url: str
+) -> None:
+    """Exercise actual registered clients with strict async ORM and runtime cleanup.
+
+    :param case_index: Literal outline row. Example: 9 for creator-only PIP.
+    :param entrypoint: Actual registration. Example: legacy or facade.
+    :param server_url: Actual facade listener or empty for legacy. Example: localhost.
+    :return: None. Example: actual authorized content and zero side effects.
+    :raises AssertionError: Protocol/content/state/runtime invariants differ.
+    """
+    case, dataset = await sync_to_async(_protocol_setup)(case_index)
+    case = _native_self_case(case, dataset, entrypoint)
+    before = await sync_to_async(_protocol_state)()
+    runtime = _capture_mcp_runtime()
+    paths: list[tuple[str, str]] = []
+    factory = MCPClientFactory(dataset, server_url, paths)
+    async with factory.open(
+        actor_username=case.actor.username, entrypoint=entrypoint
+    ) as session:
+        schemas = {
+            tool.name: tool.inputSchema for tool in await session.client.list_tools()
+        }
+        _assert_self_schema(schemas[case.tool_name], case)
+        await sync_to_async(_assert_protocol_state)(before, case)
+        result = await session.client.call_tool(
+            case.tool_name, dict(_self_invocation(case).arguments)
+        )
+        assert paths == (
+            [
+                ("GET", _self_invocation(case).route),
+                ("POST", "/api/consumption-receipts/"),
+            ]
+            if entrypoint == "facade"
+            else []
+        )
+    assert _capture_mcp_runtime() == runtime
+    assert_self_fetch_content(decode_tool_payload(result), case)
+    await sync_to_async(_assert_after_self_fetch)(before, case, entrypoint)
+
+
+def _assert_stdio_self_fetch(
+    wire: StdioMCPClient, case: SelfFetchCase, server_url: str
+) -> None:
+    """Require genuine JSON-RPC responses and exactly the actual GET plus receipt.
+
+    :param wire: Closed real facade child. Example: successful initialized session.
+    :param case: Actual target/actor. Example: Mike reading his own Phase.
+    :param server_url: Real isolated Django listener. Example: localhost random port.
+    :return: None. Example: three matching responses and no award/provider success.
+    :raises AssertionError: Protocol/HTTP boundaries or no-award state differ.
+    """
+    assert [row["id"] for row in wire.stdout_messages if "id" in row] == [1, 2, 3]
+    requests = re.findall(r"HTTP Request: (.+)", wire.stderr)
+    route = _self_invocation(case).route
+    assert requests == [
+        f'GET {server_url}{route} "HTTP/1.1 200 OK"',
+        f'POST {server_url}/api/consumption-receipts/ "HTTP/1.1 200 OK"',
+    ]
+    assert all(
+        value not in wire.stderr
+        for value in (
+            "KarmaService.persist_awards",
+            "created_count=2",
+            "PublicContributionSummaryBoundary.complete",
+            "ContributionSummaryService.refresh",
+        )
+    )
+
+
+def _native_self_case(
+    case: SelfFetchCase, dataset: MCPDataset, entrypoint: MCPEntrypoint
+) -> SelfFetchCase:
+    """Account for the existing legacy playbook shape without inventing fields.
+
+    :param case: Independent actual fixture expectation. Example: Mike's playbook.
+    :param dataset: Already prepared real fixture references. Example: workflow6202.
+    :param entrypoint: Actual registration. Example: legacy.
+    :return: Native contract expectation. Example: workflow metadata, no author_id.
+    :raises KeyError: Required independent workflow fixture is missing.
+    """
+    if entrypoint != "legacy" or case.entity_type != "playbook":
+        return case
+    expected = dict(case.expected_content)
+    del expected["author_id"]
+    expected["workflows"] = [
+        {
+            "id": dataset.cedar.workflows_by_pk[6202].pk,
+            "name": "React Frontend Development",
+            "description": "",
+            "order": 1,
+        }
+    ]
+    return replace(case, expected_content=expected)
+
+
+def _assert_after_self_fetch(
+    before: ProtocolState, case: SelfFetchCase, entrypoint: MCPEntrypoint
+) -> None:
+    """Preserve awards/profiles and certify the legacy activity's normal access touch.
+
+    :param before: Complete real pre-call state. Example: 2129 awards.
+    :param case: Actual returned target. Example: activity6203.
+    :param entrypoint: Existing surface. Example: legacy.
+    :return: None. Example: only the legitimate Recently Used timestamp advances.
+    :raises AssertionError: Any unrelated state or award changes.
+    """
+    if entrypoint != "legacy" or case.entity_type != "activity":
+        _assert_protocol_state(before, case)
+        return
+    assert_self_fetch_unchanged(before[0], case)
+    after = _protocol_state()
+    old_access = dict(json.loads(before[1].activity_access_json))
+    new_access = dict(json.loads(after[1].activity_access_json))
+    old_time = old_access.pop(case.entity_id)
+    new_time = new_access.pop(case.entity_id)
+    assert old_access == new_access
+    assert new_time is not None and (old_time is None or new_time > old_time)
+    expected = replace(after[1], activity_access_json=before[1].activity_access_json)
+    assert (after[0], expected, after[2]) == before
