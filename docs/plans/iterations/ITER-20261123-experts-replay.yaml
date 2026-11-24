@@ -4018,7 +4018,8 @@ scenarios:
         title: Reconcile persistable request IDs and malformed-provider recovery after independent review
         bpe: BPE-02
         depends_on:
-        - N4-definition-of-done
+        - N3-submission-acceptance
+        triggered_by_failed_review: N4-definition-of-done
         footprint:
         - methodology/services/pip_service.py
         - methodology/services/contribution_summary_service.py
@@ -4666,7 +4667,8 @@ scenarios:
         title: Preserve strict artifact validation while making ordinary repository CI portable
         bpe: BPE-05
         depends_on:
-        - N5-card-done
+        - R1-contact-accessible-text-expectation
+        triggered_by_failed_review: N5-card-done
         footprint:
         - tests/integration/test_expert_card_visual_evidence.py
         - Makefile
