@@ -42,10 +42,10 @@ __all__ = [
     "Notification",
 ]
 
-from .karma_award import EventChannel, KarmaAward
 from .expert_profile import ExpertProfile
+from .karma_award import EventChannel, KarmaAward
 
-__all__ += ["EventChannel", "KarmaAward", "ExpertProfile"]
+__all__ += ["EventChannel", "ExpertProfile", "KarmaAward"]
 
 # PIN S23: wire the reviewed GALDR-SUMMARY-01 collaborators after PIN-05 GO; preserve current behavior.
 

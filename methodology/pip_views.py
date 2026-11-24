@@ -770,7 +770,8 @@ def _processing_correlation_from_request(request: HttpRequest) -> str:
     :raises ValueError: For an invalid request object.
     """
     if not isinstance(request, HttpRequest):
-        raise ValueError("A Django HTTP request is required.")
+        # Preserve this established ValueError contract for existing callers.
+        raise ValueError("A Django HTTP request is required.")  # noqa: TRY004
     identifier = getattr(request, "request_id", None) or request.headers.get(
         "X-Request-ID"
     )

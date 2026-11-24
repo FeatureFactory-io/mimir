@@ -187,7 +187,8 @@ class GaldrEngine:
             )
             cls._mark_submitted_retry(pip_id)
             return
-        except Exception:
+        # Preserve retry recovery for unexpected failures without private exception logs.
+        except Exception:  # noqa: BLE001
             logger.error(
                 "Galdr assess unexpected pip id=%s reason=assessment_failed", pip_id
             )
@@ -245,7 +246,8 @@ class GaldrEngine:
             )
             cls._mark_submitted_retry(pip_id)
             return
-        except Exception:
+        # Preserve retry recovery for unexpected failures without private exception logs.
+        except Exception:  # noqa: BLE001
             logger.error(
                 "Galdr holistic unexpected pip id=%s reason=assessment_failed", pip_id
             )
@@ -333,7 +335,8 @@ class GaldrEngine:
                     update_fields.append("galdr_holistic_assessment")
                 pip.save(update_fields=update_fields)
                 logger.info("Galdr persisted pip id=%s → reviewed", pip_id)
-        except Exception:
+        # Preserve retry recovery for unexpected failures without private exception logs.
+        except Exception:  # noqa: BLE001
             logger.error(
                 "Galdr DB persist pip id=%s reason=assessment_storage_failed", pip_id
             )

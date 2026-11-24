@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
     from django.contrib.auth.models import User
 
 import os
@@ -47,14 +48,14 @@ from methodology.services.artifact_service import ArtifactService
 from methodology.services.karma_service import KarmaService
 from methodology.services.phase_service import PhaseService
 from methodology.services.pip_service import PIPService
-from methodology.services.rule_service import RuleService
-from methodology.services.skill_service import SkillService
-from methodology.services.workflow_service import WorkflowService
 from methodology.services.playbook_history_service import (
     get_playbook_version_by_number,
     list_playbook_version_rows,
     playbook_versions_ordered,
 )
+from methodology.services.rule_service import RuleService
+from methodology.services.skill_service import SkillService
+from methodology.services.workflow_service import WorkflowService
 
 logger = logging.getLogger(__name__)
 _MCP_DETAIL_CHANNEL = "mcp_detail"

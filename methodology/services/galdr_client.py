@@ -93,7 +93,8 @@ class GaldrClient:
         :raises ValueError: For an invalid provider port.
         """
         if not isinstance(llm, BaseLLM) or not callable(llm.complete):
-            raise ValueError("Galdr requires a completion port.")
+            # Both injected-port guards share the established ValueError contract.
+            raise ValueError("Galdr requires a completion port.")  # noqa: TRY004
         client = cls()
         client._llm = llm
         return client

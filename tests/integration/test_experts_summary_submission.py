@@ -32,11 +32,13 @@ from methodology.models import (
     PlaybookVersion,
     ProcessImprovementProposal,
 )
+from methodology.pip_views import _processing_correlation_from_request
 from methodology.services.contribution_summary_factory import (
     build_contribution_summary_service,
 )
 from methodology.services.contribution_summary_prompts import _count_sentences
 from methodology.services.experts_service import ExpertsService
+from methodology.services.galdr_client import GaldrClient
 from methodology.services.galdr_engine import GaldrEngine
 from methodology.services.pip_service import PIPService
 from mimir.request_local import get_current_request
@@ -209,12 +211,12 @@ def test_s23_submit_for_review_with_rollback_does_not_dispatch_processing(
     with (
         summary_processing_scope(_script(s23_pip)) as llm,
         override_settings(GALDR_EAGER=eager),
+        transaction.atomic(),
     ):
-        with transaction.atomic():
-            PIPService.submit_for_review(actor=s23_pip.created_by, pip=s23_pip)
-            assert not llm.calls
-            assert not AgentInteraction.objects.filter(pip=s23_pip).exists()
-            transaction.set_rollback(True)
+        PIPService.submit_for_review(actor=s23_pip.created_by, pip=s23_pip)
+        assert not llm.calls
+        assert not AgentInteraction.objects.filter(pip=s23_pip).exists()
+        transaction.set_rollback(True)
     s23_pip.refresh_from_db()
     assert s23_pip.status == s23_pip.STATUS_DRAFT
     assert not llm.calls
@@ -688,3 +690,110 @@ def test_s23_invalid_summary_retains_last_good_prose_and_received_usage(
     assert interaction.estimated_cost_usd == Decimal("0.000855")
     assert rejected_text not in str(interaction.events)
     assert not any(event["beat"] == "domain_write" for event in interaction.events)
+
+
+@pytest.mark.parametrize("invalid", (None, object(), 123, "not-a-request-or-port"))
+def test_s23_invalid_request_and_port_preserve_value_error_contract(
+    invalid: object,
+) -> None:
+    """Keep documented exception types at the two existing validation boundaries.
+
+    :param invalid: Invalid caller input. Example: None.
+    :return: None after both actual guards reject with ValueError.
+    :raises AssertionError: If either guard changes its exception contract.
+    """
+    with pytest.raises(
+        ValueError, match="A Django HTTP request is required"
+    ) as request_error:
+        _processing_correlation_from_request(invalid)
+    with pytest.raises(
+        ValueError, match="Galdr requires a completion port"
+    ) as port_error:
+        GaldrClient._from_port(invalid)
+    assert type(request_error.value) is ValueError
+    assert type(port_error.value) is ValueError
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("holistic", (False, True))
+def test_s23_galdr_unexpected_parser_error_recovers_without_private_logging(
+    s23_pip: ProcessImprovementProposal,
+    holistic: bool,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Keep both real assessment recovery paths without exposing provider text.
+
+    :param s23_pip: Real Cedar draft. Example: one unpublished Activity ADD.
+    :param holistic: Existing assessment mode. Example: True.
+    :param caplog: Actual log capture. Example: records from galdr_engine.
+    :return: None after real parsing fails and the proposal becomes retryable.
+    :raises AssertionError: If recovery, ledger privacy or safe logging changes.
+    """
+    s23_pip.status = s23_pip.STATUS_PROCESSING_GALDR
+    s23_pip.save(update_fields=["status"])
+    before = _ledger(), tuple(s23_pip.changes.order_by("pk").values_list())
+    llm = ScriptedLLM((json.dumps(_PROVIDER_MARKER),))
+    caplog.set_level(logging.INFO, logger="methodology.services.galdr_engine")
+    assess = (
+        GaldrEngine._assess_sync_holistic
+        if holistic
+        else GaldrEngine._assess_sync_per_change
+    )
+    assess(s23_pip.pk, llm=llm)
+    assert len(llm.calls) == 1
+    _assert_galdr_retry_contract(s23_pip, before, caplog, "assessment_failed")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_s23_galdr_unexpected_persist_error_recovers_without_private_logging(
+    s23_pip: ProcessImprovementProposal,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Keep the real persistence recovery boundary for an invalid reasoning value.
+
+    :param s23_pip: Real Cedar draft. Example: one unpublished Activity ADD.
+    :param caplog: Actual log capture. Example: safe storage failure record.
+    :return: None after the real transaction rolls back and becomes retryable.
+    :raises AssertionError: If any ledger/change data or private log content leaks.
+    """
+    s23_pip.status = s23_pip.STATUS_PROCESSING_GALDR
+    s23_pip.save(update_fields=["status"])
+    before = _ledger(), tuple(s23_pip.changes.order_by("pk").values_list())
+    caplog.set_level(logging.INFO, logger="methodology.services.galdr_engine")
+    GaldrEngine._persist_recommendations(
+        s23_pip.pk,
+        [(s23_pip.changes.get().pk, "ACCEPT", None)],
+        holistic_note=_PROVIDER_MARKER,
+    )
+    _assert_galdr_retry_contract(s23_pip, before, caplog, "assessment_storage_failed")
+
+
+def _assert_galdr_retry_contract(
+    pip: ProcessImprovementProposal,
+    before: tuple[tuple[tuple[object, ...], ...], tuple[tuple[object, ...], ...]],
+    caplog: pytest.LogCaptureFixture,
+    reason: str,
+) -> None:
+    """Require unchanged real domain data and sanitized correlated recovery logs.
+
+    :param pip: Actual assessed proposal. Example: the Cedar unpublished ADD.
+    :param before: Complete ledger and change rows before the failed operation.
+    :param caplog: Actual log records. Example: a single safe ERROR record.
+    :param reason: Stable safe failure category. Example: assessment_failed.
+    :return: None after the recovery and privacy contract is checked.
+    :raises AssertionError: If recovery changes domain data or exposes internals.
+    """
+    pip.refresh_from_db()
+    assert pip.status == pip.STATUS_SUBMITTED
+    assert pip.reviewed_at is None
+    assert (_ledger(), tuple(pip.changes.order_by("pk").values_list())) == before
+    records = [
+        r
+        for r in caplog.records
+        if r.name == "methodology.services.galdr_engine" and r.levelno == logging.ERROR
+    ]
+    assert len(records) == 1
+    assert f"pip id={pip.pk}" in records[0].getMessage()
+    assert f"reason={reason}" in records[0].getMessage()
+    assert _PROVIDER_MARKER not in records[0].getMessage()
+    assert not records[0].exc_info and not records[0].stack_info
