@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -34,19 +35,38 @@ def _invoke(operation: str, target: Path) -> dict[str, Any]:
     raise ValueError("Unknown compatibility operation.")
 
 
+def _file_fingerprint(file: Path, target: Path) -> dict[str, str | int]:
+    """Retain raw bytes and compare content without the generated clock label.
+
+    :param file: Actual exported file. Example: workflow.md.
+    :param target: Private output root. Example: pytest tmp_path.
+    :return: Raw and clock-independent fingerprints of the actual file.
+    :raises OSError: The actual output cannot be read.
+    """
+    data = file.read_bytes()
+    content = re.sub(
+        rb"(?m)^\*\*Export Date\*\*: \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC$",
+        b"**Export Date**: <generated timestamp>",
+        data,
+        count=1,
+    )
+    return {
+        "path": str(file.relative_to(target)),
+        "bytes": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "content_sha256": hashlib.sha256(content).hexdigest(),
+    }
+
+
 def _files(target: Path) -> list[dict[str, str | int]]:
-    """Fingerprint the actual written files without changing them.
+    """Fingerprint actual files while preserving their original raw hashes.
 
     :param target: Private export root. Example: Path('/tmp/probe/export').
-    :return: Sorted file fingerprints. Example: [{'bytes': 20, ...}].
+    :return: Sorted actual fingerprints. Example: [{'bytes': 20, ...}].
     :raises OSError: An output file cannot be read.
     """
     return [
-        {
-            "path": str(file.relative_to(target)),
-            "bytes": file.stat().st_size,
-            "sha256": hashlib.sha256(file.read_bytes()).hexdigest(),
-        }
+        _file_fingerprint(file, target)
         for file in sorted(target.rglob("*"))
         if file.is_file()
     ]

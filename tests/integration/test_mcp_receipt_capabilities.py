@@ -30,6 +30,7 @@ from methodology.models import KarmaAward, Playbook
 from mimir.middleware import ConsumptionReceiptCapabilityMiddleware
 from tests.support.experts_data import CedarDataset
 from tests.support.experts_logs import capture_experts_logs
+from tests.support.fob_compatibility_probe import _file_fingerprint
 from tests.support.karma_mcp import MCPClientFactory, MCPDataset
 
 _BASELINE = "333c36ded6bf58bdef94049ca0f5bf98c9ce3124"
@@ -475,3 +476,25 @@ def test_legacy_capability_branch_logs_actual_no_receipt(
     assert not any(
         "Authorization" in message or "Token " in message for message in messages
     )
+
+
+def test_export_fingerprint_with_clock_change_preserves_all_guidance_bytes(
+    tmp_path: Path,
+) -> None:
+    """Avoid clock-boundary false failures while still detecting content drift.
+
+    :param tmp_path: Actual private filesystem directory.
+    :return: None after raw-hash, generated-timestamp and real-guidance assertions.
+    :raises AssertionError: A content change is mistaken for clock metadata.
+    """
+    file = tmp_path / "workflow.md"
+    original = "**Export Date**: 2026-11-24 23:59 UTC\nReview public guidance.\n"
+    file.write_text(original)
+    before = _file_fingerprint(file, tmp_path)
+    file.write_text(original.replace("23:59", "00:00"))
+    next_minute = _file_fingerprint(file, tmp_path)
+    assert before["sha256"] != next_minute["sha256"]
+    assert before["content_sha256"] == next_minute["content_sha256"]
+    file.write_text(original.replace("public", "secret"))
+    changed_guidance = _file_fingerprint(file, tmp_path)
+    assert before["content_sha256"] != changed_guidance["content_sha256"]

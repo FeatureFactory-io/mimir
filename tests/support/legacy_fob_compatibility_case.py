@@ -89,6 +89,22 @@ def _probe(
     return json.loads(completed.stdout)
 
 
+def _comparable_files(results: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """Compare every output byte except the exporter-generated UTC minute label.
+
+    :param results: Actual native operation reports, including original raw hashes.
+    :return: Content fingerprints retaining paths and byte counts.
+    :raises KeyError: A genuine probe report omits its file evidence.
+    """
+    return [
+        [
+            {key: value for key, value in file.items() if key != "sha256"}
+            for file in row["files"]
+        ]
+        for row in results
+    ]
+
+
 @pytest.mark.django_db(transaction=True)
 def test_actual_old_fob_accepts_old_and_new_clients(
     live_server: LiveServer, tmp_path: Path
@@ -121,4 +137,4 @@ def test_actual_old_fob_accepts_old_and_new_clients(
         )
     old, new = results["baseline"]["results"], results["candidate"]["results"]
     assert old[0]["result"] == new[0]["result"]
-    assert [row["files"] for row in old] == [row["files"] for row in new]
+    assert _comparable_files(old) == _comparable_files(new)
