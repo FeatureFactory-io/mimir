@@ -4600,11 +4600,24 @@ scenarios:
           rules:
           - do-test-first
           - do-semantic-versioning-on-ui-elements
+      - id: R1-contact-accessible-text-expectation
+        title: Reconcile exact card text with the accepted shared contact description
+        bpe: BPE-04
+        depends_on:
+        - N4-card-certification
+        footprint:
+        - tests/integration/test_expert_cards.py
+        gate:
+          command: make test-experts-s04-backend
+        authority: Routine test-only integration reconciliation within the original S04 test footprint
+        constraints:
+        - Preserve exact content and no-suitability assertions and explicitly assert the added accessible contact description.
+        - Do not change production markup or weaken comparisons to loose containment.
       - id: N5-card-done
         title: Verify the complete card contract
         bpe: BPE-06
         depends_on:
-        - N4-card-certification
+        - R1-contact-accessible-text-expectation
         footprint: []
         gate:
           command: make test-experts-s04
