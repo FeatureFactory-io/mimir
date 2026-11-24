@@ -31,6 +31,7 @@ from methodology import (
     artifact_views,
     expert_views,
     feedback_views,
+    karma_views,
     phase_views,
     pip_views,
     rule_views,
@@ -216,16 +217,20 @@ def _expert_detail_urlpatterns() -> list[URLPattern]:
     ]
 
 
-def _karma_copy_receipt_route() -> "URLPattern":
-    """Describe the future successful-copy receipt route.
+def _karma_copy_receipt_route() -> URLPattern:
+    """Declare the authenticated successful-copy receipt route.
 
     :return: Named route. Example: /karma/copy-receipts/, karma_copy_receipt.
-    :raises NotImplementedError: Until approved URL wiring.
     """
-    raise NotImplementedError()
+    return path(
+        "karma/copy-receipts/",
+        karma_views.copy_success_receipt,
+        name="karma_copy_receipt",
+    )
 
 
 # PIN S39: wire the reviewed KARMA-MCP-01 collaborators after PIN-05 GO; preserve current behavior.
 
 urlpatterns.extend(_experts_routes())
 urlpatterns.extend(_expert_detail_urlpatterns())
+urlpatterns.append(_karma_copy_receipt_route())

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import sqlite3
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Literal
@@ -14,6 +14,8 @@ from uuid import UUID
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser, User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.utils import timezone
+from django.utils.module_loading import import_string
 
 from methodology.models import (
     EventChannel,
@@ -56,6 +58,29 @@ _AWARD_IDENTITY_COLLISIONS = frozenset(
     }
 )
 _SQLITE_UNIQUE_PREFIX = "UNIQUE constraint failed: "
+_CONSUMPTION_LOG = "KarmaService.award_successful_consumption"
+_CONSUMPTION_POINTS = 5
+_CONSUMPTION_CHANNELS = (
+    EventChannel.GUI_COPY,
+    EventChannel.MCP_DETAIL,
+    EventChannel.EXPORT,
+)
+MAX_CONSUMPTION_ENTITY_ID = (1 << 63) - 1
+GUI_COPY_ENTITY_TYPES = frozenset(
+    {"activity", "agent", "artifact", "pip", "rule", "skill"}
+)
+# Reader services depend on PlaybookService, which imports this writer for releases.
+_CONSUMPTION_READERS = {
+    "activity": ("activity_service.ActivityService", "get_activity_for_user"),
+    "agent": ("agent_service.AgentService", "get_agent_for_user"),
+    "artifact": ("artifact_service.ArtifactService", "get_artifact_for_user"),
+    "phase": ("phase_service.PhaseService", "get_phase_for_user"),
+    "pip": ("pip_service.PIPService", "get_pip"),
+    "playbook": ("playbook_service.PlaybookService", "get_playbook"),
+    "rule": ("rule_service.RuleService", "get_rule_for_user"),
+    "skill": ("skill_service.SkillService", "get_skill_for_user"),
+    "workflow": ("workflow_service.WorkflowService", "get_workflow_for_user"),
+}
 
 
 @dataclass(frozen=True)
@@ -385,6 +410,7 @@ class KarmaService:
             )
 
     @staticmethod
+    @transaction.atomic
     def award_successful_consumption(
         actor: User | AnonymousUser,
         entity_type: str,
@@ -395,6 +421,8 @@ class KarmaService:
     ) -> tuple[AwardOutcome, ...]:
         """Persist eligible learner/author awards after a successful operation.
 
+        Check existing recipients before delegating row comparison and writes.
+
         :param actor: Server-authenticated actor. Example: Maria.
         :param entity_type: Allowlisted entity kind. Example: "activity".
         :param entity_id: Positive entity identifier. Example: 6203.
@@ -403,8 +431,39 @@ class KarmaService:
         :return: Atomic pair or empty excluded outcome. Example: two AwardOutcome values.
         :raises ValueError: If identity, channel or entity input is invalid.
         :raises PermissionError: If existing access policy denies the target.
+        :raises ObjectDoesNotExist: If the authenticated actor's target no longer exists.
+        :raises ValidationError: If the action key conflicts with immutable evidence.
         """
-        raise NotImplementedError()
+        service = KarmaService
+        validate_input = service._validate_consumption_input
+        validate_input(entity_type, entity_id, event_identity, channel)
+        operation = _CONSUMPTION_LOG
+        trace = f"channel={channel} action_uuid={event_identity}"
+        if isinstance(actor, AnonymousUser):
+            reason = service._consumption_exclusion(actor, None)
+            logger.info(f"{operation} | branch | {trace} reason={reason} awards=0")
+            return ()
+        target = service._resolve_consumption_target(actor, entity_type, entity_id)
+        canonical_id = service._canonical_consumption_identity
+        identity = canonical_id(actor.pk, event_identity, channel)
+        trace += f" actor_id={actor.pk} playbook_id={target.playbook.pk}"
+        logger.info(f"{operation} | validation | {trace} authorized")
+        reason = service._consumption_exclusion(actor, target)
+        build_specs = service._build_consumption_specs
+        specs = () if reason else build_specs(actor, target, identity, channel=channel)
+        rows = KarmaAward.objects.filter(event_identity=identity)
+        existing = set(rows.values_list("recipient_id", flat=True))
+        if existing and existing != {spec.recipient_id for spec in specs}:
+            raise ValidationError("Event conflict.", code="award_payload_conflict")
+        if reason:
+            logger.info(f"{operation} | branch | {trace} reason={reason} awards=0")
+            return ()
+        outcomes = service.persist_awards(specs, correlation_id=identity)
+        status = "applied" if outcomes[0].created else "replayed"
+        recipients = f"learner_id={actor.pk} author_id={target.playbook.author_id}"
+        result = f"{recipients} points={_CONSUMPTION_POINTS} status={status}"
+        logger.info(f"{operation} | processing | event_identity={identity} {result}")
+        return outcomes
 
     @staticmethod
     def _validate_consumption_input(
@@ -422,7 +481,12 @@ class KarmaService:
         :return: None on valid input.
         :raises ValueError: If any boundary input is invalid.
         """
-        raise NotImplementedError()
+        if not isinstance(entity_type, str) or entity_type not in _CONSUMPTION_READERS:
+            raise ValueError("Unsupported consumption entity type.")
+        if type(entity_id) is not int or not 0 < entity_id <= MAX_CONSUMPTION_ENTITY_ID:
+            raise ValueError("A positive consumption entity ID is required.")
+        if not isinstance(event_identity, UUID) or channel not in _CONSUMPTION_CHANNELS:
+            raise ValueError("A consumption UUID and recognized channel are required.")
 
     @staticmethod
     def _resolve_consumption_target(
@@ -437,7 +501,17 @@ class KarmaService:
         :raises PermissionError: If the existing reader rejects access.
         :raises ObjectDoesNotExist: If the entity is absent.
         """
-        raise NotImplementedError()
+        if not isinstance(actor, User) or actor._state.adding or not actor.is_active:
+            raise PermissionError("An active persisted consumption actor is required.")
+        service_path, reader_name = _CONSUMPTION_READERS[entity_type]
+        service = import_string(f"methodology.services.{service_path}")
+        entity = getattr(service, reader_name)(entity_id, actor)
+        if entity_type == "playbook":
+            return ConsumptionTarget(entity_type, entity_id, entity)
+        if entity_type == "activity":
+            return ConsumptionTarget(entity_type, entity_id, entity.workflow.playbook)
+        creator_id = entity.created_by_id if entity_type == "pip" else None
+        return ConsumptionTarget(entity_type, entity_id, entity.playbook, creator_id)
 
     @staticmethod
     def _consumption_exclusion(
@@ -450,7 +524,13 @@ class KarmaService:
         :return: Exclusion reason or None. Example: "self_consumption".
         :raises ValueError: If an authenticated actor has no target.
         """
-        raise NotImplementedError()
+        if isinstance(actor, AnonymousUser):
+            return "guest"
+        if target is None:
+            raise ValueError("An authorized consumption target is required.")
+        if actor.pk in (target.playbook.author_id, target.pip_creator_id):
+            return "self_consumption"
+        return None
 
     @staticmethod
     def _canonical_consumption_identity(
@@ -464,21 +544,54 @@ class KarmaService:
         :return: Canonical key. Example: "consumption:gui_copy:42:<uuid>".
         :raises ValueError: Invalid actor, UUID, channel or resulting length.
         """
-        raise NotImplementedError()
+        if type(actor_id) is not int or not 0 < actor_id <= MAX_CONSUMPTION_ENTITY_ID:
+            raise ValueError("A positive consumption actor ID is required.")
+        if not isinstance(event_identity, UUID) or channel not in _CONSUMPTION_CHANNELS:
+            raise ValueError("A consumption UUID and recognized channel are required.")
+        identity = f"consumption:{channel}:{actor_id}:{event_identity}"
+        if not AWARD_CORRELATION_ID.fullmatch(identity):
+            raise ValueError("The consumption identity is too long.")
+        return identity
 
     @staticmethod
     def _build_consumption_specs(
-        actor: User, target: ConsumptionTarget, canonical_identity: str
+        actor: User,
+        target: ConsumptionTarget,
+        canonical_identity: str,
+        *,
+        channel: ConsumptionChannel,
     ) -> tuple[AwardSpec, ...]:
         """Build the learner and author five-point immutable award specifications.
 
         :param actor: Authenticated learner. Example: Maria.
         :param target: Authorized target with real author/category. Example: Mike/Development.
         :param canonical_identity: Scoped stable ledger key. Example: "consumption:gui_copy:…".
+        :param channel: Explicit server-selected provenance. Example: "gui_copy".
         :return: Learning then Consumption specifications. Example: a two-item tuple.
-        :raises ValueError: If attribution is missing or not recognized.
+        :raises ValidationError: If attribution is missing or not recognized.
         """
-        raise NotImplementedError()
+        book = target.playbook
+        if book.author_id is None or book.category not in CATEGORY_SLUGS:
+            raise ValidationError("Consumption target has invalid award attribution.")
+        learner_spec = AwardSpec(
+            recipient_id=actor.pk,
+            source_kind=KarmaAward.SourceKind.LEARNING,
+            points=_CONSUMPTION_POINTS,
+            category=book.category,
+            event_identity=canonical_identity,
+            playbook_id_snapshot=book.pk,
+            change_id_snapshot=None,
+            occurred_at=timezone.now(),
+            event_channel=channel,
+            entity_type_snapshot=target.entity_type,
+            entity_id_snapshot=target.entity_id,
+        )
+        author_spec = replace(
+            learner_spec,
+            recipient_id=book.author_id,
+            source_kind=KarmaAward.SourceKind.CONSUMPTION,
+        )
+        return learner_spec, author_spec
 
     @staticmethod
     def award_accepted_changes(
