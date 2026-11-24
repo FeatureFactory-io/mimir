@@ -6543,12 +6543,31 @@ scenarios:
           - do-not-mock-in-integration-tests
           - do-assert-log-story
           - do-write-concise-methods
+      - id: S45-N2b-copied-context-revocation
+        title: Revoke file-scope authority in every copied context when the fixture registration closes
+        bpe: BPE-02
+        depends_on:
+        - S45-N2a-transaction-log-and-runner-repair
+        footprint:
+        - tests/support/experts_data.py
+        - tests/unit/test_experts_database_scope.py
+        gate:
+          command: make test-experts-s45
+          ownership_command: pytest tests/unit/test_experts_database_scope.py -x
+        repair_contract: Keep the active runner and all file ownership checks. A copied ContextVar must reference a shared revocable registration; invalidate that registration in finally before resetting the local ContextVar so an already-copied context cannot authorize a later open in the same real pytest item. Add the unchanged real fixture copy_context reproduction as a durable negative test proving rejection before connection, while active registered contexts and legacy guards still work. No service/public API changes.
+        guidance_bundle:
+          activity: BPE/BPE-02-Implement_Backend.md
+          rules:
+          - do-test-first
+          - do-not-mock-in-integration-tests
+          - do-write-concise-methods
       - id: S45-N4-definition-of-done
         title: Verify complete retry contract and record backend evidence
         bpe: BPE-06
         depends_on:
         - S45-N3-acceptance
         - S45-N2a-transaction-log-and-runner-repair
+        - S45-N2b-copied-context-revocation
         footprint: []
         gate:
           command: make test-experts-s45
