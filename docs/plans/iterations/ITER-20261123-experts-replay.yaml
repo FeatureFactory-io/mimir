@@ -8673,7 +8673,7 @@ scenarios:
       - S39
       - S23
     implementation_plan: docs/plans/iterations/experts/S41-karma-mcp-02.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
@@ -9307,7 +9307,7 @@ scenarios:
       - S32
       - S33
     implementation_plan: docs/plans/iterations/experts/S34-karma-pip-03.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S32
@@ -9686,7 +9686,7 @@ scenarios:
         agent_proofs: []
         mockup_graduation: not_applicable
     implementation_plan: docs/plans/iterations/experts/S44-karma-export-03.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
