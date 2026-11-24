@@ -684,3 +684,9 @@ The real N1 rejection stories expose missing safe target/UUID metadata on GUI ac
 ## S20 / N1-boundary-proof — NODE_PASS
 
 `e7f4e4c19b275bcbae0e04ac566b7dd72892890b` changes only its public-privacy test/support files. Eleven real Django/ORM cases pass in3.31seconds with zero skips, preserving full public prose/6101, guest address exclusion, Elena's authorized contact and whole ledger/profile/model/mail state. Each ineligible visibility/status variant and exact public DTO allowlist is checked against actual persisted private records. All1,985tracked archive blobs reconcile to the commit; credential scan and scoped quality pass. Original stub red and final PTYs remain `MIN-S20-N1-*`. Exact AT/browser/DoD remain.
+
+## S20 / N2-acceptance — NODE_PASS
+
+`aaf173a8a2c635358bfb68a518d6e2a56ed427f0` changes only the existing privacy bindings. Final committed-source Make passes one exact runner; original line28 executes one scenario/six passed steps including Background, zero selected skips/undefined. Existing anonymous/request phrases and N1 public-response assertions are reused, with a single baseline load and actual persisted private records verified before GET. Seven full model snapshots/mail remain unchanged. All1,985source blobs reconcile; original incremental stub reds remain `MIN-S20-N2-*`. Original rawJSON contains the unchanged fictional token literal and is retained0600 with classification, never printed into PTY output; real credentials remain absent. Browser and independent DoD remain.
+
+Root adds the bounded S46 producer regression module and explicit stdio ownership unit module to the mandatory full backend Make gate, alongside the whole failure matrix. This prevents successful focused repair tests from becoming optional evidence. N1 and N1a must reconcile their final committed source to this actual recipe.

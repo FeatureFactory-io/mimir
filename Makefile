@@ -1202,7 +1202,7 @@ test-experts-s45:
 
 .PHONY: test-experts-s46-backend
 test-experts-s46-backend:
-	$(PYTHON) -m pytest tests/integration/karma_event/test_failures.py::test_consumption_with_denied_or_missing_target_preserves_global_ledger tests/integration/karma_event/test_failures.py::test_mcp_detail_with_denied_or_missing_target_preserves_global_ledger tests/integration/karma_event/test_failures.py::test_mcp_detail_with_invalid_token_preserves_global_ledger tests/integration/karma_event/test_failures.py::test_receipt_with_forged_fields_or_revoked_access_preserves_global_ledger tests/integration/karma_event/test_failures.py::test_export_with_real_filesystem_failure_preserves_global_ledger tests/integration/karma_event/test_failures.py::test_export_with_receipt_authentication_failure_preserves_completed_files tests/integration/karma_event/test_failures.py::test_mcp_stdio_with_denied_read_or_failed_export_returns_safe_error tests/integration/karma_event/test_failures.py::test_consumption_failure_log_story_reject tests/integration/karma_event/test_failures.py::test_consumption_receipt_failure_log_story_recovery -x
+	$(PYTHON) -m pytest tests/integration/karma_event/test_failures.py tests/integration/test_receipt_rejection_logging.py tests/unit/test_karma_stdio_scope.py -x
 
 .PHONY: test-experts-s46-browser
 test-experts-s46-browser:
