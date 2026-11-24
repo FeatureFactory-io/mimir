@@ -113,6 +113,7 @@ _CATEGORY_METRIC = (
 _LEADERBOARD = rf"(?:the{_SPACE}+)?(?:(?:{_CATEGORY_LABELS}){_SPACE}+)?leaderboard"
 _PERCENT_SUFFIX = rf"(?:{_SPACE}*%|{_SPACE}+percent\b)?"
 _REDACTED = "[redacted]"
+_MAX_REDACTION_PASSES = 4
 _CREDENTIAL_LABEL = (
     rf"(?:api{_LABEL_JOINER}(?:key|token)|(?:access|auth){_LABEL_JOINER}token"
     rf"|client{_LABEL_JOINER}secret|password)"
@@ -161,22 +162,114 @@ _AGGREGATE_PATTERNS = (
     ),
 )
 _POLICY_FLAGS = re.IGNORECASE | re.VERBOSE
-# The boundary also checks its string metadata for recognizable credentials.
-_SENSITIVE_TEXT = re.compile("|".join(_CREDENTIAL_PATTERNS), _POLICY_FLAGS)
-_PUBLIC_TEXT_PATTERNS = tuple(
-    re.compile(pattern, _POLICY_FLAGS)
-    for pattern in (*_CREDENTIAL_PATTERNS, *_AGGREGATE_PATTERNS, re.escape(_REDACTED))
+
+# Preserve these compiled recognizers from 6858ab7d32009c019d6307dd4e9f9b29b54883b8.
+# Their alternation order and whitespace rules are part of backward compatibility.
+# SHA-256 of compact JSON [pattern, flags] with the category labels from that commit:
+# _LEGACY_SENSITIVE_TEXT: 1de88e105d85bc8f683c5f401aa3dd925ea661a3716c55af1067b2ac1905537c
+# _LEGACY_AGGREGATE_CLAIMS: 5bb33d090ff120df1733a35a0138c37d2f6f16b928bc3ae775d15b46b069ecb0
+# _LEGACY_CREDENTIAL_CLAIMS: ea32e5de6a3ce04428991062aedf5aef1b8e6fbb46427880ef0956e417bc7c4d
+# Match the entire space-grouped value before any legacy ungrouped alternatives.
+_LEGACY_SPACE_GROUPED_NUMBER = r"\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[,.]\d+)?(?!\d)"
+_LEGACY_DIGIT_NUMBER = rf"(?:{_LEGACY_SPACE_GROUPED_NUMBER}|\d[\d,.]*)"
+_LEGACY_NUMBER_WORD = (
+    r"(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
+    r"|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty"
+    r"|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?"
+    r"|millions?|billions?)"
+)
+_LEGACY_NUMBER = (
+    rf"(?:{_LEGACY_DIGIT_NUMBER}(?:st|nd|rd|th)?|{_LEGACY_NUMBER_WORD}"
+    rf"(?:[-\s]+(?:and[-\s]+)?{_LEGACY_NUMBER_WORD})*)"
+)
+# Require an explicit value connector for category metrics to allow versioned titles.
+_LEGACY_AGGREGATE_CLAIMS = re.compile(rf"""(?ix)
+    \b{_LEGACY_NUMBER}\s+(?:(?:{_CATEGORY_LABELS}|management|karma)\s+)?points\b
+    | \b{_LEGACY_NUMBER}\s+(?:(?:released|public|authored|published|accepted)\s+)*
+        (?:playbooks|pips|proposals|contributions|copies)\b
+    | \b(?:copied|downloaded)\s+{_LEGACY_NUMBER}\s+times\b
+    | \b(?:karma(?:\s+(?:total|score|points))?|total\s+score|category\s+point\s+subtotals?|copy\s+count)
+        (?:\s*[:=]\s*|\s+(?:(?:is|was|of|reached|rose\s+to)\s+)?){_LEGACY_NUMBER}\b
+    | \b(?:category|(?:{_CATEGORY_LABELS})(?:[-_\s]+category)?)(?:['’]s)?[-_\s]+
+        (?:score|points|(?:point[-_\s]+)?subtotals?|karma(?:[-_\s]+(?:total|score|points))?)
+        (?:\s*[:=]\s*|\s+(?:is|are|was|were|of|reached|rose\s+to)\s+){_LEGACY_NUMBER}\b
+    | \b(?:rank(?:ed)?|placed)\s*\#?\s*(?:{_LEGACY_NUMBER}|first|second|third)\b
+    | \b(?:position|number)\s*\#?\s*{_LEGACY_NUMBER}\s+on\s+the\s+leaderboard\b
+    | \b(?:first|second|third|top\s+{_LEGACY_NUMBER})\s+(?:place|rank|on\s+the\s+leaderboard)\b
+    """)
+_LEGACY_SENSITIVE_TEXT = re.compile(
+    r"""(?ix)
+    -----BEGIN\ [A-Z\ ]*PRIVATE\ KEY-----[\s\S]*?(?:-----END\ [A-Z\ ]*PRIVATE\ KEY-----|\Z)
+    | (?<=://)[^\s/@]+:[^\s/@]+(?=@)
+    | \b[\w.%+!-]+@[\w.-]+\.[a-z]{2,}\b
+    | \b(?:api[-_\ ]?key|access[-_\ ]?token|auth[-_\ ]?token|client[-_\ ]?secret|password)
+        \s*["']?\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s;,]+)
+    | \bbearer\s+[a-z0-9._~+/=-]+
+    | \b(?:sk-(?:ant-|proj-)?|gh[pousr]_|github_pat_|xox[baprs]-)[a-z0-9_-]{12,}\b
+    | \b(?:AKIA|ASIA)[A-Z0-9]{16}\b
+    | \beyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+\b
+    | \b[a-f0-9]{40}\b
+    """
+    rf"""
+    | \b(?:total[-_\ ]+karma|karma(?:[-_\ ]+(?:total|score|points))?|category[-_\ ]+points
+           |copy[-_\ ]+count|released[-_\ ]+playbook[-_\ ]+count)
+        \s*[:=]?\s*{_LEGACY_DIGIT_NUMBER}
+    | \b{_LEGACY_DIGIT_NUMBER}\s+(?:karma(?:\s+points)?|copies|released\s+playbooks)\b
+    """
+    # An explicit value connector keeps versioned titles like Design Score 2.0.
+    rf"""
+    | \b(?:category|(?:{_CATEGORY_LABELS})(?:[-_\ ]+category)?)[-_\ ]+
+        (?:score|points|(?:point[-_\ ]+)?subtotal|karma(?:[-_\ ]+(?:score|points|total))?)
+        (?:\s*[:=]\s*|\s+(?:is|was|of)\s+)(?:{_LEGACY_SPACE_GROUPED_NUMBER}|\d+(?:[,.]\d+)*)
+    """
+)
+_LEGACY_CREDENTIAL_PATTERN = r"""
+    \[redacted\]
+    | \b(?:api[-_\ ]?(?:key|token)|access[-_\ ]?token|auth[-_\ ]?token|client[-_\ ]?secret|password)
+       \s*(?:[:=]|\bis\b|\bwas\b)\s*\S+
+    """
+_LEGACY_CREDENTIAL_CLAIMS = re.compile(f"(?ix){_LEGACY_CREDENTIAL_PATTERN}")
+
+# Metadata admits periods and colons in model IDs. The legacy credential-label
+# expression catches punctuation-only values that otherwise pass that shape.
+_SENSITIVE_TEXT = re.compile(
+    "|".join((*_CREDENTIAL_PATTERNS, _LEGACY_CREDENTIAL_PATTERN)), _POLICY_FLAGS
+)
+
+_PUBLIC_TEXT_PATTERNS = (
+    *(
+        re.compile(pattern, _POLICY_FLAGS)
+        for pattern in (*_CREDENTIAL_PATTERNS, *_AGGREGATE_PATTERNS)
+    ),
+    _LEGACY_SENSITIVE_TEXT,
+    _LEGACY_AGGREGATE_CLAIMS,
+    _LEGACY_CREDENTIAL_CLAIMS,
 )
 
 
 def _redact_public_text(text: str) -> str:
-    """Replace matching sensitive or mutable claims in a public source field.
+    """Redact matched claims, including ones exposed by replacement boundaries.
 
     :param text: Published field. Example: "Karma total is 900."
-    :return: Scrubbed field. Example: "[redacted]."
+    :return: Stable scrubbed text, or a marker if the pass limit is reached.
     """
-    # Match against the original field. A replacement could hide a label from
-    # another rule or leave a trailing number fragment from an overlapping match.
+    for _ in range(_MAX_REDACTION_PASSES):
+        scrubbed = _redact_public_text_pass(text)
+        if scrubbed == text:
+            return scrubbed
+        text = scrubbed
+    logger.info("Public evidence field | decision | reason_code=redaction_pass_limit")
+    return _REDACTED
+
+
+def _redact_public_text_pass(text: str) -> str:
+    """Merge overlapping restricted intervals before rewriting the field.
+
+    :param text: Field to scan for this pass. Example: "Karma:100Design score: 900."
+    :return: Text with all matched intervals replaced by the marker.
+    """
+    # Each expression sees the same pass input so a replacement cannot hide
+    # another match or leave a suffix from an overlapping interval.
     spans = sorted(
         match.span()
         for pattern in _PUBLIC_TEXT_PATTERNS
