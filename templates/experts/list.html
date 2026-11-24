@@ -55,7 +55,7 @@
         {% url 'expert_detail' person.username as detail_url %}
         <a class="btn btn-primary" href="{% if detail_url %}{{ detail_url }}{% else %}{{ list_url }}{{ person.username|urlencode:'' }}/{% endif %}"
            data-testid="experts-view-profile-{{ person.username }}"><i class="fa-solid fa-user me-1" aria-hidden="true"></i>View profile</a>
-        {# PIN S14: add request-local Reach out control using the production contact partial. #}
+        {% include "experts/_reach_out.html" with person=person only %}
       </div>
     </div>
   </article>

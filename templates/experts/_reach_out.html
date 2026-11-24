@@ -1,2 +1,15 @@
 
-{# PIN S14: graduate EXPERTS-REACH-01 from the approved Experts prototype after GO. #}
+<!-- Screen interaction: FOB-EXPERTS-REACH-OUT-1 -->
+{% if person.contact.state == "available" %}
+<a class="btn btn-outline-primary" href="{{ person.contact.href }}"
+   data-testid="experts-reach-out-{{ person.username }}" data-bs-toggle="tooltip"
+   title="Start an email discussion with {{ person.name }}"><i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>Reach out</a>
+{% elif person.contact.explanation %}
+<span tabindex="0" class="d-inline-block" aria-describedby="reach-explanation-{{ person.username }}"
+      data-testid="experts-reach-out-{% if person.contact.state == 'authentication_required' %}guest{% else %}unavailable{% endif %}-tooltip"
+      data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ person.contact.explanation }}">
+  <button class="btn btn-outline-primary" type="button" disabled aria-label="Reach out to {{ person.name }}"
+          data-testid="experts-reach-out-disabled-{{ person.username }}"><i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>Reach out</button>
+  <span id="reach-explanation-{{ person.username }}" class="visually-hidden">{{ person.contact.explanation }}</span>
+</span>
+{% endif %}

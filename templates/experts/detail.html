@@ -20,9 +20,9 @@
     <span class="text-primary fw-semibold" data-testid="expert-karma-total">{{ person.formatted_karma }}</span>
     <span class="text-muted">Karma</span>
   </div>
-  {% if person.contact %}
+  {% if contact_person.contact %}
   <div role="toolbar" aria-label="Expert contact">
-    {% include "experts/_reach_out.html" with person=person only %}
+    {% include "experts/_reach_out.html" with person=contact_person only %}
   </div>
   {% endif %}
 </header>
