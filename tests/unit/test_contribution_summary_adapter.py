@@ -7,13 +7,12 @@ import logging
 from collections.abc import Callable, Mapping
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import anthropic
 import httpx
 import pytest
 from django.core.exceptions import ValidationError
-from pytest_django.fixtures import SettingsWrapper
 
 from methodology.llm.anthropic_adapter import AnthropicAdapter
 from methodology.llm.base import LLMError, LLMMessage, LLMResponse
@@ -24,6 +23,9 @@ from methodology.services.contribution_summary_factory import (
     resolve_processing_llm,
 )
 from tests.support.scripted_llm import ScriptedLLM
+
+if TYPE_CHECKING:
+    from pytest_django.fixtures import SettingsWrapper
 
 _MODEL = "configured-model"
 _RESOLVED_MODEL = "resolved-model-20261124"
