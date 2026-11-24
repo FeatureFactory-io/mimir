@@ -12,6 +12,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMessage
 from django.test import Client, override_settings
+from django.urls import reverse
 
 from methodology.llm.base import LLMError, LLMResponse
 from methodology.models import (
@@ -436,17 +437,141 @@ def test_s25_submit_with_reviewed_or_foreign_actor_rejects_before_refresh(
     assert not mailoutbox
 
 
+def _post_as_submitter(
+    client: Client,
+    pip: ProcessImprovementProposal,
+    route: str,
+    destination: str,
+    *,
+    data: dict[str, str] | None = None,
+    correlation: str = "",
+) -> None:
+    """POST an existing route and verify the same proposal and actor.
+
+    :param client: Authenticated real Django client.
+    :param pip: Proposal for this lifecycle.
+    :param route: Existing POST route. Example: pip_edit.
+    :param destination: Expected redirect route. Example: pip_detail.
+    :param data: Optional form data.
+    :param correlation: Optional submission request ID.
+    :return: None on the expected redirect.
+    :raises AssertionError: For incorrect status, destination or actor.
+    """
+    ids = {"pk": pip.pk}
+    headers = {"X-Request-ID": correlation} if correlation else {}
+    response = client.post(reverse(route, kwargs=ids), data=data, headers=headers)
+    assert response.status_code == 302
+    assert response.url == reverse(destination, kwargs=ids)
+    assert response.wsgi_request.user == pip.created_by
+
+
+def _review_s25_over_http(
+    client: Client, pip: ProcessImprovementProposal, correlation: str, reasoning: str
+) -> ExpertProfile:
+    """Check review and refresh after the real HTTP transaction commits.
+
+    :param client: Authenticated real Django client.
+    :param pip: Draft for this submission.
+    :param correlation: Safe request identifier.
+    :param reasoning: Expected persisted private Galdr reasoning.
+    :return: Current saved ExpertProfile.
+    :raises AssertionError: If the ordinary POST fails to persist the assessment.
+    """
+    _post_as_submitter(
+        client, pip, "pip_submit_review", "pip_detail", correlation=correlation
+    )
+    pip.refresh_from_db()
+    change = pip.changes.get()
+    assert pip.status == pip.STATUS_REVIEWED and pip.galdr_holistic_assessment
+    assert (change.galdr_recommendation, change.galdr_reasoning) == (
+        PipChange.GALDR_ACCEPT,
+        reasoning,
+    )
+    interaction = AgentInteraction.objects.get(pip=pip, correlation_id=correlation)
+    assert pip.submitted_at <= interaction.created_at <= pip.reviewed_at
+    return ExpertProfile.objects.get(user_id=pip.created_by_id)
+
+
+def _withdraw_and_edit_s25_over_http(
+    client: Client,
+    pip: ProcessImprovementProposal,
+    llm: ScriptedLLM,
+    first: ExpertProfile,
+) -> None:
+    """Verify normal withdrawal clears assessment and saves a revised Draft.
+
+    :param client: Authenticated real Django client.
+    :param pip: Genuinely Reviewed proposal.
+    :param llm: Active model port containing the first submission's requests.
+    :param first: Last good public profile from first submission.
+    :return: None on a persisted edit with no refresh model calls or writes.
+    :raises AssertionError: If withdrawal or edit changes processing state.
+    """
+    first_calls = llm.calls
+    first_interactions = tuple(AgentInteraction.objects.filter(pip=pip).values_list())
+    _post_as_submitter(client, pip, "pip_revert_to_draft", "pip_detail")
+    pip.refresh_from_db()
+    change = pip.changes.get()
+    assert pip.status == pip.STATUS_DRAFT
+    assert pip.galdr_holistic_assessment == ""
+    assert change.galdr_recommendation == change.galdr_reasoning == ""
+    _post_as_submitter(
+        client,
+        pip,
+        "pip_edit",
+        "pip_edit",
+        data={"action": "save_header", "title": pip.title, "summary": _REVISED_BODY},
+    )
+    pip.refresh_from_db()
+    assert pip.status == pip.STATUS_DRAFT and pip.summary == _REVISED_BODY
+    assert llm.calls == first_calls
+    assert (
+        tuple(AgentInteraction.objects.filter(pip=pip).values_list())
+        == first_interactions
+    )
+    assert ExpertProfile.objects.values().get(pk=first.pk) == _profile_values(first)
+
+
 @pytest.mark.django_db(transaction=True)
 def test_s25_http_withdraw_and_resubmit_uses_existing_post_routes(
     client: Client,
+    s25_case: tuple[Mapping[str, Any], ProcessImprovementProposal],
+    mailoutbox: list[EmailMessage],
 ) -> None:
-    """Prove authenticated normal submit/revert/resubmit POST behavior.
+    """Prove authenticated normal submit/revert/edit/resubmit POST behavior.
 
     :param client: Real Django client. Example: authenticated Maria session.
-    :return: None. Example: None after redirects and persisted-state assertions.
-    :raises AssertionError: For bypassed service, publication, decision or award.
+    :param s25_case: Imported Cedar fixture and real draft.
+    :param mailoutbox: Captured Django mail for the test.
+    :return: None after redirects and persisted-state assertions.
+    :raises AssertionError: For bypassed processing, publication, decision or award.
     """
-    raise NotImplementedError()
+    _, pip = s25_case
+    baseline = _domain_state(pip)
+    assert (baseline.points, baseline.version) == (8200, Decimal("2.0"))
+    assert baseline.decision == (None, PipChange.ADMIN_UNSET, "")
+    script = load_summary_script(SUMMARY_SCRIPTS / _HAPPY_SCRIPT, pip.changes.get().pk)
+    initial, _, refreshed, _ = script
+    assert isinstance(initial, LLMResponse) and isinstance(refreshed, LLMResponse)
+    client.force_login(pip.created_by)
+    with (
+        summary_processing_scope(script) as llm,
+        override_settings(GALDR_USE_TARGET_STATE=True),
+    ):
+        first = _review_s25_over_http(client, pip, _INITIAL_RUN, _INITIAL_REASONING)
+        first_interaction = AgentInteraction.objects.get(pip=pip)
+        _assert_initial_refresh(first, initial, first_interaction)
+        assert len(llm.calls) == 2 and _domain_state(pip) == baseline
+        _withdraw_and_edit_s25_over_http(client, pip, llm, first)
+        assert _domain_state(pip) == baseline
+        second = _review_s25_over_http(
+            client, pip, _RESUBMISSION_RUN, _REVISED_REASONING
+        )
+    assert len(llm.calls) == 4 and _domain_state(pip) == baseline
+    interaction = _assert_run_identities(pip, first_interaction)
+    _assert_second_refresh(first, second, refreshed, interaction)
+    assert _REVISED_BODY in llm.calls[3].messages[0].content
+    assert not mailoutbox
 
 
 @pytest.mark.django_db(transaction=True)

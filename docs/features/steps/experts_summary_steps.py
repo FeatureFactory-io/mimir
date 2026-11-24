@@ -2,20 +2,40 @@ from __future__ import annotations
 
 import json
 import re
+from contextlib import ExitStack
+from decimal import Decimal
 from pathlib import Path
 
 from behave import given, then, when
 from behave.runner import Context
+from django.test import override_settings
+from django.urls import reverse
 
 from methodology.llm.base import LLMResponse
-from methodology.models import Activity, PipChange, Playbook, ProcessImprovementProposal
+from methodology.models import (
+    Activity,
+    AgentInteraction,
+    ExpertProfile,
+    KarmaAward,
+    PipChange,
+    Playbook,
+    ProcessImprovementProposal,
+)
 from methodology.services.contribution_summary_boundary import (
     PublicContributionSummaryBoundary,
 )
+from methodology.services.galdr_prompts import HOLISTIC_SYSTEM_PROMPT
 from methodology.services.public_contribution_evidence import (
     PublicContributionEvidenceService,
 )
 from tests.support.experts_data import seed_s27_summary_privacy_variant
+from tests.support.experts_summary_data import (
+    SUMMARY_PIP_BODY,
+    SUMMARY_SCRIPTS,
+    load_summary_script,
+    prepare_summary_submission,
+    summary_processing_scope,
+)
 from tests.support.scripted_llm import ScriptedLLM
 
 _S27_SCRIPT = (
@@ -202,6 +222,14 @@ def assert_submission_is_not_publication(context: Context) -> None:
     ), "The captured request contains unpublished proposal content."
 
 
+_S25_SCRIPT = SUMMARY_SCRIPTS / "PRF-EXPERTS-01/resubmission_happy.json"
+_S25_INITIAL_RUN = "cedar-summary-initial-at"
+_S25_SECOND_RUN = "cedar-summary-resubmission-at"
+_S25_REVISED_BODY = (
+    "Unpublished revision clarifying the screen reader recovery rationale."
+)
+
+
 @given("Maria's PIP has reached Reviewed")
 def s25_maria_pip_reached_reviewed(context: Context) -> None:
     """Reach Reviewed through genuine initial submission and finite model turns.
@@ -210,29 +238,200 @@ def s25_maria_pip_reached_reviewed(context: Context) -> None:
     :return: None. Example: context retains PIP, script and first interaction.
     :raises AssertionError: If real initial processing does not reach Reviewed.
     """
-    raise NotImplementedError()
+    pip = prepare_summary_submission(context.cedar_dataset)
+    context.s25_pip = pip
+    context.s25_script = load_summary_script(_S25_SCRIPT, pip.changes.get().pk)
+    context.s25_versions = tuple(pip.playbook.versions.order_by("pk").values_list())
+    # The shared exact-step binding compares the live projection and full ledger.
+    context.s23_pip = pip
+    context.s23_awards_before = tuple(KarmaAward.objects.order_by("pk").values_list())
+    context.client.force_login(pip.created_by)
+    scope = ExitStack()
+    context.add_cleanup(scope.close)
+    scope.enter_context(override_settings(GALDR_USE_TARGET_STATE=True))
+    context.s25_llm = scope.enter_context(summary_processing_scope(context.s25_script))
+    first_summary, first_assessment, _, _ = context.s25_script
+    context.s25_first = _s25_submit(
+        context, _S25_INITIAL_RUN, first_summary, first_assessment
+    )
+    assert len(context.s25_llm.calls) == 2
 
 
 @when("she withdraws it and resubmits through the normal allowed lifecycle")
 def s25_withdraw_and_resubmit(context: Context) -> None:
-    """POST existing revert and submit routes with Maria's real session.
+    """POST existing revert, edit and submit routes with Maria's real session.
 
     :param context: Reviewed run context. Example: first summary persisted.
-    :return: None. Example: context retains real responses and refreshed PIP.
+    :return: None. Example: context retains the refreshed PIP.
     :raises AssertionError: For incorrect transitions or failed HTTP requests.
     """
-    raise NotImplementedError()
+    pip = context.s25_pip
+    first_profile, first_interaction = context.s25_first
+    first_calls = context.s25_llm.calls
+    _s25_post(context, "pip_revert_to_draft", "pip_detail")
+    pip.refresh_from_db()
+    change = pip.changes.get()
+    assert pip.status == pip.STATUS_DRAFT
+    assert pip.galdr_holistic_assessment == ""
+    assert change.galdr_recommendation == change.galdr_reasoning == ""
+    _s25_post(
+        context,
+        "pip_edit",
+        "pip_edit",
+        data={
+            "action": "save_header",
+            "title": pip.title,
+            "summary": _S25_REVISED_BODY,
+        },
+    )
+    pip.refresh_from_db()
+    assert pip.status == pip.STATUS_DRAFT and pip.summary == _S25_REVISED_BODY
+    assert context.s25_llm.calls == first_calls
+    assert list(AgentInteraction.objects.filter(pip=pip)) == [first_interaction]
+    current = ExpertProfile.objects.get(pk=first_profile.pk)
+    assert current.contribution_summary == first_profile.contribution_summary
+    assert current.summary_updated_at == first_profile.summary_updated_at
+    _, _, second_summary, second_assessment = context.s25_script
+    context.s25_second = _s25_submit(
+        context, _S25_SECOND_RUN, second_summary, second_assessment
+    )
 
 
 @then("summary refresh is requested again before an administrator decision")
 def s25_assert_second_refresh_before_decision(context: Context) -> None:
-    """Assert second request, interaction and valid stored prose before decision.
+    """Assert independent refreshes, public inputs and unchanged publication.
 
     :param context: Completed resubmission context. Example: four consumed calls.
     :return: None. Example: None after real interaction/decision assertions.
     :raises AssertionError: For missing refresh, publication or administrator action.
     """
-    raise NotImplementedError()
+    pip = context.s25_pip
+    first_profile, first = context.s25_first
+    second_profile, second = context.s25_second
+    assert tuple(AgentInteraction.objects.filter(pip=pip).order_by("pk")) == (
+        first,
+        second,
+    )
+    assert first.call_id and second.call_id and first.call_id != second.call_id
+    assert second_profile.summary_updated_at > first_profile.summary_updated_at
+    _assert_s25_call_separation(context)
+    pip.playbook.refresh_from_db()
+    change = pip.changes.get()
+    assert pip.decided_at is None
+    assert (change.admin_decision, change.admin_note) == (PipChange.ADMIN_UNSET, "")
+    assert pip.playbook.version == Decimal("2.0")
+    assert (
+        tuple(pip.playbook.versions.order_by("pk").values_list())
+        == context.s25_versions
+    )
+    assert not pip.playbook_versions.exists()
+    assert not Activity.objects.filter(
+        workflow__playbook_id=pip.playbook_id, name=change.name
+    ).exists()
+
+
+def _s25_post(
+    context: Context,
+    route: str,
+    destination: str,
+    *,
+    data: dict[str, str] | None = None,
+    correlation: str = "",
+) -> None:
+    """Check redirects and run only the callbacks registered by the real POST.
+
+    :param context: Authenticated Django acceptance client and PIP.
+    :param route: Existing POST route. Example: pip_revert_to_draft.
+    :param destination: Expected redirect route. Example: pip_detail.
+    :param data: Optional draft edit parameters.
+    :param correlation: Optional submission request ID. Example: cedar-summary-initial-at.
+    :return: None when the HTTP response and registered callback count match.
+    :raises AssertionError: If the redirect, acting user or callback count differs.
+    """
+    pip = context.s25_pip
+    ids = {"pk": pip.pk}
+    headers = {"X-Request-ID": correlation} if correlation else {}
+    # Behave's TestCase rolls back its outer transaction at scenario teardown.
+    with context.test.captureOnCommitCallbacks(execute=True) as callbacks:
+        response = context.client.post(
+            reverse(route, kwargs=ids), data=data, headers=headers
+        )
+    assert response.status_code == 302 and response.url == reverse(
+        destination, kwargs=ids
+    )
+    assert response.wsgi_request.user == pip.created_by
+    expected_callbacks = 1 if correlation else 0
+    assert len(callbacks) == expected_callbacks
+
+
+def _s25_submit(
+    context: Context, correlation: str, summary: LLMResponse, assessment: LLMResponse
+) -> tuple[ExpertProfile, AgentInteraction]:
+    """Verify the real submission, resulting assessment and stored summary.
+
+    :param context: Authenticated acceptance client with a prepared draft.
+    :param correlation: Current submission request ID.
+    :param summary: Expected public model response.
+    :param assessment: Expected private Galdr model response.
+    :return: Persisted profile and matching refresh interaction.
+    :raises AssertionError: If the real callback did not persist both results.
+    """
+    assert isinstance(summary, LLMResponse) and isinstance(assessment, LLMResponse)
+    _s25_post(context, "pip_submit_review", "pip_detail", correlation=correlation)
+    pip = context.s25_pip
+    pip.refresh_from_db()
+    change = pip.changes.get()
+    (verdict,) = json.loads(assessment.content)["change_assessments"]
+    assert pip.status == pip.STATUS_REVIEWED and pip.galdr_holistic_assessment
+    assert (change.pk, change.galdr_recommendation, change.galdr_reasoning) == (
+        verdict["change_id"],
+        verdict["recommendation"],
+        verdict["reasoning"],
+    )
+    profile = ExpertProfile.objects.get(user_id=pip.created_by_id)
+    interaction = AgentInteraction.objects.get(pip=pip, correlation_id=correlation)
+    assert profile.contribution_summary == summary.content
+    assert profile.summary_status == ExpertProfile.SummaryStatus.SUCCESS
+    assert profile.last_summary_correlation_id == correlation
+    assert interaction.subject_id == pip.created_by_id
+    assert interaction.workflow_id == "contribution_summary"
+    assert interaction.outcome == AgentInteraction.Outcome.SUCCESS
+    assert pip.submitted_at <= interaction.created_at <= pip.reviewed_at
+    return profile, interaction
+
+
+def _assert_s25_call_separation(context: Context) -> None:
+    """Check public evidence and the private assessment of each draft revision.
+
+    :param context: Completed lifecycle with four requests and two saved profiles.
+    :return: None when both public streams exclude unpublished proposal content.
+    :raises AssertionError: If a request is missing, misclassified or leaks private prose.
+    """
+    first_public, first_assessment, second_public, second_assessment = (
+        context.s25_llm.calls
+    )
+    first_profile, _ = context.s25_first
+    second_profile, _ = context.s25_second
+    pip = context.s25_pip
+    unpublished = (pip.title, SUMMARY_PIP_BODY, pip.summary, pip.changes.get().content)
+    for call, profile in (
+        (first_public, first_profile),
+        (second_public, second_profile),
+    ):
+        (message,) = call.messages
+        assert "Identity: You are the public contribution summarizer." in call.system
+        assert "Keyboard Navigation Audit" in message.content
+        public_text = (
+            f"{call.system}\n{message.content}\n{profile.contribution_summary}"
+        )
+        assert all(value and value not in public_text for value in unpublished)
+    for private_call, body in (
+        (first_assessment, SUMMARY_PIP_BODY),
+        (second_assessment, _S25_REVISED_BODY),
+    ):
+        assert private_call.system == HOLISTIC_SYSTEM_PROMPT
+        assert pip.title in private_call.messages[0].content
+        assert body in private_call.messages[0].content
 
 
 @given("Mike has no stored contribution summary")
