@@ -78,6 +78,18 @@ _UNREGISTERED_SQLITE_SCOPE = (
 )
 _LOCAL_POSTGRES_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
 _DEMO_OWNER_IDS = {"mimir-experts-demo", "mimir-experts-demo-host"}
+_STAGING_FORMAT = "mimir-experts-owned-postgres-v1"
+_STAGING_HOSTS = {"cedar-db", "localhost", "127.0.0.1", "::1"}
+_STAGING_MANIFEST_LIMIT = 4096
+_STAGING_IDENTITY_SQL = """
+SELECT current_database(), current_user, session_user,
+       pg_get_userbyid(d.datdba), shobj_description(d.oid, 'pg_database'),
+       r.rolsuper, r.rolcreatedb, r.rolcreaterole, r.rolbypassrls,
+       r.rolreplication, r.rolcanlogin
+FROM pg_database AS d
+JOIN pg_roles AS r ON r.rolname = current_user
+WHERE d.datname = current_database()
+"""
 _INITIAL_RELEASE = "1.0"
 _VERSION = re.compile(r"(?:0|[1-9][0-9]{0,3})\.[0-9]")
 _Record = dict[str, Any]
@@ -87,7 +99,7 @@ _Record = dict[str, Any]
 class CedarDatabaseScope:
     """Expected database identity and explicit ownership evidence for local files."""
 
-    kind: Literal["test", "owned_demo"]
+    kind: Literal["test", "owned_demo", "owned_staging"]
     database_name: str
     ownership_manifest: Path | None = None
     owner_id: str | None = None
@@ -230,6 +242,9 @@ def _validate_database_scope(scope: CedarDatabaseScope) -> None:
     if scope.kind == "owned_demo" and connection.vendor == "sqlite":
         _validate_owned_demo(scope)
         _verify_sqlite_target(str(Path(effective_name).resolve()))
+        return
+    if scope.kind == "owned_staging" and connection.vendor == "postgresql":
+        _validate_owned_postgres_staging(scope)
         return
     if scope.kind != "test":
         raise ValueError("Unrecognized or unsafe Cedar database scope.")
@@ -572,6 +587,154 @@ def _validate_owned_demo(scope: CedarDatabaseScope) -> None:
         "database": str(expected),
     }:
         raise ValueError("Cedar demo ownership manifest does not match the database.")
+
+
+def _validate_owned_postgres_staging(scope: CedarDatabaseScope) -> None:
+    """Verify private runtime, local ownership and actual PostgreSQL identity.
+
+    :param scope: Explicit staging claim. Example: CedarDatabaseScope("owned_staging", name).
+    :return: None after all guards pass. Example: None.
+    :raises ValueError: If any ownership/runtime/database evidence differs.
+    """
+    if (
+        os.environ.get("DJANGO_SETTINGS_MODULE") != "experts_staging_settings"
+        or settings.MIMIR_ENV != "experts_staging"
+        or settings.EMAIL_BACKEND != "django.core.mail.backends.filebased.EmailBackend"
+    ):
+        raise ValueError("Cedar staging requires its isolated runtime and file mail.")
+    expected = _staging_expected_manifest(scope, connection.settings_dict)
+    marker = _staging_manifest_path(scope)
+    if _read_private_staging_manifest(marker) != expected:
+        raise ValueError("Cedar staging ownership manifest does not match its claim.")
+    with connection.cursor() as cursor:
+        cursor.execute(_STAGING_IDENTITY_SQL)
+        actual = cursor.fetchone()
+    if not _staging_identity_matches(expected, actual):
+        raise ValueError("Cedar staging live database ownership does not match.")
+
+
+def _staging_expected_manifest(
+    scope: CedarDatabaseScope, actual: Mapping[str, object]
+) -> dict[str, str]:
+    """Validate the closed staging namespace and configured endpoint without SQL.
+
+    :param scope: Explicit nonce claim. Example: a staging scope with a 32-hex owner.
+    :param actual: Effective connection settings. Example: {"HOST": "cedar-db"}.
+    :return: Exact expected public ownership record. Example: {"fixture": "CEDAR-RFP-01"}.
+    :raises ValueError: If namespace, role, endpoint or nonce is unsafe.
+    """
+    owner = scope.owner_id
+    if (
+        scope.kind != "owned_staging"
+        or not isinstance(owner, str)
+        or not _TEST_OWNER_ID.fullmatch(owner)
+    ):
+        raise ValueError("Cedar staging requires a 32-hex ownership nonce.")
+    name, host, port = f"experts_cedar_{owner}", actual.get("HOST"), actual.get("PORT")
+    if (
+        actual.get("ENGINE") != "django.db.backends.postgresql"
+        or scope.database_name != name
+        or actual.get("NAME") != name
+        or actual.get("USER") != name
+        or not isinstance(host, str)
+        or host not in _STAGING_HOSTS
+        or isinstance(port, bool)
+        or not str(port).isdecimal()
+        or not 1 <= int(str(port)) <= 65535
+    ):
+        raise ValueError("Cedar staging requires its dedicated database and role.")
+    return {
+        "format": _STAGING_FORMAT,
+        "fixture": "CEDAR-RFP-01",
+        "owner_id": owner,
+        "database": name,
+        "role": name,
+        "host": str(host),
+        "port": str(port),
+    }
+
+
+def _staging_manifest_path(scope: CedarDatabaseScope) -> Path:
+    """Require a private owner directory outside both application checkouts.
+
+    :param scope: Claim holding the marker path. Example: /experts-scope/owner.json.
+    :return: Checked marker path. Example: Path("/experts-scope/owner.json").
+    :raises ValueError: If the path, parent permissions or ownership is unsafe.
+    """
+    root = Path(getattr(settings, "EXPERTS_STAGING_SCOPE_ROOT", ""))
+    marker, checkout = scope.ownership_manifest, Path(settings.BASE_DIR).resolve()
+    if (
+        not root.is_absolute()
+        or root != root.resolve()
+        or any(parent.is_symlink() for parent in (root, *root.parents))
+        or root.is_relative_to(checkout)
+        or root.is_relative_to(checkout.with_name("mimir"))
+        or not root.is_dir()
+        or root.stat().st_uid != os.getuid()
+        or stat.S_IMODE(root.stat().st_mode) != 0o700
+        or marker != root / "owner.json"
+    ):
+        raise ValueError("Cedar staging requires a private ownership directory.")
+    return marker
+
+
+def _read_private_staging_manifest(path: Path) -> object:
+    """Open a bounded private manifest without following a final symlink.
+
+    :param path: Prechecked marker path. Example: Path("/experts-scope/owner.json").
+    :return: Decoded JSON value. Example: {"format": "mimir-experts-owned-postgres-v1"}.
+    :raises ValueError: If the file is unsafe, oversized or malformed.
+    :raises OSError: If the claimed file cannot be opened.
+    """
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    with os.fdopen(os.open(path, flags), "rb") as stream:
+        metadata = os.fstat(stream.fileno())
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.getuid()
+            or metadata.st_nlink != 1
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+            or metadata.st_size > _STAGING_MANIFEST_LIMIT
+        ):
+            raise ValueError("Cedar staging requires a private regular marker file.")
+        content = stream.read(_STAGING_MANIFEST_LIMIT + 1)
+    if len(content) > _STAGING_MANIFEST_LIMIT:
+        raise ValueError("Cedar staging ownership manifest is too large.")
+    try:
+        return json.loads(content)
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError("Cedar staging ownership manifest is malformed.") from error
+
+
+def _staging_identity_matches(
+    expected: Mapping[str, str], actual: Sequence[object] | None
+) -> bool:
+    """Match actual server ownership and nonprivileged LOGIN role capabilities.
+
+    :param expected: Exact marker record. Example: {"owner_id": "0" * 32}.
+    :param actual: Real SQL row. Example: (database, role, role, role, marker, False).
+    :return: Whether every identity and capability matches. Example: True.
+    """
+    role = expected["role"]
+    required = (
+        expected["database"],
+        role,
+        role,
+        role,
+        f"{_STAGING_FORMAT}:{expected['owner_id']}",
+        False,
+        False,
+        False,
+        False,
+        False,
+        True,
+    )
+    return (
+        actual is not None
+        and len(actual) == len(required)
+        and all(type(value) is bool for value in actual[5:])
+        and tuple(actual) == required
+    )
 
 
 def _rows(record: Mapping[str, object], field_name: str) -> list[_Record]:
