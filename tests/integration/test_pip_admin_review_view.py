@@ -287,6 +287,52 @@ def test_admin_10_finalize_blocked_until_all_set(bob_staff, reviewed_pip_all_acc
 
 
 @pytest.mark.django_db
+def test_save_decisions_with_partial_form_preserves_existing_choices(
+    client: Client,
+    bob_staff: AbstractUser,
+    reviewed_pip_all_accept: ProcessImprovementProposal,
+) -> None:
+    """Save recognized choices and trimmed notes without finalizing or clearing invalid input.
+
+    :param client: Actual Django test client for the staff form.
+    :param bob_staff: Authorized staff reviewer.
+    :param reviewed_pip_all_accept: Reviewed proposal with two changes.
+    :return: None. Example: one decision is updated and the other remains intact.
+    :raises AssertionError: If saving modifies the proposal lifecycle or previous choice.
+    """
+    pip = reviewed_pip_all_accept
+    first, second = pip.changes.order_by("order")
+    second.admin_decision, second.admin_note = PipChange.ADMIN_REJECT, "Previous note"
+    second.save(update_fields=["admin_decision", "admin_note"])
+    original_updated_at = pip.updated_at
+    client.force_login(bob_staff)
+    url = reverse("pip_admin_review", args=[pip.pk])
+    result = client.post(
+        url,
+        {
+            "action": "save_decisions",
+            f"decision_{first.pk}": "  ACCEPT  ",
+            f"note_{first.pk}": "  Saved note  ",
+            f"decision_{second.pk}": "  Unknown  ",
+            f"note_{second.pk}": "Should not replace the previous note",
+        },
+    )
+    assert result.status_code == 302 and result.url == url
+    first, second = pip.changes.order_by("order")
+    pip.refresh_from_db()
+    assert (first.admin_decision, first.admin_note) == (
+        PipChange.ADMIN_ACCEPT,
+        "Saved note",
+    )
+    assert (second.admin_decision, second.admin_note) == (
+        PipChange.ADMIN_REJECT,
+        "Previous note",
+    )
+    assert pip.status == pip.STATUS_REVIEWED and pip.decided_at is None
+    assert pip.updated_at == original_updated_at and not pip.playbook_versions.exists()
+
+
+@pytest.mark.django_db
 def test_admin_07_all_accept_bumps_version(bob_staff, reviewed_pip_all_accept, playbook_bundle):
     """FOB-PIP-ADMIN-07: Accepting all changes bumps playbook version."""
     pb, wf, act = playbook_bundle

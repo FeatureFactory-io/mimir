@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import timedelta
 from decimal import Decimal
+from threading import Event
+from types import FrameType
 
 import pytest
 from _pytest.logging import LogCaptureFixture
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMessage
-from django.db import DatabaseError, connection, transaction
+from django.db import DatabaseError, connection, connections, transaction
 from django.db.models import Sum
+from django.http import HttpResponseRedirect
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -34,6 +39,7 @@ from methodology.services.pip_apply_changes_service import (
     PipApplyChangesService,
     bump_playbook_major_version_after_pip_apply,
 )
+from methodology.services.pip_service import PIPService
 from tests.support.experts_data import (
     CedarDataset,
     create_reviewed_major_add_pip,
@@ -47,6 +53,8 @@ _POLICY_LOGGER = "methodology.services.karma_service"
 _ADMIN_LOGGER = "methodology.services.pip_admin_service"
 _ENTRY = "KarmaService.award_accepted_changes"
 _PRIVATE_CHANGE_BODY = "Private decision text: hidden@example.test cedar-test-token"
+_REVIEW_INTERLEAVE_TIMEOUT = 30
+_PUBLISHED_REVIEW_NOTE = "Confirmed in the publishing request"
 
 
 def _record_policy_fixture(
@@ -159,6 +167,155 @@ def _assert_major_publication(
     assert award.event_channel == EventChannel.ACCEPTED_CHANGE
     assert (award.source_kind, award.points, award.category) == ("major", 500, "design")
     assert award.occurred_at == pip.decided_at and timezone.is_aware(award.occurred_at)
+
+
+def _post_staff_choice(
+    client: Client,
+    change_key: tuple[int, int],
+    action: str,
+    decision: str,
+    note: str,
+) -> HttpResponseRedirect:
+    """Send an actual authenticated staff decision form POST."""
+    pip_id, change_id = change_key
+    return client.post(
+        reverse("pip_admin_review", args=[pip_id]),
+        {
+            "action": action,
+            f"decision_{change_id}": decision,
+            f"note_{change_id}": note,
+        },
+    )
+
+
+def _post_with_stale_review_snapshot(
+    client: Client,
+    change_key: tuple[int, int],
+    action: str,
+    preloaded: Event,
+    resume: Event,
+    publishing_connection: object,
+) -> HttpResponseRedirect:
+    """Observe the real read returning in this thread before any write transaction."""
+
+    def pause_after_preload(frame: FrameType, event: str, result: object) -> None:
+        if (
+            event == "return"
+            and frame.f_code is PIPService.get_pip_with_changes.__code__
+        ):
+            assert isinstance(result, ProcessImprovementProposal)
+            assert (
+                result.pk == change_key[0] and result.status == result.STATUS_REVIEWED
+            )
+            assert connection.connection is not publishing_connection
+            assert not connection.in_atomic_block
+            preloaded.set()
+            assert resume.wait(
+                _REVIEW_INTERLEAVE_TIMEOUT
+            ), "Publishing request timed out"
+
+    original_profile = sys.getprofile()
+    sys.setprofile(pause_after_preload)
+    try:
+        return _post_staff_choice(
+            client, change_key, action, PipChange.ADMIN_REJECT, "Stale rejection note"
+        )
+    finally:
+        sys.setprofile(original_profile)
+        connections.close_all()
+
+
+def _publish_while_staff_request_has_stale_snapshot(
+    publisher: Client, stale_client: Client, change: PipChange, action: str
+) -> tuple[HttpResponseRedirect, dict[str, object], dict[str, object]]:
+    """Commit publication on the first connection while the stale request waits."""
+    preloaded, resume = Event(), Event()
+    pip = change.pip
+    change_key = pip.pk, change.pk
+    publishing_connection = connection.connection
+    assert publishing_connection is not None and not connection.in_atomic_block
+    with ThreadPoolExecutor(max_workers=1) as worker:
+        stale = worker.submit(
+            _post_with_stale_review_snapshot,
+            stale_client,
+            change_key,
+            action,
+            preloaded,
+            resume,
+            publishing_connection,
+        )
+        try:
+            assert preloaded.wait(
+                _REVIEW_INTERLEAVE_TIMEOUT
+            ), "No stale Reviewed snapshot"
+            published = _post_staff_choice(
+                publisher,
+                change_key,
+                "finalize",
+                PipChange.ADMIN_ACCEPT,
+                _PUBLISHED_REVIEW_NOTE,
+            )
+            assert (published.status_code, published.url) == (
+                302,
+                reverse("pip_detail", args=[pip.pk]),
+            )
+            pip.refresh_from_db()
+            change.refresh_from_db()
+            assert pip.status == pip.STATUS_ACCEPTED
+            assert (change.admin_decision, change.admin_note) == (
+                PipChange.ADMIN_ACCEPT,
+                _PUBLISHED_REVIEW_NOTE,
+            )
+            _assert_major_publication(pip, change)
+            receipt = pip.playbook_versions.values().get()
+            award = KarmaAward.objects.values().get(
+                event_identity=f"accepted_change:{change.pk}"
+            )
+        finally:
+            resume.set()
+        return stale.result(timeout=_REVIEW_INTERLEAVE_TIMEOUT), receipt, award
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("action", ["finalize", "save_decisions"])
+def test_staff_post_with_stale_review_preserves_original_publication(
+    client: Client, action: str, mailoutbox: list[EmailMessage]
+) -> None:
+    """Two real connections cannot change an already published choice or receipt.
+
+    :param client: Real Django client that publishes the proposal.
+    :param action: The concurrently started staff POST. Example: "save_decisions".
+    :param mailoutbox: Django's local decision mail capture.
+    :return: None. Example: the original award is returned as a duplicate on retry.
+    :raises AssertionError: If stale data is saved or an effect is repeated.
+    """
+    dataset = load_cedar_baseline()
+    pip = create_reviewed_major_add_pip(dataset, PipChange.ENTITY_ACTIVITY)
+    change = pip.changes.get()
+    staff = dataset.users_by_username["mchen"]
+    stale_client = Client()
+    client.force_login(staff)
+    stale_client.force_login(staff)
+    response, receipt, award = _publish_while_staff_request_has_stale_snapshot(
+        client, stale_client, change, action
+    )
+    change.refresh_from_db()
+    pip.refresh_from_db()
+    assert change.admin_decision == PipChange.ADMIN_ACCEPT
+    assert change.admin_note == _PUBLISHED_REVIEW_NOTE
+    assert (response.status_code, response.url) == (
+        302,
+        reverse("pip_detail", args=[pip.pk]),
+    )
+    assert pip.status == pip.STATUS_ACCEPTED and _added_content_exists(change)
+    assert pip.playbook.version == Decimal("3.0")
+    assert pip.playbook_versions.values().get() == receipt
+    (retry,) = _record_policy_awards(pip)
+    assert not retry.created and retry.reason == "duplicate"
+    assert KarmaAward.objects.values().get(pk=retry.award.pk) == award
+    assert _ledger_totals(pip.created_by_id) == {"design": 7700, "development": 1000}
+    (sent,) = mailoutbox
+    assert sent.to == [pip.created_by.email] and "Decision: ACCEPT" in sent.body
 
 
 @pytest.mark.django_db(transaction=True)
@@ -292,28 +449,37 @@ def test_finalize_pip_with_outer_rollback_restores_content_version_decision_and_
     assert not _added_content_exists(change) and not mailoutbox
 
 
-@pytest.mark.django_db(transaction=True)
-def test_finalize_pip_with_invalid_apply_creates_no_award_or_email(
-    client: Client, mailoutbox: list[EmailMessage]
-) -> None:
-    """Prove a real invalid reference prevents committed finalization and awards.
-
-    :param client: Real Django client for the staff review POST.
-    :param mailoutbox: Django's local decision mail capture.
-    :return: None. Example: target remains 2.0 with baseline totals.
-    :raises AssertionError: If failed application creates an award or notification.
-    """
-    dataset = load_cedar_baseline()
-    pip = create_reviewed_major_add_pip(dataset, PipChange.ENTITY_SKILL)
-    skill = pip.changes.get()
-    broken_artifact = PipChange.objects.create(
+def _add_artifact_with_unresolved_producer(
+    pip: ProcessImprovementProposal,
+) -> PipChange:
+    """Add a previously rejected artifact that cannot resolve its producer."""
+    return PipChange.objects.create(
         pip=pip,
         change_type=PipChange.CHANGE_ADD,
         entity_type=PipChange.ENTITY_ARTIFACT,
         order=2,
         name="Artifact with missing producer",
         produced_by_activity_ref="#missing-producer",
+        admin_decision=PipChange.ADMIN_REJECT,
+        admin_note="Prior saved decision",
     )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_finalize_pip_with_invalid_apply_creates_no_award_or_email(
+    client: Client, mailoutbox: list[EmailMessage]
+) -> None:
+    """Prove an apply failure rolls back new choices and restores any saved notes.
+
+    :param client: Real Django client for the staff review POST.
+    :param mailoutbox: Django's local decision mail capture.
+    :return: None. Example: target remains 2.0 with baseline totals and choices.
+    :raises AssertionError: If failed application leaves any finalized effects.
+    """
+    dataset = load_cedar_baseline()
+    pip = create_reviewed_major_add_pip(dataset, PipChange.ENTITY_SKILL)
+    skill = pip.changes.get()
+    broken_artifact = _add_artifact_with_unresolved_producer(pip)
     prior_count = KarmaAward.objects.count()
     assert not _added_content_exists(skill)
     client.force_login(dataset.users_by_username["mchen"])
@@ -324,12 +490,21 @@ def test_finalize_pip_with_invalid_apply_creates_no_award_or_email(
             "action": "finalize",
             f"decision_{skill.pk}": PipChange.ADMIN_ACCEPT,
             f"decision_{broken_artifact.pk}": PipChange.ADMIN_ACCEPT,
+            f"note_{skill.pk}": "Do not retain this failed proposal choice",
+            f"note_{broken_artifact.pk}": "Do not overwrite the saved note",
         },
         follow=True,
     )
     assert response.redirect_chain == [(url, 302)]
     assert b"Unresolved internal reference" in response.content
     _assert_unpublished(pip, prior_count)
+    skill.refresh_from_db()
+    broken_artifact.refresh_from_db()
+    assert (skill.admin_decision, skill.admin_note) == (PipChange.ADMIN_UNSET, "")
+    assert (broken_artifact.admin_decision, broken_artifact.admin_note) == (
+        PipChange.ADMIN_REJECT,
+        "Prior saved decision",
+    )
     assert not _added_content_exists(skill) and not mailoutbox
 
 

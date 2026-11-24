@@ -6,8 +6,8 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
-from django.http import HttpRequest, HttpResponseRedirect
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -16,6 +16,11 @@ from django.views.generic import RedirectView
 from methodology.models import PipChange
 from methodology.models import ProcessImprovementProposal as PipModel
 from methodology.services.copy_prompt_service import CopyPromptService
+from methodology.services.pip_admin_service import (
+    DECIDED_STATUSES,
+    PIPAdminService,
+    PIPAlreadyDecidedError,
+)
 from methodology.services.pip_service import (
     PIPService,
     _normalize_processing_correlation,
@@ -639,100 +644,111 @@ def pip_revert_to_draft(request, pk: int):
 
 
 @login_required
-def pip_admin_review(request, pk: int):
+def pip_admin_review(request: HttpRequest, pk: int) -> HttpResponse:
+    """Show the staff review form or submit choices through the review service.
+
+    :param request: Staff review GET or POST. Example: action=finalize.
+    :param pk: Existing proposal ID. Example: 42.
+    :return: Rendered form or redirect. Example: proposal details after finalization.
+    :raises PermissionDenied: When the authenticated user is not staff.
     """
-    Staff-only PIP review page showing Galdr recommendations and editable admin decisions.
-
-    GET: render review form with per-change Galdr output + decision dropdowns.
-    POST action=save_decisions: persist admin_decision + admin_note for each change.
-    POST action=finalize: save decisions then call PIPAdminService.finalize_pip.
-    """
-    from django.core.exceptions import PermissionDenied
-
-    from methodology.services.pip_admin_service import PIPAdminService
-    from methodology.services.pip_service import PIPService
-
     if not request.user.is_staff:
         logger.warning(
-            f"Non-staff user {request.user.pk} attempted to access admin review for PIP {pk}"
+            "Non-staff user %s attempted to access admin review for PIP %s",
+            request.user.pk,
+            pk,
         )
         raise PermissionDenied("Only staff users can review PIPs.")
 
     pip = PIPService.get_pip_with_changes(pk, request.user)
-    changes = list(pip.changes.order_by("order"))
-
-    is_decided = pip.status in (
-        PipModel.STATUS_ACCEPTED,
-        PipModel.STATUS_ACCEPTED_PARTIAL,
-        PipModel.STATUS_REJECTED,
-    )
-
     if request.method == "POST":
+        if pip.status in DECIDED_STATUSES:
+            return _already_decided_response(request, pk)
         action = request.POST.get("action", "")
+        if action in ("save_decisions", "finalize"):
+            return _submit_admin_review(request, pip, action)
+    return _render_admin_review(request, pip)
 
-        if is_decided:
-            messages.error(
-                request, "This PIP has already been decided and cannot be modified."
-            )
-            return redirect("pip_detail", pk=pip.pk)
 
-        if action == "save_decisions":
-            for change in changes:
-                decision = request.POST.get(f"decision_{change.pk}", "").strip()
-                note = request.POST.get(f"note_{change.pk}", "").strip()
-                if decision in ("ACCEPT", "REJECT"):
-                    change.admin_decision = decision
-                    change.admin_note = note
-                    change.save(update_fields=["admin_decision", "admin_note"])
-            messages.success(request, "Decisions saved.")
-            return redirect("pip_admin_review", pk=pip.pk)
+def _already_decided_response(request: HttpRequest, pk: int) -> HttpResponseRedirect:
+    """Redirect a decided proposal to its details with the established error message.
 
-        elif action == "finalize":
-            for change in changes:
-                decision = request.POST.get(f"decision_{change.pk}", "").strip()
-                note = request.POST.get(f"note_{change.pk}", "").strip()
-                if decision in ("ACCEPT", "REJECT"):
-                    change.admin_decision = decision
-                    change.admin_note = note
-                    change.save(update_fields=["admin_decision", "admin_note"])
-
-            try:
-                finalized_pip = PIPAdminService.finalize_pip(pip, request.user)
-                status_label = (
-                    "accepted"
-                    if finalized_pip.status == PipModel.STATUS_ACCEPTED
-                    else (
-                        "partially accepted"
-                        if finalized_pip.status == PipModel.STATUS_ACCEPTED_PARTIAL
-                        else "rejected"
-                    )
-                )
-                messages.success(request, f"PIP {status_label} — changes applied.")
-            except ValidationError as exc:
-                messages.error(request, _format_validation_error(exc))
-                return redirect("pip_admin_review", pk=pip.pk)
-            return redirect("pip_detail", pk=pip.pk)
-
-    all_decided = all(ch.admin_decision in ("ACCEPT", "REJECT") for ch in changes)
-    can_finalize = all_decided and pip.status == PipModel.STATUS_REVIEWED
-
-    accepted_count = sum(1 for ch in changes if ch.admin_decision == "ACCEPT")
-    rejected_count = sum(1 for ch in changes if ch.admin_decision == "REJECT")
-    pending_count = len(changes) - accepted_count - rejected_count
-
+    :param request: Authenticated staff POST.
+    :param pk: Decided proposal ID. Example: 42.
+    :return: Redirect to the read-only proposal details.
+    """
     logger.info(
-        f"Staff user {request.user.pk} viewing admin review for PIP {pk} "
-        f"(status={pip.status}, changes={len(changes)})"
+        "pip_admin_review | branch | reason=already_decided pip_id=%s actor_id=%s "
+        "correlation_id=pip_review:%s",
+        pk,
+        request.user.pk,
+        pk,
     )
+    messages.error(request, "This PIP has already been decided and cannot be modified.")
+    return redirect("pip_detail", pk=pk)
 
+
+def _submit_admin_review(
+    request: HttpRequest, pip: PipModel, action: str
+) -> HttpResponseRedirect:
+    """Read form fields and present the service's save or finalization result.
+
+    :param request: Real staff POST.
+    :param pip: Proposal loaded before the service transaction.
+    :param action: Recognized form action. Example: save_decisions.
+    :return: Redirect to the review page or the decided proposal.
+    """
+    decisions = {
+        change.pk: (
+            request.POST.get(f"decision_{change.pk}", "").strip(),
+            request.POST.get(f"note_{change.pk}", "").strip(),
+        )
+        for change in pip.changes.all()
+    }
+    try:
+        if action == "finalize":
+            finalized = PIPAdminService.finalize_pip(
+                pip, request.user, decisions=decisions
+            )
+            label = finalized.get_status_display().lower()
+            messages.success(request, f"PIP {label} — changes applied.")
+            return redirect("pip_detail", pk=pip.pk)
+        PIPAdminService.save_decisions(pip, request.user, decisions)
+        messages.success(request, "Decisions saved.")
+    except PIPAlreadyDecidedError:
+        return _already_decided_response(request, pip.pk)
+    except ValidationError as exc:
+        messages.error(request, _format_validation_error(exc))
+    return redirect("pip_admin_review", pk=pip.pk)
+
+
+def _render_admin_review(request: HttpRequest, pip: PipModel) -> HttpResponse:
+    """Render Galdr output and the staff decision form using the loaded proposal.
+
+    :param request: Authenticated staff request.
+    :param pip: Existing proposal with its ordered changes.
+    :return: Existing PIP review template populated with counts and decision state.
+    """
+    changes = list(pip.changes.order_by("order"))
+    accepted_count = sum(ch.admin_decision == PipChange.ADMIN_ACCEPT for ch in changes)
+    rejected_count = sum(ch.admin_decision == PipChange.ADMIN_REJECT for ch in changes)
+    pending_count = len(changes) - accepted_count - rejected_count
+    logger.info(
+        "Staff user %s viewing admin review for PIP %s (status=%s, changes=%s)",
+        request.user.pk,
+        pip.pk,
+        pip.status,
+        len(changes),
+    )
     return render(
         request,
         "pips/admin_review.html",
         {
             "pip": pip,
             "changes": changes,
-            "can_finalize": can_finalize,
-            "is_decided": is_decided,
+            "can_finalize": pending_count == 0
+            and pip.status == PipModel.STATUS_REVIEWED,
+            "is_decided": pip.status in DECIDED_STATUSES,
             "accepted_count": accepted_count,
             "rejected_count": rejected_count,
             "pending_count": pending_count,
