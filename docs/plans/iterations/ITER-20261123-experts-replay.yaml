@@ -42,6 +42,7 @@ iteration:
   required_iteration_final_gates:
   - make test-at-harness
   - make test-at-experts
+  - make test-agent-experts
   - make lint
   final_gate_placement: The aggregate Experts gate includes S46, which depends on S45; it is required at iteration DoD after all49 contracts, not as a circular prerequisite to S45. Global lint remains required and its actual outcome must be recorded, never inferred from scoped lint. Remove WIP only from fully certified owning feature files before the final aggregate AT; require all83 server Examples with no selected skips/undefined.
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
@@ -7178,8 +7179,8 @@ scenarios:
           command: make test-experts-s24
           additional_commands:
           - make test-at-harness
-          - make test-agent-experts
-          requirement: S24 exact gates and nonempty aggregate gates pass; skipped/zero is not completion.
+          requirement: S24 complementary server and complete browser gates pass with positive selection; skipped/zero is not completion.
+          iteration_gate_handoff: make test-agent-experts remains mandatory at iteration-final DoD after S28/S29 proof bodies are implemented; their pending stubs cannot establish or invalidate S24 stored-read evidence.
         guidance_bundle:
           activity: BPE/BPE-06-Check_Definition_of_Done.md
           rules:

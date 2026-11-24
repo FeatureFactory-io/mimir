@@ -209,8 +209,8 @@ feature_execution_graph:
       command: make test-experts-s24
       additional_commands:
       - make test-at-harness
-      - make test-agent-experts
-      requirement: S24 exact gates and nonempty aggregate gates pass; skipped/zero is not completion.
+      requirement: S24 complementary server and complete browser gates pass with positive selection; skipped/zero is not completion.
+      iteration_gate_handoff: make test-agent-experts remains mandatory at iteration-final DoD after S28/S29 proof bodies are implemented; their pending stubs cannot establish or invalidate S24 stored-read evidence.
     guidance_bundle:
       activity: BPE/BPE-06-Check_Definition_of_Done.md
       rules:

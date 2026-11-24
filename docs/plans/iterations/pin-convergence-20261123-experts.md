@@ -255,6 +255,12 @@ Before final aggregate AT, remove WIP only from completely certified owning
 feature files and require all83expanded server cases without selected skips or
 undefined steps. This scheduling correction waives no verification obligation.
 
+The aggregate `make test-agent-experts` also remains mandatory at iteration-final
+DoD. It selects later S28/S29 proof bodies, so it is scheduled after those nodes,
+rather than used as S24's stored-read acceptance gate. S24 still requires its
+complete complementary server and seven-viewport browser checks plus harness;
+no pending agent proof is counted as passed or removed from the iteration.
+
 S05's narrow list-to-Maria browser case alone cannot close its composed scope.
 The manifest adds a separate fresh N3a and mandatory browser gate for the full
 CEDAR-JOURNEY-01/UAT-18-01 nomination, before independent N4. It uses a new
