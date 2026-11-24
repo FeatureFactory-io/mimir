@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+from tempfile import gettempdir
 from typing import Any, Literal
 
 import dj_database_url
@@ -63,6 +65,7 @@ _AWARD_UNITS = {
     KarmaAward.SourceKind.LEARNING: 5,
 }
 _TEST_SETTINGS = {"mimir.settings", "mimir.settings.test", "mimir.settings.e2e"}
+_TEST_OWNER_ID = re.compile(r"[0-9a-f]{32}")
 _LOCAL_POSTGRES_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
 _DEMO_OWNER_IDS = {"mimir-experts-demo", "mimir-experts-demo-host"}
 _INITIAL_RELEASE = "1.0"
@@ -72,7 +75,7 @@ _Record = dict[str, Any]
 
 @dataclass(frozen=True)
 class CedarDatabaseScope:
-    """Expected database identity plus optional local-demo ownership evidence."""
+    """Expected database identity and explicit ownership evidence for local files."""
 
     kind: Literal["test", "owned_demo"]
     database_name: str
@@ -216,6 +219,14 @@ def _validate_database_scope(scope: CedarDatabaseScope) -> None:
         _validate_postgres_test_scope(effective_name)
         return
     runner_memory = f"file:memorydb_{connection.alias}?mode=memory&cache=shared"
+    if (
+        connection.vendor == "sqlite"
+        and pytest_running
+        and effective_name != runner_memory
+    ):
+        _validate_sqlite_test_scope(scope)
+        _verify_sqlite_target(effective_name)
+        return
     acceptance = module == "mimir.settings.acceptance"
     if (
         connection.vendor != "sqlite"
@@ -224,6 +235,80 @@ def _validate_database_scope(scope: CedarDatabaseScope) -> None:
     ):
         raise ValueError("Cedar requires the runner-owned test database.")
     _verify_sqlite_target("")
+
+
+def _validate_sqlite_test_scope(scope: CedarDatabaseScope) -> None:
+    """Verify the runner declaration, private temp files and current-process owner.
+
+    :param scope: The explicit fixture claim for the file-backed test database.
+    :return: None once the runner settings and owner record agree.
+    :raises ValueError: The declaration, path or ownership record is unsafe.
+    """
+    database = Path(scope.database_name)
+    runner = settings.DATABASES["default"]["TEST"].get("NAME")
+    if (
+        connection.alias != "default"
+        or str(runner) != scope.database_name
+        or str(connection.settings_dict["TEST"].get("NAME")) != scope.database_name
+    ):
+        raise ValueError("Cedar file database does not match the runner declaration.")
+    marker = scope.ownership_manifest
+    owner = scope.owner_id
+    if (
+        marker is None
+        or marker != database.with_name("owner.json")
+        or not isinstance(owner, str)
+        or not _TEST_OWNER_ID.fullmatch(owner)
+    ):
+        raise ValueError("Cedar file database requires explicit run ownership.")
+    _validate_private_test_paths(database, marker)
+    try:
+        recorded = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError(
+            "Cedar file database ownership record is unreadable."
+        ) from error
+    if recorded != {"database": str(database), "owner_id": owner, "pid": os.getpid()}:
+        raise ValueError("Cedar file database ownership does not match this process.")
+
+
+def _validate_private_test_paths(database: Path, marker: Path) -> None:
+    """Require canonical owned private files directly within a temporary directory."""
+    root = Path(gettempdir()).resolve()
+    checkout = Path(settings.BASE_DIR).resolve()
+    directory = database.parent
+    if (
+        directory.parent != root
+        or database.is_relative_to(checkout)
+        or database.is_relative_to(checkout.with_name("mimir"))
+        or database != database.resolve()
+        or marker != marker.resolve()
+    ):
+        raise ValueError(
+            "Cedar file database requires a canonical private temporary path."
+        )
+    try:
+        parent = directory.lstat()
+        files = (database.lstat(), marker.lstat())
+    except OSError as error:
+        raise ValueError(
+            "Cedar file database or ownership record is missing."
+        ) from error
+    if (
+        not stat.S_ISDIR(parent.st_mode)
+        or parent.st_uid != os.getuid()
+        or parent.st_mode & 0o077
+        or any(
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.getuid()
+            or info.st_nlink != 1
+            or info.st_mode & 0o077
+            for info in files
+        )
+    ):
+        raise ValueError(
+            "Cedar file database and ownership record must be private files."
+        )
 
 
 def _verify_sqlite_target(expected_path: str) -> None:

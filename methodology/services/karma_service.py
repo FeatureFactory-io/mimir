@@ -9,12 +9,19 @@ from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from itertools import chain
-from typing import TYPE_CHECKING, Literal
+from time import sleep
+from typing import Literal
 from uuid import UUID
 
 from django.contrib.auth.models import AbstractBaseUser, AnonymousUser, User
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, transaction
+from django.db import (
+    DatabaseError,
+    IntegrityError,
+    OperationalError,
+    connection,
+    transaction,
+)
 from django.utils import timezone
 from django.utils.module_loading import import_string
 
@@ -30,9 +37,6 @@ from methodology.models import (
 from methodology.models.karma_award import CATEGORY_SLUGS, first_release_identity
 from methodology.services.pip_link_service import relationship_endpoint_types
 
-if TYPE_CHECKING:
-    from django.db import OperationalError
-
 logger = logging.getLogger(__name__)
 KarmaSource = Literal["release", "major", "minor", "consumption", "learning"]
 FIRST_RELEASE_POINTS = 5000
@@ -42,6 +46,10 @@ AWARD_CORRELATION_ID = re.compile(r"[A-Za-z0-9._:-]{1,100}")
 _RELEASE_LOG = "KarmaService.award_first_release"
 _PERSIST_LOG = "KarmaService.persist_awards"
 _EVENT_MATCH_LOG = "KarmaService._assert_matching_event"
+_EVENT_WRITE_LOG = "KarmaService._persist_event_atomic"
+_EVENT_REPLAY_MESSAGE = (
+    "%s | branch | reason=replayed created_count=0 event_identity=%s correlation_id=%s"
+)
 _ACCEPTED_CHANGE_LOG = "KarmaService.award_accepted_changes"
 _ACCEPTED_POLICY_LOG = "KarmaService._accepted_change_policy"
 _ACCEPTED_MAJOR_POINTS = 500
@@ -83,6 +91,9 @@ _AWARD_IDENTITY_COLLISIONS = frozenset(
     }
 )
 _SQLITE_UNIQUE_PREFIX = "UNIQUE constraint failed: "
+_SQLITE_PRIMARY_RESULT_CODE_MASK = 0xFF
+_SQLITE_PERSIST_ATTEMPTS = 3
+_SQLITE_BUSY_BACKOFF_SECONDS = 0.01
 _CONSUMPTION_LOG = "KarmaService.award_successful_consumption"
 _CONSUMPTION_POINTS = 5
 _CONSUMPTION_CHANNELS = (
@@ -227,28 +238,29 @@ class KarmaService:
         :param correlation_id: Safe request/run ID. Example: "release-01".
         :return: Results in input order. Example: (AwardOutcome(row, True, "created"),).
         :raises ValidationError: If a payload is invalid or conflicts.
-        :raises IntegrityError: If an unrelated database constraint fails.
+        :raises DatabaseError: If the database failure cannot be recovered here.
         """
         KarmaService._validate_batch(specifications, correlation_id)
         groups = KarmaService._partition_event_specs(specifications)
         counts = f"event_count={len(groups)} row_count={len(specifications)}"
         trace = f"award_count={len(specifications)} correlation_id={correlation_id}"
         logger.info("%s | entry | %s %s", _PERSIST_LOG, counts, trace)
-        with transaction.atomic():
-            grouped = KarmaService._persist_batch_atomic(
-                groups, correlation_id=correlation_id
-            )
-            by_spec = dict(zip(chain.from_iterable(groups), grouped, strict=True))
-            outcomes = tuple(by_spec[spec] for spec in specifications)
-            created_count = sum(outcome.created for outcome in outcomes)
-            logger.info(
-                "%s | exit | created_count=%s existing_count=%s transaction=pending %s",
-                _PERSIST_LOG,
-                created_count,
-                len(outcomes) - created_count,
-                trace,
-            )
-            return outcomes
+        grouped = KarmaService._persist_with_retry(
+            groups, correlation_id=correlation_id
+        )
+        by_spec = dict(zip(chain.from_iterable(groups), grouped, strict=True))
+        outcomes = tuple(by_spec[spec] for spec in specifications)
+        created_count = sum(outcome.created for outcome in outcomes)
+        state = "committed" if connection.get_autocommit() else "pending"
+        logger.info(
+            "%s | exit | created_count=%s existing_count=%s transaction=%s %s",
+            _PERSIST_LOG,
+            created_count,
+            len(outcomes) - created_count,
+            state,
+            trace,
+        )
+        return outcomes
 
     @staticmethod
     def _validate_batch(
@@ -362,59 +374,21 @@ class KarmaService:
     def _insert_or_get_award(specification: AwardSpec) -> AwardOutcome:
         """Use database uniqueness to insert once or retrieve the same award.
 
-        Handle an expected uniqueness race inside an appropriate savepoint;
-        do not swallow other database failures or leave a transaction broken.
+        The caller owns the event savepoint and reconciles all rows on any
+        duplicate outcome or constraint error. One row cannot prove a replay.
 
         :param specification: Validated immutable award. Example: release_spec.
         :return: Created/existing result. Example: AwardOutcome(row, False, "duplicate").
-        :raises ValidationError: If an existing immutable payload differs.
-        :raises IntegrityError: For unrelated database constraints.
+        :raises IntegrityError: If this insert lost a race or violated a constraint.
         """
         rows = KarmaAward.objects.filter(event_identity=specification.event_identity)
         if specification.source_kind in _PAIRED_SOURCES:
             rows = rows.filter(recipient_id=specification.recipient_id)
-        existing = list(rows[:2])
-        if not existing:
-            try:
-                with transaction.atomic():
-                    award = KarmaAward.objects.create(**asdict(specification))
-            except IntegrityError as error:
-                cause = error.__cause__
-                sqlstate = getattr(cause, "sqlstate", None)
-                diagnostics = getattr(cause, "diag", None)
-                postgres_key = sqlstate, getattr(diagnostics, "constraint_name", None)
-                sqlite_code = getattr(cause, "sqlite_errorcode", None)
-                sqlite_key = sqlite_code, str(cause).removeprefix(_SQLITE_UNIQUE_PREFIX)
-                if _AWARD_IDENTITY_COLLISIONS.isdisjoint((postgres_key, sqlite_key)):
-                    raise
-                existing = list(rows[:2])
-                if not existing:
-                    raise
-            else:
-                return AwardOutcome(award, True, "created")
-        if len(existing) != 1:
-            raise ValidationError(
-                "Award event identity matches multiple existing awards."
-            )
-        KarmaService._assert_matching_payload(existing[0], specification)
-        return AwardOutcome(existing[0], False, "duplicate")
-
-    @staticmethod
-    def _assert_matching_payload(award: KarmaAward, specification: AwardSpec) -> None:
-        """Reject identity reuse that would change immutable award meaning.
-
-        :param award: Existing ledger row. Example: first_release:6302 for Nora.
-        :param specification: Requested payload. Example: the same release_spec.
-        :return: None when logical values agree; retain the stored original time.
-        :raises ValidationError: If recipient, points or attribution conflicts.
-        """
-        requested = asdict(specification)
-        requested.pop("occurred_at")
-        if any(getattr(award, field) != value for field, value in requested.items()):
-            raise ValidationError(
-                "Award event identity conflicts with its recorded payload.",
-                code="award_payload_conflict",
-            )
+        existing = rows.first()
+        if existing is not None:
+            return AwardOutcome(existing, False, "duplicate")
+        award = KarmaAward.objects.create(**asdict(specification))
+        return AwardOutcome(award, True, "created")
 
     @staticmethod
     @transaction.atomic
@@ -1166,7 +1140,20 @@ class KarmaService:
         :raises EventInsertRace: Another writer owns any event row.
         :raises IntegrityError: Database constraint failure; caller handles savepoint.
         """
-        raise NotImplementedError()
+        # Acquire the unique anchor first even when callers reverse pair order.
+        ordered = sorted(
+            specifications,
+            key=lambda spec: spec.source_kind == KarmaAward.SourceKind.CONSUMPTION,
+        )
+        by_recipient: dict[int, AwardOutcome] = {}
+        for spec in ordered:
+            outcome = KarmaService._insert_or_get_award(spec)
+            if not outcome.created:
+                raise EventInsertRace(
+                    "An existing row requires whole-event reconciliation."
+                )
+            by_recipient[spec.recipient_id] = outcome
+        return tuple(by_recipient[spec.recipient_id] for spec in specifications)
 
     @staticmethod
     def _is_event_identity_collision(error: IntegrityError) -> bool:
@@ -1180,13 +1167,27 @@ class KarmaService:
         :return: Whether race reconciliation applies. Example: True.
         :raises TypeError: Unsupported input. Example: a ValueError.
         """
-        raise NotImplementedError()
+        if not isinstance(error, IntegrityError):
+            raise TypeError("Expected a ledger IntegrityError.")
+        cause = error.__cause__
+        if isinstance(cause, sqlite3.IntegrityError):
+            message = str(cause)
+            if not message.startswith(_SQLITE_UNIQUE_PREFIX):
+                return False
+            key = (
+                getattr(cause, "sqlite_errorcode", None),
+                message.removeprefix(_SQLITE_UNIQUE_PREFIX),
+            )
+        else:
+            code = getattr(cause, "sqlstate", None) or getattr(cause, "pgcode", None)
+            key = (code, getattr(getattr(cause, "diag", None), "constraint_name", None))
+        return key in _AWARD_IDENTITY_COLLISIONS
 
     @staticmethod
     def _persist_event_atomic(
         specifications: tuple[AwardSpec, ...], *, correlation_id: str
     ) -> tuple[AwardOutcome, ...]:
-        """Preflight an event and insert/reconcile using a nested savepoint.
+        """Insert a missing event after batch preflight or reconcile a racing winner.
 
         On expected collision or EventInsertRace, exit the failed savepoint before
         rereading all rows. Empty reread or unrelated failure must propagate.
@@ -1198,7 +1199,37 @@ class KarmaService:
         :raises IntegrityError: Unrelated constraint or unexplained missing winner.
         :raises OperationalError: Contention must escape to transaction owner.
         """
-        raise NotImplementedError()
+        first = specifications[0]
+        logged_identity = (
+            "historical"
+            if first.event_channel == EventChannel.HISTORICAL
+            else first.event_identity
+        )
+        try:
+            with transaction.atomic():
+                outcomes = KarmaService._insert_event_rows(specifications)
+        except (IntegrityError, EventInsertRace) as error:
+            if isinstance(
+                error, IntegrityError
+            ) and not KarmaService._is_event_identity_collision(error):
+                raise
+            winner = KarmaService._existing_event_rows(first.event_identity)
+            if not winner:
+                raise
+            replay = KarmaService._assert_matching_event(
+                winner, specifications, correlation_id=correlation_id
+            )
+            logger.info(
+                _EVENT_REPLAY_MESSAGE, _EVENT_WRITE_LOG, logged_identity, correlation_id
+            )
+            return replay
+        attribution = f"event_identity={logged_identity} channel={first.event_channel}"
+        counts = f"recipient_count={len(outcomes)} created_count={len(outcomes)}"
+        trace = f"commit_state=staged correlation_id={correlation_id}"
+        logger.info(
+            "%s | processing | %s %s %s", _EVENT_WRITE_LOG, attribution, counts, trace
+        )
+        return outcomes
 
     @staticmethod
     def _persist_batch_atomic(
@@ -1219,22 +1250,73 @@ class KarmaService:
         """
         replays: dict[str, tuple[AwardOutcome, ...]] = {}
         for group in groups:
-            identity = group[0].event_identity
+            first = group[0]
+            identity = first.event_identity
             existing = KarmaService._existing_event_rows(identity)
-            if existing:
-                replays[identity] = KarmaService._assert_matching_event(
-                    existing, group, correlation_id=correlation_id
-                )
-        outcomes = []
+            if not existing:
+                continue
+            replays[identity] = KarmaService._assert_matching_event(
+                existing, group, correlation_id=correlation_id
+            )
+            logged_identity = (
+                "historical"
+                if first.event_channel == EventChannel.HISTORICAL
+                else identity
+            )
+            logger.info(
+                _EVENT_REPLAY_MESSAGE, _EVENT_WRITE_LOG, logged_identity, correlation_id
+            )
+        outcomes: list[AwardOutcome] = []
         for group in groups:
             replay = replays.get(group[0].event_identity)
             if replay is None:
-                outcomes.extend(
-                    KarmaService._insert_or_get_award(spec) for spec in group
+                replay = KarmaService._persist_event_atomic(
+                    group, correlation_id=correlation_id
                 )
-            else:
-                outcomes.extend(replay)
+            outcomes.extend(replay)
         return tuple(outcomes)
+
+    @staticmethod
+    def _persist_with_retry(
+        groups: tuple[tuple[AwardSpec, ...], ...],
+        *,
+        correlation_id: str,
+    ) -> tuple[AwardOutcome, ...]:
+        """Retry native SQLite contention after rolling back a service-owned transaction.
+
+        :param groups: Identity-ordered complete events. Example: a singleton and pair.
+        :param correlation_id: Safe operation trace. Example: "receipt-45".
+        :return: Outcomes in identity order after a successful attempt.
+        :raises DatabaseError: Caller-owned contention, exhaustion or unrelated failure.
+        """
+        owner = "service" if connection.get_autocommit() else "caller"
+        trace = f"vendor={connection.vendor} transaction_owner={owner} correlation_id={correlation_id}"
+        for attempt in range(1, _SQLITE_PERSIST_ATTEMPTS + 1):
+            try:
+                with transaction.atomic():
+                    return KarmaService._persist_batch_atomic(
+                        groups, correlation_id=correlation_id
+                    )
+            except DatabaseError as error:
+                busy = isinstance(
+                    error, OperationalError
+                ) and KarmaService._is_retryable_database_busy(error)
+                attempt_trace = f"attempt={attempt} {trace}"
+                if busy:
+                    logger.info(
+                        "%s | branch | reason=database_busy %s",
+                        _PERSIST_LOG,
+                        attempt_trace,
+                    )
+                if not busy or owner == "caller" or attempt == _SQLITE_PERSIST_ATTEMPTS:
+                    reason = "database_busy" if busy else "database_failure"
+                    failure = f"reason={reason} error_type={type(error).__name__}"
+                    logger.error(
+                        "%s | error | %s %s", _PERSIST_LOG, failure, attempt_trace
+                    )
+                    raise
+                sleep(_SQLITE_BUSY_BACKOFF_SECONDS * attempt)
+        raise AssertionError("The bounded award retry loop did not return an outcome.")
 
     @staticmethod
     def _is_retryable_database_busy(error: OperationalError) -> bool:
@@ -1244,7 +1326,18 @@ class KarmaService:
         :return: Recognized transient SQLite contention. Example: True.
         :raises TypeError: Input is not an OperationalError.
         """
-        raise NotImplementedError()
+        if not isinstance(error, OperationalError):
+            raise TypeError("Expected a ledger OperationalError.")
+        cause = error.__cause__
+        if connection.vendor != "sqlite" or not isinstance(
+            cause, sqlite3.OperationalError
+        ):
+            return False
+        code = getattr(cause, "sqlite_errorcode", None)
+        return isinstance(code, int) and (code & _SQLITE_PRIMARY_RESULT_CODE_MASK) in (
+            sqlite3.SQLITE_BUSY,
+            sqlite3.SQLITE_LOCKED,
+        )
 
 
 ConsumptionChannel = Literal["gui_copy", "mcp_detail", "export"]

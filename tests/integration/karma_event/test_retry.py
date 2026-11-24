@@ -1,23 +1,41 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
-from dataclasses import asdict, replace
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass, field, replace
 from datetime import timedelta
 from decimal import Decimal
+from http import HTTPStatus
+from threading import Barrier, Event
+from time import monotonic, sleep
+from typing import Any
 from uuid import UUID
 
 import pytest
+from django.conf import settings
+from django.contrib.auth.models import User
 from django.core import mail
 from django.core.exceptions import ValidationError
-from django.db import connection
+from django.db import (
+    DatabaseError,
+    IntegrityError,
+    OperationalError,
+    close_old_connections,
+    connection,
+    transaction,
+)
 from django.db.models import Sum
+from django.http import HttpResponse
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
 from django.utils import timezone
 from pytest import LogCaptureFixture
 
 from methodology.models import (
     Activity,
+    EventChannel,
     KarmaAward,
     PipChange,
     Playbook,
@@ -31,6 +49,7 @@ from methodology.services.karma_service import (
 )
 from methodology.services.pip_admin_service import PIPAdminService
 from methodology.services.pip_service import PIPService
+from methodology.services.playbook_service import PlaybookService
 from tests.support.experts_data import CedarDataset, create_reviewed_major_add_pip
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.log_story import assert_log_story
@@ -38,6 +57,7 @@ from tests.support.log_story import assert_log_story
 _LOGGER = "methodology.services.karma_service"
 _PERSIST_LOG = "KarmaService.persist_awards"
 _MATCH_LOG = "KarmaService._assert_matching_event"
+_EVENT_LOG = "KarmaService._persist_event_atomic"
 _AWARD_FIELDS = ("pk", *AwardSpec.__dataclass_fields__)
 _PRIVATE_BODY = "Private staffing note hidden@example.test cedar-secret-token"
 _ACTOR = "mrodriguez"
@@ -46,6 +66,18 @@ _ACTIVITY_ID = 6203
 _ACTION_ID = UUID(int=45)
 _NEW_ACTION_ID = UUID(int=1)
 _AWARDABLE_REPLAYS = ("gui_copy", "mcp_detail", "export", "major", "minor")
+_RACE_TIMEOUT = 12
+_RACE_POLL_SECONDS = 0.01
+_SQLITE_PRIMARY_RESULT_CODE_MASK = 0xFF
+_WINNER_TRACE = "s45-race-winner"
+_LOSER_TRACE = "s45-race-loser"
+_LEDGER_TABLE = '"methodology_karmaaward"'
+
+RecordingResult = tuple[AwardOutcome, ...] | ValidationError | OperationalError
+
+
+class _CancelOuterTransaction(Exception):
+    """Roll back otherwise-successful Cedar actions through the real owner."""
 
 
 def _event_rows(event_identity: str) -> tuple[dict[str, object], ...]:
@@ -238,13 +270,47 @@ def test_record_event_with_repeated_write_preserves_original_event(
 
 
 @pytest.mark.django_db(transaction=True)
-def test_consumption_with_new_uuid_creates_new_complete_pair() -> None:
+def test_consumption_with_new_uuid_creates_new_complete_pair(
+    cedar_dataset: CedarDataset,
+) -> None:
     """Distinguish two deliberate actions from retries of either action.
 
+    :param cedar_dataset: Actual actors and released Activity.
     :return: None. Example: four rows and plus ten for each recipient.
     :raises AssertionError: New action deduplicated or retry duplicated.
     """
-    raise NotImplementedError()
+    actor, author = (
+        cedar_dataset.users_by_username[name] for name in (_ACTOR, _AUTHOR)
+    )
+    recipients = (actor.pk, author.pk)
+    totals = _category_totals(recipients)
+    old_count = KarmaAward.objects.count()
+    original_events = {}
+    for action in (_ACTION_ID, _NEW_ACTION_ID):
+        created = KarmaService.award_successful_consumption(
+            actor, "activity", _ACTIVITY_ID, action, channel="gui_copy"
+        )
+        assert created[0].created and created[1].created
+        assert (
+            created[0].award.recipient_id,
+            created[1].award.recipient_id,
+        ) == recipients
+        assert tuple(outcome.award.points for outcome in created) == (5, 5)
+        original_events[action] = tuple(
+            _snapshot_award(outcome.award) for outcome in created
+        )
+    assert len({specs[0].event_identity for specs in original_events.values()}) == 2
+    for action, originals in original_events.items():
+        rows = _event_rows(originals[0].event_identity)
+        replay = KarmaService.award_successful_consumption(
+            actor, "activity", _ACTIVITY_ID, action, channel="gui_copy"
+        )
+        _assert_replay(replay, originals)
+        assert len(rows) == 2 and _event_rows(originals[0].event_identity) == rows
+    for recipient in recipients:
+        totals[recipient, "development"] += 10
+    assert _category_totals(recipients) == totals
+    assert KarmaAward.objects.count() == old_count + 4
 
 
 def _alter_pair(
@@ -449,13 +515,54 @@ def test_consumption_reassignment_with_changed_payload_preserves_the_receipt(
 
 
 @pytest.mark.django_db(transaction=True)
-def test_event_with_outer_rollback_preserves_atomicity() -> None:
+def test_event_with_outer_rollback_preserves_atomicity(
+    cedar_dataset: CedarDataset,
+    consumption_specs: tuple[AwardSpec, ...],
+    mailoutbox: list[mail.EmailMessage],
+) -> None:
     """Rollback actual pair/accepted recording and associated domain effects.
 
+    :param cedar_dataset: Actual reviewed-PIP actors and versioned content.
+    :param consumption_specs: Complete Cedar learner/author pair.
+    :param mailoutbox: Actual locmem delivery list.
     :return: None. Example: zero new awards and no committed decision email.
     :raises AssertionError: Any ledger/version/content/decision change survives.
     """
-    raise NotImplementedError()
+    author = cedar_dataset.users_by_username[_AUTHOR]
+    pip = create_reviewed_major_add_pip(cedar_dataset, PipChange.ENTITY_ACTIVITY)
+    change = pip.changes.get()
+    activity = Activity.objects.filter(
+        workflow_id=change.parent_workflow_id, name=change.name
+    )
+    old_awards = tuple(KarmaAward.objects.order_by("pk").values(*_AWARD_FIELDS))
+    old_versions = tuple(pip.playbook.versions.order_by("pk").values())
+    old_pip = ProcessImprovementProposal.objects.values().get(pk=pip.pk)
+    old_change = PipChange.objects.values().get(pk=change.pk)
+    assert not activity.exists() and not mailoutbox
+    with pytest.raises(_CancelOuterTransaction), transaction.atomic():
+        created = KarmaService.persist_awards(
+            consumption_specs, correlation_id="s45-rollback-pair"
+        )
+        assert len(created) == 2 and all(outcome.created for outcome in created)
+        assert len(_event_rows(consumption_specs[0].event_identity)) == 2
+        decided = PIPAdminService.finalize_pip(
+            pip,
+            author,
+            decisions={change.pk: (PipChange.ADMIN_ACCEPT, "Confirmed review")},
+        )
+        assert decided.status == pip.STATUS_ACCEPTED and decided.decided_at is not None
+        assert decided.playbook.version == Decimal("3.0")
+        assert decided.playbook_versions.count() == 1 and activity.exists()
+        assert len(_event_rows(f"accepted_change:{change.pk}")) == 1
+        assert not mailoutbox
+        raise _CancelOuterTransaction
+    pip.refresh_from_db()
+    assert pip.playbook.version == Decimal("2.0") and not activity.exists()
+    assert tuple(pip.playbook.versions.order_by("pk").values()) == old_versions
+    assert not pip.playbook_versions.exists() and not mailoutbox
+    assert ProcessImprovementProposal.objects.values().get(pk=pip.pk) == old_pip
+    assert PipChange.objects.values().get(pk=change.pk) == old_change
+    assert tuple(KarmaAward.objects.order_by("pk").values(*_AWARD_FIELDS)) == old_awards
 
 
 @pytest.mark.django_db(transaction=True)
@@ -500,49 +607,303 @@ def test_event_with_partial_existing_pair_rejects_without_repair(
 
 
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize(
+    "race",
+    (
+        "pair-identical",
+        "pair-target",
+        "pair-author",
+        "singleton-identical",
+        "singleton-recipient",
+    ),
+)
 def test_event_with_concurrent_writers_preserves_one_complete_event(
     separate_connections: None,
+    consumption_specs: tuple[AwardSpec, ...],
+    cedar_dataset: CedarDataset,
+    caplog: LogCaptureFixture,
+    race: str,
 ) -> None:
     """Race actual writers on distinct real connections with bounded waits.
 
     :param separate_connections: Cleanup fixture. Example: no leaked threads.
+    :param consumption_specs: Frozen pair from a real Cedar target.
+    :param cedar_dataset: Recipients and real PIP or Activity references.
+    :param caplog: Observes actual retry decision logs.
+    :param race: Two competing immutable event proposals. Example: pair-author.
     :return: None. Example: one complete event and classified loser outcome.
     :raises AssertionError: Duplicate, partial, mixed or unclassified outcome.
     """
-    raise NotImplementedError()
+    winner, loser = _race_specifications(consumption_specs, cedar_dataset, race)
+    event_identity = winner[0].event_identity
+    before = KarmaAward.objects.count()
+    with capture_experts_logs(caplog, [_LOGGER]):
+        first, second = _race_recording_calls(
+            (_record(winner, _WINNER_TRACE), _record(loser, _LOSER_TRACE)),
+            event_identity,
+        )
+    assert isinstance(first, tuple) and all(outcome.created for outcome in first)
+    assert [_snapshot_award(outcome.award) for outcome in first] == list(winner)
+    if race.endswith("identical"):
+        assert isinstance(second, tuple)
+        _assert_replay(second, winner[::-1])
+        assert [result.award.pk for result in second] == [
+            result.award.pk for result in first[::-1]
+        ]
+    else:
+        assert (
+            isinstance(second, ValidationError)
+            and second.code == "award_payload_conflict"
+        )
+    stored = _event_rows(event_identity)
+    assert {row["pk"] for row in stored} == {result.award.pk for result in first}
+    assert len(stored) == len(winner) and KarmaAward.objects.count() == before + len(
+        winner
+    )
+    if connection.vendor == "sqlite":
+        _assert_sqlite_busy_log(caplog, owner="service", attempt=1)
+    elif race == "pair-target":
+        independent = _independent_pair(winner)[0].event_identity
+        assert_log_story(
+            caplog,
+            where=_EVENT_LOG,
+            beats={
+                "discarded staged pair": (
+                    "| processing |",
+                    f"event_identity={independent}",
+                    "commit_state=staged",
+                    f"correlation_id={_LOSER_TRACE}",
+                ),
+            },
+        )
+        assert not _event_rows(independent)
+
+
+def _race_specifications(
+    pair: tuple[AwardSpec, ...], dataset: CedarDataset, race: str
+) -> tuple[tuple[AwardSpec, ...], tuple[AwardSpec, ...]]:
+    """Build competing payloads with real target and recipient references."""
+    if race in {"pair-target", "pair-author"}:
+        field = "entity-id" if race == "pair-target" else "author"
+        changed = _alter_pair(pair, field, dataset)[::-1]
+        if race == "pair-target":
+            # A late PostgreSQL collision must also discard the earlier staged pair.
+            changed += _independent_pair(pair)
+        return pair, changed
+    if race == "pair-identical":
+        return pair, _alter_pair(pair, "fresh-time", dataset)[::-1]
+    pip = create_reviewed_major_add_pip(dataset, PipChange.ENTITY_ACTIVITY)
+    change = pip.changes.get()
+    spec = AwardSpec(
+        pip.created_by_id,
+        "major",
+        500,
+        pip.playbook.category,
+        f"accepted_change:{change.pk}",
+        pip.playbook_id,
+        change.pk,
+        timezone.now(),
+        EventChannel.ACCEPTED_CHANGE,
+        None,
+        None,
+    )
+    recipient = (
+        dataset.users_by_username["hkim"].pk
+        if race == "singleton-recipient"
+        else spec.recipient_id
+    )
+    return (spec,), (replace(spec, recipient_id=recipient, occurred_at=timezone.now()),)
 
 
 @pytest.mark.django_db(transaction=True)
-def test_event_with_database_constraints_rejects_changed_recipient() -> None:
+def test_event_with_database_constraints_rejects_changed_recipient(
+    consumption_specs: tuple[AwardSpec, ...],
+    cedar_dataset: CedarDataset,
+) -> None:
     """Exercise real unique constraints, independent of service validation.
 
+    :param consumption_specs: Actual valid GUI consumption pair.
+    :param cedar_dataset: Imported release row and distinct candidate recipient.
     :return: None. Example: changed-recipient live anchor insert fails.
     :raises AssertionError: Database permits a second logical anchor.
     """
-    raise NotImplementedError()
+    learner, author = consumption_specs
+    unrelated = User.objects.create_user(username="s45-cascade-recipient")
+    original = KarmaAward.objects.create(**asdict(learner))
+    conflicting_anchor = replace(learner, recipient_id=unrelated.pk)
+    duplicate_recipient = replace(author, recipient_id=learner.recipient_id)
+    for invalid in (conflicting_anchor, duplicate_recipient):
+        with pytest.raises(IntegrityError), transaction.atomic():
+            KarmaAward.objects.bulk_create([KarmaAward(**asdict(invalid))])
+    release = KarmaAward.objects.get(event_identity="first_release:6201")
+    competing_release = replace(
+        _snapshot_award(release),
+        recipient_id=unrelated.pk,
+        event_identity="s45-competing-release",
+    )
+    with pytest.raises(IntegrityError), transaction.atomic():
+        # Bulk create bypasses model canonical-key validation; the DB must arbitrate.
+        KarmaAward.objects.bulk_create([KarmaAward(**asdict(competing_release))])
+    extra = KarmaAward.objects.create(
+        **asdict(replace(author, recipient_id=unrelated.pk))
+    )
+    assert tuple(
+        KarmaAward.objects.filter(event_identity=learner.event_identity).order_by("pk")
+    ) == (original, extra)
+    assert release.recipient_id == cedar_dataset.users_by_username[_AUTHOR].pk
+    unrelated.delete()
+    assert not KarmaAward.objects.filter(pk=extra.pk).exists()
+    assert KarmaAward.objects.filter(pk=original.pk).exists()
 
 
 @pytest.mark.django_db(transaction=True)
-def test_first_release_with_historical_marker_preserves_singleton() -> None:
+def test_first_release_with_historical_marker_preserves_singleton(
+    cedar_dataset: CedarDataset,
+) -> None:
     """Retain imported first-release marker through retries/author replacement.
 
+    :param cedar_dataset: Real imported historical first-release marker and v1 history.
     :return: None. Example: one first-release row for the playbook.
     :raises AssertionError: Historical channel is ignored or ownership earns twice.
     """
-    raise NotImplementedError()
+    book = cedar_dataset.playbooks_by_pk[6201]
+    new_author = cedar_dataset.users_by_username[_ACTOR]
+    identity = KarmaService.first_release_identity(book.pk)
+    marker = KarmaAward.objects.get(event_identity=identity)
+    original = _snapshot_award(marker)
+    rows, versions = _event_rows(identity), tuple(book.versions.order_by("pk").values())
+    assert original.event_channel == EventChannel.HISTORICAL and original.points == 5000
+    replay = KarmaService.persist_awards(
+        (replace(original, occurred_at=timezone.now()),),
+        correlation_id="s45-history-replay",
+    )
+    _assert_replay(replay, (original,))
+    assert (
+        replay[0].award.pk == marker.pk
+        and tuple(book.versions.order_by("pk").values()) == versions
+    )
+    competing = replace(
+        original, recipient_id=new_author.pk, event_channel=EventChannel.RELEASE
+    )
+    with pytest.raises(ValidationError, match="conflicts with its recorded payload"):
+        KarmaService.persist_awards((competing,), correlation_id="s45-history-conflict")
+    PlaybookService.revert_released_playbook_to_draft(
+        book.pk, actor=marker.recipient, reason="Prepare a revision"
+    )
+    Playbook.objects.filter(pk=book.pk).update(author=new_author)
+    published = PlaybookService.release_playbook_with_award(
+        book.pk,
+        new_author,
+        description="Revised review workflow",
+        correlation_id="s45-author-changed",
+    )
+    assert published.playbook.version == Decimal("3.0")
+    assert published.first_release_award.reason == "previously_released"
+    assert published.first_release_award.award is None
+    assert book.versions.count() == len(versions) + 1
+    assert _event_rows(identity) == rows
+    assert (
+        KarmaAward.objects.filter(
+            source_kind="release", playbook_id_snapshot=book.pk
+        ).count()
+        == 1
+    )
 
 
 @pytest.mark.django_db(transaction=True)
 def test_copy_receipt_with_retry_and_changed_target_enforces_identity(
-    client: Client,
+    cedar_dataset: CedarDataset,
 ) -> None:
     """Exercise actual CSRF-valid HTTP receipt retries and target conflicts.
 
-    :param client: Real Django client. Example: authenticated Maria session.
+    :param cedar_dataset: Actual authorized, non-self Cedar Activity and actor.
     :return: None. Example: retry returns existing; changed target conflicts.
     :raises AssertionError: Boundary bypasses identity or attribution validation.
     """
-    raise NotImplementedError()
+    actor = cedar_dataset.users_by_username[_ACTOR]
+    alt = Activity.objects.create(
+        workflow_id=6202, name="Second S45 copy target", order=2
+    )
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(actor)
+    for target in (_ACTIVITY_ID, alt.pk):
+        assert (
+            client.get(
+                reverse(
+                    "activity_detail",
+                    kwargs={
+                        "playbook_pk": 6201,
+                        "workflow_pk": 6202,
+                        "activity_pk": target,
+                    },
+                )
+            ).status_code
+            == HTTPStatus.OK
+        )
+    token = client.cookies[settings.CSRF_COOKIE_NAME].value
+    before = KarmaAward.objects.count()
+    _assert_copy_reply(
+        _post_copy(client, token, _ACTIVITY_ID, _ACTION_ID),
+        HTTPStatus.OK,
+        status="applied",
+    )
+    identity = f"consumption:gui_copy:{actor.pk}:{_ACTION_ID}"
+    rows = _event_rows(identity)
+    _assert_copy_reply(
+        _post_copy(client, token, _ACTIVITY_ID, _ACTION_ID),
+        HTTPStatus.OK,
+        status="replayed",
+    )
+    _assert_copy_reply(
+        _post_copy(client, token, alt.pk, _ACTION_ID),
+        HTTPStatus.CONFLICT,
+        status="rejected",
+        reason="event_conflict",
+    )
+    _assert_copy_reply(
+        _post_copy(client, token, alt.pk, _NEW_ACTION_ID, points=5000),
+        HTTPStatus.BAD_REQUEST,
+        status="rejected",
+        reason="invalid_payload",
+    )
+    assert KarmaAward.objects.count() == before + 2 and _event_rows(identity) == rows
+    _assert_copy_reply(
+        _post_copy(client, token, alt.pk, _NEW_ACTION_ID),
+        HTTPStatus.OK,
+        status="applied",
+    )
+    new_rows = _event_rows(f"consumption:gui_copy:{actor.pk}:{_NEW_ACTION_ID}")
+    assert len(rows) == len(new_rows) == 2 and _event_rows(identity) == rows
+    assert {row["entity_id_snapshot"] for row in new_rows} == {alt.pk}
+    assert tuple(row["recipient_id"] for row in new_rows) == tuple(
+        row["recipient_id"] for row in rows
+    )
+    assert KarmaAward.objects.count() == before + 4
+
+
+def _post_copy(
+    client: Client, token: str, target: int, action: UUID, **extra: object
+) -> HttpResponse:
+    """Post a real browser-format receipt with the session's CSRF cookie token."""
+    return client.post(
+        reverse("karma_copy_receipt"),
+        data={
+            "entity_type": "activity",
+            "entity_id": target,
+            "event_identity": str(action),
+            **extra,
+        },
+        content_type="application/json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+
+
+def _assert_copy_reply(
+    response: HttpResponse, code: HTTPStatus, **payload: str
+) -> None:
+    """Check the full safe HTTP response without reading it as ledger evidence."""
+    assert response.status_code == code
+    assert response.json() == payload
 
 
 @pytest.mark.django_db(transaction=True)
@@ -609,6 +970,28 @@ def test_karma_event_log_story_happy(
             )
         },
     )
+    assert_log_story(
+        caplog,
+        where=_EVENT_LOG,
+        beats={
+            "staged": (
+                "| processing |",
+                f"event_identity={identity}",
+                "channel=gui_copy",
+                "recipient_count=2",
+                "created_count=2",
+                "commit_state=staged",
+                "correlation_id=s45-log-create",
+            ),
+            "replayed": (
+                "| branch |",
+                f"event_identity={identity}",
+                "reason=replayed",
+                "created_count=0",
+                "correlation_id=s45-log-replay",
+            ),
+        },
+    )
     beats = tuple(
         record.getMessage().split(" | ")[1]
         for record in caplog.records
@@ -619,7 +1002,9 @@ def test_karma_event_log_story_happy(
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.parametrize("reason", ("event_payload_conflict", "event_shape_conflict"))
+@pytest.mark.parametrize(
+    "reason", ("event_payload_conflict", "event_shape_conflict", "database_failure")
+)
 def test_karma_event_log_story_reject(
     consumption_specs: tuple[AwardSpec, ...], caplog: LogCaptureFixture, reason: str
 ) -> None:
@@ -631,6 +1016,9 @@ def test_karma_event_log_story_reject(
     :return: None. Example: clear branch reason without private target content.
     :raises AssertionError: Missing reason, false success or secret leakage.
     """
+    if reason == "database_failure":
+        _assert_database_failure_logs(consumption_specs, caplog)
+        return
     learner, author = consumption_specs
     Activity.objects.filter(pk=_ACTIVITY_ID).update(guidance=_PRIVATE_BODY)
     stored = consumption_specs if reason == "event_payload_conflict" else (learner,)
@@ -680,13 +1068,254 @@ def test_karma_event_log_story_reject(
     )
 
 
+@dataclass
+class _RaceControl:
+    """Coordinate real statements and the visibility of the winner's transaction."""
+
+    staged: Barrier = field(default_factory=lambda: Barrier(2, timeout=_RACE_TIMEOUT))
+    attempted_insert: Event = field(default_factory=Event)
+    sqlite_statement_busy: Event = field(default_factory=Event)
+    winner_can_commit: Event = field(default_factory=Event)
+    winner_committed: Event = field(default_factory=Event)
+    connection_ids: dict[str, int] = field(default_factory=dict)
+    backend_pids: dict[str, int] = field(default_factory=dict)
+
+    def observe_loser_statement(
+        self,
+        execute: Callable[..., Any],
+        sql: str,
+        params: object,
+        many: bool,
+        context: dict[str, Any],
+    ) -> Any:
+        """Observe actual contention without replacing SQL or its result."""
+        ledger_query = _LEDGER_TABLE in sql
+        insert = ledger_query and sql.lstrip().startswith("INSERT")
+        if insert:
+            self.attempted_insert.set()
+        if (
+            ledger_query
+            and sql.lstrip().startswith("SELECT")
+            and self.sqlite_statement_busy.is_set()
+        ):
+            assert self.winner_committed.wait(
+                _RACE_TIMEOUT
+            ), "winner did not commit before retry"
+        try:
+            return execute(sql, params, many, context)
+        except OperationalError as error:
+            driver_code = getattr(error.__cause__, "sqlite_errorcode", -1)
+            if insert and (driver_code & _SQLITE_PRIMARY_RESULT_CODE_MASK) in (
+                sqlite3.SQLITE_BUSY,
+                sqlite3.SQLITE_LOCKED,
+            ):
+                self.sqlite_statement_busy.set()
+            raise
+
+
+def _record(
+    specifications: tuple[AwardSpec, ...],
+    correlation_id: str,
+    *,
+    caller_owned: bool = False,
+) -> Callable[[], tuple[AwardOutcome, ...]]:
+    """Bind a real writer call to committed fixture references and its trace."""
+
+    def operation() -> tuple[AwardOutcome, ...]:
+        if caller_owned:
+            with transaction.atomic():
+                return KarmaService.persist_awards(
+                    specifications, correlation_id=correlation_id
+                )
+        return KarmaService.persist_awards(
+            specifications, correlation_id=correlation_id
+        )
+
+    return operation
+
+
 def _race_recording_calls(
-    operations: tuple[Callable[[], tuple[AwardOutcome, ...]], ...],
-) -> tuple[tuple[AwardOutcome, ...] | Exception, ...]:
+    operations: tuple[
+        Callable[[], tuple[AwardOutcome, ...]], Callable[[], tuple[AwardOutcome, ...]]
+    ],
+    event_identity: str,
+) -> tuple[RecordingResult, RecordingResult]:
     """Run finite, coordinated calls on separately opened real connections.
 
     :param operations: Real writer closures. Example: two same-identity calls.
+    :param event_identity: Actual ledger key withheld by the winning transaction.
     :return: Ordered actual outcomes/errors. Example: created then replayed.
     :raises AssertionError: Timeout, shared connection or leaked worker.
     """
-    raise NotImplementedError()
+    control = _RaceControl()
+    assert not _event_rows(event_identity)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        winner = executor.submit(_run_race_worker, control, "winner", operations[0])
+        loser = executor.submit(_run_race_worker, control, "loser", operations[1])
+        interleave_error: AssertionError | None = None
+        try:
+            assert control.attempted_insert.wait(
+                _RACE_TIMEOUT
+            ), "loser never attempted SQL INSERT"
+            assert not _event_rows(
+                event_identity
+            ), "winner committed before loser reached SQL"
+            if connection.vendor == "postgresql":
+                _assert_postgres_waiting_on_winner(control)
+            else:
+                assert control.sqlite_statement_busy.wait(
+                    _RACE_TIMEOUT
+                ), "SQLite did not return a real lock error"
+        except AssertionError as error:
+            interleave_error = error
+        finally:
+            control.winner_can_commit.set()
+        result = winner.result(timeout=_RACE_TIMEOUT), loser.result(
+            timeout=_RACE_TIMEOUT
+        )
+        if interleave_error is not None:
+            raise interleave_error
+    assert len(set(control.connection_ids.values()) | {id(connection.connection)}) == 3
+    return result
+
+
+def _run_race_worker(
+    control: _RaceControl,
+    role: str,
+    operation: Callable[[], tuple[AwardOutcome, ...]],
+) -> RecordingResult:
+    """Use a distinct real connection and propagate every unexpected worker error."""
+    close_old_connections()
+    connection.ensure_connection()
+    control.connection_ids[role] = id(connection.connection)
+    try:
+        if connection.vendor == "postgresql":
+            with connection.cursor() as cursor:
+                cursor.execute("SET statement_timeout = '10s'")
+                cursor.execute("SELECT pg_backend_pid()")
+                control.backend_pids[role] = cursor.fetchone()[0]
+        if role == "winner":
+            with transaction.atomic():
+                result = operation()
+                control.staged.wait()
+                assert control.winner_can_commit.wait(
+                    _RACE_TIMEOUT
+                ), "no release for winning transaction"
+            control.winner_committed.set()
+            return result
+        control.staged.wait()
+        with connection.execute_wrapper(control.observe_loser_statement):
+            try:
+                return operation()
+            except (ValidationError, OperationalError) as error:
+                return error
+    finally:
+        try:
+            assert not connection.in_atomic_block and connection.get_autocommit()
+        finally:
+            connection.close()
+
+
+def _assert_postgres_waiting_on_winner(control: _RaceControl) -> None:
+    """Require the server to report the actual winner PID as the loser's blocker."""
+    deadline = monotonic() + _RACE_TIMEOUT
+    with connection.cursor() as cursor:
+        while monotonic() < deadline:
+            cursor.execute(
+                "SELECT pg_blocking_pids(%s)", [control.backend_pids["loser"]]
+            )
+            if control.backend_pids["winner"] in cursor.fetchone()[0]:
+                return
+            sleep(_RACE_POLL_SECONDS)
+    raise AssertionError(
+        "PostgreSQL did not report the uncommitted winner as the loser's blocker"
+    )
+
+
+def _assert_sqlite_busy_log(
+    caplog: LogCaptureFixture, *, owner: str, attempt: int
+) -> None:
+    """Validate that native SQLite contention used the expected transaction owner."""
+    assert_log_story(
+        caplog,
+        where=_PERSIST_LOG,
+        beats={
+            "contention": (
+                "| branch |",
+                "vendor=sqlite",
+                f"attempt={attempt}",
+                f"transaction_owner={owner}",
+                "reason=database_busy",
+                f"correlation_id={_LOSER_TRACE}",
+            ),
+        },
+    )
+
+
+def _assert_database_failure_logs(
+    specifications: tuple[AwardSpec, ...],
+    caplog: LogCaptureFixture,
+) -> None:
+    """Observe native contention and unrelated SQL errors through their real boundaries."""
+    if connection.vendor == "sqlite":
+        with capture_experts_logs(caplog, [_LOGGER]):
+            first, second = _race_recording_calls(
+                (
+                    _record(specifications, _WINNER_TRACE),
+                    _record(specifications, _LOSER_TRACE, caller_owned=True),
+                ),
+                specifications[0].event_identity,
+            )
+        assert isinstance(first, tuple) and isinstance(second, OperationalError)
+        _assert_sqlite_busy_log(caplog, owner="caller", attempt=1)
+        assert_log_story(
+            caplog,
+            where=_PERSIST_LOG,
+            beats={
+                "caller failure": (
+                    "| error |",
+                    "reason=database_busy",
+                    "vendor=sqlite",
+                    "transaction_owner=caller",
+                    f"correlation_id={_LOSER_TRACE}",
+                ),
+            },
+        )
+        loser_messages = (record.getMessage() for record in caplog.records)
+        assert not any(
+            f"correlation_id={_LOSER_TRACE}" in message
+            and ("| exit |" in message or "attempt=2" in message)
+            for message in loser_messages
+        )
+    trace = "s45-unrelated-db-failure"
+    with (
+        capture_experts_logs(caplog, [_LOGGER]),
+        pytest.raises(DatabaseError),
+        transaction.atomic(),
+    ):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"ALTER TABLE {_LEDGER_TABLE} RENAME TO methodology_karmaaward_s45_hidden"
+            )
+        KarmaService.persist_awards(specifications, correlation_id=trace)
+    assert_log_story(
+        caplog,
+        where=_PERSIST_LOG,
+        beats={
+            "unrelated failure": (
+                "| error |",
+                "reason=database_failure",
+                f"vendor={connection.vendor}",
+                "transaction_owner=caller",
+                f"correlation_id={trace}",
+            ),
+        },
+    )
+    assert not any(
+        f"correlation_id={trace}" in record.getMessage()
+        and (
+            "| exit |" in record.getMessage()
+            or "reason=database_busy" in record.getMessage()
+        )
+        for record in caplog.records
+    )

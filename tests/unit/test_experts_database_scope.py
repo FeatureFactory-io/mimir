@@ -1,0 +1,166 @@
+"""Proofs of the Cedar importer's file-backed SQLite ownership boundary."""
+
+from __future__ import annotations
+
+import json
+import os
+from collections.abc import Iterator
+from copy import deepcopy
+from dataclasses import replace
+from pathlib import Path
+from tempfile import TemporaryDirectory, gettempdir
+from uuid import uuid4
+
+import pytest
+from django.conf import settings
+from django.db.backends.sqlite3.base import DatabaseWrapper
+
+from tests.support import experts_data
+from tests.support.experts_data import CedarDatabaseScope
+
+
+@pytest.fixture
+def owned_sqlite(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[CedarDatabaseScope, DatabaseWrapper]]:
+    """Declare a private real SQLite file while keeping the test runner's DB intact."""
+    with TemporaryDirectory(dir=Path(gettempdir()).resolve()) as directory:
+        database = Path(directory) / "test.sqlite3"
+        database.touch(mode=0o600)
+        marker = database.with_name("owner.json")
+        owner = uuid4().hex
+        marker.touch(mode=0o600)
+        _write_marker(marker, database, owner, os.getpid())
+        actual = deepcopy(experts_data.connection.settings_dict)
+        actual.update(ENGINE="django.db.backends.sqlite3", NAME=str(database))
+        actual["TEST"]["NAME"] = str(database)
+        declared = settings.DATABASES["default"]["TEST"]
+        monkeypatch.setitem(declared, "NAME", str(database))
+        sqlite = DatabaseWrapper(actual, alias="default")
+        scope = CedarDatabaseScope("test", str(database), marker, owner)
+        monkeypatch.setattr(experts_data, "connection", sqlite)
+        try:
+            yield scope, sqlite
+        finally:
+            sqlite.close()
+
+
+def _write_marker(marker: Path, database: Path, owner_id: str, pid: int) -> None:
+    """Write the exact local test-run owner proof consumed by the guard."""
+    marker.write_text(
+        json.dumps({"database": str(database), "owner_id": owner_id, "pid": pid}),
+        encoding="utf-8",
+    )
+
+
+def test_check_file_scope_with_runner_owned_database_uses_live_pragma(
+    owned_sqlite: tuple[CedarDatabaseScope, DatabaseWrapper],
+) -> None:
+    """Require real pytest runtime, explicit evidence and a real SQLite connection."""
+    scope, sqlite = owned_sqlite
+    assert os.environ["PYTEST_CURRENT_TEST"].endswith("(call)")
+    assert sqlite.connection is None
+    experts_data._validate_database_scope(scope)
+    assert sqlite.connection is not None
+
+
+@pytest.mark.parametrize("case", ("wrong-module", "wrong-environment", "no-pytest"))
+def test_check_file_scope_with_invalid_runtime_rejects_before_opening(
+    owned_sqlite: tuple[CedarDatabaseScope, DatabaseWrapper],
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+) -> None:
+    """A legitimate temporary file and owner marker cannot authorize a wrong runtime."""
+    scope, sqlite = owned_sqlite
+    if case == "wrong-module":
+        monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "mimir.settings.prod")
+    elif case == "wrong-environment":
+        monkeypatch.setattr(settings, "MIMIR_ENV", "prod")
+    else:
+        monkeypatch.delenv("PYTEST_CURRENT_TEST")
+    with pytest.raises(ValueError, match="runner-owned"):
+        experts_data._validate_database_scope(scope)
+    assert sqlite.connection is None
+
+
+@pytest.mark.parametrize(
+    "case",
+    (
+        "missing-owner",
+        "wrong-run",
+        "wrong-pid",
+        "public-marker",
+        "public-file",
+        "hardlink",
+    ),
+)
+def test_check_file_scope_with_invalid_owner_rejects_before_opening(
+    owned_sqlite: tuple[CedarDatabaseScope, DatabaseWrapper], case: str
+) -> None:
+    """Require current run ownership and private single-link regular files."""
+    scope, sqlite = owned_sqlite
+    database = Path(scope.database_name)
+    marker = scope.ownership_manifest
+    assert marker is not None and scope.owner_id is not None
+    if case == "missing-owner":
+        scope = replace(scope, ownership_manifest=None, owner_id=None)
+    elif case == "wrong-run":
+        _write_marker(marker, database, uuid4().hex, os.getpid())
+    elif case == "wrong-pid":
+        _write_marker(marker, database, scope.owner_id, os.getpid() + 1)
+    elif case == "public-marker":
+        marker.chmod(0o644)
+    elif case == "public-file":
+        database.chmod(0o644)
+    else:
+        database.with_name("another-link.sqlite3").hardlink_to(database)
+    with pytest.raises(ValueError, match="ownership|private"):
+        experts_data._validate_database_scope(scope)
+    assert sqlite.connection is None
+
+
+@pytest.mark.parametrize("case", ("runner-name", "ambient", "seed", "symlink"))
+def test_check_file_scope_with_unsafe_path_rejects_before_opening(
+    owned_sqlite: tuple[CedarDatabaseScope, DatabaseWrapper],
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+) -> None:
+    """Reject mismatched declarations, non-private paths, tracked seed and symlinks."""
+    scope, sqlite = owned_sqlite
+    database = Path(scope.database_name)
+    test_settings = settings.DATABASES["default"]["TEST"]
+    if case == "runner-name":
+        monkeypatch.setitem(test_settings, "NAME", str(database.with_suffix(".other")))
+    elif case == "ambient":
+        database.parent.chmod(0o755)
+    else:
+        if case == "seed":
+            target = Path(settings.BASE_DIR).resolve() / "mimir.db"
+        else:
+            target = database.with_name("linked.sqlite3")
+            target.symlink_to(database)
+        scope = replace(
+            scope,
+            database_name=str(target),
+            ownership_manifest=target.with_name("owner.json"),
+        )
+        sqlite.settings_dict.update(NAME=str(target), TEST={"NAME": str(target)})
+        monkeypatch.setitem(test_settings, "NAME", str(target))
+    with pytest.raises(ValueError, match="runner|private"):
+        experts_data._validate_database_scope(scope)
+    assert sqlite.connection is None
+
+
+def test_check_file_scope_with_wrong_open_database_rejects_live_pragma(
+    owned_sqlite: tuple[CedarDatabaseScope, DatabaseWrapper],
+) -> None:
+    """An already-open connection must agree with the declaration and marker."""
+    scope, sqlite = owned_sqlite
+    declared = sqlite.settings_dict["NAME"]
+    sqlite.settings_dict["NAME"] = str(Path(declared).with_name("separate.sqlite3"))
+    with sqlite.cursor() as cursor:
+        cursor.execute("SELECT 1")
+        assert cursor.fetchone() == (1,)
+    sqlite.settings_dict["NAME"] = declared
+    with pytest.raises(ValueError, match="open database"):
+        experts_data._validate_database_scope(scope)
