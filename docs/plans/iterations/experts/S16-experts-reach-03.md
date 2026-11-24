@@ -229,3 +229,8 @@ PIN-04/05 owns issue publication and human GO. Later slices: handoff docs `Refs 
 `docs/experts-replay/pin-evidence/S16.json`, `docs/features/steps/experts_contact_steps.py`, `docs/plans/iterations/experts/S16-experts-reach-03.md`, `tests/e2e/test_experts_guest_detail.py`, `tests/integration/test_experts_guest_detail.py`, `tests/support/experts_guest_detail.py`
 
 Skeleton: `666655d4353407ea03bfcba6cd7b30486b9c9819`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.
+
+
+## Final aggregate gate placement
+
+The full83case make test-at-experts command remains mandatory in iteration.required_iteration_final_gates after all49contracts. It is removed from local S16N4 prerequisites while unrelated contracts still contain owned raising stubs. S16 retains its complete composed originalscenario/backend/browser/harness and fresh native-media Definition of Done; no acceptance content or global gate is waived. This is the same global scheduling reconciliation already applied to S24/S26 and S45/S46.

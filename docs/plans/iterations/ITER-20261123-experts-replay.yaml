@@ -7386,7 +7386,7 @@ scenarios:
             -p no:asyncio -p no:anyio tests/e2e/test_experts_numeric_fallback.py -x
           convergence_commands:
           - make test-at-harness
-          - make test-at-experts
+          iteration_gate_handoff: Full83case make test-at-experts remains mandatory at iteration-final DoD after all49contracts; it is not a local scenario prerequisite while other owned contracts are unfinished.
         guidance_bundle:
           activity: BPE/BPE-06-Check_Definition_of_Done.md
           rules:
@@ -9088,7 +9088,7 @@ scenarios:
             -p no:playwright -p no:asyncio -p no:anyio tests/e2e/test_experts_guest_detail.py -x
           make_commands:
           - make test-at-harness
-          - make test-at-experts
+          iteration_gate_handoff: Full83case make test-at-experts remains mandatory at iteration-final DoD after all49contracts; it is not a local scenario prerequisite while other owned contracts are unfinished.
           expected_exit_code: 0
           reject_zero_skipped_or_undefined: true
         guidance_bundle:
