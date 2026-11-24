@@ -20,6 +20,7 @@ from pytest_django.live_server_helper import LiveServer
 from rest_framework.authtoken.models import Token
 
 from methodology.services.karma_service import KarmaService
+from tests.support.experts_acceptance import run_exact_acceptance
 from tests.support.experts_data import load_cedar_baseline
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.experts_mcp_self import (
@@ -342,7 +343,16 @@ def test_self_fetch_acceptance_with_exact_outline_executes_ten_rows(
     :return: None. Example: exactly ten passed, none skipped/undefined.
     :raises AssertionError: Nonzero exit, wrong selection or incomplete rows.
     """
-    raise NotImplementedError()
+    result = run_exact_acceptance(
+        Path("docs/features/act-18-experts/karma-accrual.feature"), "KARMA-MCP-03", 10
+    )
+    (tmp_path / "self-fetch-results.json").write_text(json.dumps(result.output))
+    assert (
+        result.scenario_count,
+        result.step_count,
+        result.skipped_count,
+        result.undefined_count,
+    ) == (10, 40, 0, 0)
 
 
 def _self_case(case_index: int) -> SelfFetchCase:
