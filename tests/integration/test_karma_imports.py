@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from pathlib import Path
 
@@ -26,9 +27,12 @@ from tests.support.experts_imports import (
 )
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.karma_mcp import (
+    MCPCase,
     MCPClientFactory,
     MCPDataset,
     MCPEntrypoint,
+    StdioMCPClient,
+    collection_snapshot,
     decode_tool_payload,
 )
 from tests.support.log_story import assert_log_story
@@ -127,16 +131,36 @@ async def test_import_facade_with_auto_apply_flag_preserves_existing_protocol_on
 
 
 def test_import_stdio_t3_with_success_returns_clean_jsonrpc_without_awards(
-    tmp_path: Path, live_server: LiveServer
+    tmp_path: Path, live_server: LiveServer, cedar_dataset: CedarDataset
 ) -> None:
     """Certify actual facade stdio and real isolated backend/file effects.
 
     :param tmp_path: Subprocess-visible source. Example: absolute temporary path.
     :param live_server: Actual test backend. Example: localhost random port.
+    :param cedar_dataset: Real independent baseline. Example: Maria8200/Mike12450.
     :return: None. Example: protocol-only stdout and unchanged Experts state.
     :raises AssertionError: Transport, import result or global invariants fail.
     """
-    raise NotImplementedError()
+    case = _prepare_import_case(cedar_dataset, tmp_path)
+    before = _snapshot_experts_state()
+    source_files = _import_source_snapshot(case.source_directory)
+    invariants = collection_snapshot()
+    with StdioMCPClient(
+        entrypoint="facade",
+        actor_username="mrodriguez",
+        dataset=MCPDataset(cedar_dataset, {}, {}),
+        server_url=live_server.url,
+        root=tmp_path,
+        include_summaries=True,
+    ) as wire:
+        assert wire.snapshot() == invariants
+        result = _call_import_stdio(wire, case)
+        assert wire.snapshot() == invariants
+    wire.assert_protocol_clean()
+    _assert_import_outcome(result, case, before, applied=False)
+    assert collection_snapshot() == invariants
+    _assert_import_source_files(case.source_directory, source_files)
+    _assert_import_stdio_boundary(wire, case, live_server.url)
 
 
 async def test_import_with_missing_source_rejects_without_awards(
@@ -322,3 +346,90 @@ def _assert_import_log_story(caplog: LogCaptureFixture, case: ImportCase) -> Non
     assert not any(word in message for word in forbidden for message in messages)
     if case.expected_guidance:
         assert all(case.expected_guidance not in message for message in messages)
+
+
+def _call_import_stdio(wire: StdioMCPClient, case: ImportCase) -> dict[str, object]:
+    """Discover and call the actual registered import over child protocol pipes.
+
+    :param wire: Initialized real facade process. Example: connected stdio client.
+    :param case: Real source and draft target. Example: Maria's CEDAR workflow.
+    :return: Native positive tool payload. Example: changes_detected with new=1.
+    :raises AssertionError: Schema, protocol result or native import options differ.
+    """
+    schemas = {tool["name"]: tool["inputSchema"] for tool in wire.list_tools()}
+    assert "import_workflow_from_local" in schemas
+    schema = schemas["import_workflow_from_local"]
+    assert set(schema["properties"]) == _IMPORT_PARAMETERS
+    assert schema["required"] == ["workflow_id", "source_directory"]
+    invocation = MCPCase(
+        name="S44 actual facade stdio import",
+        actor_username="mrodriguez",
+        tool_name="import_workflow_from_local",
+        fixture_key="owned_import_draft",
+        arguments={
+            "workflow_id": case.workflow_id,
+            "source_directory": str(case.source_directory),
+            "auto_apply": False,
+        },
+        route=f"/api/workflows/{case.workflow_id}/import_workflow/",
+        expected={},
+    )
+    result = wire.call(invocation)
+    assert isinstance(result, dict)
+    assert "auto_applied" not in result and "apply_result" not in result
+    return result
+
+
+def _import_source_snapshot(source: Path) -> dict[Path, bytes]:
+    """Retain every original source file without inferring its content from import.
+
+    :param source: Existing owned directory. Example: tmp_path / "CEDAR".
+    :return: Relative names and complete bytes. Example: five exported/fixture files.
+    :raises AssertionError: Source ownership or actual input files are unavailable.
+    """
+    assert source.is_absolute() and source.is_dir() and not source.is_symlink()
+    files = {
+        file.relative_to(source): file.read_bytes()
+        for file in source.rglob("*")
+        if file.is_file()
+    }
+    assert files
+    return files
+
+
+def _assert_import_source_files(source: Path, before: dict[Path, bytes]) -> None:
+    """Require the sole new protocol and unchanged complete original file bytes.
+
+    :param source: Actual shared child/backend directory. Example: CEDAR.
+    :param before: Pre-import complete files. Example: original Markdown bytes.
+    :return: None. Example: only _Upload_Protocol.md was added.
+    :raises AssertionError: Source content changed or output was absent/extra.
+    """
+    after = _import_source_snapshot(source)
+    assert Path("_Upload_Protocol.md") in after, "Import protocol was not created."
+    protocol = after.pop(Path("_Upload_Protocol.md"))
+    assert protocol and after == before
+
+
+def _assert_import_stdio_boundary(
+    wire: StdioMCPClient, case: ImportCase, server_url: str
+) -> None:
+    """Require the sole real import POST and no consumption or summary calls.
+
+    :param wire: Closed real facade with diagnostics. Example: clean subprocess.
+    :param case: Authorized import identity. Example: actual draft workflow ID.
+    :param server_url: Isolated HTTP listener. Example: live_server.url.
+    :return: None. Example: exactly one HTTP200 import and no award/generation.
+    :raises AssertionError: Extra requests, wrong target, awards or model calls.
+    """
+    route = f"/api/workflows/{case.workflow_id}/import_workflow/"
+    assert re.findall(r"HTTP Request: (.+)", wire.stderr) == [
+        f'POST {server_url}{route} "HTTP/1.1 200 OK"'
+    ]
+    forbidden = (
+        "consumption-receipts",
+        "KarmaService.award_",
+        "ContributionSummaryService.refresh",
+        "PublicContributionSummaryBoundary.complete",
+    )
+    assert not any(fragment in wire.stderr for fragment in forbidden)
