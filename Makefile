@@ -934,7 +934,7 @@ test-experts-s32:
 
 .PHONY: test-experts-s33-backend
 test-experts-s33-backend:
-	$(PYTHON) -m pytest tests/integration/test_experts_karma_minor_pip.py::test_minor_case_matrix_with_literal_examples_matches_all_twenty_rows tests/integration/test_experts_karma_minor_pip.py::test_finalize_pip_with_each_minor_change_applies_once_and_awards_submitter tests/integration/test_experts_karma_minor_pip.py::test_finalize_pip_with_minor_service_call_preserves_proposal_return tests/integration/test_experts_karma_minor_pip.py::test_finalize_pip_with_nonstaff_preserves_minor_target_and_ledger tests/integration/test_experts_karma_minor_pip.py::test_minor_fixture_with_unknown_or_major_row_rejects_before_writes tests/integration/test_experts_karma_minor_pip.py::test_minor_acceptance_log_story_happy -x
+	$(PYTHON) -m pytest tests/integration/test_experts_karma_minor_pip.py -x
 
 .PHONY: test-experts-s33-log
 test-experts-s33-log:
