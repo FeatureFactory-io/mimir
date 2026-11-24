@@ -45,6 +45,7 @@ conflict_map:
   tests/support/experts_acceptance.py:
   - S36
   Makefile:
+  - S32
   - S42
   - S36
   - S10
@@ -5579,6 +5580,7 @@ scenarios:
     skeleton_commit: 12f17b598a1c758b6c55d6b8acd879b9c8fbcd94
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - Makefile
     - tests/integration/test_pip_admin_review_view.py
     - templates/pips/admin_review.html
     - methodology/services/pip_apply_changes_service.py
@@ -5757,6 +5759,7 @@ scenarios:
         depends_on:
         - N3-living-at
         footprint:
+        - Makefile
         - templates/pips/admin_review.html
         - tests/integration/test_pip_admin_review_view.py
         gate:
