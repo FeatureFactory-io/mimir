@@ -6319,6 +6319,10 @@ scenarios:
     skeleton_commit: 923582242ec3446be65478594ac67b54ed913278
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/integration/test_experts_release_log_story.py
+    - tests/integration/test_karma_mcp.py
+    - tests/integration/test_karma_exports.py
+    - tests/integration/test_karma_copy.py
     - Makefile
     - tests/unit/test_experts_database_scope.py
     - tests/support/experts_data.py
@@ -6510,11 +6514,40 @@ scenarios:
           - do-test-first
           - do-not-mock-in-integration-tests
           - pytest
+      - id: S45-N2a-transaction-log-and-runner-repair
+        title: Repair independently reproduced pending-write logs and counterfeit runtime evidence
+        bpe: BPE-02
+        depends_on:
+        - S45-N2-atomic-races
+        - S45-N3-acceptance
+        footprint:
+        - methodology/services/karma_service.py
+        - tests/support/experts_data.py
+        - tests/integration/karma_event/conftest.py
+        - tests/integration/karma_event/test_retry.py
+        - tests/unit/test_experts_database_scope.py
+        - tests/integration/test_karma_copy.py
+        - tests/integration/test_karma_exports.py
+        - tests/integration/test_karma_mcp.py
+        - tests/integration/test_experts_release_log_story.py
+        gate:
+          command: make test-experts-s45
+          log_story_command: pytest tests/integration/karma_event/test_retry.py -k log_story -x
+          ownership_command: pytest tests/unit/test_experts_database_scope.py -x
+        repair_contract: Preserve all public result and award APIs. Consumption and first-release logs must identify staged/pending work until actual enclosing commit; real outer rollback must not leave a committed-success claim. File-backed Cedar authorization additionally requires live active pytest fixture-runner ownership tied to actual request/session/current node, beyond mutable environment or imported module presence; reject a standalone counterfeit current-test marker before opening/writing. Keep existing memory/PostgreSQL/owned-demo guards unchanged. Add real rollback/commit and standalone-negative regressions and reconcile only affected shared log assertions, retaining their other checks. Fresh independent N4 must rerun both engines and inspect these reproductions.
+        guidance_bundle:
+          activity: BPE/BPE-02-Implement_Backend.md
+          rules:
+          - do-test-first
+          - do-not-mock-in-integration-tests
+          - do-assert-log-story
+          - do-write-concise-methods
       - id: S45-N4-definition-of-done
         title: Verify complete retry contract and record backend evidence
         bpe: BPE-06
         depends_on:
         - S45-N3-acceptance
+        - S45-N2a-transaction-log-and-runner-repair
         footprint: []
         gate:
           command: make test-experts-s45
