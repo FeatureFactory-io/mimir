@@ -1,49 +1,22 @@
-"""
-Custom logging filters for adding contextual information to log records.
-"""
+"""Logging filters that add request context to each record."""
+
 import logging
-from django.utils.deprecation import MiddlewareMixin
+
+from mimir.request_local import get_current_request, normalize_request_id
+
+_NO_REQUEST = "NO_REQUEST"
 
 
 class RequestIDFilter(logging.Filter):
-    """
-    Logging filter that adds request ID to log records.
-    
-    This filter extracts the request ID from thread-local storage
-    (set by RequestIDMiddleware) and adds it to each log record.
-    
-    If no request ID is available (e.g., background tasks, startup),
-    it uses 'NO_REQUEST' as a placeholder.
-    
-    Usage:
-        Add this filter to LOGGING configuration in settings.py:
-        
-        'filters': {
-            'request_id': {
-                '()': 'mimir.logging_filters.RequestIDFilter',
-            },
-        }
-    """
-    
-    def filter(self, record):
+    """Attach the middleware correlation ID or the background placeholder."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Add safe context without generating a second request ID.
+
+        :param record: Record being formatted. Example: a request-start record.
+        :return: True to pass the record. Example: background logs also pass.
         """
-        Add request_id attribute to log record.
-        
-        :param record: LogRecord instance to be filtered
-        :return: True (always pass the record)
-        
-        Side effects:
-            Adds 'request_id' attribute to record
-        """
-        # Try to get request ID from thread-local storage
-        from mimir.request_local import get_current_request
-        
         request = get_current_request()
-        
-        if request and hasattr(request, 'request_id'):
-            record.request_id = request.request_id
-        else:
-            # No active request (e.g., management commands, background tasks)
-            record.request_id = 'NO_REQUEST'
-        
+        identifier = normalize_request_id(getattr(request, "request_id", None))
+        record.request_id = identifier or _NO_REQUEST
         return True

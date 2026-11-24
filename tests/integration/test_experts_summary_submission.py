@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import ast
+import io
+import json
+import logging
+import logging.config
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from threading import enumerate as active_threads
+from uuid import UUID
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -32,6 +39,7 @@ from methodology.services.contribution_summary_prompts import _count_sentences
 from methodology.services.experts_service import ExpertsService
 from methodology.services.galdr_engine import GaldrEngine
 from methodology.services.pip_service import PIPService
+from mimir.request_local import get_current_request
 from tests.support.experts_data import load_cedar_baseline
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.experts_summary_data import (
@@ -61,6 +69,40 @@ _LOGGERS = (
 )
 _SERVICE = "ContributionSummaryService.refresh_for_submission"
 _BOUNDARY = "PublicContributionSummaryBoundary.complete"
+
+
+@pytest.fixture
+def production_request_log() -> Iterator[io.StringIO]:
+    """Capture the exact production console handler without adopting its settings."""
+    path = Path(__file__).resolve().parents[2] / "mimir/settings/prod.py"
+    source = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    spec = next(
+        ast.literal_eval(node.value)
+        for node in source.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(name, ast.Name) and name.id == "LOGGING" for name in node.targets
+        )
+    )
+    capture = io.StringIO()
+    production = logging.config.DictConfigurator(spec)
+    config = production.config
+    config["formatters"]["json"] = production.configure_formatter(
+        config["formatters"]["json"]
+    )
+    config["filters"]["request_id"] = production.configure_filter(
+        config["filters"]["request_id"]
+    )
+    config["handlers"]["console"]["stream"] = capture
+    handler = production.configure_handler(config["handlers"]["console"])
+    root = logging.getLogger()
+    root.addHandler(handler)
+    try:
+        yield capture
+    finally:
+        root.removeHandler(handler)
+        handler.close()
+        capture.close()
 
 
 @pytest.fixture
@@ -221,24 +263,25 @@ def test_s23_committed_submission_dispatches_existing_worker_once(
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize(
-    "request_id", [_RUN, "unsafe@example.invalid", _CREDENTIAL_LIKE_ID]
+    "request_id", [_RUN, None, "unsafe@example.invalid", _CREDENTIAL_LIKE_ID]
 )
 def test_s23_http_submission_with_request_id_uses_normal_lifecycle(
     client: Client,
     s23_pip: ProcessImprovementProposal,
-    request_id: str,
+    request_id: str | None,
     caplog: pytest.LogCaptureFixture,
+    production_request_log: io.StringIO,
 ) -> None:
-    """Pass through a safe ID or correlate the full lifecycle with a generated ID."""
+    """Keep one safe ID across production JSON logs, response and storage."""
     client.force_login(s23_pip.created_by)
     before = _ledger(), _prose(s23_pip)
     with (
-        capture_experts_logs(caplog, _LOGGERS),
+        capture_experts_logs(caplog, (*_LOGGERS, "mimir.middleware")),
         summary_processing_scope(_script(s23_pip)) as llm,
     ):
         response = client.post(
             reverse("pip_submit_review", kwargs={"pk": s23_pip.pk}),
-            headers={"X-Request-ID": request_id},
+            headers={"X-Request-ID": request_id} if request_id is not None else {},
         )
     assert response.status_code == 302
     assert response.url == reverse("pip_detail", kwargs={"pk": s23_pip.pk})
@@ -250,15 +293,29 @@ def test_s23_http_submission_with_request_id_uses_normal_lifecycle(
     assert interaction.outcome == "success"
     assert _ledger() == before[0]
     assert _prose(s23_pip) != before[1]
-    assert interaction.correlation_id == profile.last_summary_correlation_id
-    assert f"correlation_id={interaction.correlation_id}" in caplog.text
-    if request_id == _RUN:
-        assert interaction.correlation_id == request_id
-    else:
-        assert interaction.correlation_id != request_id
+    correlation = interaction.correlation_id
+    formatted = production_request_log.getvalue()
+    assert f"correlation_id={correlation}" in caplog.text
+    if request_id is not None and request_id != _RUN:
+        assert request_id not in formatted
         assert request_id not in str(interaction.events)
-        assert request_id not in caplog.text
         assert request_id not in repr(llm.calls)
+    assert (
+        correlation
+        == response.headers["X-Request-ID"]
+        == profile.last_summary_correlation_id
+    )
+    if request_id == _RUN:
+        assert correlation == request_id
+    else:
+        assert str(UUID(correlation, version=4)) == correlation
+    records = [json.loads(line) for line in formatted.splitlines()]
+    for message in ("[REQUEST_START]", _SERVICE, "[REQUEST_END]"):
+        matching = [record for record in records if message in record["message"]]
+        assert matching and {record["request_id"] for record in matching} == {
+            correlation
+        }
+    assert get_current_request() is None
 
 
 @pytest.mark.django_db(transaction=True)

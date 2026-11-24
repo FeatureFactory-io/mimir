@@ -741,7 +741,7 @@ def pip_admin_review(request, pk: int):
 
 
 def _processing_correlation_from_request(request: HttpRequest) -> str:
-    """Normalize X-Request-ID for normal PIP processing.
+    """Carry the middleware request ID into normal PIP processing.
 
     :param request: Real request. Example: authenticated pip_submit_review POST.
     :return: Safe correlation. Example: "cedar-submit-01".
@@ -749,4 +749,7 @@ def _processing_correlation_from_request(request: HttpRequest) -> str:
     """
     if not isinstance(request, HttpRequest):
         raise ValueError("A Django HTTP request is required.")
-    return _normalize_processing_correlation(request.headers.get("X-Request-ID"))
+    identifier = getattr(request, "request_id", None) or request.headers.get(
+        "X-Request-ID"
+    )
+    return _normalize_processing_correlation(identifier)

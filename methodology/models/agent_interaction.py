@@ -11,16 +11,11 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from mimir.request_local import CORRELATION_ID_PATTERN as _CORRELATION
+from mimir.request_local import CREDENTIAL_PATTERN as _CREDENTIAL
+
 _WORKFLOW = "contribution_summary"
-_CORRELATION = r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}"
 _MODEL = r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}"
-_CREDENTIAL = re.compile(
-    r"(?:api[-_]?(?:key|token)|access[-_]?token|auth[-_]?token|client[-_]?secret|password):.+|"
-    r"(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_-]{12,}|"
-    r"github_pat_[A-Za-z0-9_-]{12,}|xox[baprs]-[A-Za-z0-9_-]{12,}|"
-    r"(?:AKIA|ASIA)[A-Z0-9]{16}|eyJ[\w-]+\.[\w-]+\.[\w-]+|[a-f0-9]{40})",
-    re.IGNORECASE,
-)
 _FAILURE_CODES = (
     "invalid_request",
     "public_evidence_failed",
