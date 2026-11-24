@@ -43,6 +43,7 @@
           "guest-1512-982"
         ],
         "directory": "traces/MIN-S04-N4/recheck-asset-guest-1512-982-1",
+        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
         "transcript": "cli/MIN-S04-N4-recheck-asset-guest-1512-982-1.txt",
         "original_report": "traces/MIN-S04-N4/repaired-observer-final/guest-1512-982.json",
         "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
@@ -52,6 +53,7 @@
           "long_identity_and_prose-1512-982"
         ],
         "directory": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-1512-982-1",
+        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
         "transcript": "cli/MIN-S04-N4-recheck-asset-long_identity_and_prose-1512-982-1.txt",
         "original_report": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-1512-982.json",
         "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
@@ -61,6 +63,7 @@
           "long_identity_and_prose-1920-1080"
         ],
         "directory": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-1920-1080-1",
+        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
         "transcript": "cli/MIN-S04-N4-recheck-asset-long_identity_and_prose-1920-1080-1.txt",
         "original_report": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-1920-1080.json",
         "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
@@ -70,6 +73,7 @@
           "long_identity_and_prose-768-1024"
         ],
         "directory": "traces/MIN-S04-N4/recheck-asset-long_identity_and_prose-768-1024-3",
+        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
         "transcript": "cli/MIN-S04-N4-recheck-asset-long_identity_and_prose-768-1024-3.txt",
         "original_report": "traces/MIN-S04-N4/repaired-observer-final/long_identity_and_prose-768-1024.json",
         "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
@@ -79,6 +83,7 @@
           "missing_summary-1280-800"
         ],
         "directory": "traces/MIN-S04-N4/recheck-asset-missing_summary-1280-800-1",
+        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
         "transcript": "cli/MIN-S04-N4-recheck-asset-missing_summary-1280-800-1.txt",
         "original_report": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-1280-800.json",
         "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
@@ -88,6 +93,7 @@
           "missing_summary-360-800"
         ],
         "directory": "traces/MIN-S04-N4/recheck-asset-missing_summary-360-800-2",
+        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
         "transcript": "cli/MIN-S04-N4-recheck-asset-missing_summary-360-800-2.txt",
         "original_report": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-360-800.json",
         "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
@@ -97,6 +103,7 @@
           "missing_summary-390-844"
         ],
         "directory": "traces/MIN-S04-N4/recheck-asset-missing_summary-390-844-1",
+        "source_revision": "798683bcc6a4e99cf9a32fc56cb1d9d995b64127",
         "transcript": "cli/MIN-S04-N4-recheck-asset-missing_summary-390-844-1.txt",
         "original_report": "traces/MIN-S04-N4/repaired-observer-final/missing_summary-390-844.json",
         "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
@@ -106,6 +113,7 @@
           "normal-1920-1080"
         ],
         "directory": "traces/MIN-S04-N4/recheck-asset-normal-1920-1080-2",
+        "source_revision": "8efa1bca78aa7844cca02db46846b53a96cccaad",
         "transcript": "cli/MIN-S04-N4-recheck-asset-normal-1920-1080-2.txt",
         "original_report": "traces/MIN-S04-N4/repaired-observer-final/normal-1920-1080.json",
         "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."
@@ -115,6 +123,7 @@
           "normal-768-1024"
         ],
         "directory": "traces/MIN-S04-N4/recheck-asset-normal-768-1024-2",
+        "source_revision": "8efa1bca78aa7844cca02db46846b53a96cccaad",
         "transcript": "cli/MIN-S04-N4-recheck-asset-normal-768-1024-2.txt",
         "original_report": "traces/MIN-S04-N4/repaired-observer-final/normal-768-1024.json",
         "reason": "The full gate passed this browser case, but a necessary webfont was absent from its capture."

@@ -223,9 +223,20 @@ def _recapture_directories(
 ) -> dict[str, PurePosixPath]:
     """Check asset recapture declarations and return their case-to-folder map."""
     case_directories: dict[str, PurePosixPath] = {}
+    directories: set[PurePosixPath] = set()
     for recapture in recaptures:
         directory = _relative_path(recapture["directory"])
         assert directory != full_run and directory.parent == full_run.parent
+        assert (
+            directory not in directories
+        ), f"Duplicate recapture directory: {directory}"
+        directories.add(directory)
+        revision = recapture.get("source_revision")
+        assert (
+            isinstance(revision, str)
+            and _GIT_SHA.fullmatch(revision)
+            and int(revision, 16) > 0
+        ), f"Invalid recapture source revision: {directory}"
         _transcript_path(recapture["transcript"])
         cases = recapture["cases"]
         assert isinstance(cases, list) and cases and recapture["reason"].strip()
@@ -312,10 +323,9 @@ def _assert_verification(evidence: dict[str, Any], root: Path) -> None:
     transcript, started_at = _recorded_transcript(root, verification["transcript"])
     assert f"collected {verification['selected']} items" in transcript
     assert f"{verification['passed']} passed in " in transcript
-    captured_head = (
-        _artifact(root, verification["source_head"]).read_text(encoding="utf-8").strip()
+    _assert_acquisition_head(
+        root, verification["source_head"], evidence["source_revision"]
     )
-    assert captured_head == evidence["source_revision"]
     hashes = _artifact(root, verification["source_hashes"])
     assert _read_json(hashes) == evidence["source_sha256"]
     for recapture in verification["asset_recaptures"]:
@@ -329,13 +339,9 @@ def _assert_recapture(
     directory = PurePosixPath(recapture["directory"])
     hashes = _artifact(root, (directory / "source-sha256.json").as_posix())
     assert _read_json(hashes) == evidence["source_sha256"]
-    # A rerun can have its own HEAD while the relevant capture inputs are identical.
-    head = (
-        _artifact(root, (directory / "source-head.txt").as_posix())
-        .read_text(encoding="utf-8")
-        .strip()
+    _assert_acquisition_head(
+        root, (directory / "source-head.txt").as_posix(), recapture["source_revision"]
     )
-    assert _GIT_SHA.fullmatch(head)
     transcript, recaptured_at = _recorded_transcript(root, recapture["transcript"])
     assert recaptured_at >= started_at
     cases = recapture["cases"]
@@ -348,6 +354,20 @@ def _assert_recapture(
         original_path = _artifact(root, (full_run / f"{case}.json").as_posix())
         original = _read_json(original_path)
         assert original["result"] == "passed" and not _has_rendered_fonts(original)
+
+
+def _assert_acquisition_head(root: Path, path: str, revision: str) -> None:
+    """Match the immutable acquisition revision recorded as one line.
+
+    :param root: Resolved directory containing the reviewed session package.
+    :param path: Evidence package path to the recorded Git HEAD.
+    :param revision: Full Git revision declared for this acquisition.
+    :raises AssertionError: If the record is missing or differs from its declaration.
+    """
+    expected = f"{revision}\n".encode("ascii")
+    assert (
+        _artifact(root, path).read_bytes() == expected
+    ), f"Acquisition revision mismatch: {path}"
 
 
 def _transcript_path(name: str) -> PurePosixPath:
