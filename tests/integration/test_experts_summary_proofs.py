@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 from django.db import connection
-from django.test import override_settings
+from django.test import Client, override_settings
 from django.test.utils import CaptureQueriesContext
 
 from methodology.llm.base import LLMError, LLMResponse
@@ -35,7 +35,10 @@ from methodology.services.public_contribution_evidence import (
     PublicContributionEvidenceService,
 )
 from tests.support.agent_story import assert_agent_story
-from tests.support.experts_data import seed_s27_summary_privacy_variant
+from tests.support.experts_data import (
+    load_cedar_baseline,
+    seed_s27_summary_privacy_variant,
+)
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.experts_summary_data import (
     SUMMARY_CHANGE_BODY,
@@ -45,6 +48,13 @@ from tests.support.experts_summary_data import (
     load_summary_script,
     prepare_summary_submission,
     summary_processing_scope,
+)
+from tests.support.experts_summary_stability import (
+    _assert_s28_generation_story,
+    _oracle_paragraph,
+    assert_live_displays,
+    capture_summary_state,
+    post_authorized_copy,
 )
 from tests.support.log_story import assert_log_story
 from tests.support.scripted_llm import ScriptedLLM, ScriptedLLMCall
@@ -778,10 +788,40 @@ def test_s25_resubmission_agent_story_reject() -> None:
 @pytest.mark.django_db(transaction=True)
 def test_s28_points_change_agent_story_happy() -> None:
     """Generate through real S23 lifecycle, then prove copy makes no model call.
+
     :return: None. Example: baseline two calls stay two; totals become 8205/12455.
     :raises AssertionError: For bypassed orchestration or changed calls/state.
     """
-    raise NotImplementedError()
+    cedar = load_cedar_baseline()
+    pip = prepare_summary_submission(cedar)
+    summary, assessment = load_summary_script(
+        SUMMARY_SCRIPTS / "PRF-EXPERTS-01/happy.json", pip.changes.get().pk
+    )
+    assert isinstance(summary, LLMResponse)
+    summary = replace(summary, content=_oracle_paragraph(cedar))
+    with summary_processing_scope((summary, assessment)) as llm:
+        PIPService.submit_for_review(
+            actor=pip.created_by, pip=pip, correlation_id="s28-real-generation"
+        )
+        pip.refresh_from_db()
+        assert pip.status == pip.STATUS_REVIEWED
+        assert pip.changes.get().galdr_recommendation == PipChange.GALDR_ACCEPT
+        _assert_s28_generation_story(
+            AgentInteraction.objects.get(pip=pip), pip.created_by_id, pip.pk
+        )
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(pip.created_by)
+        assert client.get("/auth/user/profile/").status_code == 200
+        before = capture_summary_state(pip.created_by_id)
+        assert before.profile_values["contribution_summary"] == summary.content
+        assert before.profile_values["summary_status"] == "success"
+        assert before.profile_values["summary_updated_at"] is not None
+        calls = llm.calls
+        assert len(calls) == 2
+        post_authorized_copy(client, cedar)
+        assert capture_summary_state(pip.created_by_id) == before and llm.calls == calls
+        assert_live_displays(client, cedar)
+        assert capture_summary_state(pip.created_by_id) == before and llm.calls == calls
 
 
 @pytest.mark.django_db
