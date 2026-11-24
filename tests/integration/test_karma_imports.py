@@ -14,6 +14,7 @@ from rest_framework.authtoken.models import Token
 
 from methodology.models import Workflow
 from methodology.services.workflow_import_service import WorkflowImportService
+from tests.support.experts_acceptance import run_exact_acceptance
 from tests.support.experts_data import CedarDataset
 from tests.support.experts_imports import (
     ExpertsImportState,
@@ -187,12 +188,22 @@ async def test_import_log_story_happy(
 
 
 def test_import_acceptance_with_exact_contract_runs_one_scenario() -> None:
-    """Execute the scoped Make target and reject empty/skipped acceptance runs.
+    """Execute the exact living contract and reject empty or skipped acceptance.
 
-    :return: None. Example: exactly one successful KARMA-EXPORT-03 execution.
+    :return: None. Example: one scenario, four steps including Background.
     :raises AssertionError: Wrong selection, failure, undefined step or zero runs.
     """
-    raise NotImplementedError()
+    result = run_exact_acceptance(
+        Path("docs/features/act-18-experts/karma-accrual.feature"),
+        "KARMA-EXPORT-03",
+        1,
+    )
+    assert (
+        result.scenario_count,
+        result.step_count,
+        result.skipped_count,
+        result.undefined_count,
+    ) == (1, 4, 0, 0)
 
 
 async def _registered_import(
