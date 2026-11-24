@@ -12,7 +12,7 @@ from behave import given, then, when
 from behave.runner import Context
 from django.core import mail
 from django.db import connection
-from django.test import override_settings
+from django.test import Client, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
@@ -44,6 +44,13 @@ from tests.support.experts_summary_data import (
     load_summary_script,
     prepare_summary_submission,
     summary_processing_scope,
+)
+from tests.support.experts_summary_failure_data import (
+    assert_s29_domain_unchanged,
+    assert_s29_failure_trace,
+    assert_s29_requests,
+    assert_s29_retention,
+    prepare_s29_failure_case,
 )
 from tests.support.scripted_llm import ScriptedLLM
 
@@ -574,52 +581,106 @@ def no_public_summary_paragraph_is_fabricated(context: Context) -> None:
 def s29_given_successful_summary(context: Context) -> None:
     """Prepare the real Cedar draft and exact nine-sentence successful record.
 
-    :param context: Isolated acceptance context with shared CedarDataset.
-    :return: None; retain original text/time/ledger identities in context.
+    :param context: Isolated shared Cedar context. Example: Maria and Hana v2.0.
+    :return: None. Example: original nine sentences, timestamp and award rows saved.
     :raises ValueError: If baseline or normal draft preparation is invalid.
     """
-    raise NotImplementedError()
+    oracle = next(
+        row["summary"]
+        for row in context.cedar_dataset.oracle["people"]
+        if row["username"] == "mrodriguez"
+    )
+    case = prepare_s29_failure_case()
+    assert case.paragraph == oracle and len(oracle.split(". ")) == 9
+    assert oracle.endswith("availability and project fit still require a conversation.")
+    assert case.successful_at is not None
+    assert case.profile.summary_status == ExpertProfile.SummaryStatus.SUCCESS
+    context.s29_case = case
+    context.s29_client = Client(enforce_csrf_checks=True)
+    context.s29_client.force_login(case.pip.created_by)
+    response = context.s29_client.get(reverse("pip_detail", kwargs={"pk": case.pip.pk}))
+    assert response.status_code == HTTPStatus.OK
+    assert response.wsgi_request.user == case.pip.created_by
+    logger.info("S29 AT | setup | subject_id=%s last_good=true", case.pip.created_by_id)
 
 
 @when("its next generation attempt fails")
 def s29_when_generation_fails(context: Context) -> None:
     """Submit normally with summary error followed by valid assessment.
 
-    :param context: Real draft and ScriptedLLM-only model seam.
-    :return: None; retain actual submission result and interaction.
+    :param context: Real draft with a CSRF-enforcing client. Example: Maria's ADD.
+    :return: None. Example: failed summary followed by actual valid assessment.
     :raises AssertionError: If normal submission does not execute two calls.
     """
-    raise NotImplementedError()
+    case = context.s29_case
+    turns = load_summary_script(
+        SUMMARY_SCRIPTS / "PRF-EXPERTS-02/s29_provider.json", case.pip.changes.get().pk
+    )
+    correlation = "s29-provider-failure-at"
+    with (
+        summary_processing_scope(turns) as llm,
+        override_settings(GALDR_USE_TARGET_STATE=True),
+        context.test.captureOnCommitCallbacks(execute=True) as callbacks,
+    ):
+        response = context.s29_client.post(
+            reverse("pip_submit_review", kwargs={"pk": case.pip.pk}),
+            {"csrfmiddlewaretoken": context.s29_client.cookies["csrftoken"].value},
+            headers={"X-Request-ID": correlation},
+        )
+    assert response.status_code == HTTPStatus.FOUND
+    assert response.url == reverse("pip_detail", kwargs={"pk": case.pip.pk})
+    assert response.wsgi_request.user == case.pip.created_by
+    assert len(callbacks) == 1
+    context.s29_llm = llm
+    context.s29_interaction = AgentInteraction.objects.get(pip=case.pip)
+    assert context.s29_interaction.correlation_id == correlation
+    assert_s29_requests(case, llm)
+    assert_s29_failure_trace(case, context.s29_interaction, "provider_failed")
+    logger.info("S29 AT | attempted | pip_id=%s provider_calls=2", case.pip.pk)
 
 
 @then("the last good paragraph is retained")
 def s29_then_last_good_retained(context: Context) -> None:
     """Compare exact stored text/time and failed safe refresh metadata.
 
-    :param context: Completed actual submission context.
-    :return: None when text/timestamp persist and failure metadata is correct.
+    :param context: Actual completed submission. Example: failed summary interaction.
+    :return: None. Example: full original paragraph/time and safe failure metadata.
     :raises AssertionError: If paragraph, timestamp or metadata differs.
     """
-    raise NotImplementedError()
+    assert_s29_retention(context.s29_case, context.s29_interaction, "provider_failed")
+    assert AgentInteraction.objects.filter(pip=context.s29_case.pip).count() == 1
+    logger.info("S29 AT | retained | text_and_successful_timestamp=unchanged")
 
 
 @then("the PIP follows its existing failure/recovery behavior")
 def s29_then_existing_lifecycle(context: Context) -> None:
     """Verify valid assessment continues to Reviewed without applying changes.
 
-    :param context: Actual proposal, calls and failure interaction.
-    :return: None when summary failure leaves assessment policy unchanged.
+    :param context: Real proposal, requests and failure row. Example: Maria's ADD.
+    :return: None. Example: normal Reviewed state without a staff decision or apply.
     :raises AssertionError: If processing skips assessment or changes decisions.
     """
-    raise NotImplementedError()
+    case = context.s29_case
+    case.pip.refresh_from_db()
+    assert case.pip.status == ProcessImprovementProposal.STATUS_REVIEWED
+    assert case.pip.submitted_at <= case.pip.reviewed_at
+    assert case.pip.galdr_holistic_assessment
+    change = case.pip.changes.get()
+    assert change.galdr_recommendation == PipChange.GALDR_ACCEPT
+    assert change.galdr_reasoning == "The proposed activity fits the review workflow."
+    assert_s29_domain_unchanged(case)
+    assert_s29_requests(case, context.s29_llm)
+    logger.info("S29 AT | lifecycle | status=reviewed staff_decision=false")
 
 
 @then("no Karma is awarded for summary generation")
 def s29_then_no_summary_award(context: Context) -> None:
     """Verify Maria remains at 8200 and original ledger identities persist.
 
-    :param context: Real Cedar projection and pre-attempt award snapshot.
-    :return: None when no award, accepted change or publication was created.
+    :param context: Original complete ledger and protected rows. Example: Maria 8200.
+    :return: None. Example: unchanged complete awards, target v2.0, activities and mail.
     :raises AssertionError: If any numerical or publication effect occurs.
     """
-    raise NotImplementedError()
+    assert_s29_domain_unchanged(context.s29_case)
+    assert_s29_retention(context.s29_case, context.s29_interaction, "provider_failed")
+    logger.info("S29 AT | no_award | maria_total=8200 domain_rows=unchanged")
