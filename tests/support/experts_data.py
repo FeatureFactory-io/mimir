@@ -1410,7 +1410,64 @@ def seed_s27_summary_privacy_variant() -> Mapping[str, Any]:
     :return: Real ORM rows and expected sentinels. Example: Maria plus draft PIPs.
     :raises ValueError: If baseline/publication receipt invariants do not reconcile.
     """
-    raise NotImplementedError()
+    with transaction.atomic():
+        dataset = load_cedar_baseline()
+        maria = dataset.users_by_username["mrodriguez"]
+        person = next(
+            row
+            for row in _rows(dataset.oracle, "people")
+            if row["username"] == maria.username
+        )
+        receipt = PlaybookVersion.objects.get(
+            pip=dataset.pips_by_key["HIST-MARIA-DESIGN-01"]
+        )
+        title, body = (
+            "S27 Unpublished Keyboard Recovery",
+            "S27 private recovery rationale",
+        )
+        change_body = "S27 private change guidance"
+        audit_body = "S27 private version audit narrative"
+        credential = "fixture-credential-for-privacy-testing"
+        score = f"Karma total: {person['total_karma']}"
+        submitted = ProcessImprovementProposal.objects.create(
+            playbook_id=receipt.playbook_id,
+            created_by=maria,
+            title=title,
+            summary=body,
+            status=ProcessImprovementProposal.STATUS_SUBMITTED,
+        )
+        PipChange.objects.create(
+            pip=submitted,
+            change_type=PipChange.CHANGE_ADD,
+            entity_type=PipChange.ENTITY_ACTIVITY,
+            content=change_body,
+        )
+        PlaybookVersion.objects.filter(pk=receipt.pk).update(description=audit_body)
+        Activity.objects.filter(
+            workflow__playbook_id=6101, name="Trace Keyboard Focus"
+        ).update(
+            guidance=f"Check the focus order. Email {maria.email}. API key: {credential}\n{score}"
+        )
+        Activity.objects.filter(
+            workflow__playbook_id=receipt.playbook_id, name="Error Message Review"
+        ).update(guidance="Use the real published activity guidance.")
+    return {
+        "dataset": dataset,
+        "subject_id": maria.pk,
+        "submitted_pip": submitted,
+        "sentinels": (
+            *person["private_playbooks"],
+            person["private_pip"],
+            person["private_token"],
+            maria.email,
+            title,
+            body,
+            change_body,
+            audit_body,
+            credential,
+            score,
+        ),
+    }
 
 
 def create_reviewed_major_add_pip(
