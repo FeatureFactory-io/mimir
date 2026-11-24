@@ -861,17 +861,64 @@ def test_s29_summary_agent_story_reject(failure: str) -> None:
     assert not body.strip() or body not in json.dumps(interaction.events)
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.agent_proof
-def test_s29_summary_interaction_with_failure_preserves_usage_agent_story_reject() -> (
-    None
-):
-    """Parameterize supplied usage, absent usage and absent configured rates.
+@pytest.mark.parametrize(
+    "pricing", ("provider", "invalid_usage", "unknown_usage", "unknown_rates")
+)
+def test_s29_summary_interaction_with_failure_preserves_usage_agent_story_reject(
+    pricing: str,
+) -> None:
+    """Preserve measured failure usage and unknown cost through real submission.
 
-    :return: None when failed interactions retain known usage and unknown nulls.
-    :raises AssertionError: For false zero cost, lost tokens or unsafe trace data.
+    :param pricing: Independent failure measurement case. Example: "unknown_rates".
+    :return: None. Example: supplied210/17 tokens and unknown cost remain distinct.
+    :raises AssertionError: For lost usage, false zero cost or altered last-good state.
     """
-    raise NotImplementedError()
+    case = prepare_s29_failure_case()
+    group = "PRF-EXPERTS-02" if pricing == "provider" else "PRF-OBS-01"
+    script = load_summary_script(
+        SUMMARY_SCRIPTS / group / f"s29_{pricing}.json", case.pip.changes.get().pk
+    )
+    rates = None if pricing == "unknown_rates" else {"scripted": ("3", "15")}
+    with summary_processing_scope(script, rates=rates) as llm:
+        interaction = submit_s29_case(case, llm, f"s29-observability-{pricing}")
+    code = "provider_failed" if pricing == "provider" else "output_validation_failed"
+    assert case.pip.status == case.pip.STATUS_REVIEWED
+    assert AgentInteraction.objects.count() == 1
+    assert_s29_retention(case, interaction, code)
+    assert_s29_requests(case, llm)
+    assert_s29_failure_trace(case, interaction, code)
+    _assert_s29_failure_measurements(interaction, pricing, script[0])
+
+
+def _assert_s29_failure_measurements(
+    interaction: AgentInteraction, pricing: str, response: LLMResponse | LLMError
+) -> None:
+    """Compare persisted normalized failure measurements with independent values.
+
+    :param interaction: Real failed summary row. Example: one normal-submit attempt.
+    :param pricing: Explicit fixture and rate case. Example: "invalid_usage".
+    :param response: Actual first finite transport turn. Example: normalized markup.
+    :return: None. Example: known cost0.000885 or genuine unknown None.
+    :raises AssertionError: For false measurements, unsafe body storage or invalid row.
+    """
+    expected_tokens = (
+        (None, None) if pricing in ("provider", "unknown_usage") else (210, 17)
+    )
+    expected_cost = Decimal("0.000885") if pricing == "invalid_usage" else None
+    assert (interaction.input_tokens, interaction.output_tokens) == expected_tokens
+    assert interaction.estimated_cost_usd == expected_cost
+    assert interaction.model == "scripted"
+    assert isinstance(interaction.latency_ms, Decimal)
+    assert interaction.latency_ms.is_finite() and interaction.latency_ms >= 0
+    if isinstance(response, LLMResponse):
+        assert response.content not in json.dumps(interaction.events)
+        assert response.usage.get("input_tokens") == expected_tokens[0]
+        assert response.usage.get("output_tokens") == expected_tokens[1]
+    else:
+        assert pricing == "provider"
+    interaction.full_clean()
 
 
 @pytest.mark.django_db(transaction=True)
