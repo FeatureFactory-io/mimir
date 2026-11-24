@@ -1,8 +1,66 @@
 {
-  "status": "planned_unimplemented",
   "owner": "S25",
   "contract": "GALDR-SUMMARY-03",
-  "evidence_observed": false,
-  "responses": [],
-  "note": "Empty structural placeholder; must fail finite-script validation until implemented after GO."
+  "responses": [
+    {
+      "kind": "response",
+      "content": "Maria maintains Accessibility Audit Playbook. She contributed Keyboard Navigation Audit to a published playbook.",
+      "model": "scripted",
+      "usage": {
+        "input_tokens": 210,
+        "output_tokens": 15
+      },
+      "stop_reason": "end_turn"
+    },
+    {
+      "kind": "response",
+      "model": "scripted",
+      "stop_reason": "end_turn",
+      "content": {
+        "recommendation": "ACCEPT",
+        "reasoning": "The proposed activity fits the review workflow.",
+        "holistic_assessment": {
+          "overall_coherence": "COHERENT",
+          "reasoning": "The proposed activity has a clear place in the workflow."
+        },
+        "change_assessments": [
+          {
+            "change_id": "$CHANGE_ID",
+            "recommendation": "ACCEPT",
+            "reasoning": "The proposed activity fits the review workflow."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "response",
+      "content": "Maria maintains the published Accessibility Audit Playbook. Her published contributions include Keyboard Navigation Audit.",
+      "model": "scripted",
+      "usage": {
+        "input_tokens": 218,
+        "output_tokens": 17
+      },
+      "stop_reason": "end_turn"
+    },
+    {
+      "kind": "response",
+      "model": "scripted",
+      "stop_reason": "end_turn",
+      "content": {
+        "recommendation": "ACCEPT",
+        "reasoning": "The revised proposal clarifies recovery in the review workflow.",
+        "holistic_assessment": {
+          "overall_coherence": "COHERENT",
+          "reasoning": "The revised rationale fits the workflow's purpose."
+        },
+        "change_assessments": [
+          {
+            "change_id": "$CHANGE_ID",
+            "recommendation": "ACCEPT",
+            "reasoning": "The revised proposal clarifies recovery in the review workflow."
+          }
+        ]
+      }
+    }
+  ]
 }

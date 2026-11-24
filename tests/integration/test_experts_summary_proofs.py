@@ -52,6 +52,14 @@ from tests.support.scripted_llm import ScriptedLLM, ScriptedLLMCall
 _S27_SCRIPTS = Path(__file__).parents[1] / "fixtures/llm_scripts/PRF-EXPERTS-03"
 _S27_RUN = "s27-proof-01"
 _S23_RUN = "s23-agent-proof-01"
+_S25_AGENT_RUNS = ("s25-agent-initial", "s25-agent-resubmission")
+_S25_AGENT_EDIT = (
+    "Unpublished revision clarifying the screen reader recovery rationale."
+)
+_S25_HAPPY = "PRF-EXPERTS-01/resubmission_happy.json"
+_S25_FAILURE = "PRF-EXPERTS-02/resubmission_reject_provider.json"
+_S25_RATES = {"scripted": ("3", "15")}
+_S25_SUCCESS_COSTS = (Decimal("0.000855"), Decimal("0.000909"))
 _S27_BOUNDARY = "PublicContributionSummaryBoundary.complete"
 _S27_LOGGERS = (
     "methodology.services.contribution_summary_boundary",
@@ -532,15 +540,227 @@ def test_s23_summary_interaction_agent_story_happy(pricing: str) -> None:
     _assert_s27_body_free(str(interaction.events), case, llm.calls[0], summary.content)
 
 
+def _submit_s25_agent_cycle(
+    pip: ProcessImprovementProposal, correlation: str, assessment: LLMResponse
+) -> ExpertProfile:
+    """Use the normal scheduler and check that its private assessment was saved."""
+    reviewed = PIPService.submit_for_review(
+        actor=pip.created_by, pip=pip, correlation_id=correlation
+    )
+    expected = json.loads(assessment.content)["change_assessments"][0]
+    change = reviewed.changes.get()
+    assert reviewed.pk == pip.pk and reviewed.status == pip.STATUS_REVIEWED
+    assert change.pk == expected["change_id"]
+    assert change.galdr_recommendation == expected["recommendation"]
+    assert change.galdr_reasoning == expected["reasoning"]
+    assert (
+        reviewed.decided_at is None and change.admin_decision == PipChange.ADMIN_UNSET
+    )
+    pip.refresh_from_db()
+    return ExpertProfile.objects.get(user_id=pip.created_by_id)
+
+
+def _assert_s25_agent_trace(
+    interaction: AgentInteraction,
+    public_call: ScriptedLLMCall,
+    profile: ExpertProfile,
+    correlation: str,
+    *,
+    failure: str,
+) -> None:
+    """Prove actual S27 and S23 beats in order with the real request metadata."""
+    evidence = json.loads(public_call.messages[0].content.splitlines()[1])["facts"]
+    beats = {
+        "entry": (
+            f"subject_id={profile.user_id}",
+            f"pip_id={interaction.pip_id}",
+            f"correlation_id={correlation}",
+        ),
+        "public_evidence": ("scope=public_released", f"fact_count={len(evidence)}"),
+        "llm_call": (
+            "model=scripted",
+            "tools=none",
+            f"max_tokens={public_call.max_tokens}",
+        ),
+    }
+    boundary_and_storage = ("validation", "exit", "domain_write")
+    if failure:
+        beats["failure"] = (f"reason_code={failure}", "last_good_retained=true")
+        boundary_and_storage = ("failure", "exit", "failure")
+    else:
+        beats["validation"] = ("status=accepted", "sentence_count=2", "limit=14")
+        beats["domain_write"] = (f"profile_id={profile.pk}", "summary_updated=true")
+    beats["exit"] = (f"outcome={interaction.outcome}", "karma_awarded=0")
+    assert tuple(event["beat"] for event in interaction.events) == (
+        "entry",
+        "entry",
+        "public_evidence",
+        "llm_call",
+        *boundary_and_storage,
+        "exit",
+    )
+    assert_agent_story(
+        {"workflow_id": interaction.workflow_id, "events": interaction.events},
+        workflow="contribution_summary",
+        beats=beats,
+    )
+
+
+def _assert_s25_agent_calls(
+    case: Mapping[str, Any],
+    llm: ScriptedLLM,
+    interactions: tuple[AgentInteraction, AgentInteraction],
+    summary_bodies: tuple[str, ...],
+) -> None:
+    """Verify real public and private requests and exclude content from traces."""
+    public_first, private_first, public_second, private_second = llm.calls
+    assert public_first == public_second
+    for private in (private_first, private_second):
+        assert private.system == HOLISTIC_SYSTEM_PROMPT and private.max_tokens == 16384
+        assert SUMMARY_PIP_TITLE in private.messages[0].content
+        assert SUMMARY_CHANGE_BODY in private.messages[0].content
+    assert SUMMARY_PIP_BODY in private_first.messages[0].content
+    assert _S25_AGENT_EDIT in private_second.messages[0].content
+    private_inputs = (
+        SUMMARY_PIP_TITLE,
+        SUMMARY_PIP_BODY,
+        SUMMARY_CHANGE_BODY,
+        _S25_AGENT_EDIT,
+    )
+    for public, interaction in zip(
+        (public_first, public_second), interactions, strict=True
+    ):
+        _assert_s27_request(public, case)
+        public_input = public.system + public.messages[0].content
+        telemetry = str(interaction.events)
+        assert not any(value in public_input for value in private_inputs)
+        assert not any(value in telemetry for value in private_inputs)
+        for body in summary_bodies:
+            _assert_s27_body_free(telemetry, case, public, body)
+
+
+def _assert_s25_interaction(
+    interaction: AgentInteraction,
+    *,
+    response: LLMResponse | LLMError,
+    expected_cost: Decimal | None,
+) -> None:
+    """Verify normalized usage/cost, nonnegative latency and provider outcome."""
+    assert interaction.model == "scripted"
+    assert isinstance(interaction.latency_ms, Decimal) and interaction.latency_ms >= 0
+    assert interaction.estimated_cost_usd == expected_cost
+    if isinstance(response, LLMResponse):
+        assert interaction.outcome == AgentInteraction.Outcome.SUCCESS
+        assert interaction.error_code == ""
+        assert interaction.input_tokens == response.usage["input_tokens"]
+        assert interaction.output_tokens == response.usage["output_tokens"]
+    else:
+        assert interaction.outcome == AgentInteraction.Outcome.FAILURE
+        assert interaction.error_code == "provider_failed"
+        assert interaction.input_tokens is interaction.output_tokens is None
+    interaction.full_clean()
+
+
+def _run_s25_agent_case(script_name: str, *, known_rates: bool) -> None:
+    """Drive the genuine scheduler twice and assert independent control traces."""
+    case = seed_s27_summary_privacy_variant()
+    pip = prepare_summary_submission(case["dataset"])
+    script = load_summary_script(SUMMARY_SCRIPTS / script_name, pip.changes.get().pk)
+    summary_first, assessment_first, summary_second, assessment_second = script
+    assert isinstance(summary_first, LLMResponse)
+    assert isinstance(assessment_first, LLMResponse) and isinstance(
+        assessment_second, LLMResponse
+    )
+    ledger_before = tuple(KarmaAward.objects.order_by("pk").values_list())
+    with (
+        summary_processing_scope(
+            script, rates=_S25_RATES if known_rates else None
+        ) as llm,
+        override_settings(GALDR_USE_TARGET_STATE=True),
+    ):
+        first = _submit_s25_agent_cycle(pip, _S25_AGENT_RUNS[0], assessment_first)
+        first_interaction = AgentInteraction.objects.get(pip=pip)
+        PIPService.revert_to_draft(pip, pip.created_by)
+        PIPService.save_draft_header(
+            actor=pip.created_by, pip=pip, title=pip.title, summary=_S25_AGENT_EDIT
+        )
+        assert len(llm.calls) == 2 and AgentInteraction.objects.count() == 1
+        second = _submit_s25_agent_cycle(pip, _S25_AGENT_RUNS[1], assessment_second)
+    assert tuple(KarmaAward.objects.order_by("pk").values_list()) == ledger_before
+    assert ExpertsService().project_user(pip.created_by_id).total_points == 8200
+    assert not Activity.objects.filter(
+        workflow__playbook_id=pip.playbook_id, name=SUMMARY_PIP_TITLE
+    ).exists()
+    assert pip.playbook.version == Decimal("2.0")
+    assert first.contribution_summary == summary_first.content
+    assert first.summary_updated_at is not None
+    first_row, second_row = AgentInteraction.objects.order_by("pk")
+    assert first_row.pk == first_interaction.pk
+    assert first_row.call_id != second_row.call_id
+    summary_turns = (summary_first, summary_second)
+    _assert_s25_agent_results(
+        pip,
+        llm,
+        (first_row, second_row),
+        summary_turns,
+        second,
+        known_rates=known_rates,
+    )
+    bodies = tuple(
+        turn.content for turn in summary_turns if isinstance(turn, LLMResponse)
+    )
+    _assert_s25_agent_calls(case, llm, (first_row, second_row), bodies)
+    if isinstance(summary_second, LLMError):
+        assert second.contribution_summary == first.contribution_summary
+        assert second.summary_updated_at == first.summary_updated_at
+    else:
+        assert second.contribution_summary == summary_second.content
+        assert second.summary_updated_at > first.summary_updated_at
+
+
+def _assert_s25_agent_results(
+    pip: ProcessImprovementProposal,
+    llm: ScriptedLLM,
+    interactions: tuple[AgentInteraction, AgentInteraction],
+    summary_turns: tuple[LLMResponse, LLMResponse | LLMError],
+    profile: ExpertProfile,
+    *,
+    known_rates: bool,
+) -> None:
+    """Verify the stored independent identities, metadata and control-plane events."""
+    for index, (interaction, response) in enumerate(
+        zip(interactions, summary_turns, strict=True)
+    ):
+        correlation = _S25_AGENT_RUNS[index]
+        assert interaction.correlation_id == correlation
+        assert (
+            interaction.subject_id == pip.created_by_id and interaction.pip_id == pip.pk
+        )
+        failure = "provider_failed" if isinstance(response, LLMError) else ""
+        cost = _S25_SUCCESS_COSTS[index] if known_rates and not failure else None
+        _assert_s25_interaction(interaction, response=response, expected_cost=cost)
+        _assert_s25_agent_trace(
+            interaction, llm.calls[index * 2], profile, correlation, failure=failure
+        )
+    second = interactions[1]
+    assert profile.last_summary_correlation_id == second.correlation_id
+    assert profile.summary_status == second.outcome
+    assert profile.summary_error_code == second.error_code
+
+
 @pytest.mark.agent_proof
 @pytest.mark.django_db(transaction=True)
-def test_s25_resubmission_agent_story_happy() -> None:
+@pytest.mark.parametrize(
+    "known_rates", [True, False], ids=["known-rates", "unknown-rates"]
+)
+def test_s25_resubmission_agent_story_happy(known_rates: bool) -> None:
     """Prove genuine two-cycle summary orchestration and public-only requests.
 
+    :param known_rates: Whether model rates are configured. Example: True.
     :return: None. Example: None after traces, four calls and real DB assertions.
     :raises AssertionError: For synthetic trace, private input or missing writes.
     """
-    raise NotImplementedError()
+    _run_s25_agent_case(_S25_HAPPY, known_rates=known_rates)
 
 
 @pytest.mark.agent_proof
@@ -551,7 +771,7 @@ def test_s25_resubmission_agent_story_reject() -> None:
     :return: None. Example: None after failure trace and assessment assertions.
     :raises AssertionError: For swallowed failure or successful replacement.
     """
-    raise NotImplementedError()
+    _run_s25_agent_case(_S25_FAILURE, known_rates=True)
 
 
 @pytest.mark.agent_proof
