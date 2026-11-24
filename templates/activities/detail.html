@@ -75,7 +75,7 @@
                     <i class="fa-solid fa-lightbulb"></i> Submit PIP
                 </a>
             {% endif %}
-            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
+            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid entity_type="activity" entity_pk=activity.pk %}
             <a href="{% url 'activity_list' playbook_pk=playbook.pk workflow_pk=workflow.pk %}"
                class="btn btn-outline-secondary"
                data-testid="activity-back-btn"
@@ -405,5 +405,3 @@
     }
 </style>
 {% endblock %}
-
-{# PIN S36: graduate KARMA-COPY-01 from the approved Experts prototype after GO. #}

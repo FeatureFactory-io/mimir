@@ -17,7 +17,7 @@
          aria-label="Embed activity actions"
          class="d-flex gap-2 flex-shrink-0"
          data-testid="activity-header-actions">
-      {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid testid="copy-prompt-btn" %}
+      {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid testid="copy-prompt-btn" entity_type="activity" entity_pk=activity.pk %}
     </div>
   </div>
   <div class="card-body">
@@ -76,5 +76,3 @@
     {% endif %}
   </div>
 </div>
-
-{# PIN S36: graduate KARMA-COPY-01 from the approved Experts prototype after GO. #}

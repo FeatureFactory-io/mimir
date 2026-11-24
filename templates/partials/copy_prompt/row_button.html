@@ -1,3 +1,4 @@
+{% load l10n %}
 <button type="button"
         class="btn btn-outline-secondary btn-sm mm-copy-prompt-btn-icon"
         data-testid="copy-prompt-btn-{{ entity_type }}-{{ entity_pk }}"
@@ -5,7 +6,13 @@
         title="Copy prompt to use in your ADE"
         aria-label="Copy prompt to use in your ADE for {{ entity_name }}"
         data-copy-prompt-trigger
-        data-copy-prompt-for="copy-prompt-text-{{ entity_type }}-{{ entity_pk }}">
+        data-copy-prompt-for="copy-prompt-text-{{ entity_type }}-{{ entity_pk }}"
+        {% if user.is_authenticated %}
+        data-copy-receipt-url="{% url 'karma_copy_receipt' %}"
+        data-copy-receipt-entity-type="{{ entity_type }}"
+        data-copy-receipt-entity-id="{{ entity_pk|unlocalize }}"
+        data-copy-receipt-csrf="{{ csrf_token }}"
+        {% endif %}>
     {% include "partials/copy_prompt/cursor_icon.html" %}
 </button>
 <textarea class="visually-hidden"
@@ -15,5 +22,3 @@
           id="copy-prompt-text-{{ entity_type }}-{{ entity_pk }}"
           data-testid="copy-prompt-text-{{ entity_type }}-{{ entity_pk }}"
           data-copy-prompt-source>{{ copy_prompt_text }}</textarea>
-
-{# PIN S36: graduate KARMA-COPY-01 from the approved Experts prototype after GO. #}

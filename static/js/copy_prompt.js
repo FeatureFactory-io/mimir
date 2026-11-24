@@ -1,6 +1,10 @@
 (function () {
     "use strict";
 
+    var COPY_RECEIPT_MAX_ATTEMPTS = 2;
+    var HTTP_REQUEST_TIMEOUT = 408;
+    var HTTP_SERVER_ERROR = 500;
+
     function getToasts() {
         var successEl = document.getElementById("copy-prompt-toast");
         var errorEl = document.getElementById("copy-prompt-error-toast");
@@ -76,13 +80,106 @@
             : null;
     }
 
+    /**
+     * Allocate one identity per successful copy.
+     * @returns {string} UUID reused only for receipt retries.
+     */
+    function createCopyActionIdentity() {
+        return window.crypto.randomUUID();
+    }
+
+    /**
+     * Read the explicit server-rendered entity metadata.
+     * @param {HTMLButtonElement} btn Existing copy control.
+     * @returns {{entity_type: string, entity_id: number}|null} Eligible report target.
+     */
+    function readCopyReceiptTarget(btn) {
+        var entityType = btn.dataset.copyReceiptEntityType;
+        var entityId = Number(btn.dataset.copyReceiptEntityId);
+        if (!entityType || !Number.isSafeInteger(entityId) || entityId < 1) {
+            return null;
+        }
+        return { entity_type: entityType, entity_id: entityId };
+    }
+
+    /**
+     * Read the server-rendered CSRF token for this control.
+     * @param {HTMLButtonElement} btn Existing copy control.
+     * @returns {string} CSRF token or an empty string when absent.
+     */
+    function readCopyReceiptCsrf(btn) {
+        var csrfToken = btn.dataset.copyReceiptCsrf;
+        return csrfToken && csrfToken !== "NOTPROVIDED" ? csrfToken : "";
+    }
+
+    /**
+     * Report an already completed clipboard write.
+     * @param {HTMLButtonElement} btn Existing successful copy control.
+     * @param {string} eventIdentity UUID allocated for this clipboard action.
+     * @returns {Promise<void>} Receipt completion independent of clipboard feedback.
+     */
+    async function reportSuccessfulCopy(btn, eventIdentity) {
+        var target = readCopyReceiptTarget(btn);
+        var csrfToken = readCopyReceiptCsrf(btn);
+        if (!target || !csrfToken) {
+            return;
+        }
+        var payload = {
+            entity_type: target.entity_type,
+            entity_id: target.entity_id,
+            event_identity: eventIdentity,
+        };
+        await sendCopyReceipt(btn.dataset.copyReceiptUrl, payload, csrfToken, 1);
+    }
+
+    /**
+     * Retry transient receipt delivery failures with exactly the same action.
+     * @param {string} endpoint Same-origin receipt endpoint.
+     * @param {{entity_type: string, entity_id: number, event_identity: string}} payload Report.
+     * @param {string} csrfToken Token from the rendered control.
+     * @param {number} attempt Current delivery attempt, starting at one.
+     * @returns {Promise<void>} Receipt completion, or rejection if delivery fails.
+     */
+    async function sendCopyReceipt(endpoint, payload, csrfToken, attempt) {
+        var response;
+        try {
+            response = await fetch(endpoint, {
+                method: "POST",
+                mode: "same-origin",
+                credentials: "same-origin",
+                redirect: "error",
+                headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+                body: JSON.stringify(payload),
+            });
+        } catch {
+            response = null;
+        }
+        if (response && response.ok) {
+            return;
+        }
+        var transient = !response || response.status === HTTP_REQUEST_TIMEOUT ||
+            response.status >= HTTP_SERVER_ERROR;
+        if (transient && attempt < COPY_RECEIPT_MAX_ATTEMPTS) {
+            return sendCopyReceipt(endpoint, payload, csrfToken, attempt + 1);
+        }
+        throw new Error("Copy receipt delivery failed");
+    }
+
     function handleCopyClick(btn) {
         var source = resolveSource(btn);
         var text = source ? source.value : "";
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function () {
+            navigator.clipboard.writeText(text).then(async function () {
                 showCopySuccess(btn);
-            }).catch(showCopyError);
+                if (!btn.dataset.copyReceiptUrl) {
+                    return;
+                }
+                try {
+                    await reportSuccessfulCopy(btn, createCopyActionIdentity());
+                } catch {
+                    console.warn("[copy-prompt] receipt delivery failed");
+                }
+            }, showCopyError);
             return;
         }
         showCopyError(new Error("Clipboard API unavailable"));
@@ -97,5 +194,3 @@
         handleCopyClick(btn);
     });
 })();
-
-/* PIN S36: KARMA-COPY-01 wiring and interaction contract remains unimplemented until GO. */

@@ -67,7 +67,7 @@
                     <i class="fa-solid fa-lightbulb"></i> Submit PIP
                 </a>
             {% endif %}
-            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
+            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid entity_type="agent" entity_pk=agent.pk %}
             </div>
         </div>
     </div>
@@ -152,5 +152,3 @@
     <div id="agent-delete-modal-container"></div>
 </div>
 {% endblock %}
-
-{# PIN S36: graduate KARMA-COPY-01 from the approved Experts prototype after GO. #}

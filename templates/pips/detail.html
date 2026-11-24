@@ -77,7 +77,7 @@
                 </button>
             </form>
             {% endif %}
-            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid %}
+            {% include "partials/copy_prompt/button.html" with copy_prompt_text=copy_prompt_text text_testid=copy_prompt_text_testid entity_type="pip" entity_pk=pip.pk %}
             </div>
         </div>
     </div>
@@ -269,5 +269,3 @@
 });</script>
 {% include "includes/markdown_content_assets.html" %}
 {% endblock %}
-
-{# PIN S36: graduate KARMA-COPY-01 from the approved Experts prototype after GO. #}
