@@ -14,6 +14,7 @@ from pytest import LogCaptureFixture
 from pytest_django.live_server_helper import LiveServer
 from rest_framework.authtoken.models import Token
 
+from tests.support.experts_acceptance import run_exact_acceptance
 from tests.support.experts_data import CedarDataset
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.karma_mcp import (
@@ -392,10 +393,19 @@ def test_collection_with_stdio_entrypoint_preserves_protocol_and_state(
 
 def test_collection_with_exact_acceptance_executes_one_contract() -> None:
     """Run scoped real Behave acceptance with explicit WIP override.
-    :return: None; example: one scenario, three steps, zero skips/undefined.
+
+    :return: None; example: one scenario, four steps including Background, zero skips.
     :raises AssertionError: Nonzero exit, missing execution or incorrect counts.
     """
-    raise NotImplementedError()
+    result = run_exact_acceptance(
+        Path("docs/features/act-18-experts/karma-accrual.feature"), "KARMA-MCP-02", 1
+    )
+    assert (
+        result.scenario_count,
+        result.step_count,
+        result.skipped_count,
+        result.undefined_count,
+    ) == (1, 4, 0, 0)
 
 
 def _assert_collection_log_story(

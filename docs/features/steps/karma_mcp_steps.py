@@ -22,6 +22,9 @@ from tests.support.karma_mcp import (
     MCPClientFactory,
     MCPDataset,
     _prepare_mcp_entities,
+    assert_collection_result,
+    collection_case,
+    collection_snapshot,
     decode_tool_payload,
     detail_case,
 )
@@ -326,18 +329,48 @@ def maria_mcp_token(context: Context) -> None:
 @when("she calls list_activities")
 def list_activities_without_consumption(context: Context) -> None:
     """Call actual authorized activity collection through Django-client AT.
+
     :param context: Prepared token context; example: workflow 6202.
-    :return: None; example: actual collection response retained.
-    :raises AssertionError: Response or actual metadata is incorrect.
+    :return: None; example: actual collection metadata and global snapshot retained.
+    :raises AssertionError: Response, authentication or native metadata differs.
     """
-    raise NotImplementedError()
+    workflow = context.mcp_dataset.cedar.workflows_by_pk[_MIKE_WORKFLOW_ID]
+    dataset = MCPDataset(context.mcp_dataset.cedar, {"mike_workflow": workflow.pk}, {})
+    case = collection_case(
+        "list_activities", dataset, actor_username="mrodriguez", entrypoint="facade"
+    )
+    token = Token.objects.get(user=context.mcp_actor)
+    context.mcp_state_before = collection_snapshot()
+    response = context.client.get(
+        case.route, dict(case.arguments), HTTP_AUTHORIZATION=f"Token {token.key}"
+    )
+    assert response.status_code == 200
+    assert response.wsgi_request.user == context.mcp_actor
+    assert (response.wsgi_request.method, response.wsgi_request.path) == (
+        "GET",
+        case.route,
+    )
+    payload = response.json()
+    if isinstance(payload, dict):
+        payload = payload["results"]
+    assert_collection_result(
+        case, payload, context.mcp_state_before, collection_snapshot()
+    )
+    context.mcp_collection_response = response
 
 
 @then("Maria remains at 8200 and Mike remains at 12450")
 def maria_and_mike_unchanged(context: Context) -> None:
     """Assert exact totals plus global ledger and summary invariants.
-    :param context: AT response/snapshot; example: Maria 8200, Mike 12450.
-    :return: None; example: no learner, author or unrelated recipient changes.
+
+    :param context: AT state snapshot; example: collection or import's before state.
+    :return: None; example: no recipient, access, profile or interaction changes.
     :raises AssertionError: Any required invariant differs.
     """
-    raise NotImplementedError()
+    after = collection_snapshot()
+    assert after == context.mcp_state_before, "Global award or summary state changed."
+    assert list(KarmaAward.objects.order_by("pk").values()) == context.mcp_awards_before
+    people = context.mcp_dataset.cedar.users_by_username
+    totals = _recipient_totals()
+    assert totals[people[_ACTOR_USERNAMES["Maria"]].pk] == 8200
+    assert totals[people[_ACTOR_USERNAMES["Mike"]].pk] == 12450
