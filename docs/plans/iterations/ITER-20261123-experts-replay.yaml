@@ -3585,7 +3585,7 @@ scenarios:
       scenario_dependencies:
       - S17
     implementation_plan: docs/plans/iterations/experts/S19-experts-view-03.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S17
@@ -6816,7 +6816,7 @@ scenarios:
       - S17
       - S19
     implementation_plan: docs/plans/iterations/experts/S05-experts-list-05.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S04
