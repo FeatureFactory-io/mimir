@@ -6,12 +6,15 @@ import hashlib
 import json
 from collections.abc import Mapping
 from decimal import Decimal
+from http import HTTPStatus
 
 from behave import given, then, when
 from behave.runner import Context
 from django.apps import apps
+from django.contrib.auth.models import User
 from django.core import mail
 from django.db import transaction
+from django.db.models import Sum
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -22,6 +25,8 @@ from methodology.models import (
     EventChannel,
     KarmaAward,
     PipChange,
+    Playbook,
+    PlaybookVersion,
     Skill,
     VersionSource,
 )
@@ -34,6 +39,7 @@ from tests.support.experts_data import (
     CedarDataset,
     create_nonaccepted_pip_case,
     create_reviewed_major_add_pip,
+    create_reviewed_partial_pip,
     load_cedar_baseline,
 )
 from tests.support.experts_pip_minor import (
@@ -66,6 +72,7 @@ _S35_SESSION_FIELDS = frozenset(("session_data", "expire_date"))
 _S35_REJECTION_NOTE = "Rejected after checking the unchanged published baseline"
 S35DatabaseState = tuple[tuple[str, int, str], ...]
 S35Observation = tuple[object, ...]
+_S34_NOTE = "Accepted ADD only; preserve the existing recovery step"
 
 
 @given("Maria's new PIP targets Hana's Accessible Forms Review version 2.0")
@@ -392,7 +399,28 @@ def prepare_maria_partial_pip(context: Context) -> None:
     :return: None. Example: real reviewed proposal retained for finalization.
     :raises AssertionError: Baseline or fixture violates Section C.
     """
-    raise NotImplementedError()
+    _record_maria_decision_baseline(context)
+    pip = create_reviewed_partial_pip(context.cedar_dataset)
+    context.s34_pip = pip
+    changes = tuple(pip.changes.order_by("order", "pk"))
+    assert tuple(c.change_type for c in changes) == ("ADD", "ALTER")
+    assert all(c.entity_type == "Activity" and not c.admin_decision for c in changes)
+    assert pip.status == PIP.STATUS_REVIEWED and pip.decided_at is None
+    assert pip.playbook_id == _TARGET_ID and pip.playbook.version == _VERSION_BEFORE
+    context.client.handler.enforce_csrf_checks = True
+    context.client.force_login(context.cedar_dataset.users_by_username["mchen"])
+    assert (
+        context.client.get(reverse("pip_admin_review", args=[pip.pk])).status_code
+        == HTTPStatus.OK
+    )
+    assert context.client.cookies["csrftoken"].value and not mail.outbox
+    context.s34_ledger_ids = tuple(KarmaAward.objects.values_list("pk", flat=True))
+    context.s34_activity_ids = tuple(Activity.objects.values_list("pk", flat=True))
+    context.s34_history_ids = tuple(
+        PlaybookVersion.objects.values_list("pk", flat=True)
+    )
+    context.s34_totals = _s34_totals()
+    context.s34_before = _s34_database_state(context, {})
 
 
 @when("the Administrator accepts ADD and rejects ALTER")
@@ -403,7 +431,29 @@ def finalize_maria_partial_pip(context: Context) -> None:
     :return: None. Example: actual response and persisted terminal PIP retained.
     :raises AssertionError: Unauthorized response or unsuccessful finalization.
     """
-    raise NotImplementedError()
+    pip = context.s34_pip
+    fields = {"action": "finalize"}
+    for change in pip.changes.order_by("order", "pk"):
+        decision = (
+            PipChange.ADMIN_ACCEPT
+            if change.change_type == "ADD"
+            else PipChange.ADMIN_REJECT
+        )
+        fields[f"decision_{change.pk}"] = decision
+        fields[f"note_{change.pk}"] = _S34_NOTE
+    context.s34_started = timezone.now()
+    with context.test.captureOnCommitCallbacks(execute=True) as callbacks:
+        response = context.client.post(
+            reverse("pip_admin_review", args=[pip.pk]),
+            fields,
+            HTTP_X_CSRFTOKEN=context.client.cookies["csrftoken"].value,
+        )
+        assert not mail.outbox
+    assert len(callbacks) == 1 and response.status_code == HTTPStatus.FOUND
+    assert response.url == reverse("pip_detail", args=[pip.pk])
+    assert response.wsgi_request.user.pk == context.cedar_dataset.user_ids["mchen"]
+    assert response.wsgi_request._messages is not None
+    context.s34_response = response
 
 
 @then("Maria's total becomes 8700 rather than 8800")
@@ -414,7 +464,34 @@ def assert_maria_partial_total(context: Context) -> None:
     :return: None. Example: Maria8700/Design7700 with one500 award, not8800.
     :raises AssertionError: Totals, rejected content, award or receipt differ.
     """
-    raise NotImplementedError()
+    pip = context.s34_pip
+    pip.refresh_from_db()
+    pip.playbook.refresh_from_db()
+    accepted = pip.changes.get(change_type=PipChange.CHANGE_ADD)
+    rejected = pip.changes.get(change_type=PipChange.CHANGE_ALTER)
+    award = KarmaAward.objects.exclude(pk__in=context.s34_ledger_ids).get()
+    added = Activity.objects.exclude(pk__in=context.s34_activity_ids).get()
+    receipt = PlaybookVersion.objects.exclude(pk__in=context.s34_history_ids).get()
+    omitted = {
+        KarmaAward._meta.label_lower: (award.pk,),
+        Activity._meta.label_lower: (added.pk,),
+        PlaybookVersion._meta.label_lower: (receipt.pk,),
+    }
+    assert _s34_database_state(context, omitted) == context.s34_before
+    assert pip.status == PIP.STATUS_ACCEPTED_PARTIAL
+    assert accepted.admin_decision == PipChange.ADMIN_ACCEPT
+    assert rejected.admin_decision == PipChange.ADMIN_REJECT
+    assert accepted.admin_note == rejected.admin_note == _S34_NOTE
+    assert (added.name, added.guidance, added.workflow_id) == (
+        accepted.name,
+        accepted.content,
+        accepted.parent_workflow_id,
+    )
+    assert added.workflow.playbook_id == pip.playbook_id
+    _s34_assert_award(pip, accepted, award)
+    _s34_assert_publication(context, accepted, receipt)
+    _s34_assert_scores(context)
+    _s34_assert_notification(context)
 
 
 @then("{points:d} points are attributed to the target Design category")
@@ -648,3 +725,174 @@ def _s35_case_values(dataset: CedarDataset, pip: PIP, delivered: int) -> S35Obse
         ),
         delivered,
     )
+
+
+def _s34_database_state(
+    context: Context, omitted: Mapping[str, tuple[int, ...]]
+) -> S35DatabaseState:
+    """Fingerprint every original row while allowing only this decision's writes.
+
+    :param context: Prepared partial-decision context. Example: reviewed PIP42.
+    :param omitted: Exact verified new row identities. Example: one award/activity/receipt.
+    :return: Ordered all-model count/digest tuples. Example:2129 immutable old awards.
+    :raises AssertionError: Missing real authenticated session identity.
+    """
+    snapshots = []
+    for model in sorted(
+        apps.get_models(include_auto_created=True),
+        key=lambda item: item._meta.label_lower,
+    ):
+        label = model._meta.label_lower
+        rows = list(
+            model.objects.exclude(pk__in=omitted.get(label, ())).order_by("pk").values()
+        )
+        for row in rows:
+            for field in _s34_allowed_fields(context, label, row):
+                row.pop(field)
+        payload = json.dumps(rows, sort_keys=True, default=str).encode()
+        snapshots.append((label, len(rows), hashlib.sha256(payload).hexdigest()))
+    return tuple(snapshots)
+
+
+def _s34_allowed_fields(
+    context: Context, label: str, row: Mapping[str, object]
+) -> frozenset[str]:
+    """Normalize only current decision fields, target version and staff session.
+
+    :param context: Actual partial fixture and prepared client. Example: Mike session.
+    :param label: Actual model label. Example: methodology.pipchange.
+    :param row: Real persisted row. Example: the current proposal change.
+    :return: Precisely permitted fields. Example: admin_decision/admin_note.
+    :raises AssertionError: Prepared staff session is absent.
+    """
+    pip = context.s34_pip
+    if label == PIP._meta.label_lower and row["id"] == pip.pk:
+        return _S35_PIP_FIELDS
+    if label == PipChange._meta.label_lower and row["pip_id"] == pip.pk:
+        return _S35_CHANGE_FIELDS
+    if label == Playbook._meta.label_lower and row["id"] == pip.playbook_id:
+        return frozenset(("version", "updated_at"))
+    if label == "sessions.session":
+        assert context.client.session.session_key
+        if row["session_key"] == context.client.session.session_key:
+            return _S35_SESSION_FIELDS
+    return frozenset()
+
+
+def _s34_totals() -> dict[int, int]:
+    """Read independent ledger totals for every actual account, including zeros.
+
+    :return: Every actual user/total pair. Example: Maria8200 and Mike12450.
+    :raises DatabaseError: The owned test database cannot be queried.
+    """
+    return {
+        pk: KarmaAward.objects.filter(recipient_id=pk).aggregate(total=Sum("points"))[
+            "total"
+        ]
+        or 0
+        for pk in User.objects.order_by("pk").values_list("pk", flat=True)
+    }
+
+
+def _s34_assert_award(pip: PIP, accepted: PipChange, award: KarmaAward) -> None:
+    """Check every field of the sole new accepted-change ledger row.
+
+    :param pip: Actually finalized partial proposal. Example: Maria's PIP42.
+    :param accepted: Sole accepted ADD Activity. Example: change43.
+    :param award: Sole newly persisted global award. Example:500 Design points.
+    :return: None. Example: exact identity, category, amount and decision timestamp.
+    :raises AssertionError: Any immutable award field differs.
+    """
+    assert KarmaAward.objects.values().get(pk=award.pk) == {
+        "id": award.pk,
+        "recipient_id": pip.created_by_id,
+        "event_identity": f"accepted_change:{accepted.pk}",
+        "event_channel": EventChannel.ACCEPTED_CHANGE,
+        "source_kind": KarmaAward.SourceKind.MAJOR,
+        "points": _MAJOR_POINTS,
+        "category": _DESIGN,
+        "playbook_id_snapshot": pip.playbook_id,
+        "change_id_snapshot": accepted.pk,
+        "entity_type_snapshot": None,
+        "entity_id_snapshot": None,
+        "occurred_at": pip.decided_at,
+    }
+
+
+def _s34_assert_publication(
+    context: Context, accepted: PipChange, receipt: PlaybookVersion
+) -> None:
+    """Verify the one real major receipt and accepted-only publication summary.
+
+    :param context: Real finalization and lower time bound. Example: Hana2.0 to3.0.
+    :param accepted: Actual accepted ADD. Example: new Activity43.
+    :param receipt: Sole new global version receipt. Example: source=pip/is_major.
+    :return: None. Example: one PIP receipt containing only accepted43.
+    :raises AssertionError: Version, snapshot, attribution or timestamps differ.
+    """
+    pip = context.s34_pip
+    assert receipt.playbook_id == pip.playbook_id and receipt.pip_id == pip.pk
+    assert receipt.version_number == pip.playbook.version == _VERSION_AFTER
+    assert receipt.source == VersionSource.PIP_SOURCE and receipt.is_major
+    assert receipt.created_by_id == context.cedar_dataset.user_ids["mchen"]
+    assert receipt.snapshot_data == {
+        "pip_id": pip.pk,
+        "playbook_name": pip.playbook.name,
+        "version_before": "2.0",
+        "version_after": "3.0",
+        "accepted_change_ids": [accepted.pk],
+        "category": _DESIGN,
+    }
+    assert receipt.change_summary == f"ADD {accepted.name}"
+    assert pip.playbook_versions.count() == 1
+    assert context.s34_started <= receipt.created_at <= timezone.now()
+    assert (
+        context.s34_started
+        <= pip.decided_at
+        <= pip.status_changed_at
+        <= pip.updated_at
+        <= timezone.now()
+    )
+    assert timezone.is_aware(pip.decided_at)
+    assert context.s34_started <= pip.playbook.updated_at <= timezone.now()
+
+
+def _s34_assert_scores(context: Context) -> None:
+    """Require exactly Maria's500 increment and unchanged totals for all others.
+
+    :param context: Independent pre-decision all-user totals. Example: Maria8200.
+    :return: None. Example:8700/7700/1000, Hana5800 and Mike12450.
+    :raises AssertionError: Any wrong recipient, rejected100 or projection drift.
+    """
+    pip = context.s34_pip
+    expected = dict(context.s34_totals)
+    expected[pip.created_by_id] += _MAJOR_POINTS
+    assert _s34_totals() == expected
+    projection = ExpertsService().project_user(pip.created_by_id)
+    assert projection.total_points == 8700 and projection.total_points != 8800
+    assert dict(projection.category_points) == {_DESIGN: 7700, _DEVELOPMENT: 1000}
+    assert expected[context.cedar_dataset.user_ids["hkim"]] == 5800
+    assert expected[context.cedar_dataset.user_ids["mchen"]] == 12450
+
+
+def _s34_assert_notification(context: Context) -> None:
+    """Inspect truthful feedback and the one actually executed postcommit email.
+
+    :param context: Real response and decided proposal. Example: partial ADD/ALTER.
+    :return: None. Example: both decisions/version3.0, no invented Karma earnings.
+    :raises AssertionError: Message, recipient, decisions or mail scope differs.
+    """
+    pip = context.s34_pip
+    assert [
+        str(message) for message in context.s34_response.wsgi_request._messages
+    ] == ["PIP partially accepted — changes applied."]
+    (sent,) = mail.outbox
+    assert sent.to == [pip.created_by.email] and not sent.cc and not sent.bcc
+    assert sent.subject == f'Your PIP "{pip.title}" — Partially accepted'
+    assert "Overall: Partially accepted." in sent.body
+    assert f"{pip.playbook.name} is now v3.0." in sent.body
+    assert reverse("pip_detail", args=[pip.pk]) in sent.body and _S34_NOTE in sent.body
+    for change in pip.changes.order_by("order", "pk"):
+        assert f'{change.change_type} Activity "{change.name}"' in sent.body
+        assert f"Decision: {change.admin_decision}" in sent.body
+    assert all(value not in sent.body for value in ("Karma", "8700", "500"))
