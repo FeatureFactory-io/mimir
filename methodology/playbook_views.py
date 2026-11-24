@@ -7,20 +7,16 @@ Includes a 3-step creation wizard and export/import functionality.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from django.http import HttpRequest
-    from methodology.services.playbook_service import ReleaseOutcome
-
 import json
 import logging
 from decimal import Decimal
+from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.http import Http404
+from django.http import Http404, HttpRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -30,10 +26,15 @@ from methodology.forms.playbook_forms import (
     PlaybookWorkflowForm,
 )
 from methodology.models import Playbook
+from methodology.services.expert_text import format_karma
+from methodology.services.karma_service import AWARD_CORRELATION_ID
 from methodology.services.playbook_service import PlaybookService
+from methodology.services.workflow_service import WorkflowService
 from methodology.utils.guest_auth import guest_read_or_login_required
 from methodology.utils.playbook_access import playbook_readable_or_404
-from methodology.services.workflow_service import WorkflowService
+
+if TYPE_CHECKING:
+    from methodology.services.playbook_service import ReleaseOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -578,18 +579,17 @@ def playbook_delete(request, pk):
 
 @login_required
 @require_POST
-def playbook_release(request, pk):
-    """
-    Confirm release: draft → released next major line, or released → next major line.
+def playbook_release(request: HttpRequest, pk: int) -> HttpResponseRedirect:
+    """Publish the next major version and display feedback on playbook detail.
 
-    POST body ``release_description`` is required.
-
+    :param request: Release POST with notes. Example: Nora publishing her draft.
+    :param pk: Target playbook ID. Example: 6302.
+    :return: Redirect to the target. Example: /playbooks/6302/.
+    :raises Http404: If the playbook does not exist.
     """
     get_object_or_404(Playbook, pk=pk)
-    description = request.POST.get("release_description", "")
-
     try:
-        PlaybookService.release_playbook(pk, request.user, description=description)
+        _release_with_karma_message(request, pk)
     except PermissionError:
         messages.error(request, "You don't have permission to release this playbook.")
     except ValidationError as e:
@@ -602,10 +602,6 @@ def playbook_release(request, pk):
                 messages.error(request, msg)
         else:
             messages.error(request, str(e.message))
-    else:
-        messages.success(request, "Playbook released.")
-
-    logger.info(f"Release POST for playbook id={pk} by {request.user.username}")
     return redirect("playbook_detail", pk=pk)
 
 
@@ -697,17 +693,21 @@ def playbook_toggle_status(request, pk):
     return redirect("playbook_detail", pk=pk)
 
 
-# ==================== PRIVATE HELPERS (none currently) ====================
+# ==================== RELEASE HELPERS ====================
 
 
 def _release_request_correlation_id(request: HttpRequest) -> str:
     """Use a bounded safe request identifier or generate a new UUID.
 
     :param request: Incoming release request. Example: POST with X-Request-ID.
-    :return: Safe trace identifier. Example: "release-01".
-    :raises ValueError: If a supplied identifier violates the shared safe format.
+    :return: Safe trace identifier. Example: "release-01" or a generated UUID.
     """
-    raise NotImplementedError()
+    request_id = getattr(request, "request_id", None) or request.headers.get(
+        "X-Request-ID"
+    )
+    if isinstance(request_id, str) and AWARD_CORRELATION_ID.fullmatch(request_id):
+        return request_id
+    return str(uuid4())
 
 
 def _first_release_success_message(outcome: ReleaseOutcome) -> str | None:
@@ -718,15 +718,19 @@ def _first_release_success_message(outcome: ReleaseOutcome) -> str | None:
         "You earned 5,000 Karma for releasing Accessible Workshop Starter".
     :raises ValueError: If an outcome claims a new award without a valid award row.
     """
-    raise NotImplementedError()
+    if not outcome.first_release_award.created:
+        return None
+    award = outcome.first_release_award.award
+    if award is None:
+        raise ValueError("A newly created first-release award requires its ledger row.")
+    return (
+        f"You earned {format_karma(award.points)} Karma for releasing "
+        f"{outcome.playbook.name}"
+    )
 
 
 def _release_with_karma_message(request: HttpRequest, playbook_id: int) -> Playbook:
     """Run publication and add its normal success/earned message after success.
-
-    The existing decorated endpoint delegates here after GO while preserving
-    its current permission/validation error handling and redirect destination.
-    Do not infer a fresh award from before/after queries in the view.
 
     :param request: Authenticated POST request. Example: Nora's release.
     :param playbook_id: Existing route target. Example: 6302.
@@ -734,4 +738,24 @@ def _release_with_karma_message(request: HttpRequest, playbook_id: int) -> Playb
     :raises PermissionError: If the actor is not the owner.
     :raises ValidationError: If publication or award validation fails.
     """
-    raise NotImplementedError()
+    correlation_id = _release_request_correlation_id(request)
+    request.request_id = correlation_id
+    trace = (
+        f"playbook_id={playbook_id} actor_id={request.user.pk} "
+        f"correlation_id={correlation_id}"
+    )
+    logger.info("_release_with_karma_message | entry | %s", trace)
+    outcome = PlaybookService.release_playbook_with_award(
+        playbook_id,
+        request.user,
+        description=request.POST.get("release_description", ""),
+        correlation_id=correlation_id,
+    )
+    earned_message = _first_release_success_message(outcome)
+    messages.success(request, earned_message or "Playbook released.")
+    logger.info(
+        "_release_with_karma_message | exit | earned_message=%s %s",
+        str(earned_message is not None).lower(),
+        trace,
+    )
+    return outcome.playbook

@@ -1,9 +1,10 @@
-"""Captured log stories for the real first-release domain path."""
+"""Captured log stories for real first-release service and view paths."""
 
 from __future__ import annotations
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 
 from methodology.models import KarmaAward, PlaybookVersion, VersionSource
 from methodology.services.karma_service import KarmaService
@@ -14,6 +15,7 @@ from tests.support.log_story import assert_log_story
 
 PLAYBOOK_LOGGER = "methodology.services.playbook_service"
 KARMA_LOGGER = "methodology.services.karma_service"
+VIEW_LOGGER = "methodology.playbook_views"
 RELEASE_METHOD = "PlaybookService.release_playbook_with_award"
 AWARD_METHOD = "KarmaService.award_first_release"
 RELEASE_NOTES = "Private milestone narrative"
@@ -101,6 +103,63 @@ def test_karma_release_log_story_happy(caplog: pytest.LogCaptureFixture) -> None
     assert case.playbook.name not in caplog.text
     assert case.author.email not in caplog.text
     assert case.author.username not in caplog.text
+
+
+@pytest.mark.django_db
+def test_release_view_log_story_reports_first_and_later_message_outcomes(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Trace the earnings alert decisions from real release POST requests.
+
+    :param caplog: Real log capture. Example: INFO for cedar-first-release.
+    :return: None when the view traces both decisions and their request IDs.
+    :raises AssertionError: If an exit beat is missing or private text leaks.
+    """
+    case = build_nora_release_case()
+    url = reverse("playbook_release", kwargs={"pk": case.playbook.pk})
+    payload = {"release_description": RELEASE_NOTES}
+    caplog.clear()
+    with capture_experts_logs(caplog, (VIEW_LOGGER, PLAYBOOK_LOGGER)):
+        first = case.client.post(url, payload, headers={"X-Request-ID": "cedar-first"})
+        later = case.client.post(url, payload, headers={"X-Request-ID": "cedar-later"})
+
+    assert first.status_code == later.status_code == 302
+    playbook = f"playbook_id={case.playbook.pk}"
+    assert_log_story(
+        caplog,
+        where="_release_with_karma_message",
+        beats={
+            "first": (
+                "| exit |",
+                playbook,
+                "earned_message=true",
+                "correlation_id=cedar-first",
+            ),
+            "later": (
+                "| exit |",
+                playbook,
+                "earned_message=false",
+                "correlation_id=cedar-later",
+            ),
+        },
+    )
+    assert_log_story(
+        caplog,
+        where=RELEASE_METHOD,
+        beats={"entry": ("| entry |", playbook, "correlation_id=cedar-first")},
+    )
+    release_logs = "\n".join(
+        record.getMessage()
+        for record in caplog.records
+        if record.name in (VIEW_LOGGER, PLAYBOOK_LOGGER)
+    )
+    for private_text in (
+        RELEASE_NOTES,
+        case.playbook.name,
+        case.author.username,
+        case.author.email,
+    ):
+        assert private_text not in release_logs
 
 
 @pytest.mark.django_db
