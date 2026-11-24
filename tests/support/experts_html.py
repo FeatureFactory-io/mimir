@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
+from http import HTTPStatus
 
 from django.http import HttpResponse
 from django.test.html import Element, HTMLParseError, parse_html
+
+_OTHER_EMPTY_MESSAGE = "No experts in Other yet — release a playbook to be the first"
 
 
 def find_by_test_id(html: str | bytes, test_id: str) -> Element:
@@ -93,7 +96,15 @@ def assert_no_expert_cards(response: HttpResponse) -> None:
     :return: None when HTTP 200 and zero experts-card-* nodes are present.
     :raises AssertionError: If status, leaderboard or card absence differs.
     """
-    raise NotImplementedError()
+    assert response.status_code == HTTPStatus.OK
+    leaderboard = find_by_test_id(response.content, "experts-leaderboard")
+    cards = [
+        value
+        for node in _walk_elements(leaderboard)
+        for name, value in node.attributes
+        if name == "data-testid" and value.startswith("experts-card-")
+    ]
+    assert not cards, f"Expected an empty leaderboard, found {cards!r}"
 
 
 def assert_other_empty_message(response: HttpResponse) -> None:
@@ -103,7 +114,11 @@ def assert_other_empty_message(response: HttpResponse) -> None:
     :return: None when experts-empty text is exact and Other is current.
     :raises AssertionError: If status, element text or aria-current differs.
     """
-    raise NotImplementedError()
+    assert response.status_code == HTTPStatus.OK
+    empty = find_by_test_id(response.content, "experts-empty")
+    assert element_text(empty) == _OTHER_EMPTY_MESSAGE
+    category = find_by_test_id(response.content, "experts-category-other")
+    assert ("aria-current", "page") in category.attributes
 
 
 def assert_karma_source_rows(
