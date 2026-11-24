@@ -303,7 +303,11 @@ test-experts-s03:
 
 .PHONY: test-experts-s04-backend
 test-experts-s04-backend:
-	$(PYTHON) -m pytest tests/integration/test_expert_card_presentation.py::test_present_with_stored_summary_preserves_public_prose tests/integration/test_expert_card_presentation.py::test_present_with_missing_summary_uses_live_numeric_fallback tests/integration/test_expert_card_presentation.py::test_present_with_invalid_projection_rejects_input tests/integration/test_expert_card_presentation.py::test_expert_card_log_story_happy tests/integration/test_expert_card_presentation.py::test_expert_card_log_story_reject tests/integration/test_expert_cards.py::test_experts_card_with_cedar_baseline_shows_readable_signals tests/integration/test_expert_cards.py::test_experts_card_with_stored_caveat_adds_no_suitability_claim tests/integration/test_expert_card_visual_evidence.py::test_experts_cards_with_reviewed_visual_evidence_cover_required_states -x
+	$(PYTHON) -m pytest tests/integration/test_expert_card_presentation.py::test_present_with_stored_summary_preserves_public_prose tests/integration/test_expert_card_presentation.py::test_present_with_missing_summary_uses_live_numeric_fallback tests/integration/test_expert_card_presentation.py::test_present_with_invalid_projection_rejects_input tests/integration/test_expert_card_presentation.py::test_expert_card_log_story_happy tests/integration/test_expert_card_presentation.py::test_expert_card_log_story_reject tests/integration/test_expert_cards.py::test_experts_card_with_cedar_baseline_shows_readable_signals tests/integration/test_expert_cards.py::test_experts_card_with_stored_caveat_adds_no_suitability_claim tests/integration/test_expert_card_visual_evidence.py -x
+
+.PHONY: test-experts-s04-evidence
+test-experts-s04-evidence: ## Verify S04 browser evidence (set EXPERTS_EVIDENCE_ROOT)
+	$(PYTHON) -m tests.integration.test_expert_card_visual_evidence
 
 .PHONY: test-experts-s04-browser
 test-experts-s04-browser:
@@ -320,6 +324,7 @@ test-experts-s04-at:
 .PHONY: test-experts-s04
 test-experts-s04:
 	+$(MAKE) test-experts-s04-backend
+	+$(MAKE) test-experts-s04-evidence
 	+$(MAKE) test-experts-s04-at
 	+$(MAKE) test-experts-s04-browser
 	+$(MAKE) test-experts-s04-log
