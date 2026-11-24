@@ -6587,7 +6587,7 @@ scenarios:
       - S30
       - S36
     implementation_plan: docs/plans/iterations/experts/S45-karma-event-01.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S30
@@ -9862,7 +9862,7 @@ scenarios:
       - S42
       - S45
     implementation_plan: docs/plans/iterations/experts/S46-karma-event-02.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S36
