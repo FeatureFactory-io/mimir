@@ -339,3 +339,12 @@ jedao_recommendation: fix and retry with the prepared two-file provenance correc
 await_human_decision: true
 <!-- /ESCALATE -->
 - S11 N1 is active within its original test-only footprint while independent work continues. No S04-dependent scenario is advanced before its decision and acceptance.
+
+
+## Real protocol delivery and profile summary proofs
+
+- S39 N4 a2474967de6358ead7011a772e679d6bed232b71 commits only the stdio test and existing support. Immutable archive passes nine actual facade child cases,77 canonical backend and all82 module cases, zero skips. Redacted actual wire evidence records27JSON-RPC replies, nine ordered GET/receipt pairs and18five-point rows; all child processes exit0/close pipes. Real tools/list reports72 while inherited stderr diagnostic says59; no new tool is added. The facade child has noORM and uses its function-owned pytest HTTP backend. Legacy child/concurrency work remains later. Fresh N5 is active.
+- S11 N1 c05adbd3c18933397889d89a068782115095f94e proves the complete independent nine-sentence Maria summary through authenticated GET even with another subject in the query; original summary/time, full ledger and interaction count are unchanged, no commit callbacks/provider turns. One genuine stub red→one pass. N2 3ec5fc7392a6fdb0e36341262ee27a15846a3386 adds the server semantics proof: unique native Show more, initial aria-expanded=false and unique linked full summary region, original account hooks. Both server cases pass and N1 bytes remain unchanged. N3 now owns primary exact browser geometry/expansion/collapse/keyboard/short text.
+- Root’s extended S27 backend gate selects249 cases including all18new shared request privacy unit cases and passes249. Full canonical unique count becomes263 when the existing exact AT/log/agent gates are included; fresh independent review is checking this conjunction and real production formatting. Evidence MIN-S27-R5-selected-request-privacy.
+
+- After shared request middleware/filter changes, the same182-file existing CI inventory passes1,642 cases/three inherited skips/72warnings in31.71seconds on immutable f9891d92cddc7dbd6dee7974cb96a30437444c39. Evidence post-request-privacy-existing-regressions. No remaining broad-regression failure is hidden; unfinished Experts contracts remain outside that historical file inventory.
