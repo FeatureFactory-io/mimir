@@ -3251,7 +3251,7 @@ scenarios:
         notes: Record nonzero execution counts and deployed/local identity accurately; no merge/release permission
           implied.
     implementation_plan: docs/plans/iterations/experts/S13-experts-profile-04.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S10
@@ -5178,7 +5178,7 @@ scenarios:
       - S17
       - S14
     implementation_plan: docs/plans/iterations/experts/S20-experts-view-04.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
