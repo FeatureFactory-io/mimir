@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 
 from behave import given, then, when
 from behave.runner import Context
+from django.contrib.auth.models import User
+from django.core import mail
+from django.db import connection
 from django.test.html import Element, parse_html
 from django.urls import reverse
 
+from methodology.models import AgentInteraction, ExpertProfile, KarmaAward
 from tests.support.experts_data import CEDAR_PASSWORD
 from tests.support.experts_html import _walk_elements, element_text, find_by_test_id
 
@@ -17,6 +23,30 @@ _ELENA_USERNAME = "esvensson"
 _SIDEBAR_TEST_ID = "app-sidebar"
 _EXPERTS_LINK_TEST_ID = "nav-experts"
 _CATEGORY_TABS_TEST_ID = "experts-category-tabs"
+_S48_SECTION_LABELS = (
+    ("sidebar-sec-workspace", "Workspace"),
+    ("sidebar-sec-methodology", "Methodology"),
+    ("sidebar-sec-collaborate", "Collaborate"),
+)
+_S48_LINK_GROUPS = (
+    (("Home", "/dashboard/", "nav-dashboard"),),
+    (
+        ("Playbooks", "/playbooks/", "nav-playbooks"),
+        ("Workflows", "/workflows/", "nav-workflows"),
+        ("Phases", "/phases/", "nav-phases"),
+        ("Activities", "/activities/", "nav-activities"),
+        ("Artifacts", "/artifacts/", "nav-artifacts"),
+        ("Agents", "/agents/", "nav-agents"),
+        ("Skills", "/skills/", "nav-skills"),
+        ("Rules", "/rules/", "nav-rules"),
+    ),
+    (
+        ("Teams", "/teams/", "nav-teams"),
+        ("Experts", "/experts/", "nav-experts"),
+        ("PIPs", "/pips/", "nav-pips"),
+    ),
+)
+_S48_PROTECTED_MODELS = (User, KarmaAward, ExpertProfile, AgentInteraction)
 
 
 @given("Elena is authenticated")
@@ -154,7 +184,24 @@ def opens_collaborate_section(context: Context) -> None:
     :return: None. Example: None.
     :raises AssertionError: If sidebar or labelled Collaborate list is absent.
     """
-    raise NotImplementedError()
+    elena = context.cedar_dataset.users_by_username[_ELENA_USERNAME]
+    elena.refresh_from_db()
+    assert not elena.is_staff and not elena.is_superuser
+    context.s48_state_before = _s48_state_fingerprint()
+    context.s48_callbacks_before = tuple(connection.run_on_commit)
+    context.response = context.client.get(reverse("dashboard"))
+    response = context.response
+    assert response.status_code == 200 and not response.has_header("Location")
+    assert response.wsgi_request.user == elena
+    assert response.wsgi_request.path == reverse("dashboard")
+    assert response.context["chrome"] == "authenticated"
+    _s48_sidebar_structure(response.content)
+    _s48_assert_current(
+        find_by_test_id(response.content, _SIDEBAR_TEST_ID), "nav-dashboard"
+    )
+    assert _s48_state_fingerprint() == context.s48_state_before
+    assert tuple(connection.run_on_commit) == context.s48_callbacks_before
+    logger.info("Experts sidebar AT | section exit | actor_id=%s", elena.pk)
 
 
 @then('Experts is a link to "{path}" with data-testid "{test_id}"')
@@ -167,7 +214,14 @@ def experts_sidebar_link(context: Context, path: str, test_id: str) -> None:
     :return: None. Example: None.
     :raises AssertionError: If destination, accessible name or grouping differs.
     """
-    raise NotImplementedError()
+    assert (path, test_id) == (reverse("experts_list"), _EXPERTS_LINK_TEST_ID)
+    _, collaborate = _s48_sidebar_structure(context.response.content)
+    link = find_by_test_id(str(collaborate), test_id)
+    attributes = dict(link.attributes)
+    assert link.name == "a" and element_text(link) == "Experts"
+    assert attributes["href"] == path
+    assert attributes["title"] == "Top contributors by playbook category"
+    context.s48_experts_href = attributes["href"]
 
 
 @then('"{test_id}" is present and Experts is the active navigation item')
@@ -179,4 +233,121 @@ def experts_sidebar_is_current(context: Context, test_id: str) -> None:
     :return: None. Example: None.
     :raises AssertionError: If marker or exclusive semantic current state differs.
     """
-    raise NotImplementedError()
+    assert test_id == "experts-leaderboard"
+    response = context.response
+    assert response.status_code == 200 and not response.has_header("Location")
+    assert response.wsgi_request.get_full_path() == context.s48_experts_href
+    assert response.wsgi_request.user.username == _ELENA_USERNAME
+    assert response.wsgi_request.user.is_authenticated
+    assert response.context["chrome"] == "authenticated"
+    assert "experts/list.html" in [item.name for item in response.templates]
+    find_by_test_id(response.content, test_id)
+    sidebar, _ = _s48_sidebar_structure(response.content)
+    _s48_assert_current(sidebar, _EXPERTS_LINK_TEST_ID)
+    _s48_assert_current(
+        find_by_test_id(response.content, "realm-nav-list"), "realm-nav-mimir"
+    )
+    _s48_assert_current(
+        find_by_test_id(response.content, _CATEGORY_TABS_TEST_ID),
+        "experts-category-development",
+    )
+    assert _s48_state_fingerprint() == context.s48_state_before
+    assert tuple(connection.run_on_commit) == context.s48_callbacks_before
+    logger.info(
+        "Experts sidebar AT | destination exit | status=%s", response.status_code
+    )
+
+
+def _s48_sidebar_structure(html: str | bytes) -> tuple[Element, Element]:
+    """Validate original shell groups and return the real Collaborate list.
+
+    :param html: Actual response bytes. Example: dashboard response.content.
+    :return: Parsed sidebar and group. Example: aside and Collaborate ul.
+    :raises AssertionError: Labels, order, links or accessible structure differ.
+    """
+    sidebar = find_by_test_id(html, _SIDEBAR_TEST_ID)
+    assert sidebar.name == "aside"
+    assert dict(sidebar.attributes)["aria-label"] == "Mimir in-app navigation"
+    nodes = tuple(_walk_elements(sidebar))
+    labels = [
+        node
+        for node in nodes
+        if "mm-sidebar-section-label" in dict(node.attributes).get("class", "").split()
+    ]
+    assert (
+        tuple((dict(node.attributes)["id"], element_text(node)) for node in labels)
+        == _S48_SECTION_LABELS
+    )
+    groups = [node for node in nodes if node.name == "ul"]
+    assert len(groups) == len(_S48_SECTION_LABELS)
+    for group, (label_id, _), expected in zip(
+        groups, _S48_SECTION_LABELS, _S48_LINK_GROUPS, strict=True
+    ):
+        assert dict(group.attributes)["aria-labelledby"] == label_id
+        _s48_assert_group(group, expected)
+    return sidebar, groups[-1]
+
+
+def _s48_assert_group(
+    group: Element, expected: tuple[tuple[str, str, str], ...]
+) -> None:
+    """Require original ordered destinations and decorative icons.
+
+    :param group: Actual labelled sidebar ul. Example: Collaborate.
+    :param expected: Contract links in order. Example: Teams, Experts, PIPs.
+    :return: None. Example: all actual anchors match the contract.
+    :raises AssertionError: A link, title, order or icon differs.
+    """
+    links = [node for node in _walk_elements(group) if node.name == "a"]
+    actual = tuple(
+        (
+            element_text(node),
+            dict(node.attributes).get("href"),
+            dict(node.attributes).get("data-testid"),
+        )
+        for node in links
+    )
+    assert actual == expected
+    for link in links:
+        assert dict(link.attributes).get("title", "").strip()
+        icons = [node for node in _walk_elements(link) if node.name == "i"]
+        assert len(icons) == 1 and ("aria-hidden", "true") in icons[0].attributes
+        assert element_text(icons[0]) == ""
+
+
+def _s48_assert_current(container: Element, test_id: str) -> None:
+    """Require both current-page signals on exactly one scoped anchor.
+
+    :param container: Actual parsed region. Example: sidebar or realm nav.
+    :param test_id: Sole current anchor. Example: nav-experts.
+    :return: None. Example: every other scoped anchor is not current.
+    :raises AssertionError: Semantic current or active class differs.
+    """
+    links = [
+        dict(node.attributes) for node in _walk_elements(container) if node.name == "a"
+    ]
+    assert [
+        link.get("data-testid") for link in links if link.get("aria-current") == "page"
+    ] == [test_id]
+    assert [
+        link.get("data-testid")
+        for link in links
+        if "active" in link.get("class", "").split()
+    ] == [test_id]
+
+
+def _s48_state_fingerprint() -> str:
+    """Hash every protected stored field and complete existing mail contents.
+
+    :return: Private deterministic digest. Example: SHA256 of complete rows.
+    :raises TypeError: A stored value cannot use the real JSON adapter.
+    """
+    rows = [
+        (model._meta.label, list(model.objects.order_by("pk").values_list()))
+        for model in _S48_PROTECTED_MODELS
+    ]
+    messages = [vars(message) for message in getattr(mail, "outbox", ())]
+    rows.append(("mail", messages))
+    return hashlib.sha256(
+        json.dumps(rows, default=str, sort_keys=True).encode()
+    ).hexdigest()

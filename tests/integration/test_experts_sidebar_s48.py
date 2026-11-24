@@ -14,6 +14,7 @@ from django.test.html import Element
 from pytest import LogCaptureFixture
 
 from methodology.models import AgentInteraction, ExpertProfile, KarmaAward
+from tests.support.experts_acceptance import run_exact_acceptance
 from tests.support.experts_data import load_cedar_baseline
 from tests.support.experts_html import _walk_elements, element_text, find_by_test_id
 from tests.support.experts_logs import capture_experts_logs
@@ -141,7 +142,18 @@ def test_sidebar_acceptance_with_exact_contract_runs_one_passing_scenario(
     :return: None. Example: None.
     :raises AssertionError: For nonzero exit, wrong count, skips or failed steps.
     """
-    raise NotImplementedError()
+    assert tmp_path.is_dir()
+    result = run_exact_acceptance(
+        Path("docs/features/act-0-auth/experts-navigation.feature"),
+        "FOB-NAV-EXPERTS-01",
+        1,
+    )
+    assert (
+        result.scenario_count,
+        result.step_count,
+        result.skipped_count,
+        result.undefined_count,
+    ) == (1, 6, 0, 0)
 
 
 def _login_elena(client: Client) -> User:
