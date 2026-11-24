@@ -1,8 +1,37 @@
 {
-  "status": "planned_unimplemented",
-  "owner": "S29",
+  "owner": "S29-N1",
   "contract": "GALDR-SUMMARY-07",
-  "evidence_observed": false,
-  "responses": [],
-  "note": "Empty structural placeholder; must fail finite-script validation until implemented after GO."
+  "note": "Explicit finite transport fixture; actual public evidence, orchestration, parser and database remain real.",
+  "responses": [
+    {
+      "kind": "response",
+      "model": "scripted",
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 210,
+        "output_tokens": 17
+      },
+      "content": "Maria maintains Accessibility Audit Playbook. The playbook reviews keyboard access. It covers focus order. It covers accessible names. It covers form feedback. Its workflow leads an accessibility review. The review begins with the user task. The workflow considers relevant input data. Trace Keyboard Focus records control order. Review Form Feedback checks field identification. The published examples distinguish empty forms. They also distinguish partially completed forms. They cover rejected submissions. Maria contributed Keyboard Navigation Audit. She also revised Error Message Review."
+    },
+    {
+      "kind": "response",
+      "model": "scripted",
+      "stop_reason": "end_turn",
+      "content": {
+        "recommendation": "ACCEPT",
+        "reasoning": "The proposed activity fits the review workflow.",
+        "holistic_assessment": {
+          "overall_coherence": "COHERENT",
+          "reasoning": "The proposed activity has a clear place in the workflow."
+        },
+        "change_assessments": [
+          {
+            "change_id": "$CHANGE_ID",
+            "recommendation": "ACCEPT",
+            "reasoning": "The proposed activity fits the review workflow."
+          }
+        ]
+      }
+    }
+  ]
 }

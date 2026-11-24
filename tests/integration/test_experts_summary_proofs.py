@@ -49,6 +49,17 @@ from tests.support.experts_summary_data import (
     prepare_summary_submission,
     summary_processing_scope,
 )
+from tests.support.experts_summary_failure_data import (
+    S29_CODES,
+    S29_FAILURES,
+    assert_s29_exhausted_boundary,
+    assert_s29_failure_trace,
+    assert_s29_requests,
+    assert_s29_retention,
+    load_s29_submission_model,
+    prepare_s29_failure_case,
+    submit_s29_case,
+)
 from tests.support.experts_summary_stability import (
     _assert_s28_generation_story,
     _oracle_paragraph,
@@ -824,15 +835,30 @@ def test_s28_points_change_agent_story_happy() -> None:
         assert capture_summary_state(pip.created_by_id) == before and llm.calls == calls
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.agent_proof
-def test_s29_summary_agent_story_reject() -> None:
-    """Assert persisted authentic failure trace through real normal submission.
+@pytest.mark.parametrize("failure", S29_FAILURES)
+def test_s29_summary_agent_story_reject(failure: str) -> None:
+    """Authenticate actual persisted adverse traces through normal submission.
 
-    :return: None when PRF-EXPERTS-02, retention and bounded calls pass.
-    :raises AssertionError: For missing beats, domain writes or unexpected awards.
+    :param failure: Explicit provider/output adverse case. Example: "markup".
+    :return: None. Example: retained paragraph and partial production failure trace.
+    :raises AssertionError: For bypassed lifecycle, extra calls or false domain writes.
     """
-    raise NotImplementedError()
+    case = prepare_s29_failure_case()
+    llm = load_s29_submission_model(case, failure)
+    interaction = submit_s29_case(case, llm, f"s29-agent-{failure}")
+    code = S29_CODES[failure]
+    assert case.pip.status == case.pip.STATUS_REVIEWED
+    assert_s29_retention(case, interaction, code)
+    assert_s29_requests(case, llm)
+    assert_s29_failure_trace(case, interaction, code)
+    response = load_summary_script(
+        SUMMARY_SCRIPTS / "PRF-EXPERTS-02" / f"s29_{failure}.json",
+        case.pip.changes.get().pk,
+    )[0]
+    body = response.content if isinstance(response, LLMResponse) else str(response)
+    assert not body.strip() or body not in json.dumps(interaction.events)
 
 
 @pytest.mark.django_db
@@ -848,15 +874,15 @@ def test_s29_summary_interaction_with_failure_preserves_usage_agent_story_reject
     raise NotImplementedError()
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 @pytest.mark.agent_proof
 def test_s29_summary_with_exhausted_script_fails_loudly() -> None:
-    """Exhaust a finite queue through the real read-only production boundary.
+    """Exhaust the actual finite port through the read-only production boundary.
 
-    :return: None when typed failure preserves explicit exhaustion and DB state.
-    :raises AssertionError: If exhaustion becomes success or fallback prose.
+    :return: None. Example: typed provider_failed and unchanged complete storage.
+    :raises AssertionError: For hidden/default success, raw errors or a domain write.
     """
-    raise NotImplementedError()
+    assert_s29_exhausted_boundary(prepare_s29_failure_case())
 
 
 @pytest.mark.django_db

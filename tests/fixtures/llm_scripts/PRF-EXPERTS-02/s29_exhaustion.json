@@ -1,8 +1,17 @@
 {
-  "status": "planned_unimplemented",
-  "owner": "S29",
+  "owner": "S29-N1",
   "contract": "GALDR-SUMMARY-07",
-  "evidence_observed": false,
-  "responses": [],
-  "note": "Empty structural placeholder; must fail finite-script validation until implemented after GO."
+  "note": "Exactly one successful read-only boundary call; next real call must exhaust, with no default prose.",
+  "responses": [
+    {
+      "kind": "response",
+      "model": "scripted",
+      "stop_reason": "end_turn",
+      "content": "Maria maintains Accessibility Audit Playbook. She contributed Keyboard Navigation Audit to a published playbook.",
+      "usage": {
+        "input_tokens": 210,
+        "output_tokens": 15
+      }
+    }
+  ]
 }
