@@ -341,6 +341,37 @@ jobs:
               output.write('idle_env=' + idle['EnvironmentName'] + '\n')
           print('Resolved distinct live and idle environments from their current CNAMEs.')
           PY_IDENTITY
+      - name: Read idle launch and network metadata without starting a host
+        env:
+          IDLE_ENV: ${{ steps.identity.outputs.idle_env }}
+        run: |
+          aws elasticbeanstalk describe-environment-resources --environment-name "$IDLE_ENV" --output json > preflight-receipts/resources.json
+          python3 - <<'PY_LAYOUT'
+          import json
+          from pathlib import Path
+          resources = json.loads(Path('preflight-receipts/resources.json').read_text())['EnvironmentResources']
+          groups = resources['AutoScalingGroups']
+          templates = resources['LaunchTemplates']
+          assert len(groups) == 1 and len(templates) == 1
+          Path('preflight-receipts/asg-name.txt').write_text(groups[0]['Name'])
+          Path('preflight-receipts/launch-template-id.txt').write_text(templates[0]['Id'])
+          PY_LAYOUT
+          ASG_NAME=$(cat preflight-receipts/asg-name.txt)
+          LAUNCH_TEMPLATE_ID=$(cat preflight-receipts/launch-template-id.txt)
+          aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$ASG_NAME" --query 'AutoScalingGroups[].{AutoScalingGroupName:AutoScalingGroupName,MinSize:MinSize,MaxSize:MaxSize,DesiredCapacity:DesiredCapacity,VPCZoneIdentifier:VPCZoneIdentifier,LaunchTemplate:LaunchTemplate,MixedInstancesPolicy:MixedInstancesPolicy}' --output json > preflight-receipts/autoscaling.json
+          aws ec2 describe-launch-template-versions --launch-template-id "$LAUNCH_TEMPLATE_ID" --versions '$Latest' --query 'LaunchTemplateVersions[].{VersionNumber:VersionNumber,ImageId:LaunchTemplateData.ImageId,InstanceType:LaunchTemplateData.InstanceType,IamInstanceProfile:LaunchTemplateData.IamInstanceProfile,SecurityGroupIds:LaunchTemplateData.SecurityGroupIds,NetworkInterfaces:LaunchTemplateData.NetworkInterfaces,BlockDeviceMappings:LaunchTemplateData.BlockDeviceMappings,MetadataOptions:LaunchTemplateData.MetadataOptions}' --output json > preflight-receipts/launch-metadata.json
+          python3 - <<'PY_SUBNET_IDS'
+          import json
+          from pathlib import Path
+          groups = json.loads(Path('preflight-receipts/autoscaling.json').read_text())
+          assert len(groups) == 1
+          subnets = groups[0]['VPCZoneIdentifier'].split(',')
+          assert subnets and all(item.startswith('subnet-') and item[7:].isalnum() for item in subnets)
+          Path('preflight-receipts/subnet-ids.txt').write_text('\n'.join(subnets))
+          PY_SUBNET_IDS
+          mapfile -t SUBNET_IDS < preflight-receipts/subnet-ids.txt
+          aws ec2 describe-subnets --subnet-ids "${SUBNET_IDS[@]}" --query 'Subnets[].{SubnetId:SubnetId,VpcId:VpcId,AvailabilityZone:AvailabilityZone,MapPublicIpOnLaunch:MapPublicIpOnLaunch,AvailableIpAddressCount:AvailableIpAddressCount}' --output json > preflight-receipts/subnets.json
+          aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 --query Parameter.Value --output text > preflight-receipts/amazon-linux-x86-ami.txt
       - name: Verify idle instance ownership and SSM availability
         id: host
         env:
