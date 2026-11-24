@@ -931,7 +931,7 @@ mark.mm-search-highlight {
 .analytics-consent[hidden] { display: none; }
 .analytics-consent p { margin: 0; }
 .analytics-consent > div { display: flex; gap: 0.5rem; flex-shrink: 0; }
-.analytics-settings { bottom: 1rem; position: fixed; right: 1rem; z-index: 1089; }
+.analytics-settings { display: block; margin: 0 1rem 1rem auto; position: static; }
 
 @media (max-width: 620px) {
   .analytics-consent { align-items: stretch; flex-direction: column; }
