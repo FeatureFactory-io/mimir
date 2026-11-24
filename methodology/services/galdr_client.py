@@ -8,8 +8,8 @@ import re
 
 from django.conf import settings
 
-from methodology.llm.anthropic_adapter import AnthropicAdapter
 from methodology.llm.base import BaseLLM, LLMError, LLMMessage, LLMResponse
+from methodology.services.contribution_summary_factory import _configured_summary_llm
 from methodology.services.galdr_prompts import HOLISTIC_SYSTEM_PROMPT, SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,12 @@ class GaldrClient:
         """
         llm = self._llm
         if llm is None:
-            llm = AnthropicAdapter(settings.GALDR_MODEL)
+            try:
+                llm = _configured_summary_llm()
+            except ValueError:
+                raise GaldrLLMError(
+                    "Galdr provider configuration is invalid."
+                ) from None
         max_tokens = (
             _HOLISTIC_MAX_TOKENS
             if system == HOLISTIC_SYSTEM_PROMPT
@@ -231,21 +236,24 @@ def get_galdr_client() -> GaldrClient:
     return StubGaldrClient()
 
 
-def _select_galdr_port(injected: BaseLLM | None) -> BaseLLM | None:
-    """Select explicit/scoped injection or the configured production adapter.
+def _select_galdr_port(injected: BaseLLM | None) -> tuple[BaseLLM | None, bool]:
+    """Capture the selected provider and any default configuration failure.
 
-    If no injection and GALDR_USE_ANTHROPIC is false, return None so existing
-    legacy StubGaldrClient selection remains unchanged. New agent proofs
-    explicitly inject ScriptedLLM and therefore do not use that stub.
+    A disabled default preserves the existing StubGaldrClient path. A failed
+    default is captured separately so the committed submission can retry even
+    if the setting changes before dispatch.
 
     :param injected: Optional explicit provider. Example: ScriptedLLM([...]).
-    :return: Provider or legacy-selection sentinel. Example: None.
-    :raises ValueError: For an invalid configured provider.
+    :return: Port and invalid-config flag. Example: (None, True) for a bad model.
+    :raises ValueError: For an invalid injected port.
     """
     if injected is not None:
         if not isinstance(injected, BaseLLM) or not callable(injected.complete):
             raise ValueError("Galdr requires a completion port.")
-        return injected
-    if settings.GALDR_USE_ANTHROPIC:
-        return AnthropicAdapter(settings.GALDR_MODEL)
-    return None
+        return injected, False
+    if not settings.GALDR_USE_ANTHROPIC:
+        return None, False
+    try:
+        return _configured_summary_llm(), False
+    except ValueError:
+        return None, True

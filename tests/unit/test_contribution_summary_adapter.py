@@ -287,6 +287,16 @@ def test_s23_configured_provider_with_galdr_model_builds_without_transport(
     assert port.model_id == _MODEL
 
 
+def test_s23_resolve_processing_llm_with_unpersistable_model_rejects_port() -> None:
+    """Reject an explicit port whose model identifier would fail storage."""
+    explicit = ScriptedLLM(["unused"])
+    explicit.model_id = "model" + ("1" * 48)
+    with pytest.raises(ValueError, match="safe model ID") as caught:
+        resolve_processing_llm(explicit)
+    assert explicit.model_id not in str(caught.value)
+    assert not explicit.calls
+
+
 @pytest.mark.parametrize(
     "rates",
     ['{"resolved-model-20261124": ["0", "1.25"]}', {_RESOLVED_MODEL: ("0", "1.25")}],

@@ -13,6 +13,7 @@ from django.conf import settings
 
 from methodology.llm.anthropic_adapter import AnthropicAdapter
 from methodology.llm.base import BaseLLM
+from methodology.models.agent_interaction import _CREDENTIAL
 from methodology.services.contribution_summary_boundary import (
     _MODEL_ID,
     PublicContributionSummaryBoundary,
@@ -157,6 +158,7 @@ def _validate_port(value: object) -> BaseLLM:
         or not isinstance(value.model_id, str)
         or not _MODEL_ID.fullmatch(value.model_id)
         or _SENSITIVE_TEXT.search(value.model_id)
+        or _CREDENTIAL.search(value.model_id)
     ):
         raise ValueError("A completion port with a safe model ID is required.")
     return value

@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from methodology.llm.base import BaseLLM
 from methodology.models import PipChange, ProcessImprovementProposal
+from methodology.models.agent_interaction import _CREDENTIAL
 from methodology.services import galdr_client
 from methodology.services.contribution_summary_boundary import _CORRELATION_ID
 from methodology.services.contribution_summary_factory import (
@@ -64,6 +65,7 @@ class GaldrEngine:
             not isinstance(correlation_id, str)
             or not _CORRELATION_ID.fullmatch(correlation_id)
             or _SENSITIVE_TEXT.search(correlation_id)
+            or _CREDENTIAL.search(correlation_id)
         ):
             raise ValueError("A safe processing correlation ID is required.")
         if settings.GALDR_EAGER:

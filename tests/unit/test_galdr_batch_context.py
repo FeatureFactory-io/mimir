@@ -2,12 +2,14 @@
 
 import json
 import runpy
+from collections.abc import Iterator
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import anthropic
 import pytest
 import yaml
+from anthropic.types import Message, TextBlock, Usage
 from django.contrib.auth import get_user_model
 
 from methodology.models import PipChange, Playbook, ProcessImprovementProposal
@@ -20,6 +22,7 @@ from methodology.services.galdr_prompts import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+_HOLISTIC_MIN_TOKENS = 16384
 
 
 @pytest.mark.parametrize(
@@ -114,22 +117,50 @@ def test_persist_with_incomplete_assessments_keeps_pip_unreviewed(db, case):
     assert change.galdr_recommendation == ""
 
 
-def test_call_llm_with_large_batch_allocates_holistic_output_budget(monkeypatch):
+@pytest.fixture
+def sdk_client(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
+    """Capture the configured SDK client used inside AnthropicAdapter's context."""
     client = MagicMock()
-    client.messages.create.return_value = SimpleNamespace(
-        content=[SimpleNamespace(text=json.dumps({"ok": True}))], stop_reason="end_turn"
+    client.__enter__.return_value = client
+    constructor = MagicMock(return_value=client)
+    monkeypatch.setattr(anthropic, "Anthropic", constructor)
+    yield client
+    constructor.assert_called_once_with(max_retries=0)
+    client.__enter__.assert_called_once()
+    client.__exit__.assert_called_once()
+
+
+def test_call_llm_with_large_batch_allocates_holistic_output_budget(
+    sdk_client: MagicMock,
+) -> None:
+    sdk_client.messages.create.return_value = Message(
+        id="msg_batch_budget",
+        content=[TextBlock(type="text", text=json.dumps({"ok": True}))],
+        model="galdr-batch-fixture",
+        role="assistant",
+        stop_reason="end_turn",
+        type="message",
+        usage=Usage(input_tokens=6, output_tokens=4),
     )
-    monkeypatch.setattr("anthropic.Anthropic", lambda: client)
     GaldrClient()._call_llm_raw("58 changes", system=HOLISTIC_SYSTEM_PROMPT)
-    assert client.messages.create.call_args.kwargs["max_tokens"] >= 16384
-
-
-def test_call_llm_with_truncated_output_raises_before_parsing(monkeypatch):
-    client = MagicMock()
-    client.messages.create.return_value = SimpleNamespace(
-        content=[SimpleNamespace(text="{}")], stop_reason="max_tokens"
+    assert (
+        sdk_client.messages.create.call_args.kwargs["max_tokens"]
+        >= _HOLISTIC_MIN_TOKENS
     )
-    monkeypatch.setattr("anthropic.Anthropic", lambda: client)
+
+
+def test_call_llm_with_truncated_output_raises_before_parsing(
+    sdk_client: MagicMock,
+) -> None:
+    sdk_client.messages.create.return_value = Message(
+        id="msg_batch_truncated",
+        content=[TextBlock(type="text", text="{}")],
+        model="galdr-batch-fixture",
+        role="assistant",
+        stop_reason="max_tokens",
+        type="message",
+        usage=Usage(input_tokens=6, output_tokens=_HOLISTIC_MIN_TOKENS),
+    )
     with pytest.raises(GaldrLLMError, match="truncated"):
         GaldrClient()._call_llm_raw("58 changes", system=HOLISTIC_SYSTEM_PROMPT)
 

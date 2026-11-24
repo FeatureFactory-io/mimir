@@ -25,8 +25,12 @@ from methodology.models import (
     PlaybookVersion,
     ProcessImprovementProposal,
 )
+from methodology.services.contribution_summary_factory import (
+    build_contribution_summary_service,
+)
 from methodology.services.contribution_summary_prompts import _count_sentences
 from methodology.services.experts_service import ExpertsService
+from methodology.services.galdr_engine import GaldrEngine
 from methodology.services.pip_service import PIPService
 from tests.support.experts_data import load_cedar_baseline
 from tests.support.experts_logs import capture_experts_logs
@@ -43,6 +47,7 @@ from tests.support.log_story import assert_log_story
 from tests.support.scripted_llm import ScriptedLLM
 
 _RUN = "s23-submission-01"
+_CREDENTIAL_LIKE_ID = "trace" + ("1" * 48)
 _PROVIDER_MARKER = "provider_response_private_marker"
 _LOGGERS = (
     "methodology.services.pip_service",
@@ -215,13 +220,22 @@ def test_s23_committed_submission_dispatches_existing_worker_once(
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.parametrize("request_id", [_RUN, "unsafe@example.invalid"])
+@pytest.mark.parametrize(
+    "request_id", [_RUN, "unsafe@example.invalid", _CREDENTIAL_LIKE_ID]
+)
 def test_s23_http_submission_with_request_id_uses_normal_lifecycle(
-    client: Client, s23_pip: ProcessImprovementProposal, request_id: str
+    client: Client,
+    s23_pip: ProcessImprovementProposal,
+    request_id: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Prove real authenticated POST carries a safe ID through the same path."""
+    """Pass through a safe ID or correlate the full lifecycle with a generated ID."""
     client.force_login(s23_pip.created_by)
-    with summary_processing_scope(_script(s23_pip)) as llm:
+    before = _ledger(), _prose(s23_pip)
+    with (
+        capture_experts_logs(caplog, _LOGGERS),
+        summary_processing_scope(_script(s23_pip)) as llm,
+    ):
         response = client.post(
             reverse("pip_submit_review", kwargs={"pk": s23_pip.pk}),
             headers={"X-Request-ID": request_id},
@@ -233,12 +247,107 @@ def test_s23_http_submission_with_request_id_uses_normal_lifecycle(
     interaction = AgentInteraction.objects.get(pip=s23_pip)
     profile = ExpertProfile.objects.get(user_id=s23_pip.created_by_id)
     assert interaction.subject_id == s23_pip.created_by_id
+    assert interaction.outcome == "success"
+    assert _ledger() == before[0]
+    assert _prose(s23_pip) != before[1]
     assert interaction.correlation_id == profile.last_summary_correlation_id
+    assert f"correlation_id={interaction.correlation_id}" in caplog.text
     if request_id == _RUN:
         assert interaction.correlation_id == request_id
     else:
         assert interaction.correlation_id != request_id
         assert request_id not in str(interaction.events)
+        assert request_id not in caplog.text
+        assert request_id not in repr(llm.calls)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_s23_direct_refresh_and_schedule_reject_unpersistable_correlation(
+    s23_pip: ProcessImprovementProposal, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Reject a credential-like ID before logging, querying or completing."""
+    llm = ScriptedLLM(_script(s23_pip))
+    service = build_contribution_summary_service(llm)
+    with capture_experts_logs(caplog, _LOGGERS):
+        with pytest.raises(ValueError, match="safe processing correlation ID"):
+            service.refresh_for_submission(s23_pip.pk, _CREDENTIAL_LIKE_ID)
+        with pytest.raises(ValueError, match="safe processing correlation ID"):
+            GaldrEngine.schedule(
+                s23_pip.pk, llm=llm, correlation_id=_CREDENTIAL_LIKE_ID
+            )
+    assert not llm.calls
+    assert _CREDENTIAL_LIKE_ID not in caplog.text
+    assert not AgentInteraction.objects.filter(pip=s23_pip).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("configured_model", ["", _CREDENTIAL_LIKE_ID])
+def test_s23_http_submission_with_invalid_default_model_allows_retry(
+    client: Client,
+    s23_pip: ProcessImprovementProposal,
+    configured_model: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Keep bad default config in the normal Submitted/retry lifecycle."""
+    client.force_login(s23_pip.created_by)
+    client.raise_request_exception = False
+    before = _ledger(), _prose(s23_pip)
+    url = reverse("pip_submit_review", kwargs={"pk": s23_pip.pk})
+    with (
+        capture_experts_logs(caplog, (*_LOGGERS, "methodology.llm.anthropic_adapter")),
+        override_settings(
+            GALDR_EAGER=True,
+            GALDR_USE_ANTHROPIC=True,
+            GALDR_MODEL=configured_model,
+            CONTRIBUTION_SUMMARY_LLM=None,
+        ),
+    ):
+        response = client.post(url, headers={"X-Request-ID": _RUN})
+        assert response.status_code == 302
+        assert response.url == reverse("pip_detail", kwargs={"pk": s23_pip.pk})
+        s23_pip.refresh_from_db()
+        assert s23_pip.status == s23_pip.STATUS_SUBMITTED
+        assert s23_pip.submitted_at and not s23_pip.reviewed_at
+        assert not s23_pip.changes.get().galdr_recommendation
+        assert not AgentInteraction.objects.filter(pip=s23_pip).exists()
+        assert (_ledger(), _prose(s23_pip)) == before
+        assert "reason=provider_configuration_invalid" in caplog.text
+        assert "AnthropicAdapter.complete" not in caplog.text
+        assert _CREDENTIAL_LIKE_ID not in caplog.text
+        with summary_processing_scope(_script(s23_pip)) as llm:
+            assert client.post(url).status_code == 302
+    assert len(llm.calls) == 2 and _ledger() == before[0]
+    _assert_reviewed(s23_pip)
+    assert AgentInteraction.objects.get(pip=s23_pip).outcome == "success"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_s23_unpersistable_response_model_preserves_summary_and_known_usage(
+    s23_pip: ProcessImprovementProposal, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Keep validated text and usage without storing or pricing a rejected ID."""
+    summary, assessment = _script(s23_pip)
+    assert isinstance(summary, LLMResponse)
+    script = (replace(summary, model=_CREDENTIAL_LIKE_ID), assessment)
+    with (
+        capture_experts_logs(caplog, _LOGGERS),
+        summary_processing_scope(
+            script, rates={"scripted": ("3", "15"), "unknown": ("3", "15")}
+        ) as llm,
+    ):
+        PIPService.submit_for_review(actor=s23_pip.created_by, pip=s23_pip)
+    assert len(llm.calls) == 2
+    _assert_reviewed(s23_pip)
+    assert _prose(s23_pip)[0] == summary.content
+    interaction = AgentInteraction.objects.get(pip=s23_pip)
+    assert interaction.outcome == "success"
+    assert interaction.model == "unknown"
+    assert interaction.input_tokens == summary.usage["input_tokens"]
+    assert interaction.output_tokens == summary.usage["output_tokens"]
+    assert interaction.estimated_cost_usd is None
+    assert any("model=scripted " in event["details"] for event in interaction.events)
+    assert _CREDENTIAL_LIKE_ID not in str(interaction.events)
+    assert _CREDENTIAL_LIKE_ID not in caplog.text
 
 
 def _assert_common_logs(

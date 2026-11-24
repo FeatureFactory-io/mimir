@@ -31,6 +31,7 @@ from methodology.models import (
     UserPIPListVisit,
     Workflow,
 )
+from methodology.models.agent_interaction import _CREDENTIAL
 from methodology.services.contribution_summary_boundary import _CORRELATION_ID
 from methodology.services.contribution_summary_factory import resolve_processing_llm
 from methodology.services.galdr_client import _select_galdr_port
@@ -51,6 +52,8 @@ from methodology.services.public_contribution_evidence import (
 )
 
 logger = logging.getLogger(__name__)
+
+_INVALID_PROVIDER = "provider_configuration_invalid"
 
 _WITHDRAW_ALLOWED = frozenset(
     {
@@ -818,7 +821,7 @@ class PIPService:
             raise ValidationError("; ".join(structural.errors))
 
         correlation_id = _normalize_processing_correlation(correlation_id)
-        port = _select_galdr_port(resolve_processing_llm(llm))
+        port, invalid_configuration = _select_galdr_port(resolve_processing_llm(llm))
         with transaction.atomic():
             locked = ProcessImprovementProposal.objects.select_for_update().get(
                 pk=pip.pk
@@ -830,22 +833,31 @@ class PIPService:
             locked.submitted_at = locked.submitted_at or timezone.now()
             locked.save(update_fields=["status", "submitted_at", "updated_at"])
 
-        PIPService._schedule_processing(pip.pk, actor.pk, port, correlation_id)
+        PIPService._schedule_processing(
+            pip.pk, actor.pk, port, correlation_id, invalid_configuration
+        )
         return ProcessImprovementProposal.objects.get(pk=pip.pk)
 
     @staticmethod
     def _schedule_processing(
-        pip_id: int, actor_id: int, llm: BaseLLM | None, correlation_id: str
+        pip_id: int,
+        actor_id: int,
+        llm: BaseLLM | None,
+        correlation_id: str,
+        invalid_configuration: bool,
     ) -> None:
         """Dispatch existing Galdr processing with captured provider/correlation.
 
         Register the worker after validation and a successful processing
         transition. A real outer transaction must commit before dispatch.
+        Only the legacy provider-free eager path runs synchronously inside
+        Django TestCase's rollback-only atomic blocks.
 
         :param pip_id: Committed processing proposal. Example: 7301.
         :param actor_id: Validated submitter. Example: 42.
         :param llm: Explicit/scoped port or None. Example: ScriptedLLM([...]).
         :param correlation_id: Safe run ID. Example: "cedar-submit-01".
+        :param invalid_configuration: Default provider was invalid at submission.
         :return: None. Example: None after existing scheduler dispatch.
         :raises ValueError: For malformed callback arguments.
         """
@@ -856,20 +868,22 @@ class PIPService:
             raise ValueError("Processing requires positive PIP and actor IDs.")
 
         def _dispatch() -> None:
+            reason = _INVALID_PROVIDER if invalid_configuration else "submission"
             logger.info(
                 "PIPService._schedule_processing | entry | pip_id=%s actor_id=%s "
-                "correlation_id=%s reason=submission",
+                "correlation_id=%s reason=%s",
                 pip_id,
                 actor_id,
                 correlation_id,
+                reason,
             )
+            if invalid_configuration:
+                return GaldrEngine._mark_submitted_retry(pip_id)
             GaldrEngine.schedule(pip_id, llm=llm, correlation_id=correlation_id)
 
-        # Django TestCase wraps each legacy eager test in rollback-only atomic
-        # blocks. Keep its provider-free assessment path synchronous; explicit
-        # ports and genuine transactions always use on_commit.
         if (
             llm is None
+            and not invalid_configuration
             and settings.GALDR_EAGER
             and connection.atomic_blocks
             and all(block._from_testcase for block in connection.atomic_blocks)
@@ -883,7 +897,7 @@ def _normalize_processing_correlation(correlation_id: str | None) -> str:
     """Accept a safe bounded request ID or generate a background identifier.
 
     The bound is 100 characters, matching canonical ExpertProfile metadata.
-    Invalid string content is replaced with a generated ID, never logged raw.
+    Replace IDs rejected by the public boundary or interaction storage before logging.
 
     :param correlation_id: Optional request identifier. Example: "cedar-submit-01".
     :return: Safe correlation. Example: "cedar-submit-01".
@@ -895,6 +909,7 @@ def _normalize_processing_correlation(correlation_id: str | None) -> str:
         correlation_id
         and _CORRELATION_ID.fullmatch(correlation_id)
         and not _SENSITIVE_TEXT.search(correlation_id)
+        and not _CREDENTIAL.search(correlation_id)
     ):
         return correlation_id
     return uuid4().hex

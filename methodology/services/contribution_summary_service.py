@@ -20,6 +20,7 @@ from methodology.models import (
     ExpertProfile,
     ProcessImprovementProposal,
 )
+from methodology.models.agent_interaction import _CREDENTIAL
 from methodology.services.contribution_summary_boundary import (
     _CORRELATION_ID,
     _MODEL_ID,
@@ -41,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 _REFRESH = "ContributionSummaryService.refresh_for_submission"
 _WORKFLOW = "contribution_summary"
+_UNKNOWN_MODEL = "unknown"
 _MILLISECONDS_PER_SECOND = 1000
 _TOKENS_PER_RATE_UNIT = Decimal(1_000_000)
 _LATENCY_PRECISION = Decimal("0.001")
@@ -89,6 +91,7 @@ class ContributionSummaryService:
             and isinstance(llm.model_id, str)
             and _MODEL_ID.fullmatch(llm.model_id)
             and not _SENSITIVE_TEXT.search(llm.model_id)
+            and not _CREDENTIAL.search(llm.model_id)
             and isinstance(rates, Mapping)
             and callable(clock)
         ):
@@ -170,6 +173,7 @@ class ContributionSummaryService:
             not isinstance(correlation_id, str)
             or not _CORRELATION_ID.fullmatch(correlation_id)
             or _SENSITIVE_TEXT.search(correlation_id)
+            or _CREDENTIAL.search(correlation_id)
         ):
             raise ValueError("A safe processing correlation ID is required.")
 
@@ -565,23 +569,29 @@ class ContributionSummaryService:
     ) -> dict[str, Any]:
         """Normalize supplied usage and optional configured-rate cost.
 
+        If storage rejects the returned model identifier, retain actual usage with
+        unknown model and cost. The trace retains the safe requested model.
+
         :param response: Available response. Example: None on provider failure.
         :param latency_ms: Measured bounded-call duration. Example: Decimal("125").
         :return: Safe measurement fields. Example: {"input_tokens": None, "estimated_cost_usd": None}.
         :raises ValueError: For invalid normalized metadata.
         """
         model = (response.model if response is not None else "") or self._llm.model_id
+        unsafe_model = _CREDENTIAL.search(model) is not None
         usage = response.usage if response is not None else {}
         input_tokens, output_tokens = usage.get("input_tokens"), usage.get(
             "output_tokens"
         )
         return {
-            "model": model,
+            "model": _UNKNOWN_MODEL if unsafe_model else model,
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "latency_ms": latency_ms,
-            "estimated_cost_usd": self._estimated_cost(
-                model, input_tokens, output_tokens
+            "estimated_cost_usd": (
+                None
+                if unsafe_model
+                else self._estimated_cost(model, input_tokens, output_tokens)
             ),
         }
 
