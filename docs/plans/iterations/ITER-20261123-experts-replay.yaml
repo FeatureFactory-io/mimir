@@ -38,6 +38,8 @@ conflict_map:
   - S36
   Makefile:
   - S36
+  - S10
+  - S12
   - S04
   - S23
   - S27
@@ -990,6 +992,7 @@ scenarios:
     skeleton_commit: 26d29adfc227baf6a39309dcdd1622a7ae5b8935
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - Makefile
     - accounts/views.py
     - docs/experts-replay/pin-evidence/S10.json
     - docs/features/steps/experts_profile_steps.py
@@ -1190,6 +1193,7 @@ scenarios:
         depends_on:
         - N5-profile-dod
         footprint:
+        - Makefile
         - templates/accounts/profile.html
         - tests/integration/test_experts_own_profile.py
         gate:
@@ -2900,6 +2904,7 @@ scenarios:
     skeleton_commit: e14a42ad76ed1aaf24845bd478c7d541732ce480
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - Makefile
     - tests/unit/test_experts_html.py
     - docs/experts-replay/pin-evidence/S12.json
     - docs/features/steps/experts_profile_steps.py
@@ -3020,6 +3025,7 @@ scenarios:
         - N3-production-browser
         triggered_by_failed_review: N4-definition-of-done
         footprint:
+        - Makefile
         - tests/support/experts_html.py
         - tests/integration/test_experts_profile_sources.py
         - tests/unit/test_experts_html.py

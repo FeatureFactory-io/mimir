@@ -467,7 +467,7 @@ test-experts-s11:
 
 .PHONY: test-experts-s12-backend
 test-experts-s12-backend:
-	$(PYTHON) -m pytest tests/integration/test_experts_profile_sources.py::test_profile_sources_with_cedar_ledger_reconcile tests/integration/test_experts_profile_sources.py::test_profile_sources_with_new_learning_award_refresh_values -x
+	$(PYTHON) -m pytest tests/integration/test_experts_profile_sources.py::test_profile_sources_with_cedar_ledger_reconcile tests/integration/test_experts_profile_sources.py::test_profile_sources_with_new_learning_award_refresh_values tests/integration/test_experts_profile_sources.py::test_profile_sources_with_public_detail_reconcile_grouped_values -x
 
 .PHONY: test-experts-s12-browser
 test-experts-s12-browser:
