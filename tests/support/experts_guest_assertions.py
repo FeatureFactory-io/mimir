@@ -103,10 +103,10 @@ def assert_no_private_account_controls(html: str) -> None:
     for node in _walk_elements(_parse_root(html)):
         for key, value in node.attributes:
             if key in ("data-testid", "id"):
-                assert (
-                    value not in _PRIVATE_ACCOUNT_HOOKS
-                ), "Found an account-only control"
-                assert not value.startswith(
-                    _PRIVATE_TOKEN_PREFIXES
-                ), "Found a private token control"
+                assert value not in _PRIVATE_ACCOUNT_HOOKS, (
+                    "Found an account-only control"
+                )
+                assert not value.startswith(_PRIVATE_TOKEN_PREFIXES), (
+                    "Found a private token control"
+                )
     assert "DEMO_ONLY_NOT_A_REAL_TOKEN" not in html, "Found a private token sentinel"

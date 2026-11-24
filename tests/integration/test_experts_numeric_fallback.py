@@ -439,9 +439,9 @@ def _read_unchanged(client: Client, url: str) -> HttpResponse:
     ):
         response = client.get(url, headers={"X-Request-ID": _REQUEST_ID})
     assert response.status_code == HTTPStatus.OK
-    assert (
-        _fingerprint() == before
-    ), "Numeric-fallback GET changed domain/session/mail state."
+    assert _fingerprint() == before, (
+        "Numeric-fallback GET changed domain/session/mail state."
+    )
     assert not callbacks, "Numeric-fallback GET queued post-commit work."
     for query in queries:
         sql = query["sql"].lstrip().upper()

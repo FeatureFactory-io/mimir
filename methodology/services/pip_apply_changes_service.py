@@ -163,7 +163,9 @@ class PipApplyChangesService:
             )
         if change.parent_workflow_id:
             return change.parent_workflow_id
-        raise ValidationError("ADD Activity requires parent_workflow in target playbook.")
+        raise ValidationError(
+            "ADD Activity requires parent_workflow in target playbook."
+        )
 
     @staticmethod
     def _resolve_insert_after_activity_id(
@@ -210,20 +212,28 @@ class PipApplyChangesService:
         et = change.entity_type
         if et == PipChange.ENTITY_ACTIVITY:
             parent_id = PipApplyChangesService._resolve_parent_workflow_id(
-                change=change, playbook=playbook, ref_map=ref_map,
+                change=change,
+                playbook=playbook,
+                ref_map=ref_map,
             )
             parent = Workflow.objects.get(pk=parent_id, playbook_id=playbook.pk)
             name = change.name.strip()
             if not name:
                 raise ValidationError("ADD Activity requires a name.")
             guidance_body = (
-                change.content.strip() if change.content and change.content.strip() else "## TBD"
+                change.content.strip()
+                if change.content and change.content.strip()
+                else "## TBD"
             )
             after_id = PipApplyChangesService._resolve_insert_after_activity_id(
-                change=change, playbook=playbook, ref_map=ref_map,
+                change=change,
+                playbook=playbook,
+                ref_map=ref_map,
             )
             phase_id = PipApplyChangesService._resolve_phase_id(
-                change=change, playbook=playbook, ref_map=ref_map,
+                change=change,
+                playbook=playbook,
+                ref_map=ref_map,
             )
             if change.append_to_playbook_end or after_id is None:
                 agg = Activity.objects.filter(workflow_id=parent.pk).aggregate(
@@ -257,7 +267,9 @@ class PipApplyChangesService:
             name = change.name.strip()
             if not name:
                 raise ValidationError("ADD Phase requires a name.")
-            agg = Phase.objects.filter(playbook_id=playbook.pk).aggregate(m=Max("order"))
+            agg = Phase.objects.filter(playbook_id=playbook.pk).aggregate(
+                m=Max("order")
+            )
             next_order = int(agg["m"] or 0) + 1
             ph = Phase.objects.create(
                 playbook=playbook,
@@ -265,14 +277,18 @@ class PipApplyChangesService:
                 description=(change.content or "")[:500],
                 order=next_order,
             )
-            logger.info("PIP apply ADD Phase pk=%s pip=%s order=%s", ph.pk, pip_pk, next_order)
+            logger.info(
+                "PIP apply ADD Phase pk=%s pip=%s order=%s", ph.pk, pip_pk, next_order
+            )
             return ph.pk
 
         if et == PipChange.ENTITY_WORKFLOW:
             name = change.name.strip()
             if not name:
                 raise ValidationError("ADD Workflow requires a name.")
-            agg = Workflow.objects.filter(playbook_id=playbook.pk).aggregate(m=Max("order"))
+            agg = Workflow.objects.filter(playbook_id=playbook.pk).aggregate(
+                m=Max("order")
+            )
             next_order = int(agg["m"] or 0) + 1
             wf = Workflow.objects.create(
                 playbook=playbook,
@@ -357,7 +373,12 @@ class PipApplyChangesService:
                 type=_normalize_artifact_type(change.artifact_type),
                 is_required=bool(change.artifact_is_required),
             )
-            logger.info("PIP apply ADD Artifact pk=%s pip=%s producer=%s", art.pk, pip_pk, producer_id)
+            logger.info(
+                "PIP apply ADD Artifact pk=%s pip=%s producer=%s",
+                art.pk,
+                pip_pk,
+                producer_id,
+            )
             return art.pk
         raise ValidationError(f"Unsupported ADD entity '{et}'.")
 
@@ -417,7 +438,9 @@ class PipApplyChangesService:
                 ActivityService.clear_activity_agent(tgt_id)
         elif rel == PipChange.REL_ACTIVITY_WORKFLOW:
             if is_link:
-                WorkflowService.add_activity_to_workflow(src_id, tgt_id, order=change.order)
+                WorkflowService.add_activity_to_workflow(
+                    src_id, tgt_id, order=change.order
+                )
             else:
                 WorkflowService.remove_activity_from_workflow(src_id, tgt_id)
         elif rel == PipChange.REL_ARTIFACT_ACTIVITY:
@@ -472,7 +495,7 @@ class PipApplyChangesService:
                 raise ValidationError("Activity not in playbook.")
             if body:
                 if body.startswith(_APPEND_PREFIX):
-                    suffix = body[len(_APPEND_PREFIX):].strip()
+                    suffix = body[len(_APPEND_PREFIX) :].strip()
                     act.guidance = (act.guidance or "").rstrip() + "\n\n" + suffix
                 else:
                     act.guidance = body
@@ -480,7 +503,9 @@ class PipApplyChangesService:
                 act.name = change.name.strip()[:200]
             if change.phase_ref:
                 act.phase_id = PipApplyChangesService._resolve_phase_id(
-                    change=change, playbook=playbook, ref_map=ref_map,
+                    change=change,
+                    playbook=playbook,
+                    ref_map=ref_map,
                 )
             act.save(update_fields=["guidance", "name", "phase_id", "updated_at"])
             if change.display_order is not None:
@@ -530,7 +555,7 @@ class PipApplyChangesService:
                 sk.title = change.name.strip()[:200]
             if body:
                 if body.startswith(_APPEND_PREFIX):
-                    suffix = body[len(_APPEND_PREFIX):].strip()
+                    suffix = body[len(_APPEND_PREFIX) :].strip()
                     sk.content = (sk.content or "").rstrip() + "\n\n" + suffix
                 else:
                     sk.content = body
@@ -561,7 +586,15 @@ class PipApplyChangesService:
             if change.artifact_type.strip():
                 art.type = change.artifact_type.strip()[:50]
             art.is_required = bool(change.artifact_is_required)
-            art.save(update_fields=["name", "description", "type", "is_required", "updated_at"])
+            art.save(
+                update_fields=[
+                    "name",
+                    "description",
+                    "type",
+                    "is_required",
+                    "updated_at",
+                ]
+            )
             logger.info("PIP apply ALTER Artifact pk=%s pip=%s", cid, pip_pk)
             return
 
@@ -573,7 +606,7 @@ class PipApplyChangesService:
                 ru.title = change.name.strip()[:200]
             if body:
                 if body.startswith(_APPEND_PREFIX):
-                    suffix = body[len(_APPEND_PREFIX):].strip()
+                    suffix = body[len(_APPEND_PREFIX) :].strip()
                     ru.content = (ru.content or "").rstrip() + "\n\n" + suffix
                 else:
                     ru.content = body

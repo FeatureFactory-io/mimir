@@ -563,8 +563,9 @@ def _click_s38_copy(
         expect(toast).to_be_hidden()
     else:
         with page.expect_response(
-            lambda response: response.url == receipt_url
-            and response.request.method == "POST",
+            lambda response: (
+                response.url == receipt_url and response.request.method == "POST"
+            ),
             timeout=COPY_RECEIPT_TIMEOUT_MS,
         ) as receipt:
             button.click()

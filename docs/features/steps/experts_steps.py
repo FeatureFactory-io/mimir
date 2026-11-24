@@ -108,9 +108,9 @@ def contributor_is_absent(context: Context, username: str) -> None:
     :return: None. Example: None.
     :raises AssertionError: If that contributor card exists.
     """
-    assert username not in dict(
-        _leaderboard_cards(context.response)
-    ), f"{username} has a ranked card."
+    assert username not in dict(_leaderboard_cards(context.response)), (
+        f"{username} has a ranked card."
+    )
 
 
 @when("Elena selects Development")
@@ -204,9 +204,9 @@ def _leaderboard_cards(response: HttpResponse) -> tuple[tuple[str, Element], ...
         test_id = dict(child.attributes).get("data-testid", "")
         assert test_id.startswith(_CARD_PREFIX) and test_id != _CARD_PREFIX
         cards.append((test_id.removeprefix(_CARD_PREFIX), child))
-    assert len({username for username, _ in cards}) == len(
-        cards
-    ), "Duplicate ranked card."
+    assert len({username for username, _ in cards}) == len(cards), (
+        "Duplicate ranked card."
+    )
     return tuple(cards)
 
 

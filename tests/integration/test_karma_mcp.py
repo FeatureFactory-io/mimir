@@ -480,8 +480,9 @@ async def test_mcp_detail_with_legacy_registration_returns_content_and_pair(
     :raises AssertionError: Legacy registration bypasses the shared path.
     """
     case = _eligible_mcp_case(tool_name, mcp_dataset)
-    before, environment = await KarmaAward.objects.acount(), os.environ.get(
-        UNSAFE_ORM_FLAG
+    before, environment = (
+        await KarmaAward.objects.acount(),
+        os.environ.get(UNSAFE_ORM_FLAG),
     )
     async with mcp_client_factory.open(
         actor_username=case.actor_username, entrypoint="legacy"

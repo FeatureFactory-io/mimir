@@ -180,7 +180,7 @@ def expert_detail(request: HttpRequest, username: str) -> HttpResponse:
     )
     try:
         detail = ExpertsService.public_detail(username, correlation_id=correlation_id)
-    except (LookupError, ValueError):
+    except LookupError, ValueError:
         logger.info(
             "%s | branch | reason=expert_unavailable correlation_id=%s",
             _DETAIL_LOG,

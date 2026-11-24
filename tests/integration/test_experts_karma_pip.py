@@ -210,9 +210,9 @@ def _post_with_stale_review_snapshot(
             assert connection.connection is not publishing_connection
             assert not connection.in_atomic_block
             preloaded.set()
-            assert resume.wait(
-                _REVIEW_INTERLEAVE_TIMEOUT
-            ), "Publishing request timed out"
+            assert resume.wait(_REVIEW_INTERLEAVE_TIMEOUT), (
+                "Publishing request timed out"
+            )
 
     original_profile = sys.getprofile()
     sys.setprofile(pause_after_preload)
@@ -245,9 +245,9 @@ def _publish_while_staff_request_has_stale_snapshot(
             publishing_connection,
         )
         try:
-            assert preloaded.wait(
-                _REVIEW_INTERLEAVE_TIMEOUT
-            ), "No stale Reviewed snapshot"
+            assert preloaded.wait(_REVIEW_INTERLEAVE_TIMEOUT), (
+                "No stale Reviewed snapshot"
+            )
             published = _post_staff_choice(
                 publisher,
                 change_key,

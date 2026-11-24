@@ -1168,9 +1168,9 @@ class _RaceControl:
             and sql.lstrip().startswith("SELECT")
             and self.sqlite_statement_busy.is_set()
         ):
-            assert self.winner_committed.wait(
-                _RACE_TIMEOUT
-            ), "winner did not commit before retry"
+            assert self.winner_committed.wait(_RACE_TIMEOUT), (
+                "winner did not commit before retry"
+            )
         try:
             return execute(sql, params, many, context)
         except OperationalError as error:
@@ -1224,24 +1224,25 @@ def _race_recording_calls(
         loser = executor.submit(_run_race_worker, control, "loser", operations[1])
         interleave_error: AssertionError | None = None
         try:
-            assert control.attempted_insert.wait(
-                _RACE_TIMEOUT
-            ), "loser never attempted SQL INSERT"
-            assert not _event_rows(
-                event_identity
-            ), "winner committed before loser reached SQL"
+            assert control.attempted_insert.wait(_RACE_TIMEOUT), (
+                "loser never attempted SQL INSERT"
+            )
+            assert not _event_rows(event_identity), (
+                "winner committed before loser reached SQL"
+            )
             if connection.vendor == "postgresql":
                 _assert_postgres_waiting_on_winner(control)
             else:
-                assert control.sqlite_statement_busy.wait(
-                    _RACE_TIMEOUT
-                ), "SQLite did not return a real lock error"
+                assert control.sqlite_statement_busy.wait(_RACE_TIMEOUT), (
+                    "SQLite did not return a real lock error"
+                )
         except AssertionError as error:
             interleave_error = error
         finally:
             control.winner_can_commit.set()
-        result = winner.result(timeout=_RACE_TIMEOUT), loser.result(
-            timeout=_RACE_TIMEOUT
+        result = (
+            winner.result(timeout=_RACE_TIMEOUT),
+            loser.result(timeout=_RACE_TIMEOUT),
         )
         if interleave_error is not None:
             raise interleave_error
@@ -1268,9 +1269,9 @@ def _run_race_worker(
             with transaction.atomic():
                 result = operation()
                 control.staged.wait()
-                assert control.winner_can_commit.wait(
-                    _RACE_TIMEOUT
-                ), "no release for winning transaction"
+                assert control.winner_can_commit.wait(_RACE_TIMEOUT), (
+                    "no release for winning transaction"
+                )
             control.winner_committed.set()
             return result
         control.staged.wait()

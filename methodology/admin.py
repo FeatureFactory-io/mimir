@@ -44,11 +44,19 @@ logger = logging.getLogger(__name__)
 class PlaybookAdmin(admin.ModelAdmin):
     """Admin configuration for Playbook model."""
 
-    list_display = ('name', 'author', 'category', 'status', 'source', 'version', 'created_at')
-    list_filter = ('status', 'category', 'source', 'visibility')
-    search_fields = ('name', 'description', 'tags')
-    readonly_fields = ('created_at', 'updated_at')
-    actions = ('revert_released_playbooks_to_draft',)
+    list_display = (
+        "name",
+        "author",
+        "category",
+        "status",
+        "source",
+        "version",
+        "created_at",
+    )
+    list_filter = ("status", "category", "source", "visibility")
+    search_fields = ("name", "description", "tags")
+    readonly_fields = ("created_at", "updated_at")
+    actions = ("revert_released_playbooks_to_draft",)
 
     @admin.action(description="Revert Released → Draft (keeps numeric version)")
     def revert_released_playbooks_to_draft(self, request, queryset):
@@ -62,10 +70,14 @@ class PlaybookAdmin(admin.ModelAdmin):
                     reason=f"Admin revert (user id={request.user.pk}, playbook id={playbook.pk})",
                 )
             except (ValidationError, PermissionError) as exc:
-                self.message_user(request, f"{playbook.name}: {exc}", level=messages.ERROR)
+                self.message_user(
+                    request, f"{playbook.name}: {exc}", level=messages.ERROR
+                )
             else:
                 self.message_user(
-                    request, f'Reverted "{playbook.name}" to draft.', level=messages.SUCCESS
+                    request,
+                    f'Reverted "{playbook.name}" to draft.',
+                    level=messages.SUCCESS,
                 )
 
 
@@ -344,7 +356,7 @@ class _PipAdmin(admin.ModelAdmin):
             return queryset.none()
         try:
             return queryset.filter(pk=unquote(object_id))
-        except (ValueError, ValidationError):
+        except ValueError, ValidationError:
             return queryset.none()
 
     def _destination_id(self, request: HttpRequest) -> int | None:
@@ -464,91 +476,112 @@ class PipChangeAdmin(_PipAdmin):
 @admin.register(Workflow)
 class WorkflowAdmin(admin.ModelAdmin):
     """Admin configuration for Workflow model."""
-    list_display = ('name', 'playbook', 'order', 'created_at')
-    list_filter = ('created_at', 'updated_at')
-    search_fields = ('name', 'description', 'playbook__name')
-    readonly_fields = ('created_at', 'updated_at')
-    ordering = ('playbook', 'order')
+
+    list_display = ("name", "playbook", "order", "created_at")
+    list_filter = ("created_at", "updated_at")
+    search_fields = ("name", "description", "playbook__name")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("playbook", "order")
 
 
 @admin.register(Activity)
 class ActivityAdmin(admin.ModelAdmin):
     """Admin configuration for Activity model."""
-    list_display = ('name', 'workflow', 'phase', 'order', 'predecessor', 'successor')
-    list_filter = ('phase', 'created_at')
-    search_fields = ('name', 'guidance', 'workflow__name', 'workflow__playbook__name')
-    readonly_fields = ('created_at', 'updated_at')
-    ordering = ('workflow', 'order')
-    filter_horizontal = ('rules',)
+
+    list_display = ("name", "workflow", "phase", "order", "predecessor", "successor")
+    list_filter = ("phase", "created_at")
+    search_fields = ("name", "guidance", "workflow__name", "workflow__playbook__name")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("workflow", "order")
+    filter_horizontal = ("rules",)
     fieldsets = (
-        ('Basic Information', {
-            'fields': ('workflow', 'name', 'guidance')
-        }),
-        ('Organization', {
-            'fields': ('order', 'phase')
-        }),
-        ('Dependencies', {
-            'fields': ('predecessor', 'successor')
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
+        ("Basic Information", {"fields": ("workflow", "name", "guidance")}),
+        ("Organization", {"fields": ("order", "phase")}),
+        ("Dependencies", {"fields": ("predecessor", "successor")}),
+        (
+            "Timestamps",
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
     )
 
 
 @admin.register(Artifact)
 class ArtifactAdmin(admin.ModelAdmin):
     """Admin configuration for Artifact model."""
-    list_display = ('name', 'type', 'produced_by', 'playbook', 'is_required', 'created_at')
-    list_filter = ('type', 'is_required', 'playbook')
-    search_fields = ('name', 'description')
-    readonly_fields = ('created_at', 'updated_at')
+
+    list_display = (
+        "name",
+        "type",
+        "produced_by",
+        "playbook",
+        "is_required",
+        "created_at",
+    )
+    list_filter = ("type", "is_required", "playbook")
+    search_fields = ("name", "description")
+    readonly_fields = ("created_at", "updated_at")
 
 
 @admin.register(ArtifactInput)
 class ArtifactInputAdmin(admin.ModelAdmin):
     """Admin configuration for ArtifactInput model."""
-    list_display = ('artifact', 'activity', 'is_required', 'created_at')
-    list_filter = ('is_required',)
-    search_fields = ('artifact__name', 'activity__name')
+
+    list_display = ("artifact", "activity", "is_required", "created_at")
+    list_filter = ("is_required",)
+    search_fields = ("artifact__name", "activity__name")
 
 
 @admin.register(Skill)
 class SkillAdmin(admin.ModelAdmin):
     """Admin configuration for Skill model."""
-    list_display = ('title', 'playbook', 'capability_domain', 'technology_stack', 'created_at')
-    search_fields = ('title', 'content', 'capability_domain', 'technology_stack')
-    list_filter = ('created_at',)
-    readonly_fields = ('created_at', 'updated_at')
-    raw_id_fields = ('playbook',)
+
+    list_display = (
+        "title",
+        "playbook",
+        "capability_domain",
+        "technology_stack",
+        "created_at",
+    )
+    search_fields = ("title", "content", "capability_domain", "technology_stack")
+    list_filter = ("created_at",)
+    readonly_fields = ("created_at", "updated_at")
+    raw_id_fields = ("playbook",)
 
 
 @admin.register(Rule)
 class RuleAdmin(admin.ModelAdmin):
     """Admin configuration for Rule model."""
-    list_display = ('title', 'slug', 'playbook', 'always_apply', 'created_at')
-    search_fields = ('title', 'slug', 'content')
-    list_filter = ('always_apply', 'created_at')
-    readonly_fields = ('created_at', 'updated_at')
-    raw_id_fields = ('playbook',)
+
+    list_display = ("title", "slug", "playbook", "always_apply", "created_at")
+    search_fields = ("title", "slug", "content")
+    list_filter = ("always_apply", "created_at")
+    readonly_fields = ("created_at", "updated_at")
+    raw_id_fields = ("playbook",)
 
 
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
     """Admin configuration for Agent model."""
-    list_display = ('name', 'playbook', 'created_at', 'updated_at')
-    search_fields = ('name', 'description', 'playbook__name')
-    list_filter = ('created_at', 'playbook')
-    readonly_fields = ('created_at', 'updated_at')
-    raw_id_fields = ('playbook',)
+
+    list_display = ("name", "playbook", "created_at", "updated_at")
+    search_fields = ("name", "description", "playbook__name")
+    list_filter = ("created_at", "playbook")
+    readonly_fields = ("created_at", "updated_at")
+    raw_id_fields = ("playbook",)
 
 
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
     """Admin configuration for Team model."""
 
-    list_display = ["name", "visibility", "join_policy", "category", "admin", "created_at"]
+    list_display = [
+        "name",
+        "visibility",
+        "join_policy",
+        "category",
+        "admin",
+        "created_at",
+    ]
     search_fields = ["name", "description"]
     list_filter = ["visibility", "category", "join_policy"]
     readonly_fields = ("created_at", "updated_at")

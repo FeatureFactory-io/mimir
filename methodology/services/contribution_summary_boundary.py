@@ -149,7 +149,7 @@ class PublicContributionSummaryBoundary:
             code = "output_validation_failed"
             response = self._freeze_response(raw_response)
             text = validate_summary_response(response, evidence)
-        except (ValueError, LLMError, DatabaseError):
+        except ValueError, LLMError, DatabaseError:
             failure = self._failure(code, trace, response)
         else:
             logger.info("%s | exit | %s outcome=success", _COMPLETE, details)

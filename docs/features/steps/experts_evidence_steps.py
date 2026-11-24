@@ -29,8 +29,9 @@ def elena_on_maria_public_profile(context: Context) -> None:
     path = reverse("expert_detail", args=[_MARIA_USERNAME])
     context.execute_steps(f'Given Elena is authenticated\nWhen Elena opens "{path}"')
     _assert_destination(context, path, "experts/detail.html")
-    assert context.response.context["person"]["subject_id"] == (
-        context.cedar_dataset.user_ids[_MARIA_USERNAME]
+    assert (
+        context.response.context["person"]["subject_id"]
+        == (context.cedar_dataset.user_ids[_MARIA_USERNAME])
     )
 
 
@@ -172,6 +173,6 @@ def _assert_workflow_activities(
         for activity in response.context["activities"]
         if activity.workflow_id == actual_workflow.pk
     }
-    assert (
-        expected <= activity_names
-    ), "A required activity belongs to another workflow."
+    assert expected <= activity_names, (
+        "A required activity belongs to another workflow."
+    )

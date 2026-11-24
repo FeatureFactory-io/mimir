@@ -74,9 +74,9 @@ def test_own_profile_with_anonymous_browser_navigation_shows_login_only(
     _assert_login_handoff(page, live_server_url, responses)
     _assert_private_profile_absent(page, responses, private_profile)
 
-    assert (
-        sqlite_connection.total_changes == writes_before
-    ), "Guest navigation wrote to SQLite"
+    assert sqlite_connection.total_changes == writes_before, (
+        "Guest navigation wrote to SQLite"
+    )
     if _snapshot_rows() != rows_before:
         raise AssertionError("Guest navigation changed persisted Cedar state")
     assert len(mailoutbox) == 0, "Guest navigation sent mail"

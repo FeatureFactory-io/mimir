@@ -412,8 +412,9 @@ def _follow_guest_link(
     :raises AssertionError: If the click does not reach the public document.
     """
     with page.expect_response(
-        lambda response: response.url == destination
-        and response.request.is_navigation_request()
+        lambda response: (
+            response.url == destination and response.request.is_navigation_request()
+        )
     ) as navigation:
         link.click()
     _assert_guest_document(page, navigation.value, destination, private_values)

@@ -255,7 +255,7 @@ class ContributionSummaryService:
             result = self._persist_success(
                 subject_id, pip_id, correlation_id, completed, latency_ms
             )
-        except (DatabaseError, ValidationError):
+        except DatabaseError, ValidationError:
             return self._record_failure(
                 subject_id,
                 pip_id,
@@ -398,7 +398,7 @@ class ContributionSummaryService:
             interaction_id = self._persist_failure(
                 subject_id, pip_id, correlation_id, code, trace, response, latency_ms
             )
-        except (DatabaseError, ValidationError):
+        except DatabaseError, ValidationError:
             logger.error(
                 "%s | error | reason_code=storage_failed correlation_id=%s",
                 _REFRESH,
@@ -580,8 +580,9 @@ class ContributionSummaryService:
         model = (response.model if response is not None else "") or self._llm.model_id
         unsafe_model = _CREDENTIAL.search(model) is not None
         usage = response.usage if response is not None else {}
-        input_tokens, output_tokens = usage.get("input_tokens"), usage.get(
-            "output_tokens"
+        input_tokens, output_tokens = (
+            usage.get("input_tokens"),
+            usage.get("output_tokens"),
         )
         return {
             "model": _UNKNOWN_MODEL if unsafe_model else model,

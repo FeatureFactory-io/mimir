@@ -189,7 +189,9 @@ def test_workflow_export_does_not_overwrite_stale_cursor_rules(
         folder_name="MIN",
     )
 
-    assert (active / "assert-log-story.mdc").read_text(encoding="utf-8") == "OLD VERSION\n"
+    assert (active / "assert-log-story.mdc").read_text(
+        encoding="utf-8"
+    ) == "OLD VERSION\n"
     assert (active / "assert-agent-story.mdc").exists()
     assert result["active_cursor_rules_synchronized"] is False
     assert "assert-log-story.mdc" in result["stale_or_missing_active_rules"]

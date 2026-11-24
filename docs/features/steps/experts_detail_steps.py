@@ -60,12 +60,12 @@ def public_paragraph_has_no_truncation_contract(context: Context) -> None:
     """
     paragraph = find_by_test_id(context.response.content, _SUMMARY_TEST_ID)
     attributes = dict(paragraph.attributes)
-    assert _TRUNCATION_CLASSES.isdisjoint(
-        attributes.get("class", "").split()
-    ), "The public summary uses a truncation class."
-    assert not _INLINE_TRUNCATION.search(
-        attributes.get("style", "")
-    ), "The public summary declares inline truncation."
+    assert _TRUNCATION_CLASSES.isdisjoint(attributes.get("class", "").split()), (
+        "The public summary uses a truncation class."
+    )
+    assert not _INLINE_TRUNCATION.search(attributes.get("style", "")), (
+        "The public summary declares inline truncation."
+    )
 
 
 @then('the title includes "{title}"')

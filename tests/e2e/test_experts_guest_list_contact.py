@@ -335,6 +335,6 @@ def _assert_actions_reachable(page: Page, usernames: tuple[str, ...]) -> None:
                 ));
             }"""), f"The contact control is covered on the {username} card"
     if below_initial_viewport:
-        assert page.evaluate(
-            "scrollY > 0"
-        ), "The final card requires document scrolling"
+        assert page.evaluate("scrollY > 0"), (
+            "The final card requires document scrolling"
+        )

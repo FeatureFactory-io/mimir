@@ -145,7 +145,7 @@ class PlaybookExportService:
                 force_apply=force_apply,
                 user=user,
             )
-        except (ObjectDoesNotExist, PermissionError):
+        except ObjectDoesNotExist, PermissionError:
             logger.info(
                 "%s | error | %s reason=unavailable completed_file_count=0 receipt_sent=false",
                 _EXPORT_LOG,

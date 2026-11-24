@@ -214,8 +214,9 @@ def _submit_normal_proposal(page: Page, origin: str, change: PipChange) -> None:
     )
     submit_url = origin + reverse("pip_submit_review", args=[change.pip_id])
     with page.expect_response(
-        lambda response: response.url == submit_url
-        and response.request.method == "POST"
+        lambda response: (
+            response.url == submit_url and response.request.method == "POST"
+        )
     ) as submission:
         _submit_and_expect_reviewed(page, detail_url, change, _ASSESSMENT_REASON)
     assert submission.value.status == HTTPStatus.FOUND
@@ -303,8 +304,9 @@ def _finalize_as_mike(
     expect(modal).to_have_accessible_name("Confirm Finalize")
     expect(modal.get_by_role("button", name="Close", exact=True)).to_be_visible()
     with page.expect_response(
-        lambda response: response.url == review_url
-        and response.request.method == "POST"
+        lambda response: (
+            response.url == review_url and response.request.method == "POST"
+        )
     ) as submission:
         modal.get_by_test_id("confirm-finalize-btn").click()
     assert submission.value.status == HTTPStatus.FOUND

@@ -331,9 +331,9 @@ def test_profile_contribution_context_with_maria_log_story_happy(
         "Cedar Bid Pricing",
         "Internal staffing notes for Cedar",
     )
-    assert not any(
-        value in messages for value in private_values
-    ), "Profile logs exposed private content."
+    assert not any(value in messages for value in private_values), (
+        "Profile logs exposed private content."
+    )
 
 
 def test_profile_contribution_context_with_anonymous_request_log_story_reject(

@@ -10,7 +10,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("methodology", "0027_experts_schema"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

@@ -34,9 +34,9 @@ def maria_is_authenticated(context: Context) -> None:
     maria = context.cedar_dataset.users_by_username.get(_MARIA_USERNAME)
     assert maria is not None, "The Cedar baseline must contain Maria."
     logger.info("Experts profile AT | sign-in entry | user_id=%s", maria.pk)
-    assert context.client.login(
-        username=maria.username, password=CEDAR_PASSWORD
-    ), "Maria's Cedar account could not sign in."
+    assert context.client.login(username=maria.username, password=CEDAR_PASSWORD), (
+        "Maria's Cedar account could not sign in."
+    )
     logger.info("Experts profile AT | sign-in exit | user_id=%s", maria.pk)
 
 
@@ -239,7 +239,7 @@ def source_sum_matches_total(context: Context, total: int) -> None:
     )
     assert stored and stored == original, "The stored Cedar prose changed."
     paragraph = find_by_test_id(response.content, "profile-contribution-summary")
-    assert paragraph.name == "p" and paragraph.children == [
-        stored
-    ], "The profile did not render the full stored contribution summary."
+    assert paragraph.name == "p" and paragraph.children == [stored], (
+        "The profile did not render the full stored contribution summary."
+    )
     logger.info("S12 total | exit | user_id=%s request_id=%s", maria.pk, request_id)

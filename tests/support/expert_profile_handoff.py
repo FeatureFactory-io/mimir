@@ -21,7 +21,7 @@ def extract_maria_profile_href(html: str | bytes) -> str:
     hrefs = [value for name, value in anchor.attributes if name == "href"]
     assert len(hrefs) == 1, "Maria's View profile anchor must have exactly one href."
     href = hrefs[0]
-    assert (
-        href == _MARIA_PROFILE_PATH
-    ), "Maria's View profile href must be her local path."
+    assert href == _MARIA_PROFILE_PATH, (
+        "Maria's View profile href must be her local path."
+    )
     return href

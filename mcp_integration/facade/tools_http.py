@@ -145,7 +145,7 @@ def get_playbook(
                 )
             )
         payload = check_response(response, tool)
-    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+    except ValueError, PermissionError, RuntimeError, httpx.HTTPError:
         logger.info(_DETAIL_REJECT_LOG, tool, playbook_id, identity)
         raise
     return _complete_mcp_detail(
@@ -264,7 +264,7 @@ def get_workflow(workflow_id: int, event_identity: str | None = None) -> dict:
     try:
         response = get_client().get(f"/api/workflows/{workflow_id}/")
         payload = check_response(response, tool)
-    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+    except ValueError, PermissionError, RuntimeError, httpx.HTTPError:
         logger.info(_DETAIL_REJECT_LOG, tool, workflow_id, identity)
         raise
     return _complete_mcp_detail(
@@ -379,7 +379,7 @@ def get_activity(activity_id: int, event_identity: str | None = None) -> dict:
     try:
         response = get_client().get(f"/api/activities/{activity_id}/")
         payload = check_response(response, tool)
-    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+    except ValueError, PermissionError, RuntimeError, httpx.HTTPError:
         logger.info(_DETAIL_REJECT_LOG, tool, activity_id, identity)
         raise
     return _complete_mcp_detail(
@@ -856,7 +856,7 @@ def get_skill(skill_id: int, event_identity: str | None = None) -> dict:
     try:
         response = get_client().get(f"/api/skills/{skill_id}/")
         payload = check_response(response, tool)
-    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+    except ValueError, PermissionError, RuntimeError, httpx.HTTPError:
         logger.info(_DETAIL_REJECT_LOG, tool, skill_id, identity)
         raise
     return _complete_mcp_detail(
@@ -1035,7 +1035,7 @@ def get_rule(rule_id: int, event_identity: str | None = None) -> dict:
     try:
         response = get_client().get(f"/api/rules/{rule_id}/")
         payload = check_response(response, tool)
-    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+    except ValueError, PermissionError, RuntimeError, httpx.HTTPError:
         logger.info(_DETAIL_REJECT_LOG, tool, rule_id, identity)
         raise
     return _complete_mcp_detail(
@@ -1161,7 +1161,7 @@ def get_agent(agent_id: int, event_identity: str | None = None) -> dict:
     try:
         response = get_client().get(f"/api/agents/{agent_id}/")
         payload = check_response(response, tool)
-    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+    except ValueError, PermissionError, RuntimeError, httpx.HTTPError:
         logger.info(_DETAIL_REJECT_LOG, tool, agent_id, identity)
         raise
     return _complete_mcp_detail(
@@ -1311,7 +1311,7 @@ def get_artifact(artifact_id: int, event_identity: str | None = None) -> dict:
     try:
         response = get_client().get(f"/api/artifacts/{artifact_id}/")
         payload = check_response(response, tool)
-    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+    except ValueError, PermissionError, RuntimeError, httpx.HTTPError:
         logger.info(_DETAIL_REJECT_LOG, tool, artifact_id, identity)
         raise
     return _complete_mcp_detail(
@@ -1452,7 +1452,7 @@ def get_phase(phase_id: int, event_identity: str | None = None) -> dict:
     try:
         response = get_client().get(f"/api/phases/{phase_id}/")
         payload = check_response(response, tool)
-    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+    except ValueError, PermissionError, RuntimeError, httpx.HTTPError:
         logger.info(_DETAIL_REJECT_LOG, tool, phase_id, identity)
         raise
     return _complete_mcp_detail(
@@ -1557,7 +1557,7 @@ def get_pip(pip_id: int, event_identity: str | None = None) -> dict:
     try:
         response = get_client().get(f"/api/pips/{pip_id}/")
         payload = check_response(response, tool)
-    except (ValueError, PermissionError, RuntimeError, httpx.HTTPError):
+    except ValueError, PermissionError, RuntimeError, httpx.HTTPError:
         logger.info(_DETAIL_REJECT_LOG, tool, pip_id, identity)
         raise
     return _complete_mcp_detail(
@@ -1968,7 +1968,7 @@ def _resolve_consumption_event_identity(value: str | None) -> UUID:
         return uuid4()
     try:
         return UUID(value)
-    except (ValueError, AttributeError, TypeError):
+    except ValueError, AttributeError, TypeError:
         logger.info(
             "_resolve_consumption_event_identity | branch | reason=invalid_event_identity"
         )
@@ -2432,7 +2432,7 @@ def _run_local_export(
     logger.info("facade_export | entry | %s", trace)
     try:
         bundle = check_response(get_client().post(route, json=payload), tool)
-    except (httpx.TransportError, PermissionError, RuntimeError, ValueError):
+    except httpx.TransportError, PermissionError, RuntimeError, ValueError:
         logger.info(
             "facade_export | error | %s reason=bundle_unavailable completed_file_count=0 receipt_sent=false",
             trace,

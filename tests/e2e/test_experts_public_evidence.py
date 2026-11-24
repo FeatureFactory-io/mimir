@@ -136,8 +136,10 @@ def _follow_link(page: Page, link: Locator, origin: str, path: str) -> None:
     """
     expect(link).to_have_attribute("href", path)
     with page.expect_response(
-        lambda response: response.request.is_navigation_request()
-        and response.frame == page.main_frame
+        lambda response: (
+            response.request.is_navigation_request()
+            and response.frame == page.main_frame
+        )
     ) as navigation:
         link.click()
     destination = f"{origin}{path}"

@@ -33,9 +33,9 @@ def find_by_test_id(html: str | bytes, test_id: str) -> Element:
         for element in _walk_elements(_parse_root(html))
         if ("data-testid", test_id) in element.attributes
     ]
-    assert (
-        len(matches) == 1
-    ), f"Expected one data-testid={test_id!r}, found {len(matches)}"
+    assert len(matches) == 1, (
+        f"Expected one data-testid={test_id!r}, found {len(matches)}"
+    )
     return matches[0]
 
 
@@ -167,9 +167,9 @@ def assert_karma_source_rows(
     for group, expected_group in zip(groups, expected_rows, strict=True):
         _assert_source_row_group(group, expected_group)
     total = find_by_test_id(html, total_test_id)
-    assert total not in _walk_elements(
-        table
-    ), "The score must be separate from the table"
+    assert total not in _walk_elements(table), (
+        "The score must be separate from the table"
+    )
     assert element_text(total) == displayed_total
 
 
@@ -194,6 +194,6 @@ def _assert_source_row_group(
         if is_header:
             assert ("scope", "col") in cells[1].attributes
         actual_cells = tuple(element_text(cell) for cell in cells)
-        assert (
-            actual_cells == expected_cells
-        ), f"Expected {expected_cells!r}, found {actual_cells!r}"
+        assert actual_cells == expected_cells, (
+            f"Expected {expected_cells!r}, found {actual_cells!r}"
+        )

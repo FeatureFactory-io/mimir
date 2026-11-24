@@ -227,9 +227,9 @@ def _recapture_directories(
     for recapture in recaptures:
         directory = _relative_path(recapture["directory"])
         assert directory != full_run and directory.parent == full_run.parent
-        assert (
-            directory not in directories
-        ), f"Duplicate recapture directory: {directory}"
+        assert directory not in directories, (
+            f"Duplicate recapture directory: {directory}"
+        )
         directories.add(directory)
         revision = recapture.get("source_revision")
         assert (
@@ -241,9 +241,9 @@ def _recapture_directories(
         cases = recapture["cases"]
         assert isinstance(cases, list) and cases and recapture["reason"].strip()
         originals = {full_run / f"{case}.json" for case in cases}
-        assert (
-            _relative_path(recapture["original_report"]) in originals
-        ), "Original recapture report must identify a case in the full run"
+        assert _relative_path(recapture["original_report"]) in originals, (
+            "Original recapture report must identify a case in the full run"
+        )
         for case in cases:
             assert (
                 _relative_path(case).parts == (case,) and case not in case_directories
@@ -365,9 +365,9 @@ def _assert_acquisition_head(root: Path, path: str, revision: str) -> None:
     :raises AssertionError: If the record is missing or differs from its declaration.
     """
     expected = f"{revision}\n".encode("ascii")
-    assert (
-        _artifact(root, path).read_bytes() == expected
-    ), f"Acquisition revision mismatch: {path}"
+    assert _artifact(root, path).read_bytes() == expected, (
+        f"Acquisition revision mismatch: {path}"
+    )
 
 
 def _transcript_path(name: str) -> PurePosixPath:
@@ -414,15 +414,15 @@ def _assert_capture(row: dict[str, Any], root: Path, browser: str) -> None:
         assert report["form"] == "authenticated"
     screenshot = _artifact(root, row["screenshot"])
     assert screenshot.name == report["screenshot"]
-    assert (
-        _sha256(screenshot) == report["screenshot_sha256"]
-    ), f"Screenshot hash mismatch: {row['screenshot']}"
+    assert _sha256(screenshot) == report["screenshot_sha256"], (
+        f"Screenshot hash mismatch: {row['screenshot']}"
+    )
     assert _png_covers_viewport(screenshot, width, height)
     trace = _artifact(root, row["trace"])
     assert trace.name == report["trace"]
-    assert (
-        _sha256(trace) == report["trace_sha256"]
-    ), f"Trace hash mismatch: {row['trace']}"
+    assert _sha256(trace) == report["trace_sha256"], (
+        f"Trace hash mismatch: {row['trace']}"
+    )
     with ZipFile(trace) as archive:
         assert {"trace.trace", "trace.network"} <= set(archive.namelist())
 
@@ -437,13 +437,13 @@ def _has_rendered_fonts(report: dict[str, Any]) -> bool:
 
 def _relative_path(name: str) -> PurePosixPath:
     """Reject unsafe manifest paths even when no evidence files are installed."""
-    assert (
-        isinstance(name, str) and "\\" not in name and "\0" not in name
-    ), f"Unsafe evidence path: {name!r}"
+    assert isinstance(name, str) and "\\" not in name and "\0" not in name, (
+        f"Unsafe evidence path: {name!r}"
+    )
     path = PurePosixPath(name)
-    assert (
-        path.parts and not path.is_absolute() and ".." not in path.parts
-    ), f"Unsafe evidence path: {name}"
+    assert path.parts and not path.is_absolute() and ".." not in path.parts, (
+        f"Unsafe evidence path: {name}"
+    )
     return path
 
 
@@ -451,9 +451,9 @@ def _artifact(root: Path, name: str) -> Path:
     """Resolve a nonempty artifact inside the evidence package."""
     path = (root / _relative_path(name)).resolve()
     assert path.is_relative_to(root), f"Evidence path escapes package: {name}"
-    assert (
-        path.is_file() and path.stat().st_size
-    ), f"Missing or empty evidence artifact: {name}"
+    assert path.is_file() and path.stat().st_size, (
+        f"Missing or empty evidence artifact: {name}"
+    )
     return path
 
 

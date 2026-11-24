@@ -953,9 +953,9 @@ class _ExportObservation:
             self.bundle = response.json()
             if self.revoked is not None:
                 # The body must drain before Django can close the response and signal.
-                assert self.revoked.wait(
-                    SIGNAL_WAIT_SECONDS
-                ), "The real bundle did not finish."
+                assert self.revoked.wait(SIGNAL_WAIT_SECONDS), (
+                    "The real bundle did not finish."
+                )
         elif path == _RECEIPT:
             receipt = json.loads(response.request.content)
             assert response.headers["X-Request-ID"] == receipt["event_identity"]

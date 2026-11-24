@@ -76,6 +76,6 @@ def assert_expert_precedes(
         card = find_by_test_id(str(leaderboard), f"{_CARD_PREFIX}{username}")
         total = find_by_test_id(str(card), "expert-card-karma")
         assert element_text(total) == _TIED_DISPLAY_TOTAL
-    assert context.tie03_ledger == list(
-        KarmaAward.objects.order_by("pk").values()
-    ), "Opening the Design leaderboard changed its award ledger."
+    assert context.tie03_ledger == list(KarmaAward.objects.order_by("pk").values()), (
+        "Opening the Design leaderboard changed its award ledger."
+    )

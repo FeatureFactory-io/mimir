@@ -50,9 +50,9 @@ def assert_both_contact_destinations(context: Context, destination: str) -> None
         assert (
             "disabled" not in attributes and attributes.get("aria-disabled") != "true"
         ), f"{surface}: Maria's Reach out is disabled."
-        assert (
-            attributes.get("href") == destination
-        ), f"{surface}: Maria's Reach out has the wrong destination."
+        assert attributes.get("href") == destination, (
+            f"{surface}: Maria's Reach out has the wrong destination."
+        )
 
 
 @then("the action does not imply that availability is confirmed")
@@ -64,9 +64,9 @@ def assert_contact_does_not_confirm_availability(context: Context) -> None:
     :raises AssertionError: For availability or suitability confirmation language.
     """
     for surface, action in context.maria_contact_actions:
-        assert (
-            element_text(action) == "Reach out"
-        ), f"{surface}: expected the Reach out label."
+        assert element_text(action) == "Reach out", (
+            f"{surface}: expected the Reach out label."
+        )
         assert dict(action.attributes).get("title") == (
             "Start an email discussion with Maria Rodriguez"
         ), f"{surface}: expected an invitation to start an email discussion."

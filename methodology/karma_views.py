@@ -84,7 +84,7 @@ def copy_success_receipt(request: HttpRequest) -> JsonResponse:
         reason = "invalid_payload"
         if isinstance(error, _RejectedCopyPayload) and error.event_identity is not None:
             trace += f" action_uuid={error.event_identity}"
-    except (ObjectDoesNotExist, PermissionError):
+    except ObjectDoesNotExist, PermissionError:
         reason = "access_denied"
     except ValidationError:
         reason = "event_conflict"

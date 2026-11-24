@@ -603,9 +603,9 @@ def decode_tool_payload(result: object) -> object:
     :raises AssertionError: Tool error, missing payload or malformed result.
     """
     if isinstance(result, CallToolResult):
-        assert (
-            not result.is_error
-        ), "Registered MCP call did not return a successful result."
+        assert not result.is_error, (
+            "Registered MCP call did not return a successful result."
+        )
         if result.structured_content is not None:
             return result.structured_content
         blocks = result.content
@@ -700,15 +700,15 @@ def assert_collection_result(
     :raises AssertionError: Metadata, disclosure, access timestamp or invariant differs.
     """
     assert before.summaries_json is not None and before.interactions_json is not None
-    assert (
-        after == before
-    ), "Collection changed complete awards, all projections, access times or summaries."
-    assert (
-        isinstance(payload, list) and payload
-    ), "Primary collection must return genuine nonempty metadata."
-    assert (
-        payload == case.expected["rows"]
-    ), "Native metadata, identity, field set or order differs."
+    assert after == before, (
+        "Collection changed complete awards, all projections, access times or summaries."
+    )
+    assert isinstance(payload, list) and payload, (
+        "Primary collection must return genuine nonempty metadata."
+    )
+    assert payload == case.expected["rows"], (
+        "Native metadata, identity, field set or order differs."
+    )
     if case.tool_name == "list_activities":
         assert all("guidance" not in row for row in payload)
 
@@ -1022,7 +1022,7 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         """
         try:
             self._stop_process()
-        except (AssertionError, OSError, RuntimeError, TimeoutExpired):
+        except AssertionError, OSError, RuntimeError, TimeoutExpired:
             if exc is None:
                 raise
             exc.add_note("Facade stdio cleanup also failed.")
@@ -1060,9 +1060,9 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :raises AssertionError: Missing/malformed tool list.
         """
         tools = self._request("tools/list", {}).get("tools")
-        assert (
-            isinstance(tools, list) and tools
-        ), "No registered MCP tools were returned."
+        assert isinstance(tools, list) and tools, (
+            "No registered MCP tools were returned."
+        )
         assert all(
             isinstance(tool, dict) and isinstance(tool.get("inputSchema"), dict)
             for tool in tools
@@ -1076,9 +1076,9 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :return: Actual decoded content. Example: historical changes.
         :raises AssertionError: Tool error, malformed result or wrong actor context.
         """
-        assert (
-            case.actor_username == self.actor_username
-        ), "Case actor differs from the stdio token actor."
+        assert case.actor_username == self.actor_username, (
+            "Case actor differs from the stdio token actor."
+        )
         result = self._request(
             "tools/call", {"name": case.tool_name, "arguments": dict(case.arguments)}
         )
@@ -1117,9 +1117,9 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :raises AssertionError: Banner, log line, malformed JSON or unmatched result.
         """
         assert self._process is not None and self._process.returncode == 0
-        assert (
-            not self._pending_stdout
-        ), "Child wrote more stdout after its last matched response."
+        assert not self._pending_stdout, (
+            "Child wrote more stdout after its last matched response."
+        )
         response_ids = [
             message["id"] for message in self.stdout_messages if "id" in message
         ]
@@ -1267,9 +1267,9 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
             self.stdout_messages.append(envelope)
             if isinstance(message, JSONRPCResponse) and message.id == request_id:
                 return envelope
-            assert isinstance(
-                message, JSONRPCNotification
-            ), "Unexpected facade JSON-RPC message."
+            assert isinstance(message, JSONRPCNotification), (
+                "Unexpected facade JSON-RPC message."
+            )
         raise TimeoutError(f"No facade JSON-RPC response for request {request_id}.")
 
     def _drain_stderr(self) -> None:

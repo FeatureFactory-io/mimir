@@ -121,7 +121,7 @@ class GaldrClient:
                 max_tokens=max_tokens,
                 temperature=_ASSESSMENT_TEMPERATURE,
             )
-        except (LLMError, ValueError):
+        except LLMError, ValueError:
             raise GaldrLLMError("Galdr assessment provider failed.") from None
         if not isinstance(response, LLMResponse):
             raise GaldrLLMError("Galdr assessment returned invalid metadata.")

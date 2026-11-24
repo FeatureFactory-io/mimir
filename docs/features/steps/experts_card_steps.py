@@ -30,9 +30,9 @@ def card_identity(context: Context, card_id: str, rank: int, display_name: str) 
     """
     response = context.response
     assert response.status_code == HTTPStatus.OK, "The Design leaderboard did not load."
-    assert (
-        card_id.startswith(_CARD_PREFIX) and card_id != _CARD_PREFIX
-    ), "Expected a contributor card selector."
+    assert card_id.startswith(_CARD_PREFIX) and card_id != _CARD_PREFIX, (
+        "Expected a contributor card selector."
+    )
     leaderboard = find_by_test_id(response.content, "experts-leaderboard")
     articles = [
         child
@@ -42,9 +42,9 @@ def card_identity(context: Context, card_id: str, rank: int, display_name: str) 
     card = find_by_test_id(str(leaderboard), card_id)
     assert card.name == "article", "The requested contributor is not a card article."
     assert 1 <= rank <= len(articles), "Expected rank is outside the leaderboard."
-    assert ("data-testid", card_id) in articles[
-        rank - 1
-    ].attributes, "The contributor card is in the wrong position."
+    assert ("data-testid", card_id) in articles[rank - 1].attributes, (
+        "The contributor card is in the wrong position."
+    )
 
     rank_label = find_by_test_id(str(card), "expert-card-rank")
     assert element_text(rank_label) == str(rank), "The displayed rank differs."
@@ -75,13 +75,13 @@ def card_signals(context: Context, total: str, category: str) -> None:
         user_id=context.cedar_dataset.user_ids[username]
     )
     stored_summary = profile.contribution_summary
-    assert (
-        stored_summary and "accessibility" in stored_summary.casefold()
-    ), "The Cedar contributor must have stored accessibility prose."
+    assert stored_summary and "accessibility" in stored_summary.casefold(), (
+        "The Cedar contributor must have stored accessibility prose."
+    )
     hint = find_by_test_id(html, f"experts-card-hint-{username}")
-    assert hint.name == "p" and hint.children == [
-        stored_summary
-    ], "The card must contain the complete stored paragraph as text."
+    assert hint.name == "p" and hint.children == [stored_summary], (
+        "The card must contain the complete stored paragraph as text."
+    )
 
 
 @then("it has an avatar or initials plus View profile and Reach out controls")

@@ -194,15 +194,15 @@ def _validate_acceptance_selection(
     :return: Positive passed evidence. Example: nine passed scenarios.
     :raises AssertionError: Missing, failed, skipped, undefined or duplicate selected cases.
     """
-    assert (
-        isinstance(payload, list) and len(payload) == 1
-    ), "Expected one Behave feature report."
+    assert isinstance(payload, list) and len(payload) == 1, (
+        "Expected one Behave feature report."
+    )
     feature = payload[0]
     assert isinstance(feature, dict), "Malformed Behave feature report."
     scenarios = _selected_scenarios(feature, _selection_pattern(acceptance_id))
-    assert (
-        scenarios and len(scenarios) == expected_cases
-    ), f"{acceptance_id}: expected {expected_cases} selected cases, got {len(scenarios)}."
+    assert scenarios and len(scenarios) == expected_cases, (
+        f"{acceptance_id}: expected {expected_cases} selected cases, got {len(scenarios)}."
+    )
     step_count = sum(_passed_step_count(case) for case in scenarios.values())
     return AcceptanceResult(len(scenarios), step_count, 0, 0, {"features": payload})
 
@@ -221,9 +221,9 @@ def _selected_scenarios(
         name = element.get("name")
         assert isinstance(name, str) and name, "Behave scenario has no name."
         if not re.match(pattern, name):
-            assert (
-                element.get("status") == "skipped"
-            ), f"Unexpected executed scenario: {name}"
+            assert element.get("status") == "skipped", (
+                f"Unexpected executed scenario: {name}"
+            )
             continue
         assert name not in selected, f"Duplicate selected scenario: {name}"
         selected[name] = element
@@ -233,15 +233,15 @@ def _selected_scenarios(
 def _passed_step_count(case: Mapping[str, object]) -> int:
     """Require a passing case with a positive number of passing steps."""
     name = case["name"]
-    assert (
-        case.get("status") == "passed"
-    ), f"{name}: scenario status {case.get('status')!r}"
+    assert case.get("status") == "passed", (
+        f"{name}: scenario status {case.get('status')!r}"
+    )
     steps = case.get("steps")
     assert isinstance(steps, list) and steps, f"{name}: no executed steps."
     for step in steps:
         assert isinstance(step, dict), f"{name}: malformed step."
         result = step.get("result")
-        assert (
-            isinstance(result, dict) and result.get("status") == "passed"
-        ), f"{name}: step {step.get('name')!r} did not pass: {result!r}"
+        assert isinstance(result, dict) and result.get("status") == "passed", (
+            f"{name}: step {step.get('name')!r} did not pass: {result!r}"
+        )
     return len(steps)

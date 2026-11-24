@@ -156,8 +156,10 @@ def _follow_link(page: Page, link: Locator, origin: str, path: str) -> None:
     """
     expect(link).to_have_attribute("href", path)
     with page.expect_response(
-        lambda response: response.request.is_navigation_request()
-        and response.frame == page.main_frame
+        lambda response: (
+            response.request.is_navigation_request()
+            and response.frame == page.main_frame
+        )
     ) as navigation:
         link.click()
     destination = f"{origin}{path}"
@@ -374,9 +376,9 @@ def _assert_maria_private_values_absent(page: Page, dataset: CedarDataset) -> No
     """
     token = Token.objects.get(user=dataset.users_by_username[_MARIA])
     html = page.content()
-    assert not any(
-        value in html for value in (*_PRIVATE_SENTINELS, token.key)
-    ), "Maria's public profile included a private value."
+    assert not any(value in html for value in (*_PRIVATE_SENTINELS, token.key)), (
+        "Maria's public profile included a private value."
+    )
 
 
 def _follow_audit_playbook(page: Page, origin: str) -> str:

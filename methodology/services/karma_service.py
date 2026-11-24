@@ -680,7 +680,7 @@ class KarmaService:
                 if specifications
                 else ()
             )
-        except (ValidationError, IntegrityError):
+        except ValidationError, IntegrityError:
             logger.error(
                 "%s | error | reason=award_batch_failed %s", _ACCEPTED_CHANGE_LOG, trace
             )

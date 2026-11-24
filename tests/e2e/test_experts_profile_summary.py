@@ -200,9 +200,9 @@ def _assert_restored_preview_in_viewport(page: Page) -> None:
         };
     }""")
     assert bounds["contentTop"] >= bounds["headerBottom"] - _PIXEL_TOLERANCE, bounds
-    assert (
-        bounds["contentBottom"] <= bounds["viewportBottom"] + _PIXEL_TOLERANCE
-    ), bounds
+    assert bounds["contentBottom"] <= bounds["viewportBottom"] + _PIXEL_TOLERANCE, (
+        bounds
+    )
 
 
 @pytest.mark.parametrize(

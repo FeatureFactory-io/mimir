@@ -119,9 +119,9 @@ def _assert_composed_routes(routes: list[str]) -> None:
     :return: None when list, detail, Other and both rejections were actually visited.
     :raises AssertionError: If a composed UAT branch is missing.
     """
-    assert (
-        len(routes) == 10
-    ), "The assigned composed guest document sequence is incomplete"
+    assert len(routes) == 10, (
+        "The assigned composed guest document sequence is incomplete"
+    )
     assert routes[:3] == [
         "/experts/?category=design",
         "/experts/mrodriguez/",

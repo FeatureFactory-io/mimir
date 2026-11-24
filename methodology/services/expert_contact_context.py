@@ -61,7 +61,7 @@ def build_expert_contact_context(
     tag = _validate_contact_request(request)
     try:
         usernames = _validated_usernames(expert_usernames)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         logger.warning(_VALIDATION_LOG, "expert_usernames", tag)
         raise
     authenticated = request.user.is_authenticated

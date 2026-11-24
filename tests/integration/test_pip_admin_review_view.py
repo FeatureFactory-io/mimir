@@ -165,7 +165,9 @@ def test_admin_04_staff_can_access_review_form(bob_staff, reviewed_pip_all_accep
     url = reverse("pip_admin_review", kwargs={"pk": reviewed_pip_all_accept.pk})
     response = client.get(url)
     assert response.status_code == 200
-    assert b"Admin Review" in response.content or b"admin-review-page" in response.content
+    assert (
+        b"Admin Review" in response.content or b"admin-review-page" in response.content
+    )
 
 
 @pytest.mark.django_db
@@ -277,10 +279,10 @@ def test_admin_10_finalize_blocked_until_all_set(bob_staff, reviewed_pip_all_acc
     client = Client()
     client.force_login(bob_staff)
     url = reverse("pip_admin_review", kwargs={"pk": reviewed_pip_all_accept.pk})
-    
+
     # Try to finalize without setting decisions
     response = client.post(url, {"action": "finalize"})
-    
+
     # Should fail validation
     reviewed_pip_all_accept.refresh_from_db()
     assert reviewed_pip_all_accept.status == ProcessImprovementProposal.STATUS_REVIEWED
@@ -333,22 +335,24 @@ def test_save_decisions_with_partial_form_preserves_existing_choices(
 
 
 @pytest.mark.django_db
-def test_admin_07_all_accept_bumps_version(bob_staff, reviewed_pip_all_accept, playbook_bundle):
+def test_admin_07_all_accept_bumps_version(
+    bob_staff, reviewed_pip_all_accept, playbook_bundle
+):
     """FOB-PIP-ADMIN-07: Accepting all changes bumps playbook version."""
     pb, wf, act = playbook_bundle
     client = Client()
     client.force_login(bob_staff)
     url = reverse("pip_admin_review", kwargs={"pk": reviewed_pip_all_accept.pk})
-    
+
     changes = list(reviewed_pip_all_accept.changes.all())
     post_data = {"action": "finalize"}
     for ch in changes:
         post_data[f"decision_{ch.pk}"] = "ACCEPT"
         post_data[f"note_{ch.pk}"] = "accepted"
-    
+
     response = client.post(url, post_data)
     assert response.status_code == 302
-    
+
     reviewed_pip_all_accept.refresh_from_db()
     pb.refresh_from_db()
     assert reviewed_pip_all_accept.status == ProcessImprovementProposal.STATUS_ACCEPTED
@@ -362,28 +366,33 @@ def test_admin_07_all_accept_bumps_version(bob_staff, reviewed_pip_all_accept, p
 
 
 @pytest.mark.django_db
-def test_admin_08_partial_accept_applies_only_accepted(bob_staff, reviewed_pip_partial, playbook_bundle):
+def test_admin_08_partial_accept_applies_only_accepted(
+    bob_staff, reviewed_pip_partial, playbook_bundle
+):
     """FOB-PIP-ADMIN-08: Accepting some changes applies only those."""
     pb, wf, act = playbook_bundle
     client = Client()
     client.force_login(bob_staff)
     url = reverse("pip_admin_review", kwargs={"pk": reviewed_pip_partial.pk})
-    
+
     changes = list(reviewed_pip_partial.changes.order_by("order"))
     post_data = {"action": "finalize"}
     post_data[f"decision_{changes[0].pk}"] = "ACCEPT"
     post_data[f"note_{changes[0].pk}"] = "good"
     post_data[f"decision_{changes[1].pk}"] = "REJECT"
     post_data[f"note_{changes[1].pk}"] = "bad"
-    
+
     response = client.post(url, post_data)
     assert response.status_code == 302
-    
+
     reviewed_pip_partial.refresh_from_db()
     pb.refresh_from_db()
-    assert reviewed_pip_partial.status == ProcessImprovementProposal.STATUS_ACCEPTED_PARTIAL
+    assert (
+        reviewed_pip_partial.status
+        == ProcessImprovementProposal.STATUS_ACCEPTED_PARTIAL
+    )
     assert pb.version == Decimal("2.0")
-    
+
     # Check only first change applied
     act.refresh_from_db()
     assert "good alteration" in act.guidance
@@ -391,23 +400,25 @@ def test_admin_08_partial_accept_applies_only_accepted(bob_staff, reviewed_pip_p
 
 
 @pytest.mark.django_db
-def test_admin_09_all_reject_no_change(bob_staff, reviewed_pip_all_accept, playbook_bundle):
+def test_admin_09_all_reject_no_change(
+    bob_staff, reviewed_pip_all_accept, playbook_bundle
+):
     """FOB-PIP-ADMIN-09: Rejecting all changes leaves playbook unchanged."""
     pb, wf, act = playbook_bundle
     original_version = pb.version
     client = Client()
     client.force_login(bob_staff)
     url = reverse("pip_admin_review", kwargs={"pk": reviewed_pip_all_accept.pk})
-    
+
     changes = list(reviewed_pip_all_accept.changes.all())
     post_data = {"action": "finalize"}
     for ch in changes:
         post_data[f"decision_{ch.pk}"] = "REJECT"
         post_data[f"note_{ch.pk}"] = "rejected"
-    
+
     response = client.post(url, post_data)
     assert response.status_code == 302
-    
+
     reviewed_pip_all_accept.refresh_from_db()
     pb.refresh_from_db()
     assert reviewed_pip_all_accept.status == ProcessImprovementProposal.STATUS_REJECTED
@@ -424,7 +435,7 @@ def test_admin_17_decided_pip_readonly(bob_staff, reviewed_pip_all_accept):
         ch.admin_note = "accepted"
         ch.save(update_fields=["admin_decision", "admin_note"])
     PIPAdminService.finalize_pip(reviewed_pip_all_accept, bob_staff)
-    
+
     # Now try to access it
     client = Client()
     client.force_login(bob_staff)
@@ -433,7 +444,7 @@ def test_admin_17_decided_pip_readonly(bob_staff, reviewed_pip_all_accept):
     assert response.status_code == 200
     content = response.content.decode()
     assert "already been decided" in content or "already-decided-banner" in content
-    
+
     # Try to POST anyway - should be blocked
     post_data = {"action": "finalize"}
     for ch in changes:

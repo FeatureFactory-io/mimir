@@ -47,6 +47,6 @@ def follow_maria_profile_link(context: Context) -> None:
     context.execute_steps(f'When Elena opens "{href}"')
     detail = context.response
     assert detail.status_code == HTTPStatus.OK, "Maria's profile did not load."
-    assert (
-        detail.wsgi_request.user == listing.wsgi_request.user
-    ), "Maria's profile must be served in Elena's session."
+    assert detail.wsgi_request.user == listing.wsgi_request.user, (
+        "Maria's profile must be served in Elena's session."
+    )

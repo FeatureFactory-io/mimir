@@ -104,8 +104,9 @@ def _persisted_private_sentinels(dataset: CedarDataset) -> tuple[str, str, str]:
     people = cast(Sequence[Mapping[str, object]], dataset.oracle["people"])
     person = next(row for row in people if row["username"] == _MARIA)
     book_title = cast(Sequence[str], person["private_playbooks"])[0]
-    pip_title, token = cast(str, person["private_pip"]), cast(
-        str, person["private_token"]
+    pip_title, token = (
+        cast(str, person["private_pip"]),
+        cast(str, person["private_token"]),
     )
     author_id = dataset.user_ids[_MARIA]
     exists = (

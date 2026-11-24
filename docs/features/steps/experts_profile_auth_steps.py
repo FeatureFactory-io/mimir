@@ -103,9 +103,9 @@ def _cedar_private_profile_values(dataset: CedarDataset) -> tuple[str, ...]:
     :raises AssertionError: If the original request created an account or token.
     """
     expected_users = set(dataset.user_ids.values())
-    assert (
-        set(User.objects.values_list("pk", flat=True)) == expected_users
-    ), "Guest request changed the Cedar account set"
+    assert set(User.objects.values_list("pk", flat=True)) == expected_users, (
+        "Guest request changed the Cedar account set"
+    )
     maria = dataset.users_by_username["mrodriguez"]
     token_rows = dict(Token.objects.values_list("user_id", "key"))
     assert set(token_rows) == {maria.pk}, "Expected only Maria's seeded API token"
@@ -152,9 +152,9 @@ def _assert_private_profile_absent(
         for name, value in node.attributes
         if name in {"id", "data-testid"}
     }
-    assert not any(
-        hook.startswith(_PRIVATE_HOOK_PREFIXES) for hook in hooks
-    ), "The guest response rendered an own-profile control"
+    assert not any(hook.startswith(_PRIVATE_HOOK_PREFIXES) for hook in hooks), (
+        "The guest response rendered an own-profile control"
+    )
     return hooks
 
 

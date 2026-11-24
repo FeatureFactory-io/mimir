@@ -387,9 +387,9 @@ def _assert_tab_order(page: Page, actions: list[Locator]) -> None:
                         }];
                     }));
             }""")
-        assert (
-            not coverings
-        ), f"Action label is occluded: {action.get_attribute('data-testid')} {coverings}"
+        assert not coverings, (
+            f"Action label is occluded: {action.get_attribute('data-testid')} {coverings}"
+        )
 
 
 def _wait_for_scroll_to_settle(page: Page) -> None:

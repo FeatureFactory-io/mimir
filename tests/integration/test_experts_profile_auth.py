@@ -201,9 +201,9 @@ def _assert_private_profile_absent(
         for name, value in node.attributes
         if name in {"id", "data-testid"}
     }
-    assert hooks.isdisjoint(
-        _PRIVATE_TEST_IDS
-    ), "The guest response has private controls"
+    assert hooks.isdisjoint(_PRIVATE_TEST_IDS), (
+        "The guest response has private controls"
+    )
     return hooks
 
 

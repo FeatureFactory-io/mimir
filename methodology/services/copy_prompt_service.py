@@ -243,7 +243,9 @@ class CopyPromptService:
     @staticmethod
     def map_activity_prompts(activities: Iterable[Activity]) -> Dict[int, str]:
         """Build copy prompts keyed by activity pk for list templates."""
-        return {act.pk: CopyPromptService.build_activity_prompt(act) for act in activities}
+        return {
+            act.pk: CopyPromptService.build_activity_prompt(act) for act in activities
+        }
 
     @staticmethod
     def map_skill_prompts(skills: Iterable[Skill]) -> Dict[int, str]:

@@ -85,7 +85,7 @@ def _assert_design_ranking(page: Page) -> None:
 
         bounds = card.bounding_box()
         assert bounds is not None, f"Rank {rank} has no visible card bounds"
-        assert (
-            previous_bottom <= bounds["y"]
-        ), f"Rank {rank} overlaps or precedes its predecessor"
+        assert previous_bottom <= bounds["y"], (
+            f"Rank {rank} overlaps or precedes its predecessor"
+        )
         previous_bottom = bounds["y"] + bounds["height"]
