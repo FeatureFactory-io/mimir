@@ -7,8 +7,9 @@ from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
-from django.db import connection, transaction
-from django.db.models import F
+from django.db import connections, transaction
+from django.db.models import F, QuerySet
+from django.db.transaction import TransactionManagementError
 from django.utils import timezone
 
 from methodology.models import PipChange, ProcessImprovementProposal
@@ -42,6 +43,32 @@ class PIPAlreadyDecidedError(ValidationError):
 
 class PIPAdminService:
     """Apply administrator decisions atomically."""
+
+    @staticmethod
+    def lock_proposals(
+        proposals: QuerySet[ProcessImprovementProposal],
+    ) -> list[ProcessImprovementProposal]:
+        """Reload proposals under the same lock used by staff review mutations.
+
+        :param proposals: Parent rows to lock. Example: proposals filtered by ID.
+        :return: Current proposals in primary-key order. Example: [PIP 42].
+        :raises TypeError: If given something other than a PIP queryset.
+        :raises TransactionManagementError: If the caller does not own an atomic block.
+        """
+        if (
+            not isinstance(proposals, QuerySet)
+            or proposals.model is not ProcessImprovementProposal
+        ):
+            raise TypeError("PIP review locks require a proposal queryset.")
+        locked = proposals.select_for_update(of=("self",)).order_by("pk")
+        connection = connections[locked.db]
+        if not connection.in_atomic_block:
+            raise TransactionManagementError("PIP review locks require a transaction.")
+        if connection.vendor == "sqlite":
+            # SQLite ignores SELECT FOR UPDATE. Take the write lock before reading
+            # any proposal in this transaction to avoid a stale read snapshot.
+            locked.update(status=F("status"))
+        return list(locked)
 
     @staticmethod
     @transaction.atomic
@@ -142,16 +169,15 @@ class PIPAdminService:
             raise ValidationError("A saved PIP is required to record decisions.")
         if not isinstance(decisions, Mapping):
             raise ValidationError("PIP decisions must be keyed by change ID.")
-        proposal = ProcessImprovementProposal.objects.filter(pk=pip.pk)
-        if connection.vendor == "sqlite":
-            # Start SQLite's write transaction before reading the parent. Its
-            # SELECT FOR UPDATE is a no-op, and writing later can use a stale read.
-            proposal.update(status=F("status"))
-        return (
-            proposal.select_for_update(of=("self",))
-            .select_related("playbook", "created_by")
-            .get()
+        proposal = ProcessImprovementProposal.objects.filter(pk=pip.pk).select_related(
+            "playbook", "created_by"
         )
+        locked = PIPAdminService.lock_proposals(proposal)
+        if not locked:
+            raise ProcessImprovementProposal.DoesNotExist(
+                f"PIP {pip.pk} does not exist."
+            )
+        return locked[0]
 
     @staticmethod
     def _write_choices(

@@ -1,17 +1,27 @@
 """Admin configuration for methodology models."""
 
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
 from django import forms
 from django.contrib import admin, messages
-from django.core.exceptions import ValidationError
+from django.contrib.admin.actions import delete_selected as django_delete_selected
+from django.contrib.admin.utils import unquote
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import router, transaction
+from django.db.models import Q
+
 from methodology.models import (
     Activity,
     Agent,
     Artifact,
     ArtifactInput,
     JoinRequest,
+    PipChange,
     Playbook,
     PlaybookVersion,
-    PipChange,
     ProcessImprovementProposal,
     Rule,
     Skill,
@@ -20,6 +30,14 @@ from methodology.models import (
     TeamPlaybook,
     Workflow,
 )
+from methodology.services.pip_admin_service import DECIDED_STATUSES, PIPAdminService
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from django.http import HttpRequest, HttpResponse
+    from django.template.response import TemplateResponse
+
+logger = logging.getLogger(__name__)
 
 
 @admin.register(Playbook)
@@ -81,13 +99,17 @@ def _pip_admin_exc_text(exc: ValidationError | Exception) -> str:
     return str(exc)
 
 
-_PIP_INLINE_FREEZE_AFTER = frozenset(
-    {
-        ProcessImprovementProposal.STATUS_ACCEPTED,
-        ProcessImprovementProposal.STATUS_ACCEPTED_PARTIAL,
-        ProcessImprovementProposal.STATUS_REJECTED,
-    }
-)
+_PIP_DECIDED_NOTICE = "This PIP has already been decided and cannot be modified."
+
+
+def _is_decided(obj: ProcessImprovementProposal | PipChange | None) -> bool:
+    """Check the persisted parent state of an admin object when one is present.
+
+    :param obj: Object from the Django Admin lookup. Example: Change 7.
+    :return: Whether the object's proposal is decided. Example: True for Accepted.
+    """
+    proposal = obj.pip if isinstance(obj, PipChange) else obj
+    return proposal is not None and proposal.status in DECIDED_STATUSES
 
 
 class PipChangeInlineForm(forms.ModelForm):
@@ -145,7 +167,15 @@ class PipChangeInline(admin.TabularInline):
         "updated_at",
     )
 
-    def get_readonly_fields(self, request, obj=None):
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: ProcessImprovementProposal | None = None
+    ) -> tuple[str, ...]:
+        """Choose editable inline fields from the proposal's review stage.
+
+        :param request: Admin request. Example: GET the parent form.
+        :param obj: Parent proposal, if saved. Example: PIP 42 in Reviewed.
+        :return: Read-only field names. Example: every field when decided.
+        """
         audit_always = frozenset(
             {
                 "galdr_recommendation",
@@ -158,14 +188,210 @@ class PipChangeInline(admin.TabularInline):
         if obj is None:
             return tuple(sorted(audit_always))
         if obj.status == ProcessImprovementProposal.STATUS_REVIEWED:
-            return tuple(n for n in field_names if n not in {"admin_decision", "admin_note"})
-        if obj.status in _PIP_INLINE_FREEZE_AFTER:
+            return tuple(
+                n for n in field_names if n not in {"admin_decision", "admin_note"}
+            )
+        if _is_decided(obj):
             return tuple(field_names)
         return tuple(sorted(audit_always))
 
 
+class _PipAdmin(admin.ModelAdmin):
+    """Share the proposal decision boundary between registered admin forms."""
+
+    actions = ("delete_selected",)
+
+    def has_change_permission(
+        self,
+        request: HttpRequest,
+        obj: ProcessImprovementProposal | PipChange | None = None,
+    ) -> bool:
+        """Allow authorized edits to a proposal that has not been decided.
+
+        :param request: Admin request. Example: POST a reviewed change.
+        :param obj: Object being edited or None for model-level permission.
+        :return: True when Django grants permission and the object is mutable.
+        """
+        return super().has_change_permission(request, obj) and not _is_decided(obj)
+
+    def has_delete_permission(
+        self,
+        request: HttpRequest,
+        obj: ProcessImprovementProposal | PipChange | None = None,
+    ) -> bool:
+        """Preserve decided records in direct and cascading admin delete checks.
+
+        :param request: Admin request. Example: GET a deletion confirmation.
+        :param obj: Object being deleted or None for model-level permission.
+        :return: True when Django grants permission and the object is mutable.
+        """
+        return super().has_delete_permission(request, obj) and not _is_decided(obj)
+
+    def render_change_form(
+        self,
+        request: HttpRequest,
+        context: dict[str, object],
+        add: bool = False,
+        change: bool = False,
+        form_url: str = "",
+        obj: ProcessImprovementProposal | PipChange | None = None,
+    ) -> TemplateResponse:
+        """Explain why the registered Django form is read-only after decision.
+
+        :param request: Admin request. Example: GET an accepted PIP's child.
+        :param context: Existing Django form context.
+        :param add: Whether this is the add form.
+        :param change: Whether this is the change form.
+        :param form_url: Optional form action URL.
+        :param obj: Existing proposal or change shown in the form, if any.
+        :return: Standard Django Admin form response with a notice when decided.
+        """
+        if _is_decided(obj):
+            self.message_user(request, _PIP_DECIDED_NOTICE, messages.WARNING)
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def changeform_view(
+        self,
+        request: HttpRequest,
+        object_id: str | None = None,
+        form_url: str = "",
+        extra_context: dict[str, object] | None = None,
+    ) -> HttpResponse:
+        """Use Django's normal form handling under the parent lock for POSTs.
+
+        :param request: Admin request. Example: POST a child decision.
+        :param object_id: Django Admin object ID, or None for an add form.
+        :param form_url: Optional form action URL.
+        :param extra_context: Optional template values supplied by a caller.
+        :return: Normal Django view, validation, or save response.
+        :raises PermissionDenied: If the source or destination is decided.
+        """
+        if request.method == "POST":
+            adding = object_id is None or "_saveasnew" in request.POST
+            can_post = (
+                self.has_add_permission(request)
+                if adding
+                else self.has_change_permission(request)
+            )
+            if not can_post:
+                raise PermissionDenied
+            with transaction.atomic(using=router.db_for_write(self.model)):
+                self._lock_editable_proposals(
+                    request,
+                    self._object_selection(request, object_id),
+                    self._destination_id(request),
+                )
+                return super().changeform_view(
+                    request, object_id, form_url, extra_context
+                )
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def delete_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        extra_context: dict[str, object] | None = None,
+    ) -> HttpResponse:
+        """Protect a confirmed direct deletion with the proposal review lock.
+
+        :param request: Admin request. Example: confirmed POST to delete a child.
+        :param object_id: Django Admin object ID.
+        :param extra_context: Optional template values supplied by a caller.
+        :return: Standard Django deletion or confirmation response.
+        :raises PermissionDenied: If the proposal has been decided.
+        """
+        if request.method == "POST":
+            if not self.has_delete_permission(request):
+                raise PermissionDenied
+            with transaction.atomic(using=router.db_for_write(self.model)):
+                self._lock_editable_proposals(
+                    request, self._object_selection(request, object_id)
+                )
+                return super().delete_view(request, object_id, extra_context)
+        return super().delete_view(request, object_id, extra_context)
+
+    @admin.action(
+        permissions=["delete"], description="Delete selected %(verbose_name_plural)s"
+    )
+    def delete_selected(
+        self,
+        request: HttpRequest,
+        queryset: QuerySet[ProcessImprovementProposal | PipChange],
+    ) -> TemplateResponse | None:
+        """Keep Django's bulk delete workflow with the same parent lock on confirm.
+
+        :param request: Admin action request. Example: confirmed deletion POST.
+        :param queryset: Existing Admin selection. Example: two pending changes.
+        :return: Standard Django confirmation, or None after deleting.
+        :raises PermissionDenied: If the selection includes a decided proposal.
+        """
+        if request.POST.get("post"):
+            # Use the same identities for locking and deleting even when the
+            # filtered changelist gains a row between these operations.
+            selected_ids = tuple(queryset.values_list("pk", flat=True))
+            selected = self.get_queryset(request).filter(pk__in=selected_ids)
+            with transaction.atomic(using=router.db_for_write(self.model)):
+                self._lock_editable_proposals(request, selected)
+                return django_delete_selected(self, request, selected)
+        return django_delete_selected(self, request, queryset)
+
+    def _object_selection(
+        self, request: HttpRequest, object_id: str | None
+    ) -> QuerySet[ProcessImprovementProposal | PipChange]:
+        """Resolve the form identity without reading before the review lock."""
+        queryset = self.get_queryset(request)
+        if object_id is None:
+            return queryset.none()
+        try:
+            return queryset.filter(pk=unquote(object_id))
+        except (ValueError, ValidationError):
+            return queryset.none()
+
+    def _destination_id(self, request: HttpRequest) -> int | None:
+        """Read the posted child foreign key, leaving validation to Django's form."""
+        if self.model is not PipChange:
+            return None
+        try:
+            return int(request.POST.get("pip", ""))
+        except ValueError:
+            return None
+
+    def _lock_editable_proposals(
+        self,
+        request: HttpRequest,
+        selected: QuerySet[ProcessImprovementProposal | PipChange],
+        destination_id: int | None = None,
+    ) -> None:
+        """Check current parent rows and reject mutations of decided proposals."""
+        child_selection = self.model is PipChange
+        matching = Q(pk__in=selected.values("pip_id" if child_selection else "pk"))
+        if destination_id is not None:
+            matching |= Q(pk=destination_id)
+        proposals = ProcessImprovementProposal.objects.using(
+            router.db_for_write(self.model)
+        )
+        locked = PIPAdminService.lock_proposals(proposals.filter(matching))
+        for proposal in locked:
+            if _is_decided(proposal):
+                logger.info(
+                    "PIP admin mutation denied | actor_id=%s pip_id=%s correlation_id=pip_review:%s reason=decided",
+                    request.user.pk,
+                    proposal.pk,
+                    proposal.pk,
+                )
+                raise PermissionDenied(_PIP_DECIDED_NOTICE)
+        if (
+            child_selection
+            and selected.exclude(pip_id__in=[pip.pk for pip in locked]).exists()
+        ):
+            # The child was moved while this request acquired its parent locks.
+            raise PermissionDenied(
+                "The change moved to another proposal. Open it again."
+            )
+
+
 @admin.register(ProcessImprovementProposal)
-class ProcessImprovementProposalAdmin(admin.ModelAdmin):
+class ProcessImprovementProposalAdmin(_PipAdmin):
     inlines = (PipChangeInline,)
     list_display = (
         "title",
@@ -184,13 +410,13 @@ class ProcessImprovementProposalAdmin(admin.ModelAdmin):
         "status_changed_at",
     )
     raw_id_fields = ("playbook", "created_by")
-    actions = ("finalize_reviewed_pips",)
+    actions = ("finalize_reviewed_pips", "delete_selected")
 
-    @admin.action(description="Finalize reviewed PIPs (apply accepted changes + notify)")
+    @admin.action(
+        description="Finalize reviewed PIPs (apply accepted changes + notify)"
+    )
     def finalize_reviewed_pips(self, request, queryset):
         """Admin queue action — thin wrapper around :class:`PIPAdminService`."""
-
-        from methodology.services.pip_admin_service import PIPAdminService
 
         ok = skipped = failed = 0
         for row in queryset.iterator():
@@ -229,7 +455,7 @@ class ProcessImprovementProposalAdmin(admin.ModelAdmin):
 
 
 @admin.register(PipChange)
-class PipChangeAdmin(admin.ModelAdmin):
+class PipChangeAdmin(_PipAdmin):
     list_display = ("id", "pip", "change_type", "entity_type", "order", "name")
     list_filter = ("change_type", "entity_type")
     raw_id_fields = ("pip", "parent_workflow", "insert_after_activity")
