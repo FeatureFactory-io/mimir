@@ -1,10 +1,41 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+
 from methodology.llm.base import LLMError, LLMResponse
+from methodology.models import Activity, AgentInteraction, ExpertProfile, KarmaAward
+from methodology.services.contribution_summary_boundary import (
+    PublicContributionSummaryBoundary,
+    SummaryBoundaryError,
+    SummaryTraceEvent,
+    trace_as_agent_story,
+)
+from methodology.services.public_contribution_evidence import (
+    MAX_EVIDENCE_CHARACTERS,
+    PublicContributionEvidenceService,
+)
+from tests.support.agent_story import assert_agent_story
+from tests.support.experts_data import seed_s27_summary_privacy_variant
+from tests.support.experts_logs import capture_experts_logs
+from tests.support.log_story import assert_log_story
+from tests.support.scripted_llm import ScriptedLLM, ScriptedLLMCall
+
+_S27_SCRIPTS = Path(__file__).parents[1] / "fixtures/llm_scripts/PRF-EXPERTS-03"
+_S27_RUN = "s27-proof-01"
+_S27_BOUNDARY = "PublicContributionSummaryBoundary.complete"
+_S27_LOGGERS = (
+    "methodology.services.contribution_summary_boundary",
+    "methodology.services.public_contribution_evidence",
+    "methodology.services.contribution_summary_prompts",
+    "tests.support.scripted_llm",
+)
 
 
 def _load_s27_script(path: Path) -> tuple[LLMResponse | LLMError, ...]:
@@ -14,7 +45,38 @@ def _load_s27_script(path: Path) -> tuple[LLMResponse | LLMError, ...]:
     :return: Ordered normalized responses/errors. Example: (public_response,).
     :raises ValueError: For empty scripts, invalid entries or malformed JSON.
     """
-    raise NotImplementedError()
+    document = json.loads(path.read_text(encoding="utf-8"))
+    responses = document.get("responses") if isinstance(document, dict) else None
+    if not isinstance(responses, list) or not responses:
+        raise ValueError("S27 requires a nonempty response script")
+    return tuple(_decode_s27_turn(turn) for turn in responses)
+
+
+def _decode_s27_turn(turn: object) -> LLMResponse | LLMError:
+    """Decode one explicit provider response or failure from a test script.
+
+    :param turn: Script item. Example: {"kind": "error", "code": "provider_failed"}.
+    :return: One finite scripted turn. Example: LLMError("provider_failed").
+    :raises ValueError: For invalid turn metadata.
+    """
+    if not isinstance(turn, dict):
+        raise ValueError("Invalid S27 script turn")  # noqa: TRY004
+    if turn.get("kind") == "error" and isinstance(turn.get("code"), str):
+        return LLMError(turn["code"])
+    if turn.get("kind") != "response" or any(
+        not isinstance(turn.get(field), str)
+        for field in ("content", "model", "stop_reason")
+    ):
+        raise ValueError("Invalid S27 script response")
+    usage = turn.get("usage", {})
+    if not isinstance(usage, dict) or any(
+        key not in {"input_tokens", "output_tokens"}
+        or type(value) is not int
+        or value < 0
+        for key, value in usage.items()
+    ):
+        raise ValueError("Invalid S27 script usage")
+    return LLMResponse(turn["content"], turn["model"], usage, turn["stop_reason"])
 
 
 @pytest.fixture
@@ -25,7 +87,121 @@ def s27_proof_case(db: None) -> Mapping[str, Any]:
     :return: Real ORM/privacy variant. Example: Maria and publication receipts.
     :raises ValueError: If fixture invariants fail.
     """
-    raise NotImplementedError()
+    return seed_s27_summary_privacy_variant()
+
+
+def _s27_boundary() -> PublicContributionSummaryBoundary:
+    """Compose the production boundary with the real public evidence service.
+
+    :return: Read-only orchestrator around the actual database query service.
+    """
+    return PublicContributionSummaryBoundary(PublicContributionEvidenceService())
+
+
+def _s27_domain_state() -> tuple[tuple[tuple[object, ...], ...], ...]:
+    """Capture full profile, ledger and interaction rows before a boundary run.
+
+    :return: All rows grouped by model, including the stored Cedar summaries.
+    """
+    return tuple(
+        tuple(model.objects.order_by("pk").values_list())
+        for model in (ExpertProfile, KarmaAward, AgentInteraction)
+    )
+
+
+def _assert_s27_sql_is_read_only(queries: CaptureQueriesContext) -> None:
+    """Require real snapshot reads and allow only reads and savepoint controls.
+
+    :param queries: Actual SQL dispatched by the boundary.
+    :raises AssertionError: For missing reads or any domain mutation statement.
+    """
+    commands = [query["sql"].split(maxsplit=1)[0].upper() for query in queries]
+    assert "SELECT" in commands
+    assert set(commands) <= {"SELECT", "SAVEPOINT", "RELEASE"}
+
+
+def _assert_s27_request(call: ScriptedLLMCall, case: Mapping[str, Any]) -> None:
+    """Prove the actual model request retains public data and excludes private input.
+
+    :param call: Captured CAP-001 request from the production boundary.
+    :param case: Real Cedar data and exclusion sentinels.
+    :raises AssertionError: For absent public facts, leaked private data or missing policy.
+    """
+    assert call.max_tokens == 1024
+    assert len(call.messages) == 1
+    assert call.messages[0].role == "user"
+    begin, payload, end = call.messages[0].content.splitlines()
+    assert (begin, end) == ("BEGIN PUBLIC EVIDENCE JSON", "END PUBLIC EVIDENCE JSON")
+    evidence = json.loads(payload)
+    assert evidence["subject_id"] == case["subject_id"]
+    assert {"Accessibility Audit Playbook", "Keyboard Navigation Audit"} <= {
+        fact["title"] for fact in evidence["facts"]
+    }
+    assert "Use the real published activity guidance." in payload
+    assert any(fact["category"] == "development" for fact in evidence["facts"])
+    assert len(payload) <= 24_000
+    assert not any(sentinel in payload + call.system for sentinel in case["sentinels"])
+    assert not any(
+        key in payload for key in ("total_karma", "category_points", "copy_count")
+    )
+    assert "Foundation policy" in call.system and "Identity:" in call.system
+    assert "Karma totals, category point subtotals" in call.system
+    assert (
+        "quoted data" in call.system
+        and "changes published by acceptance" in call.system
+    )
+
+
+def _assert_s27_body_free(
+    text: str, case: Mapping[str, Any], call: ScriptedLLMCall | None, body: str
+) -> None:
+    """Check that control telemetry omits private sentinels and model bodies.
+
+    :param text: Rendered trace or captured log records.
+    :param case: Real Cedar privacy fixture.
+    :param call: Actual recorded provider request.
+    :param body: Response text from the explicit test script.
+    :raises AssertionError: If input/output content is recorded.
+    """
+    excluded = (
+        *case["sentinels"],
+        body,
+        "Foundation policy:",
+        "BEGIN PUBLIC EVIDENCE JSON",
+        "Accessibility Audit Playbook",
+        "Keyboard Navigation Audit",
+        "Use the real published activity guidance.",
+        "proof-mail@example.invalid",
+    )
+    if call is not None:
+        excluded += (call.system, call.messages[0].content)
+    assert not any(value in text for value in excluded)
+
+
+def _assert_s27_trace(
+    trace: tuple[SummaryTraceEvent, ...], case: Mapping[str, Any], failure: str = ""
+) -> None:
+    """Prove ordered control events from the actual completion boundary.
+
+    :param trace: Actual immutable boundary trace.
+    :param case: Real Cedar fixture identifying the subject.
+    :param failure: Safe failure code if rejected. Example: "provider_failed".
+    :raises AssertionError: For a missing or out-of-order beat or any domain write.
+    """
+    beats = {
+        "entry": (f"subject_id={case['subject_id']}", f"correlation_id={_S27_RUN}"),
+        "public_evidence": ("scope=public_released", "fact_count="),
+        "llm_call": ("model=scripted", "tools=none", "max_tokens=1024"),
+    }
+    if failure:
+        beats["failure"] = (f"reason_code={failure}",)
+    else:
+        beats["validation"] = ("status=accepted",)
+    beats["exit"] = ("outcome=failure" if failure else "outcome=success",)
+    assert tuple(event.beat for event in trace) == tuple(beats)
+    assert_agent_story(
+        trace_as_agent_story(trace), workflow="contribution_summary", beats=beats
+    )
 
 
 @pytest.mark.django_db
@@ -37,7 +213,28 @@ def test_s27_summary_agent_story_happy(s27_proof_case: Mapping[str, Any]) -> Non
     :return: None when request capture, public facts and production trace pass.
     :raises AssertionError: For leaked input, bypassed collaborators or domain writes.
     """
-    raise NotImplementedError()
+    (turn,) = _load_s27_script(_S27_SCRIPTS / "happy.json")
+    assert isinstance(turn, LLMResponse)
+    llm = ScriptedLLM([turn])
+    boundary = _s27_boundary()
+    before = _s27_domain_state()
+    assert before[0] and before[1] and not before[2]
+    with CaptureQueriesContext(connection) as queries:
+        completed = boundary.complete(
+            s27_proof_case["subject_id"], llm=llm, correlation_id=_S27_RUN
+        )
+    _assert_s27_sql_is_read_only(queries)
+    assert _s27_domain_state() == before
+    (call,) = llm.calls
+    _assert_s27_request(call, s27_proof_case)
+    assert completed.text == completed.response.content == turn.content
+    assert completed.response.model == "scripted"
+    assert completed.response.stop_reason == "end_turn"
+    assert completed.response.usage == {"input_tokens": 210, "output_tokens": 15}
+    with pytest.raises(TypeError):
+        completed.response.usage["output_tokens"] = 99
+    _assert_s27_trace(completed.trace, s27_proof_case)
+    _assert_s27_body_free(str(completed.trace), s27_proof_case, call, turn.content)
 
 
 @pytest.mark.django_db
@@ -49,7 +246,30 @@ def test_s27_summary_agent_story_reject(s27_proof_case: Mapping[str, Any]) -> No
     :return: None when failure trace passes and database remains unchanged.
     :raises AssertionError: If unsafe output succeeds or changes domain state.
     """
-    raise NotImplementedError()
+    (turn,) = _load_s27_script(_S27_SCRIPTS / "reject_unsafe.json")
+    assert isinstance(turn, LLMResponse)
+    llm = ScriptedLLM([turn])
+    boundary = _s27_boundary()
+    before = _s27_domain_state()
+    with (
+        CaptureQueriesContext(connection) as queries,
+        pytest.raises(SummaryBoundaryError) as failed,
+    ):
+        boundary.complete(
+            s27_proof_case["subject_id"], llm=llm, correlation_id=_S27_RUN
+        )
+    _assert_s27_sql_is_read_only(queries)
+    assert _s27_domain_state() == before
+    (call,) = llm.calls
+    _assert_s27_request(call, s27_proof_case)
+    error = failed.value
+    assert error.code == "output_validation_failed"
+    assert error.response is not None
+    assert error.response.usage == {"input_tokens": 210, "output_tokens": 17}
+    assert error.response.stop_reason == "end_turn"
+    assert error.response.content == error.response.thinking == ""
+    _assert_s27_trace(error.trace, s27_proof_case, error.code)
+    _assert_s27_body_free(f"{error} {error.trace}", s27_proof_case, call, turn.content)
 
 
 @pytest.mark.django_db
@@ -63,7 +283,34 @@ def test_s27_summary_with_exhausted_script_fails_loudly(
     :return: None when exhausted completion fails explicitly.
     :raises AssertionError: For fallback prose or a success outcome.
     """
-    raise NotImplementedError()
+    (turn,) = _load_s27_script(_S27_SCRIPTS / "happy.json")
+    assert isinstance(turn, LLMResponse)
+    llm = ScriptedLLM([turn])
+    boundary = _s27_boundary()
+    before = _s27_domain_state()
+    subject_id = s27_proof_case["subject_id"]
+    assert (
+        boundary.complete(subject_id, llm=llm, correlation_id="s27-first-turn").text
+        == turn.content
+    )
+    with (
+        CaptureQueriesContext(connection) as queries,
+        pytest.raises(SummaryBoundaryError) as failed,
+    ):
+        boundary.complete(subject_id, llm=llm, correlation_id=_S27_RUN)
+    _assert_s27_sql_is_read_only(queries)
+    assert _s27_domain_state() == before
+    assert len(llm.calls) == 2
+    assert llm.calls[0] == llm.calls[1]
+    assert failed.value.code == "provider_failed"
+    assert failed.value.response is None
+    _assert_s27_trace(failed.value.trace, s27_proof_case, "provider_failed")
+    _assert_s27_body_free(
+        f"{failed.value} {failed.value.trace}",
+        s27_proof_case,
+        llm.calls[1],
+        turn.content,
+    )
 
 
 @pytest.mark.agent_proof
@@ -178,7 +425,9 @@ def test_s29_summary_with_exhausted_script_fails_loudly() -> None:
 
 
 @pytest.mark.django_db
-def test_s27_summary_log_story_happy(s27_proof_case: Mapping[str, Any], caplog: pytest.LogCaptureFixture) -> None:
+def test_s27_summary_log_story_happy(
+    s27_proof_case: Mapping[str, Any], caplog: pytest.LogCaptureFixture
+) -> None:
     """Capture actual ordinary logs across evidence, prompt validation and the read-only boundary.
 
     :param s27_proof_case: Real independent public/private Cedar case. Example: Maria.
@@ -186,15 +435,169 @@ def test_s27_summary_log_story_happy(s27_proof_case: Mapping[str, Any], caplog: 
     :return: None after assert_log_story checks every declared happy beat and private exclusions.
     :raises AssertionError: Missing beat, false domain write or leaked private material.
     """
-    raise NotImplementedError()
+    (turn,) = _load_s27_script(_S27_SCRIPTS / "happy.json")
+    assert isinstance(turn, LLMResponse)
+    llm = ScriptedLLM([turn])
+    subject_id = s27_proof_case["subject_id"]
+    with capture_experts_logs(caplog, _S27_LOGGERS):
+        _s27_boundary().complete(subject_id, llm=llm, correlation_id=_S27_RUN)
+    (call,) = llm.calls
+    payload = call.messages[0].content.splitlines()[1]
+    _assert_s27_evidence_logs(caplog, subject_id, payload)
+    assert_log_story(
+        caplog,
+        where="validate_summary_response",
+        beats={
+            "validation": ("| validation |", "sentence_count=1", "status=accepted"),
+        },
+    )
+    _assert_s27_boundary_logs(caplog, subject_id, model_called=True)
+    _assert_s27_body_free(caplog.text, s27_proof_case, call, turn.content)
+
+
+def _assert_s27_evidence_logs(
+    caplog: pytest.LogCaptureFixture, subject_id: int, payload: str
+) -> None:
+    """Check named evidence and prompt operations using the real request shape.
+
+    :param caplog: Actual records from enabled named loggers.
+    :param subject_id: Cedar contributor ID. Example: Maria's ID.
+    :param payload: Compact evidence JSON taken from the actual request.
+    :raises AssertionError: For a missing scope, fact or token-bound log beat.
+    """
+    assert_log_story(
+        caplog,
+        where="PublicContributionEvidenceService.collect",
+        beats={
+            "validation": (
+                "| validation |",
+                f"subject_id={subject_id}",
+                "scope=public_released",
+            ),
+            "processing": (
+                "| processing |",
+                f"subject_id={subject_id}",
+                f"fact_count={len(json.loads(payload)['facts'])}",
+                f"evidence_chars={len(payload)}",
+            ),
+        },
+    )
+    assert_log_story(
+        caplog,
+        where="build_summary_prompt",
+        beats={
+            "config": (
+                "| config |",
+                "layers=foundation,identity,evidence",
+                "max_tokens=1024",
+            ),
+        },
+    )
+
+
+def _assert_s27_boundary_logs(
+    caplog: pytest.LogCaptureFixture,
+    subject_id: int,
+    *,
+    model_called: bool,
+    failure: str = "",
+) -> None:
+    """Prove the correlated ordinary boundary logs follow the chosen path.
+
+    :param caplog: Actual records from enabled named loggers.
+    :param subject_id: Cedar contributor ID or a missing valid-form ID.
+    :param model_called: Whether processing reached model invocation.
+    :param failure: Expected safe reason code. Example: "provider_failed".
+    :raises AssertionError: If the model was unexpectedly called or a beat was lost.
+    """
+    correlation = f"correlation_id={_S27_RUN}"
+    beats = {"entry": ("| entry |", f"subject_id={subject_id}", correlation)}
+    if model_called:
+        beats["processing"] = (
+            "| processing |",
+            correlation,
+            "model=scripted",
+            "tools=none",
+        )
+    if failure:
+        beats["error"] = (
+            "| error |",
+            correlation,
+            f"reason_code={failure}",
+            "outcome=failure",
+        )
+    beats["exit"] = (
+        "| exit |",
+        correlation,
+        "outcome=failure" if failure else "outcome=success",
+    )
+    assert_log_story(caplog, where=_S27_BOUNDARY, beats=beats)
+    actual = [
+        record.getMessage().split(" | ")[1]
+        for record in caplog.records
+        if record.name == _S27_LOGGERS[0]
+    ]
+    assert actual == list(beats)
+
 
 @pytest.mark.django_db
-def test_s27_summary_log_story_reject(s27_proof_case: Mapping[str, Any], caplog: pytest.LogCaptureFixture) -> None:
+@pytest.mark.parametrize(
+    "stage,reason",
+    [
+        ("unsafe_output", "output_validation_failed"),
+        ("provider", "provider_failed"),
+        ("missing_subject", "public_evidence_failed"),
+        ("oversize_snapshot", "public_evidence_failed"),
+    ],
+)
+def test_s27_summary_log_story_reject(
+    s27_proof_case: Mapping[str, Any],
+    caplog: pytest.LogCaptureFixture,
+    stage: str,
+    reason: str,
+) -> None:
     """Capture actual rejected prompt/output/boundary logs with safe reason codes and no body leakage.
 
     :param s27_proof_case: Real adverse Cedar case. Example: private sentinel and unsafe response.
     :param caplog: Real ordinary logger capture. Example: same correlated attempt.
+    :param stage: Adverse stage. Example: "unsafe_output".
+    :param reason: Expected safe failure code. Example: "output_validation_failed".
     :return: None after assert_log_story verifies the applicable rejection sequence.
     :raises AssertionError: Missing error/exit beat or private text disclosed.
     """
-    raise NotImplementedError()
+    (turn,) = _load_s27_script(_S27_SCRIPTS / "reject_unsafe.json")
+    assert isinstance(turn, LLMResponse)
+    body = turn.content
+    subject_id = s27_proof_case["subject_id"]
+    model_called = stage in {"unsafe_output", "provider"}
+    if stage == "missing_subject":
+        subject_id = 1_000_000
+    if stage == "oversize_snapshot":
+        body = "Private marker in oversized request evidence."
+        Activity.objects.filter(workflow__playbook__author_id=subject_id).update(
+            guidance=body + "x" * MAX_EVIDENCE_CHARACTERS
+        )
+    if stage == "provider":
+        body = "Raw provider failure with request metadata."
+        turn = LLMError(body)
+    llm = ScriptedLLM([turn])
+    with (
+        capture_experts_logs(caplog, _S27_LOGGERS),
+        pytest.raises(SummaryBoundaryError) as failed,
+    ):
+        _s27_boundary().complete(subject_id, llm=llm, correlation_id=_S27_RUN)
+    assert failed.value.code == reason
+    assert len(llm.calls) == int(model_called)
+    _assert_s27_boundary_logs(
+        caplog, subject_id, model_called=model_called, failure=reason
+    )
+    if stage == "unsafe_output":
+        assert_log_story(
+            caplog,
+            where="validate_summary_response",
+            beats={
+                "error": ("| error |", "reason_code=invalid_response"),
+            },
+        )
+    call = llm.calls[0] if model_called else None
+    _assert_s27_body_free(f"{failed.value} {caplog.text}", s27_proof_case, call, body)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
+
 import pytest
 
 from methodology.llm.base import BaseLLM, LLMError, LLMMessage, LLMResponse
@@ -115,4 +117,28 @@ def test_scripted_llm_with_recorded_call_preserves_request_and_exhaustion() -> N
     :return: None when capture, explicit errors and exhaustion remain correct.
     :raises AssertionError: If capture mutates requests or changes queue semantics.
     """
-    raise NotImplementedError()
+    scripted = ScriptedLLM([LLMError("provider failure"), "recovery"])
+    caller_messages = list(MESSAGES)
+    with pytest.raises(ValueError):
+        scripted.complete(caller_messages, max_tokens=0)
+    assert scripted.calls == ()
+    with pytest.raises(LLMError, match="provider failure"):
+        scripted.complete(caller_messages, system="Public policy", temperature=0.1)
+    first_calls = scripted.calls
+    caller_messages.clear()
+    assert isinstance(first_calls, tuple)
+    assert first_calls[0].messages == MESSAGES
+    assert first_calls[0].system == "Public policy"
+    assert first_calls[0].max_tokens == 1024
+    assert first_calls[0].temperature == 0.1
+    with pytest.raises(FrozenInstanceError):
+        first_calls[0].system = "Changed policy"
+    assert scripted.complete(MESSAGES).content == "recovery"
+    with pytest.raises(LLMError, match="exhausted after 2 calls"):
+        scripted.complete(MESSAGES, system="Exhausted request")
+    assert len(first_calls) == 1
+    assert [call.system for call in scripted.calls] == [
+        "Public policy",
+        "",
+        "Exhausted request",
+    ]

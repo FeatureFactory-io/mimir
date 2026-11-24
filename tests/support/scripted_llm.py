@@ -1,10 +1,10 @@
 """CAP-004 ordered model responses for tests only; never a runtime fallback."""
 
 from __future__ import annotations
-from dataclasses import dataclass
 
 import logging
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from methodology.llm.base import LLMError, LLMMessage, LLMResponse
 
@@ -31,6 +31,7 @@ class ScriptedLLM:
             raise ValueError("ScriptedLLM requires a nonempty valid response queue")
         self._responses = tuple(responses)
         self._index = 0
+        self._calls: list[ScriptedLLMCall] = []
 
     def complete(
         self,
@@ -50,6 +51,7 @@ class ScriptedLLM:
         :raises ValueError: For invalid request arguments.
         """
         _validate_request(messages, system, max_tokens, temperature)
+        self._record_call(messages, system, max_tokens, temperature)
         if self._index >= len(self._responses):
             raise LLMError(f"ScriptedLLM exhausted after {self._index} calls")
         response = self._responses[self._index]
@@ -68,7 +70,7 @@ class ScriptedLLM:
         :return: Actual recorded calls. Example: (first_public_summary_call,).
         :raises RuntimeError: If capture state is inconsistent.
         """
-        raise NotImplementedError()
+        return tuple(self._calls)
 
     def _record_call(
         self,
@@ -84,9 +86,11 @@ class ScriptedLLM:
         :param max_tokens: Output limit. Example: 1024.
         :param temperature: Sampling value. Example: 0.2.
         :return: None.
-        :raises ValueError: For malformed capture arguments.
+        Callers validate the request before recording it.
         """
-        raise NotImplementedError()
+        self._calls.append(
+            ScriptedLLMCall(tuple(messages), system, max_tokens, temperature)
+        )
 
 
 def _validate_request(
