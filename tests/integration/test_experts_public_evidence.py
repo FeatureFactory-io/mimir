@@ -1,4 +1,4 @@
-"""S27 real-database public evidence, prompt, validator and log contracts."""
+"""Real-database public evidence and contribution summary contracts."""
 
 from __future__ import annotations
 
@@ -6,13 +6,18 @@ import json
 from collections.abc import Mapping
 from dataclasses import asdict, replace
 from decimal import Decimal
+from http import HTTPStatus
 from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connection
+from django.http import HttpResponse
 from django.test import Client
+from django.test.html import Element
 from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
+from pytest_django.asserts import assertTemplateUsed
 
 from methodology.llm.base import LLMResponse
 from methodology.models import (
@@ -42,6 +47,7 @@ from methodology.services.public_contribution_evidence import (
     PublicContributionEvidenceService,
 )
 from tests.support.experts_data import CedarDataset, seed_s27_summary_privacy_variant
+from tests.support.experts_html import element_text, find_by_test_id
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.log_story import assert_log_story
 from tests.support.scripted_llm import ScriptedLLM, ScriptedLLMCall
@@ -55,6 +61,16 @@ _BOUNDARY_COMPLETE = "PublicContributionSummaryBoundary.complete"
 _TRACE_CORRELATION = "s27-public-evidence-trace"
 _GOOD_SUMMARY = "Maria maintains Accessibility Audit Playbook."
 _FOCUS_ACTIVITY = "Trace Keyboard Focus"
+_S19_PLAYBOOK_ID = 6101
+_S19_PLAYBOOK_TITLE = "Accessibility Audit Playbook"
+_S19_PLAYBOOK_PATH = "/playbooks/6101/"
+_S19_VERSION = "v1.0"
+_S19_WORKFLOW_NAME = "Lead an Accessibility Review"
+_S19_ACTIVITY_NAMES = (
+    "Trace Keyboard Focus",
+    "Review Form Feedback",
+    "Document Recovery Paths",
+)
 
 
 @pytest.fixture
@@ -1415,18 +1431,17 @@ def test_public_evidence_log_story_reject(
 
 
 @pytest.fixture
-def s19_cedar_dataset(db: None) -> CedarDataset:
-    """Load real Cedar objects without replaying live event hooks.
+def s19_cedar_dataset(cedar_dataset: CedarDataset) -> CedarDataset:
+    """Reuse the imported Cedar objects in the isolated test database.
 
-    :param db: Isolated pytest database. Example: None.
+    :param cedar_dataset: Shared fixture with real Cedar records.
     :return: Cedar dataset. Example: dataset.playbooks_by_pk[6101].
-    :raises ValueError: If Cedar source data is invalid.
     """
-    raise NotImplementedError()
+    return cedar_dataset
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("username", ["esvensson", None])
+@pytest.mark.parametrize("username", ["esvensson", None], ids=["elena", "anonymous"])
 def test_public_evidence_with_cedar_release_links_existing_detail_route(
     client: Client, s19_cedar_dataset: CedarDataset, username: str | None
 ) -> None:
@@ -1438,11 +1453,21 @@ def test_public_evidence_with_cedar_release_links_existing_detail_route(
     :return: None. Example: None after checking the extracted href.
     :raises AssertionError: If href, version, badges or response differ.
     """
-    raise NotImplementedError()
+    response = _follow_cedar_playbook(client, s19_cedar_dataset, username)
+    header = find_by_test_id(response.content, "playbook-header")
+    assert _S19_PLAYBOOK_TITLE in element_text(header)
+    for badge, expected in (
+        ("status-badge", "Released"),
+        ("version-badge", _S19_VERSION),
+        ("visibility-badge", "Public"),
+    ):
+        label = find_by_test_id(response.content, badge)
+        assert label in header
+        assert element_text(label) == expected
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("username", ["esvensson", None])
+@pytest.mark.parametrize("username", ["esvensson", None], ids=["elena", "anonymous"])
 def test_public_evidence_with_followed_workflow_exposes_cedar_activities(
     client: Client, s19_cedar_dataset: CedarDataset, username: str | None
 ) -> None:
@@ -1454,4 +1479,110 @@ def test_public_evidence_with_followed_workflow_exposes_cedar_activities(
     :return: None. Example: None after checking all three Cedar activities.
     :raises AssertionError: If a route redirects, fails or lacks the activity chain.
     """
-    raise NotImplementedError()
+    playbook = _follow_cedar_playbook(client, s19_cedar_dataset, username)
+    workflow = Workflow.objects.get(
+        playbook_id=_S19_PLAYBOOK_ID, name=_S19_WORKFLOW_NAME
+    )
+    workflows = find_by_test_id(playbook.content, "workflows-section")
+    link = find_by_test_id(playbook.content, f"workflow-name-link-{workflow.pk}")
+    assert link in workflows
+    assert link.name == "a"
+    assert element_text(link) == _S19_WORKFLOW_NAME
+    href = dict(link.attributes).get("href")
+    assert href == reverse("workflow_detail", args=[_S19_PLAYBOOK_ID, workflow.pk])
+
+    response = client.get(href, follow=False)
+    assert response.status_code == HTTPStatus.OK
+    assert response.wsgi_request.path == href
+    assertTemplateUsed(response, "workflows/detail.html")
+    assert response.context["playbook"].pk == _S19_PLAYBOOK_ID
+    assert response.context["workflow"] == workflow
+    assert response.context["workflow"].playbook_id == _S19_PLAYBOOK_ID
+    _assert_cedar_activity_graph(response)
+
+
+def _follow_cedar_playbook(
+    client: Client, cedar: CedarDataset, username: str | None
+) -> HttpResponse:
+    """Follow Maria's rendered evidence link with the same client session.
+
+    :param client: Real Django client for the viewer's session.
+    :param cedar: Isolated Cedar dataset. Example: Elena's account.
+    :param username: Viewer username or None for an anonymous request.
+    :return: The 200 response from Cedar playbook 6101's detail route.
+    :raises AssertionError: If the viewer, link, route, or playbook differs.
+    """
+    if username is not None:
+        client.force_login(cedar.users_by_username[username])
+    profile = client.get(reverse("expert_detail", args=["mrodriguez"]), follow=False)
+    assert profile.status_code == HTTPStatus.OK
+    assertTemplateUsed(profile, "experts/detail.html")
+    assert profile.wsgi_request.user.get_username() == (username or "")
+
+    href = _cedar_playbook_href(profile.content)
+    response = client.get(href, follow=False)
+    assert response.status_code == HTTPStatus.OK
+    assert response.wsgi_request.path == _S19_PLAYBOOK_PATH
+    assertTemplateUsed(response, "playbooks/detail.html")
+    playbook = response.context["playbook"]
+    assert playbook.pk == _S19_PLAYBOOK_ID
+    assert playbook.author_id == cedar.users_by_username["mrodriguez"].pk
+    return response
+
+
+def _cedar_playbook_href(html: bytes) -> str:
+    """Extract the destination from the titled and versioned evidence item.
+
+    :param html: Rendered public expert detail HTML.
+    :return: Existing local detail href. Example: "/playbooks/6101/".
+    :raises AssertionError: If the evidence item, link, or target is wrong.
+    """
+    evidence = find_by_test_id(html, "expert-public-playbooks")
+    assert "Public released playbooks" in element_text(evidence)
+    link = find_by_test_id(html, f"expert-playbook-{_S19_PLAYBOOK_ID}")
+    assert link.name == "a"
+    attributes = dict(link.attributes)
+    assert attributes.get("aria-label") == f"View {_S19_PLAYBOOK_TITLE}"
+    items = [
+        entry
+        for body in evidence.children
+        if isinstance(body, Element)
+        for entry in body.children
+        if isinstance(entry, Element) and entry != link and link in entry
+    ]
+    assert len(items) == 1, "The link must belong to one public playbook entry"
+    fields = {
+        child.name: element_text(child)
+        for child in items[0].children
+        if isinstance(child, Element)
+    }
+    assert fields.get("h3") == _S19_PLAYBOOK_TITLE
+    assert fields.get("p", "").split()[-1:] == [_S19_VERSION]
+    href = attributes.get("href")
+    assert (
+        href
+        == _S19_PLAYBOOK_PATH
+        == reverse("playbook_detail", args=[_S19_PLAYBOOK_ID])
+    )
+    return href
+
+
+def _assert_cedar_activity_graph(response: HttpResponse) -> None:
+    """Verify the rendered graph names belong to the followed workflow.
+
+    :param response: Actual workflow detail response. Example: Lead an Accessibility Review.
+    :return: None when the three Cedar activities are present and related.
+    :raises AssertionError: If a name is absent or points to a different workflow.
+    """
+    assert (
+        element_text(find_by_test_id(response.content, "workflow-name"))
+        == _S19_WORKFLOW_NAME
+    )
+    graph_labels = element_text(find_by_test_id(response.content, "activities-graph"))
+    activities = {
+        activity.name: activity for activity in response.context["activities"]
+    }
+    for name in _S19_ACTIVITY_NAMES:
+        assert name in graph_labels
+        assert name in activities
+        assert activities[name].workflow_id == response.context["workflow"].pk
