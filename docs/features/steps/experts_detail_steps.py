@@ -6,12 +6,15 @@ import re
 
 from behave import then
 from behave.runner import Context
+from django.http.response import HttpResponseBase
 from django.test.html import Element, parse_html
 
 from methodology.models import ExpertProfile
 from tests.support.experts_html import element_text, find_by_test_id
 
 _SUMMARY_TEST_ID = "expert-contribution-summary"
+_MIN_HTTP_STATUS = 100
+_MAX_HTTP_STATUS = 599
 _TRUNCATION_CLASSES = frozenset(
     {"expert-hint", "expert-summary-collapsed", "text-truncate"}
 )
@@ -90,10 +93,18 @@ def public_title_includes_identity(context: Context, title: str) -> None:
 
 @then("the response status is {status:d}")
 def public_response_has_expected_status(context: Context, status: int) -> None:
-    """Assert the actual Django response status; missing and zero-score profiles share generic 404 content.
+    """Compare the observed Django response with the specified HTTP status.
 
-    :param context: Actual isolated Django-client acceptance state. Example: context.cedar_dataset.
-    :param status: Expected actual HTTP status. Example: 404.
-    :return: None when the described real observation holds. Example: None.
-    :raises AssertionError: Actual domain, response or recorded boundary differs."""
-    raise NotImplementedError()
+    :param context: Real acceptance state, e.g. context.response from a GET.
+    :param status: Expected integer HTTP status, e.g. 404.
+    :return: None when the actual response matches, e.g. HTTP 404 equals 404.
+    :raises ValueError: Invalid status value, e.g. True or 600.
+    :raises AssertionError: Missing response or mismatch, e.g. HTTP 200 versus 404.
+    """
+    if type(status) is not int or not _MIN_HTTP_STATUS <= status <= _MAX_HTTP_STATUS:
+        raise ValueError("An integer HTTP status from 100 through 599 is required.")
+    response = getattr(context, "response", None)
+    assert isinstance(response, HttpResponseBase), "A Django HTTP response is required."
+    assert (
+        response.status_code == status
+    ), f"Expected HTTP {status}, got HTTP {response.status_code}."
