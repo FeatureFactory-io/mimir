@@ -792,7 +792,7 @@ scenarios:
       scenario_dependencies:
       - S03
     implementation_plan: docs/plans/iterations/experts/S06-experts-list-06.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
@@ -1156,7 +1156,7 @@ scenarios:
       - S03
       - S17
     implementation_plan: docs/plans/iterations/experts/S10-experts-profile-01.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
