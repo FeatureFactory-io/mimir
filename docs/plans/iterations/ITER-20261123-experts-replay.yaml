@@ -5349,7 +5349,7 @@ scenarios:
       scenario_dependencies:
       - S23
     implementation_plan: docs/plans/iterations/experts/S25-galdr-summary-03.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S23
@@ -5568,6 +5568,7 @@ scenarios:
     skeleton_commit: 12f17b598a1c758b6c55d6b8acd879b9c8fbcd94
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - methodology/services/pip_apply_changes_service.py
     - docs/experts-replay/pin-evidence/S32.json
     - docs/features/steps/experts_karma_pip_steps.py
     - docs/plans/iterations/experts/S32-karma-pip-01.md
@@ -5674,6 +5675,10 @@ scenarios:
         - KarmaService._accepted_change_policy:processing
         - KarmaService.award_accepted_changes:branch
         - KarmaService.award_accepted_changes:exit
+        approved_additional_helpers:
+        - _accepted_publication
+        - _accepted_publication_category
+        - _has_awardable_relationship
         gate:
           command: pytest tests/integration/test_experts_karma_pip.py -k 'policy or ineligible or retry or
             log_story' -x
@@ -5692,6 +5697,7 @@ scenarios:
         depends_on:
         - N1-accepted-change-policy
         footprint:
+        - methodology/services/pip_apply_changes_service.py
         - methodology/services/pip_admin_service.py
         - tests/integration/test_experts_karma_pip.py
         tests:
@@ -5701,6 +5707,14 @@ scenarios:
         - test_accepted_change_log_story_happy
         log_story_rows:
         - PIPAdminService._award_finalized_pip:exit
+        receipt_producer_reconciliation:
+          reason: Existing publication receipts omit accepted_change_ids and event-time category required by the accepted-change and public-evidence contracts.
+          owner: bump_playbook_major_version_after_pip_apply
+          requirements:
+          - Record accepted_change_ids and refreshed target category when the existing receipt is created, inside the same finalization transaction.
+          - Preserve the existing snapshot keys, Decimal return and one version row; awards retain persisted pip.decided_at as their event time.
+          - Use the actual persisted accepted list, with no caller-supplied award attributes or after-the-fact receipt patch.
+          - Small private helpers needed to keep edited public entrypoints within thirty lines are approved under the engineering autonomy correction and must be recorded.
         gate:
           command: pytest tests/integration/test_experts_karma_pip.py -x
           log_story_command: pytest tests/integration/test_experts_karma_pip.py -k log_story -x
@@ -5760,7 +5774,7 @@ scenarios:
       - S11
       - S12
     implementation_plan: docs/plans/iterations/experts/S32-karma-pip-01.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S30
@@ -8635,7 +8649,7 @@ scenarios:
         mockup_graduation: not_applicable
         agent_proofs: []
     implementation_plan: docs/plans/iterations/experts/S42-karma-export-01.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
