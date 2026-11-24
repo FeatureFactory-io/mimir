@@ -1,20 +1,26 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from contextlib import ExitStack
 from decimal import Decimal
+from http import HTTPStatus
 from pathlib import Path
 
 from behave import given, then, when
 from behave.runner import Context
+from django.core import mail
+from django.db import connection
 from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from methodology.llm.base import LLMResponse
 from methodology.models import (
     Activity,
     AgentInteraction,
+    EventChannel,
     ExpertProfile,
     KarmaAward,
     PipChange,
@@ -24,11 +30,14 @@ from methodology.models import (
 from methodology.services.contribution_summary_boundary import (
     PublicContributionSummaryBoundary,
 )
+from methodology.services.expert_text import format_numeric_fallback
+from methodology.services.experts_service import ExpertsService
 from methodology.services.galdr_prompts import HOLISTIC_SYSTEM_PROMPT
 from methodology.services.public_contribution_evidence import (
     PublicContributionEvidenceService,
 )
 from tests.support.experts_data import seed_s27_summary_privacy_variant
+from tests.support.experts_html import _walk_elements, element_text, find_by_test_id
 from tests.support.experts_summary_data import (
     SUMMARY_PIP_BODY,
     SUMMARY_SCRIPTS,
@@ -37,6 +46,14 @@ from tests.support.experts_summary_data import (
     summary_processing_scope,
 )
 from tests.support.scripted_llm import ScriptedLLM
+
+logger = logging.getLogger(__name__)
+_S26_MODELS = (KarmaAward, ExpertProfile, AgentInteraction)
+_S26_PATH = "/experts/?category=development"
+_S26_BOOKS = 2
+_S26_GUI_COPIES = 47
+_S26_ALL_CONSUMPTION = 470
+_S26_READ_SQL = ("SELECT", "BEGIN", "COMMIT", "SAVEPOINT", "RELEASE")
 
 _S27_SCRIPT = (
     Path(__file__).resolve().parents[3]
@@ -439,10 +456,20 @@ def mike_has_no_stored_contribution_summary(context: Context) -> None:
     """Verify the shared baseline normalized Mike's null prose to empty storage.
 
     :param context: Shared Cedar AT context. Example: context.cedar_dataset.
-    :return: None. Example: None with persisted public_summary == "".
+    :return: None. Example: None with persisted contribution_summary == "".
     :raises AssertionError: If Mike is absent or stored prose is nonempty.
     """
-    raise NotImplementedError()
+    mike = context.cedar_dataset.users_by_username["mchen"]
+    profile = ExpertProfile.objects.get(user=mike)
+    assert profile.contribution_summary == ""
+    assert profile.summary_status == ExpertProfile.SummaryStatus.NEVER
+    assert profile.summary_updated_at is None
+    context.s26_mike = mike
+    context.s26_before = tuple(
+        tuple(model.objects.order_by("pk").values_list()) for model in _S26_MODELS
+    )
+    context.s26_mail = tuple(getattr(mail, "outbox", ()))
+    logger.info("S26 numeric fallback AT | entry | subject_id=%s", mike.pk)
 
 
 @when("Elena opens the Development leaderboard")
@@ -453,7 +480,28 @@ def elena_opens_development_leaderboard(context: Context) -> None:
     :return: None. Example: None with response for /experts/?category=development.
     :raises AssertionError: If the request does not return the actual leaderboard.
     """
-    raise NotImplementedError()
+    context.execute_steps("Given Elena is authenticated")
+    with (
+        context.test.captureOnCommitCallbacks() as callbacks,
+        CaptureQueriesContext(connection) as queries,
+    ):
+        context.execute_steps(f'When Elena opens "{_S26_PATH}"')
+    assert not callbacks, "A read must not queue post-commit generation work."
+    assert all(
+        query["sql"]
+        .lstrip()
+        .upper()
+        .startswith((*_S26_READ_SQL, 'UPDATE "DJANGO_SESSION" SET'))
+        for query in queries.captured_queries
+    ), "The leaderboard GET must not write domain rows."
+    response = context.response
+    assert response.status_code == HTTPStatus.OK and "Location" not in response
+    assert response.wsgi_request.get_full_path() == _S26_PATH
+    assert response.wsgi_request.user == (
+        context.cedar_dataset.users_by_username["esvensson"]
+    )
+    assert response.context["selected_category"] == "development"
+    context.test.assertTemplateUsed(response, "experts/list.html")
 
 
 @then('Mike\'s hint is "{expected}" from live released-playbook and GUI-copy counts')
@@ -465,7 +513,35 @@ def mike_hint_matches_live_counts(context: Context, expected: str) -> None:
     :return: None. Example: None after exact rendered and row-count assertions.
     :raises AssertionError: If hint, qualifying counts or 47/470 distinction fails.
     """
-    raise NotImplementedError()
+    mike = context.s26_mike
+    books = Playbook.objects.filter(
+        author=mike, visibility="public", status="released"
+    ).count()
+    consumption = KarmaAward.objects.filter(
+        recipient=mike, source_kind=KarmaAward.SourceKind.CONSUMPTION
+    )
+    copies = consumption.filter(event_channel=EventChannel.GUI_COPY).count()
+    assert (books, copies, consumption.count()) == (
+        _S26_BOOKS,
+        _S26_GUI_COPIES,
+        _S26_ALL_CONSUMPTION,
+    )
+    projection = ExpertsService().project_user(mike.pk)
+    assert (
+        projection.released_public_playbook_count,
+        projection.successful_gui_copy_count,
+    ) == (books, copies)
+    assert expected == format_numeric_fallback(books, copies)
+    hint = find_by_test_id(context.response.content, "experts-card-hint-mchen")
+    assert element_text(hint) == expected
+    (person,) = tuple(
+        row for row in context.response.context["people"] if row["username"] == "mchen"
+    )
+    assert person["hint"] == expected
+    context.s26_expected = expected
+    logger.info(
+        "S26 numeric fallback AT | validation | books=%s gui_copies=%s", books, copies
+    )
 
 
 @then("no public-summary paragraph is fabricated")
@@ -476,7 +552,23 @@ def no_public_summary_paragraph_is_fabricated(context: Context) -> None:
     :return: None. Example: None with no summary paragraph and empty storage.
     :raises AssertionError: If prose is rendered or persisted without a summary.
     """
-    raise NotImplementedError()
+    card = find_by_test_id(context.response.content, "experts-card-mchen")
+    paragraphs = [node for node in _walk_elements(card) if node.name == "p"]
+    assert len(paragraphs) == 1
+    assert dict(paragraphs[0].attributes)["data-testid"] == "experts-card-hint-mchen"
+    assert element_text(paragraphs[0]) == context.s26_expected
+    profile = ExpertProfile.objects.get(user=context.s26_mike)
+    assert profile.contribution_summary == "" and profile.summary_updated_at is None
+    assert (
+        tuple(
+            tuple(model.objects.order_by("pk").values_list()) for model in _S26_MODELS
+        )
+        == context.s26_before
+    ), "Read-only fallback changed ledger, profile or generation history."
+    assert tuple(getattr(mail, "outbox", ())) == context.s26_mail
+    logger.info(
+        "S26 numeric fallback AT | exit | prose_fabricated=false state=unchanged"
+    )
 
 
 @given("Maria has a stored successful contribution summary")
