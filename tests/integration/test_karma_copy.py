@@ -393,34 +393,46 @@ def test_copy_receipt_log_story_reject(
             == ()
         )
 
-    assert_log_story(
-        caplog,
-        where=RECEIPT_VIEW,
-        beats={
-            reason: (
-                "| branch |",
-                f"request_id={REQUEST_ID}",
-                f"reason={reason}",
-                "awards=0",
-            )
-            for reason in ("invalid_payload", "access_denied")
-        },
-    )
-    assert_log_story(
-        caplog,
-        where=CONSUMPTION_SERVICE,
-        beats={"guest": ("| branch |", "reason=guest", "channel=gui_copy", "awards=0")},
-    )
+    _assert_rejected_copy_log_story(caplog)
     assert KarmaAward.objects.count() == before
     assert private_content not in caplog.text
-    assert not any(
-        CONSUMPTION_SERVICE in record.getMessage()
-        and any(
-            fragment in record.getMessage()
-            for fragment in ("reason=eligible", "| processing |", "| exit |")
+
+
+def _assert_rejected_copy_log_story(caplog: LogCaptureFixture) -> None:
+    """Require denial branches and exactly one safe guest zero-result exit.
+
+    :param caplog: Real view/service log capture. Example: malformed, denied, guest.
+    :return: None after rejecting every eligible, processing or non-guest exit beat.
+    :raises AssertionError: Missing denial/exclusion fields or any award-success beat.
+    """
+    denied = {
+        reason: (
+            "| branch |",
+            f"request_id={REQUEST_ID}",
+            f"reason={reason}",
+            "awards=0",
         )
+        for reason in ("invalid_payload", "access_denied")
+    }
+    assert_log_story(caplog, where=RECEIPT_VIEW, beats=denied)
+    common = ("channel=gui_copy", "reason=guest", "awards=0")
+    guest = {
+        "guest": ("| branch |", *common),
+        "guest-exit": ("| exit |", *common, "created_count=0"),
+    }
+    assert_log_story(caplog, where=CONSUMPTION_SERVICE, beats=guest)
+    messages = [
+        record.getMessage()
         for record in caplog.records
+        if CONSUMPTION_SERVICE in record.getMessage()
+    ]
+    assert all(
+        "reason=eligible" not in message and "| processing |" not in message
+        for message in messages
     )
+    exits = [message for message in messages if "| exit |" in message]
+    expected = f"{CONSUMPTION_SERVICE} | exit | channel=gui_copy action_uuid={EVENT_ID}"
+    assert exits == [f"{expected} reason=guest awards=0 created_count=0"]
 
 
 @dataclass(frozen=True)
@@ -621,21 +633,7 @@ def _assert_self_copy_log_story(caplog: LogCaptureFixture, actor_id: int) -> Non
     :return: None after confirming the safe ordered exclusion story.
     :raises AssertionError: If a beat is missing, out of order or adds other fields.
     """
-    request = f"request_id={REQUEST_ID}"
-    action = f"action_uuid={EVENT_ID}"
-    target = f"entity_type=activity entity_id={ACTIVITY_ID}"
-    service = f"channel=gui_copy {action} actor_id={actor_id} playbook_id={PLAYBOOK_ID}"
-    story = (
-        (RECEIPT_VIEW, "entry", f"{request} actor_id={actor_id} operation=gui_copy"),
-        (RECEIPT_VIEW, "validation", f"{request} {target} {action} validated"),
-        (CONSUMPTION_SERVICE, "validation", f"{service} authorized"),
-        (
-            CONSUMPTION_SERVICE,
-            "branch",
-            f"{service} author_id={actor_id} reason=self_consumption awards=0",
-        ),
-        (RECEIPT_VIEW, "exit", f"{request} {action} status=skipped"),
-    )
+    story = _self_copy_expected_log_story(actor_id)
     expected = [f"{where} | {beat} | {fields}" for where, beat, fields in story]
     observed = [
         record.getMessage()
@@ -652,3 +650,41 @@ def _assert_self_copy_log_story(caplog: LogCaptureFixture, actor_id: int) -> Non
             if operation == where
         }
         assert_log_story(caplog, where=where, beats=beats)
+
+
+def _self_copy_expected_log_story(actor_id: int) -> tuple[tuple[str, str, str], ...]:
+    """Describe every permitted receipt/service beat for self-copy.
+
+    :param actor_id: Persisted owner identity. Example: Mike's PK.
+    :return: Exact safe seven-record story. Example: view entry through view exit.
+    :raises ValueError: If the supplied identity cannot be interpolated.
+    """
+    request = f"request_id={REQUEST_ID}"
+    action = f"action_uuid={EVENT_ID}"
+    target = f"entity_type=activity entity_id={ACTIVITY_ID}"
+    service = f"channel=gui_copy {action} actor_id={actor_id} playbook_id={PLAYBOOK_ID}"
+    attribution = f"author_id={actor_id} reason=self_consumption awards=0"
+    identity = f"consumption:gui_copy:{actor_id}:{EVENT_ID}"
+    role = f"exclusion_role=self_author pip_creator_id=None event_identity={identity}"
+    story = (
+        (RECEIPT_VIEW, "entry", f"{request} actor_id={actor_id} operation=gui_copy"),
+        (RECEIPT_VIEW, "validation", f"{request} {target} {action} validated"),
+        (
+            CONSUMPTION_SERVICE,
+            "entry",
+            f"channel=gui_copy {action} actor_id={actor_id} {target}",
+        ),
+        (CONSUMPTION_SERVICE, "validation", f"{service} authorized"),
+        (
+            CONSUMPTION_SERVICE,
+            "branch",
+            f"{service} {attribution} {role}",
+        ),
+        (
+            CONSUMPTION_SERVICE,
+            "exit",
+            f"{service} {attribution} {role} created_count=0",
+        ),
+        (RECEIPT_VIEW, "exit", f"{request} {action} status=skipped"),
+    )
+    return story

@@ -419,8 +419,8 @@ class KarmaService:
         service = KarmaService
         validate_input = service._validate_consumption_input
         validate_input(entity_type, entity_id, event_identity, channel)
-        operation = _CONSUMPTION_LOG
         trace = f"channel={channel} action_uuid={event_identity}"
+        service._log_consumption_entry(actor, entity_type, entity_id, trace)
         if isinstance(actor, AnonymousUser):
             service._consumption_exclusion(actor, None, None, trace=trace)
             return ()
@@ -428,7 +428,7 @@ class KarmaService:
         canonical_id = service._canonical_consumption_identity
         identity = canonical_id(actor.pk, event_identity, channel)
         trace += f" actor_id={actor.pk} playbook_id={target.playbook.pk}"
-        logger.info(f"{operation} | validation | {trace} authorized")
+        logger.info(f"{_CONSUMPTION_LOG} | validation | {trace} authorized")
         if service._consumption_exclusion(actor, target, identity, trace=trace):
             return ()
         build_specs = service._build_consumption_specs
@@ -440,11 +440,11 @@ class KarmaService:
         recipients = f"learner_id={actor.pk} author_id={specs[1].recipient_id}"
         details = f"{recipients} points={_CONSUMPTION_POINTS} status={status}"
         event = f"event_identity={identity} transaction=pending"
-        logger.info(f"{operation} | processing | {event} {details}")
+        logger.info(f"{_CONSUMPTION_LOG} | processing | {event} {details}")
         created = sum(outcome.created for outcome in outcomes)
         result = f"created_count={created}" if created else "duplicate"
         timestamp = f"occurred_at={award.occurred_at.isoformat()}"
-        logger.info(f"{operation} | exit | {event} {result} {timestamp}")
+        logger.info(f"{_CONSUMPTION_LOG} | exit | {event} {result} {timestamp}")
         return outcomes
 
     @staticmethod
@@ -515,7 +515,9 @@ class KarmaService:
         """
         operation = _CONSUMPTION_LOG
         if isinstance(actor, AnonymousUser):
-            logger.info(f"{operation} | branch | {trace} reason=guest awards=0")
+            KarmaService._log_consumption_exclusion(
+                actor, target, canonical_identity, trace
+            )
             return "guest"
         if target is None or canonical_identity is None:
             raise ValueError("An authorized target and event key are required.")
@@ -528,9 +530,8 @@ class KarmaService:
         if is_self:
             if KarmaAward.objects.filter(event_identity=canonical_identity).exists():
                 raise ValidationError("Event conflict.", code="award_payload_conflict")
-            logger.info(
-                f"{operation} | branch | {trace} author_id={book.author_id} "
-                "reason=self_consumption awards=0"
+            KarmaService._log_consumption_exclusion(
+                actor, target, canonical_identity, trace
             )
             return "self_consumption"
         attribution = f"author_id={book.author_id} category={book.category}"
@@ -539,6 +540,60 @@ class KarmaService:
             f"{operation} | branch | {trace} {event} {attribution} reason=eligible"
         )
         return None
+
+    @staticmethod
+    def _log_consumption_entry(
+        actor: User | AnonymousUser, entity_type: str, entity_id: int, trace: str
+    ) -> None:
+        """Record safe validated receipt inputs before target authorization.
+
+        :param actor: Server-authenticated actor or guest. Example: Mike.
+        :param entity_type: Validated entity kind. Example: "activity".
+        :param entity_id: Validated positive ID. Example: 6203.
+        :param trace: Validated action/channel context. Example: "channel=mcp_detail …".
+        :return: None after one INFO entry record.
+        :raises ValueError: Propagates invalid logging configuration errors.
+        """
+        logger.info(
+            f"{_CONSUMPTION_LOG} | entry | {trace} actor_id={actor.pk} "
+            f"entity_type={entity_type} entity_id={entity_id}"
+        )
+
+    @staticmethod
+    def _log_consumption_exclusion(
+        actor: User | AnonymousUser,
+        target: ConsumptionTarget | None,
+        canonical_identity: str | None,
+        trace: str,
+    ) -> None:
+        """Complete the safe log story for an already decided exclusion.
+
+        :param actor: Server-authenticated actor or guest. Example: Mike.
+        :param target: Authorized target, or None for guests. Example: activity 6203.
+        :param canonical_identity: Scoped immutable identity, or None for guests.
+        :param trace: Validated channel/action context. Example: "channel=mcp_detail …".
+        :return: None after emitting branch and zero-result exit records.
+        :raises ValueError: If authenticated logging has no authorized target.
+        """
+        reason, details = "guest", ""
+        branch = "reason=guest awards=0"
+        if not isinstance(actor, AnonymousUser):
+            if target is None:
+                raise ValueError(
+                    "An authorized target is required for exclusion logging."
+                )
+            author_id = target.playbook.author_id
+            role = "self_author" if actor.pk == author_id else "self_creator"
+            reason = "self_consumption"
+            branch = f"author_id={author_id} reason={reason} awards=0"
+            details = (
+                f" exclusion_role={role} pip_creator_id={target.pip_creator_id} "
+                f"event_identity={canonical_identity}"
+            )
+        logger.info(f"{_CONSUMPTION_LOG} | branch | {trace} {branch}{details}")
+        logger.info(
+            f"{_CONSUMPTION_LOG} | exit | {trace} {branch}{details} created_count=0"
+        )
 
     @staticmethod
     def _canonical_consumption_identity(
