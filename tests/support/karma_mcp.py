@@ -35,6 +35,7 @@ from django.apps import apps
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.db import connection
+from django.db.models import Model, Q
 from fastmcp import Client, FastMCP
 from fastmcp.client.client import CallToolResult
 from mcp.types import (
@@ -51,8 +52,27 @@ from rest_framework.authtoken.models import Token
 from mcp_integration.context import _current_user, set_current_user
 from mcp_integration.facade import client as facade_client
 from mcp_integration.facade.server import _build_mcp
-from methodology.models import Activity, Agent, Artifact, Phase, Rule, Skill
+from methodology.models import (
+    Activity,
+    Agent,
+    Artifact,
+    Phase,
+    Playbook,
+    ProcessImprovementProposal,
+    Rule,
+    Skill,
+    Workflow,
+)
+from methodology.services.activity_service import ActivityService
+from methodology.services.agent_service import AgentService
+from methodology.services.artifact_service import ArtifactService
 from methodology.services.experts_service import ExpertsService
+from methodology.services.phase_service import PhaseService
+from methodology.services.pip_service import PIPService
+from methodology.services.playbook_service import PlaybookService
+from methodology.services.rule_service import RuleService
+from methodology.services.skill_service import SkillService
+from methodology.services.workflow_service import WorkflowService
 from tests.support.experts_data import (
     CedarDatabaseScope,
     CedarDataset,
@@ -538,7 +558,19 @@ def collection_case(
     :return: Actual collection contract. Example: authorized lightweight activity rows.
     :raises ValueError: Unsupported tool/fixture.
     """
-    raise NotImplementedError()
+    _collection_parameter_validation(tool_name, dataset, actor_username, entrypoint)
+    arguments = _collection_arguments(tool_name, dataset)
+    rows = _collection_expected_objects(tool_name, dataset, actor_username, entrypoint)
+    expected = [_collection_metadata(row, tool_name, entrypoint) for row in rows]
+    return MCPCase(
+        tool_name,
+        actor_username,
+        tool_name,
+        f"collection:{tool_name}",
+        arguments,
+        f"/api/{_COLLECTION_RESOURCES[tool_name]}/",
+        {"rows": expected, "entrypoint": entrypoint},
+    )
 
 
 def collection_service_result(case: MCPCase, dataset: MCPDataset) -> object:
@@ -549,7 +581,10 @@ def collection_service_result(case: MCPCase, dataset: MCPDataset) -> object:
     :return: Actual native result fully materialized. Example: authorized workflow rows.
     :raises PermissionError: Existing collection permission denies the request.
     """
-    raise NotImplementedError()
+    _collection_parameter_validation(
+        case.tool_name, dataset, case.actor_username, case.expected["entrypoint"]
+    )
+    return _collection_native_rows(case, dataset)
 
 
 def decode_tool_payload(result: object) -> object:
@@ -634,7 +669,11 @@ def collection_snapshot() -> MCPInvariantSnapshot:
     :return: Complete snapshot. Example: summaries and interactions included.
     :raises AssertionError: Required S23 schema unavailable.
     """
-    raise NotImplementedError()
+    snapshot = karma_snapshot(include_summaries=True)
+    assert (
+        snapshot.summaries_json is not None and snapshot.interactions_json is not None
+    )
+    return snapshot
 
 
 def assert_collection_result(
@@ -652,7 +691,18 @@ def assert_collection_result(
     :return: None. Example: exact content and no consumption effects asserted.
     :raises AssertionError: Metadata, disclosure, access timestamp or invariant differs.
     """
-    raise NotImplementedError()
+    assert before.summaries_json is not None and before.interactions_json is not None
+    assert (
+        after == before
+    ), "Collection changed complete awards, all projections, access times or summaries."
+    assert (
+        isinstance(payload, list) and payload
+    ), "Primary collection must return genuine nonempty metadata."
+    assert (
+        payload == case.expected["rows"]
+    ), "Native metadata, identity, field set or order differs."
+    if case.tool_name == "list_activities":
+        assert all("guidance" not in row for row in payload)
 
 
 def _write_subprocess_settings(root: Path, database_path: Path) -> str:
@@ -1278,3 +1328,398 @@ def run_collection_stdio(
     :raises AssertionError: Protocol, metadata or state differs.
     """
     raise NotImplementedError()
+
+
+_COLLECTION_FIELDS = {
+    "facade": {
+        "list_playbooks": (
+            "id",
+            "name",
+            "status",
+            "version",
+            "category",
+            "visibility",
+            "workflow_count",
+        ),
+        "list_workflows": (
+            "id",
+            "playbook_id",
+            "name",
+            "description",
+            "abbreviation",
+            "order",
+            "activity_count",
+            "activities",
+        ),
+        "list_activities": (
+            "id",
+            "workflow_id",
+            "name",
+            "phase_id",
+            "order",
+            "predecessor_id",
+            "predecessor_name",
+            "agent_id",
+            "agent_name",
+            "skills",
+        ),
+        "list_phases": (
+            "id",
+            "playbook_id",
+            "name",
+            "description",
+            "order",
+            "activity_count",
+        ),
+        "list_skills": (
+            "id",
+            "playbook_id",
+            "title",
+            "content",
+            "capability_domain",
+            "technology_stack",
+            "activity_count",
+        ),
+        "list_rules": ("id", "playbook_id", "title", "slug", "content", "always_apply"),
+        "list_agents": ("id", "playbook_id", "name", "description", "activity_count"),
+        "list_artifacts": (
+            "id",
+            "playbook_id",
+            "produced_by_id",
+            "name",
+            "description",
+            "type",
+            "is_required",
+            "consumer_count",
+        ),
+        "list_pips": (
+            "id",
+            "playbook_id",
+            "title",
+            "summary",
+            "status",
+            "submitted_by_username",
+            "submitted_at",
+            "status_changed_at",
+            "changes_count",
+        ),
+    },
+    "legacy": {
+        "list_playbooks": (
+            "id",
+            "name",
+            "description",
+            "category",
+            "status",
+            "version",
+            "visibility",
+        ),
+        "list_workflows": (
+            "id",
+            "name",
+            "description",
+            "abbreviation",
+            "order",
+            "playbook_id",
+        ),
+        "list_activities": (
+            "id",
+            "name",
+            "phase_id",
+            "order",
+            "workflow_id",
+            "predecessor_id",
+            "successor_id",
+        ),
+        "list_phases": (
+            "id",
+            "name",
+            "description",
+            "order",
+            "playbook_id",
+            "created_at",
+            "updated_at",
+        ),
+        "list_skills": (
+            "id",
+            "title",
+            "capability_domain",
+            "technology_stack",
+            "activity_count",
+            "playbook_id",
+        ),
+        "list_rules": (
+            "id",
+            "title",
+            "slug",
+            "always_apply",
+            "activity_count",
+            "playbook_id",
+        ),
+        "list_agents": ("id", "name", "description", "activity_count", "playbook_id"),
+        "list_artifacts": (
+            "id",
+            "name",
+            "type",
+            "is_required",
+            "produced_by_id",
+            "playbook_id",
+        ),
+        "list_pips": (
+            "id",
+            "title",
+            "summary",
+            "status",
+            "playbook_id",
+            "submitted_by_username",
+            "submitted_at",
+            "status_changed_at",
+            "changes_count",
+        ),
+    },
+}
+_COLLECTION_RESOURCES = {
+    tool: tool.removeprefix("list_") for tool in _COLLECTION_FIELDS["facade"]
+}
+_COLLECTION_MODELS = {
+    "list_workflows": Workflow,
+    "list_activities": Activity,
+    "list_phases": Phase,
+    "list_skills": Skill,
+    "list_rules": Rule,
+    "list_agents": Agent,
+    "list_artifacts": Artifact,
+}
+_COLLECTION_ORDER = {
+    "list_workflows": ("order",),
+    "list_activities": ("order",),
+    "list_phases": ("order",),
+    "list_skills": ("title",),
+    "list_rules": ("title",),
+    "list_agents": ("name",),
+    "list_artifacts": ("name",),
+}
+
+
+def _collection_arguments(tool_name: str, dataset: MCPDataset) -> Mapping[str, object]:
+    """Resolve actual parent identifiers, preserving the ordinary list API.
+
+    :param tool_name: Supported collection. Example: "list_activities".
+    :param dataset: Real fixture relationships. Example: Mike workflow6202.
+    :return: Actual tool arguments. Example: {"workflow_id": 6202}.
+    :raises KeyError: Required real fixture is missing.
+    """
+    if tool_name == "list_playbooks":
+        return {"status": "all"}
+    if tool_name == "list_pips":
+        return {"scope": "mine"}
+    parent = "workflow_id" if tool_name == "list_activities" else "playbook_id"
+    fixture = "mike_workflow" if parent == "workflow_id" else "mike_playbook"
+    return {parent: dataset.entity_ids[fixture]}
+
+
+def _collection_expected_objects(
+    tool_name: str, dataset: MCPDataset, actor_username: str, entrypoint: MCPEntrypoint
+) -> list[Model]:
+    """Read independent ORM identities/order without calling wrappers or serializers.
+
+    :param tool_name: Supported collection. Example: "list_rules".
+    :param dataset: Real fixture. Example: Mike's public released book.
+    :param actor_username: Explicit active actor. Example: "mrodriguez".
+    :param entrypoint: Existing ordering contract. Example: "legacy".
+    :return: Actual expected objects in native order. Example: one Rule.
+    :raises LookupError: Expected model or actor is missing.
+    """
+    actor = dataset.cedar.users_by_username[actor_username]
+    if tool_name == "list_playbooks":
+        allowed = Q(author=actor) | Q(
+            visibility="public", status__in=("released", "disabled")
+        )
+        return list(Playbook.objects.filter(allowed).order_by("-updated_at"))
+    if tool_name == "list_pips":
+        return list(
+            ProcessImprovementProposal.objects.filter(created_by=actor).order_by(
+                "-updated_at", "-pk"
+            )
+        )
+    arguments = _collection_arguments(tool_name, dataset)
+    order = _COLLECTION_ORDER[tool_name]
+    if entrypoint == "legacy" and tool_name == "list_rules":
+        order = ("slug",)
+    if entrypoint == "legacy" and tool_name == "list_artifacts":
+        order = ("produced_by__order", "name")
+    return list(
+        _COLLECTION_MODELS[tool_name].objects.filter(**arguments).order_by(*order)
+    )
+
+
+def _collection_playbooks(actor: User) -> list[Model]:
+    """Materialize all three existing authorized native playbook list services.
+
+    :param actor: Actual authenticated user. Example: Maria.
+    :return: Existing combined native ordered objects. Example: owned/public/team.
+    :raises PermissionError: Existing native service denies access.
+    """
+    rows = list(PlaybookService.list_playbooks(actor))
+    rows.extend(PlaybookService.list_public_playbooks(actor))
+    rows.extend(PlaybookService.list_team_playbooks_for_user(actor))
+    rows.sort(
+        key=lambda row: (row.updated_at is None, row.updated_at or row.created_at),
+        reverse=True,
+    )
+    return rows
+
+
+def _collection_native_rows(case: MCPCase, dataset: MCPDataset) -> tuple[Model, ...]:
+    """Invoke the real service for each collection, without a consumption writer.
+
+    :param case: Explicit native contract. Example: Maria list_workflows.
+    :param dataset: Actual parent/actor references. Example: Mike book6201.
+    :return: Fully materialized actual models. Example: (Workflow(...),).
+    :raises PermissionError: Actor cannot read the real parent.
+    :raises ValueError: Unsupported tool.
+    """
+    actor = dataset.cedar.users_by_username[case.actor_username]
+    book = dataset.cedar.playbooks_by_pk[dataset.entity_ids["mike_playbook"]]
+    if case.tool_name not in ("list_playbooks", "list_pips") and not book.can_view(
+        actor
+    ):
+        raise PermissionError("Collection parent is unavailable.")
+    calls = {
+        "list_playbooks": lambda: _collection_playbooks(actor),
+        "list_workflows": lambda: WorkflowService.get_workflows_for_playbook(book.pk),
+        "list_activities": lambda: ActivityService.get_activities_for_workflow(
+            dataset.cedar.workflows_by_pk[dataset.entity_ids["mike_workflow"]]
+        ),
+        "list_phases": lambda: PhaseService.list_phases(book.pk, actor),
+        "list_skills": lambda: SkillService.list_skills_for_playbook(book.pk),
+        "list_rules": lambda: RuleService.list_rules_for_playbook(book.pk),
+        "list_agents": lambda: AgentService.list_agents_for_playbook(book.pk),
+        "list_artifacts": lambda: ArtifactService.get_artifacts_for_playbook(book),
+        "list_pips": lambda: PIPService.list_queryset_for_user(
+            actor=actor, scope="mine"
+        ),
+    }
+    return tuple(calls[case.tool_name]())
+
+
+def _collection_metadata(
+    entity: Model, tool_name: str, entrypoint: MCPEntrypoint
+) -> Mapping[str, object]:
+    """Project explicit native field contracts from independent ORM values.
+
+    :param entity: Real persisted row. Example: Mike's Workflow.
+    :param tool_name: Actual list name. Example: "list_workflows".
+    :param entrypoint: Actual surface. Example: "facade".
+    :return: Exact expected native metadata. Example: workflow with lightweight activities.
+    :raises AssertionError: Required expected field cannot be resolved.
+    """
+    fields = _COLLECTION_FIELDS[entrypoint][tool_name]
+    values = {name: getattr(entity, name) for name in fields if hasattr(entity, name)}
+    values.update(_collection_core_extras(entity))
+    values.update(_collection_resource_extras(entity))
+    values.update(_collection_pip_times(entity, entrypoint))
+    if "version" in values:
+        values["version"] = str(values["version"])
+    return {name: values[name] for name in fields if name in values}
+
+
+def _collection_core_extras(entity: Model) -> Mapping[str, object]:
+    """Resolve real lightweight core relations without detail retrieval.
+
+    :param entity: Real core object. Example: Workflow6202.
+    :return: Actual related metadata. Example: activity_count and three-field children.
+    :raises AttributeError: Expected real relation is missing.
+    """
+    if isinstance(entity, Playbook):
+        return {"workflow_count": entity.workflows.count()}
+    if isinstance(entity, Workflow):
+        return {
+            "activity_count": entity.activities.count(),
+            "activities": list(
+                entity.activities.order_by("order").values("id", "name", "order")
+            ),
+        }
+    if isinstance(entity, Activity):
+        data = {
+            "skills": list(
+                entity.skills.all().values(
+                    "id", "title", "capability_domain", "technology_stack"
+                )
+            )
+        }
+        if entity.predecessor_id is not None:
+            data["predecessor_name"] = entity.predecessor.name
+        if entity.agent_id is not None:
+            data["agent_name"] = entity.agent.name
+        return data
+    return {}
+
+
+def _collection_resource_extras(entity: Model) -> Mapping[str, object]:
+    """Read actual relation counts required by the explicit resource schemas.
+
+    :param entity: Real resource. Example: Skill with no linked activities.
+    :return: Exact actual count metadata. Example: {"activity_count": 0}.
+    :raises AttributeError: Expected real relation is missing.
+    """
+    if isinstance(entity, (Phase, Skill, Rule, Agent)):
+        return {"activity_count": entity.activities.count()}
+    if isinstance(entity, Artifact):
+        return {"consumer_count": entity.inputs.count()}
+    return {}
+
+
+def _collection_pip_times(
+    entity: Model, entrypoint: MCPEntrypoint
+) -> Mapping[str, object]:
+    """Preserve native phase/PIP time representations and summary metadata.
+
+    :param entity: Actual time-bearing list row. Example: historical Maria PIP.
+    :param entrypoint: Existing representation. Example: legacy ISO offset strings.
+    :return: Exact nullable/empty time and PIP fields. Example: null API submitted_at.
+    :raises AttributeError: Required persisted date/creator relation is absent.
+    """
+    if not isinstance(entity, (Phase, ProcessImprovementProposal)):
+        return {}
+    fields = (
+        ("created_at", "updated_at")
+        if isinstance(entity, Phase)
+        else ("submitted_at", "status_changed_at")
+    )
+    data = {}
+    for name in fields:
+        value = getattr(entity, name)
+        data[name] = (
+            value.isoformat() if value else ("" if entrypoint == "legacy" else None)
+        )
+        if entrypoint == "facade" and isinstance(data[name], str):
+            data[name] = data[name].replace("+00:00", "Z")
+    if isinstance(entity, ProcessImprovementProposal):
+        data.update(
+            submitted_by_username=entity.created_by.username,
+            changes_count=entity.changes.count(),
+            summary=entity.summary or "",
+        )
+    return data
+
+
+def _collection_parameter_validation(
+    tool_name: str, dataset: MCPDataset, actor_username: str, entrypoint: MCPEntrypoint
+) -> None:
+    """Fail before ORM work for unsupported collection/actor/surface inputs.
+
+    :param tool_name: Candidate list name. Example: "list_activities".
+    :param dataset: Real fixture container. Example: MCPDataset(...).
+    :param actor_username: Explicit known actor. Example: "mrodriguez".
+    :param entrypoint: Real registration selector. Example: "facade".
+    :return: None for valid contract inputs. Example: active Maria/list pair.
+    :raises ValueError: Tool, actor, dataset or entrypoint is invalid.
+    """
+    if not isinstance(dataset, MCPDataset) or entrypoint not in _COLLECTION_FIELDS:
+        raise ValueError("An actual dataset and supported MCP entrypoint are required.")
+    if tool_name not in _COLLECTION_FIELDS[entrypoint]:
+        raise ValueError("Unsupported collection tool.")
+    actor = dataset.cedar.users_by_username.get(actor_username)
+    if actor is None or not actor.is_active:
+        raise ValueError("An explicit active Cedar actor is required.")
