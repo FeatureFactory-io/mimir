@@ -24,6 +24,11 @@ iteration:
     recorded_at: '2026-11-23T21:48:25.790050+00:00'
     external_issue_publication: explicitly skipped by user
     progress_record: docs/plans/iterations/experts/execution-journal.md
+  approved_scope_autonomy:
+    user_clarification: the point of having the storyboard to stop asking about content, and having playbook to stop asking about engineering workflow
+    authority: Necessary content alignment and engineering repairs, verification, retries and shared-file reconciliation inside the approved 49 contracts proceed without repeated confirmations.
+    retained_review: Material feature/scope changes and main merge, release and production promotion decisions.
+    explicit_pause_preserved: S04 remains paused until explicit resume; independent work continues.
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
     exact-AT runner implementation is N4. No product or scenario footprint expanded.
 conflict_map:
@@ -1179,6 +1184,20 @@ scenarios:
         - Existing account and email-change behavior retained
         - No provider, award or summary write on GET
         - S11/S12/S13 certification obligations remain separately tracked
+      - id: R1-summary-toggle-reading
+        title: Remove a focused tooltip that obscures the expanded stored paragraph
+        bpe: BPE-03
+        depends_on:
+        - N5-profile-dod
+        footprint:
+        - templates/accounts/profile.html
+        - tests/integration/test_experts_own_profile.py
+        gate:
+          command: make test-experts-s10-backend
+        constraints:
+        - Preserve focus, native button semantics, expansion states and complete stored prose.
+        - Keep the useful explanation accessible without placing a popup over the paragraph.
+        - S11 owns the new deterministic reading/occlusion browser assertion and full recapture.
       scenario_dependencies:
       - S03
       - S17

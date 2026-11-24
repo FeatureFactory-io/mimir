@@ -62,3 +62,23 @@ handoff/traceability requirements for this replay; it does not waive tests,
 footprints, fresh node agents or later merge/release review gates.
 BPE-02+ implementation and real test bodies are now authorized within that
 contract. Record observed results; narration remains male.
+
+
+## Approved-scope autonomy correction — 24 November 2026
+
+Denis clarified: “the point of having the storyboard to stop asking about
+content, and having playbook to stop asking about engineering workflow”. The
+approved storyboard, local 49-contract GO and this correction authorize routine
+content alignment to observed work and necessary engineering repairs,
+verification, retries, helper refactoring and shared-file reconciliation inside
+that approved scope without repeated retry or footprint confirmation questions.
+Record the actual scope, source, failures, evidence and fresh independent review;
+do not weaken acceptance or conceal drift. This user instruction takes precedence
+for this replay over repeated human-decision stops for those routine repairs.
+Return to Denis for a material change to the intended feature/scope or for the
+existing main merge, release and production promotion review decisions.
+
+Denis separately answered “Pause S04”. That scenario stays paused, with its
+prepared provenance patch unapplied and its dependent scenarios waiting, until
+an explicit resume. The autonomy correction does not infer a resume or drop any
+of the 49 contracts. Independent approved work continues.
