@@ -9964,3 +9964,51 @@ scenarios:
     parallel_group: F
     structural_followup_commits:
     - 233048f36c09ea0f2032290443100833b226f2c4
+
+iteration_convergence_followups:
+  architecture_compatibility:
+    source: 90cd314299652e5c0691b0ce641a547d5951a7ad
+    status: independently_verified
+    proof: planning/SAO-repair-independent-20261124/verification.json
+    independent_cases: 227
+    qualification: No additional blocker in the reviewed repairs; whole-suite, real PostgreSQL and staging remain separate gates.
+  test_isolation:
+    source: 90cd314299652e5c0691b0ce641a547d5951a7ad
+    status: independently_verified_full_local_suite_passed
+    footprint:
+    - tests/integration/karma_event/conftest.py
+    - tests/integration/test_playbook_version_migration.py
+    - tests/unit/test_karma_sqlite_lifecycle.py
+    preserves: Production behavior unchanged; restore the actual async worker wrapper and current schema leaves after owned test lifetimes.
+  isolated_idle_runner:
+    status: preparation_in_progress_no_cloud_dispatch
+    footprint:
+    - .github/workflows/experts-staging-uat.yml
+    - scripts/experts-staging/
+    - tests/unit/test_experts_staging_runner*
+    authorization: Existing local GO and explicit user CI/CD staging instruction; prepare bounded owned resources without changing normal deployment or production infrastructure.
+    constraints:
+    - Existing verified physical idle host only; rediscover and guard live CNAME identity.
+    - No ambient DB_URL, EB environment credentials, default image entrypoint or admin bootstrap.
+    - Private PostgreSQL owner marker and actual role/database/comment proof before migrations or Cedar writes.
+    - Explicit capacity limits; preserve all unrelated containers, networks, volumes and backup objects.
+    - Source IAM has no StartSession; no IAM expansion. Prefer owned on-host browser via existing SendCommand and bounded artifact transport.
+    - Exact image digest mapped by CI source receipt and actual source-file hash verification; no nonexistent embedded revision label claim.
+    - Deployment held until complete gates and independent review; main merge, release and promotion retain human review.
+  ci_dependency_compatibility:
+    status: repair_in_progress
+    observed_run: 45508236061
+    observed_source: c45b036252db2456c1eea16fe9515f7a9b1f007a
+    footprint:
+    - tests/unit/test_contribution_summary_adapter.py
+    - tests/support/provider_http_server.py
+    - tests/support/karma_mcp.py
+    - tests/unit/test_mcp_protocol_compatibility.py
+    - tests/integration/test_karma_mcp_collections.py
+    - .github/workflows/build-and-deploy.yml
+    authorization: Necessary compatibility of existing contract proofs with freshly installed supported libraries; preserve real SDK transport and protocol failure semantics.
+    constraints:
+    - No arbitrary dependency downgrade, skipped acceptance cases or weakened error decoding.
+    - Real loopback SDK transport outside provider private internals.
+    - Empty collection opt-in only at the collection caller; generic, malformed and isError results stay strict.
+    - System Graphviz is required by SAO and installed in CI; app graph behavior is unchanged.

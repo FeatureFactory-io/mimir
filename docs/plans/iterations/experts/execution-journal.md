@@ -1028,3 +1028,57 @@ pytest-django export; `c45b036` removes that runtime dependency with no test-bod
 change. Retry 45508236061 is still pending at this journal entry. The nine real
 Postgres-owned-scope checks have not yet been counted as passed. Candidate
 build/deploy, staging Saga/UAT and reviewed main merge/release remain open.
+
+### 2026-11-24 — independent compatibility repair acceptance
+
+Fresh reviewer accepted exact `90cd314`: 227 independent cases passed with zero
+skips, including the actual older/newer client/server matrix and strict receipt
+failures. All 1,997 tracked blobs matched before/after with zero overlays. The
+fresh S04 external artifact gate verified 29 pairs and four recaptures. Scoped
+format checks pass for 15 changed Python paths; actual global Ruff remains 893
+inherited findings, zero introduced versus baseline 923. Review report and proof:
+`planning/SAO-repair-independent-20261124`, verification SHA-256
+`411579c4cea6f54e4a841646a76f50d4262cbf91bec4b3f59810edaa14a344bd`.
+The compatibility owner also completed exact `694b9ac` S39–S46: all 25 subtargets
+passed, 540 case executions including intentional repeats. The final `b5c1184`
+17-case matrix preserves raw export hashes and only tolerates its generated
+minute timestamp in content comparison; the final run's raw files also matched.
+
+A full exact committed-source MakeTest/AT/agent run is in progress on `90cd314`.
+That same reviewed source was pushed to the iteration branch and dispatched for
+build-only CI with deploy_to_idle=false, preflight_only=false and wake_idle=false.
+No main/latest publication or candidate deployment is authorized by that build.
+
+Isolated idle preparation discovered source IAM permits SendCommand but does not
+include StartSession. No new IAM is added. The preparation node now evaluates a
+separate bounded browser container on the private owned network, recording real
+idle interactions and exporting only its owned artifacts. The image also lacks
+an embedded revision label; identity must use the CI digest/source receipt plus
+actual source-file hashes, rather than inventing an embedded SHA. Both findings
+are preparation constraints, not proof of an executed staging surface.
+
+
+### 2026-11-24 — complete local regression convergence and real PostgreSQL proof
+
+The exact detached Git worktree at `90cd314` passed actual `make test`: 3,228
+passed, 12 skipped, 186 warnings, 644.54 seconds, zero failures/errors. The 12
+skips comprise the nine opt-in PostgreSQL cases and three established baseline
+skips; the required actual older-server compatibility cases ran. Harness passed
+one scenario/three steps; the normal living specification passed all seven
+features, 83 scenarios and 410 steps with no skips/undefined steps; all 24 agent
+proofs passed (five non-agent cases deselected). All 1,997 tracked source blobs
+were verified unchanged after every gate, zero overlays. Recordings and
+before/after proof: `planning/iteration-convergence-gates-20261124` and
+`cli/CONVERGENCE-*-90cd314-20261124`.
+
+CI45508236061 at the older c45b036 completed: 68 failed, 3,148 passed, 3 skipped,
+one error, 1,146.16 seconds. All nine real PostgreSQL owned-scope checks passed,
+including fresh import/reimport and eight unsafe claims. Its overall failure is
+retained, not represented as a candidate build pass. Remaining failures include
+older source already repaired locally, missing Graphviz executable and changed
+SDK test interfaces. CI now installs Graphviz, as required by SAO. A fresh owner
+reproduces the latest CI dependencies in an independent environment and repairs
+bounded SDK/protocol test support without loosening native errors. The observed
+PostgreSQL fixture primary-key collision has its own investigation and is not
+silently dismissed. Build-only CI45511392694 runs the reviewed90cd314, before
+those newer CI environment repairs; deploy remains explicitly disabled.
