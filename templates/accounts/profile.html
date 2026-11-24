@@ -110,11 +110,12 @@
                     <p id="own-contribution-summary" class="text-break" data-testid="profile-contribution-summary">{{ contributions.summary }}</p>
                     <button type="button" class="btn btn-outline-secondary btn-sm"
                             aria-expanded="false" aria-controls="own-contribution-summary"
-                            title="Show or hide the full contribution summary" data-bs-toggle="tooltip"
+                            aria-describedby="profile-summary-toggle-help"
                             id="profile-summary-toggle"
                             data-testid="profile-summary-toggle" hidden>
                         <i class="fa-solid fa-chevron-down me-1" aria-hidden="true"></i><span>Show more</span>
                     </button>
+                    <span id="profile-summary-toggle-help" hidden>Show or hide the full contribution summary</span>
                     {% endif %}
                 </div>
             </div>

@@ -7,6 +7,7 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.test import Client, RequestFactory
+from django.test.html import parse_html
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.html import escape
@@ -231,6 +232,33 @@ def test_profile_view_with_summary_markup_escapes_content(client: Client) -> Non
     assert element_text(summary) == summary_text
     assert escape(summary_text).encode() in response.content
     assert summary_text.encode() not in response.content
+
+
+def test_profile_view_with_summary_toggle_explains_purpose_without_bootstrap_popup(
+    client: Client, cedar_dataset: CedarDataset
+) -> None:
+    """Verify the disclosure retains help without activating a Bootstrap tooltip.
+
+    :param client: Real Django client. Example: authenticated Maria.
+    :param cedar_dataset: Imported Cedar dataset. Example: Maria has a long summary.
+    :return: None. Example: the button has one persistent accessible description.
+    :raises AssertionError: If the popup is enabled or the description is missing.
+    """
+    client.force_login(cedar_dataset.users_by_username["mrodriguez"])
+
+    response = client.get(reverse("profile"))
+
+    assert response.status_code == 200
+    toggle = find_by_test_id(response.content, "profile-summary-toggle")
+    attributes = dict(toggle.attributes)
+    assert attributes.get("data-bs-toggle") != "tooltip"
+    description_id = "profile-summary-toggle-help"
+    assert attributes.get("aria-describedby") == description_id
+    description = parse_html(
+        f'<span id="{description_id}" hidden>'
+        "Show or hide the full contribution summary</span>"
+    )
+    assert parse_html(response.content.decode(response.charset)).count(description) == 1
 
 
 def test_profile_contribution_context_with_maria_log_story_happy(
