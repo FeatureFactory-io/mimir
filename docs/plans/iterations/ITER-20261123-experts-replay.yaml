@@ -2575,7 +2575,7 @@ scenarios:
       - S03
       - S01
     implementation_plan: docs/plans/iterations/experts/S07-experts-list-07.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
@@ -2888,7 +2888,7 @@ scenarios:
           command. Require positive counts and no skips. Confirm one handler, S10-owned CSS, unchanged paragraph
           and retained account controls; resolve living-spec mapping before claiming EXPERTS-PROFILE-02 done.
     implementation_plan: docs/plans/iterations/experts/S11-experts-profile-02.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S10
@@ -3048,7 +3048,7 @@ scenarios:
       - S03
       - S10
     implementation_plan: docs/plans/iterations/experts/S12-experts-profile-03.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
