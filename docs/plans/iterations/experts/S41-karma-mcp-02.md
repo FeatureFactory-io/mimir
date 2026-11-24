@@ -122,6 +122,7 @@ feature_execution_graph:
     - S23
     footprint:
     - tests/integration/test_karma_mcp_collections.py
+    - tests/support/karma_mcp.py
     gate:
       command: pytest tests/integration/test_karma_mcp_collections.py -k 'registered_tool or direct_service
         or plain_rest or empty_or_denied or log_story' -x
@@ -216,3 +217,16 @@ feature_execution_graph:
 `docs/experts-replay/pin-evidence/S41.json`, `docs/features/steps/karma_mcp_steps.py`, `docs/plans/iterations/experts/S41-karma-mcp-02.md`, `tests/integration/test_karma_mcp_collections.py`
 
 Skeleton: `428d5fe9f04bc16989e78033dd23b2a0ee64b7ba`; shared reconciliation: `39d598328d438d09723b6eb14574fbf92fab71c9`. Semantic and physical-file dependencies are recorded separately in the iteration manifest. Context-map line ranges record the workers’ inspection baseline; headers and the final scaffold remain authoritative.
+
+
+## Shared test-interface footprint reconciliation
+
+N1 fills the four already-planned S41 collection interfaces in
+`tests/support/karma_mcp.py`: `collection_case`, `collection_service_result`,
+`collection_snapshot`, and `assert_collection_result`. The original N1 graph
+omitted that shared test path. Bounded private collection helpers may support
+these interfaces; actual native collection APIs, metadata, permission and state
+oracles remain the contract. Existing implemented S39/detail/protocol helpers
+and all S40 self-fetch stubs remain unchanged. N2/N3 consume these completed
+interfaces; no duplicate local policy, production source or acceptance scope is
+added. Root reconciles test/support ownership under the existing local GO.

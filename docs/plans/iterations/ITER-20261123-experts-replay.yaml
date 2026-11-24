@@ -8523,6 +8523,7 @@ scenarios:
     - docs/features/steps/karma_mcp_steps.py
     - docs/plans/iterations/experts/S41-karma-mcp-02.md
     - tests/integration/test_karma_mcp_collections.py
+    - tests/support/karma_mcp.py
     feature_file_paths:
     - docs/features/act-18-experts/karma-accrual.feature
     system_dependencies: []
@@ -8589,6 +8590,7 @@ scenarios:
         - S23
         footprint:
         - tests/integration/test_karma_mcp_collections.py
+        - tests/support/karma_mcp.py
         gate:
           command: pytest tests/integration/test_karma_mcp_collections.py -k 'registered_tool or direct_service
             or plain_rest or empty_or_denied or log_story' -x
