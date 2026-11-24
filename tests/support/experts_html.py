@@ -9,6 +9,12 @@ from django.http import HttpResponse
 from django.test.html import Element, HTMLParseError, parse_html
 
 _OTHER_EMPTY_MESSAGE = "No experts in Other yet — release a playbook to be the first"
+_SOURCE_TABLE_BY_TOTAL_ID = {
+    "profile-karma-total": "profile-karma-source-breakdown",
+    "expert-karma-total": "karma-source-breakdown",
+}
+_SOURCE_ROW_COUNT = 4
+_SOURCE_ROW_GROUPS = ("thead", "tbody", "tfoot")
 
 
 def find_by_test_id(html: str | bytes, test_id: str) -> Element:
@@ -128,9 +134,39 @@ def assert_karma_source_rows(
 
     :param html: Actual production response HTML. Example: response.content.decode().
     :param expected: Ordered source amounts. Example: {"Released": 5000, "PIP": 1600, "Consumption": 1200, "Learning": 400}.
-    :param total_test_id: Total card selector. Example: "profile-karma-total".
+    :param total_test_id: Own or public score selector. Example: "profile-karma-total".
     :param expected_total: Required integer total. Example: 8200.
     :return: None. Example: all body, footer and card assertions pass.
     :raises AssertionError: For missing, duplicated, unexpected or inconsistent rows.
+    :raises ValueError: For a score selector without a registered source table.
     """
-    raise NotImplementedError()
+    table_id = _SOURCE_TABLE_BY_TOTAL_ID.get(total_test_id)
+    if table_id is None:
+        raise ValueError(f"No Karma source table is registered for {total_test_id!r}.")
+    table = find_by_test_id(html, table_id)
+    assert table.name == "table"
+    children = [node for node in table.children if isinstance(node, Element)]
+    groups = [node for node in children if node.name != "caption"]
+    assert tuple(group.name for group in groups) == _SOURCE_ROW_GROUPS
+    assert len(expected) == _SOURCE_ROW_COUNT
+    assert sum(expected.values()) == expected_total
+    displayed_total = f"{expected_total:,}"
+    body_rows = [(label, str(points)) for label, points in expected.items()]
+    expected_rows = ([("Source", "Karma")], body_rows, [("Total", displayed_total)])
+    for group, expected_group in zip(groups, expected_rows, strict=True):
+        rows = [row for row in group.children if isinstance(row, Element)]
+        assert len(rows) == len(expected_group), f"Wrong number of {group.name} rows"
+        for row, expected_cells in zip(rows, expected_group, strict=True):
+            cells = [cell for cell in row.children if isinstance(cell, Element)]
+            is_header = group.name == "thead"
+            assert row.name == "tr"
+            assert [cell.name for cell in cells] == ["th", "th" if is_header else "td"]
+            assert ("scope", "col" if is_header else "row") in cells[0].attributes
+            if is_header:
+                assert ("scope", "col") in cells[1].attributes
+            assert tuple(element_text(cell) for cell in cells) == expected_cells
+    total = find_by_test_id(html, total_test_id)
+    assert total not in _walk_elements(
+        table
+    ), "The score must be separate from the table"
+    assert element_text(total) == displayed_total
