@@ -1,21 +1,31 @@
 from __future__ import annotations
 
+import json
 import logging
+import socket
+from collections.abc import Callable
 from pathlib import Path
 from uuid import UUID
 
+import httpx
 import pytest
+from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
 from django.db.models import Sum
-from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from pytest import LogCaptureFixture
 from pytest_django.live_server_helper import LiveServer
+from rest_framework.authtoken.models import Token
+from rest_framework.test import APIClient
 
+from mcp_integration.facade.client import get_client
 from mcp_integration.facade.export_paths import confined_export_path
 from methodology.models import KarmaAward, Playbook, Rule
 from methodology.services.playbook_export_service import PlaybookExportService
 from methodology.services.workflow_export_service import WorkflowExportService
-from tests.support.experts_data import load_cedar_baseline
+from tests.support.experts_data import CedarDataset, load_cedar_baseline
+from tests.support.experts_logs import capture_experts_logs
+from tests.support.karma_mcp import MCPClientFactory, MCPDataset, decode_tool_payload
 from tests.support.log_story import assert_log_story
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -23,34 +33,131 @@ pytestmark = pytest.mark.django_db(transaction=True)
 _CEDAR_PLAYBOOK_ID = 6201
 _CEDAR_WORKFLOW_ID = 6202
 _EXPORT_FOLDER = "cedar"
+_ACTOR = "mrodriguez"
+_AUTHOR = "mchen"
+_RECEIPT_PATH = "/api/consumption-receipts/"
+_FACADE_LOGGERS = (
+    "mcp_integration.facade.tools_http",
+    "methodology.api.consumption_views",
+)
+_BUNDLE_ROUTES = {
+    "workflow": f"/api/workflows/{_CEDAR_WORKFLOW_ID}/export/",
+    "playbook": f"/api/playbooks/{_CEDAR_PLAYBOOK_ID}/export-local/",
+}
+_ENTITY_IDS = {"workflow": _CEDAR_WORKFLOW_ID, "playbook": _CEDAR_PLAYBOOK_ID}
+_EXPORT_PARAMETERS = {
+    "workflow": {"workflow_id", "target_directory", "folder_name"},
+    "playbook": {
+        "playbook_id",
+        "target_directory",
+        "folder_name",
+        "additional_targets",
+        "sync_root_rules",
+        "ade_targets",
+        "force_apply",
+        "ade_target",
+    },
+}
 _EXPORT_LOG = {
     "workflow": "WorkflowExportService.export_workflow_to_markdown",
     "playbook": "PlaybookExportService.export_playbook_to_local",
 }
 
 
-def _configure_real_export_facade(live_server: LiveServer, actor: User) -> FastMCP:
-    """Configure real token HTTP and return existing registered facade.
+@pytest.fixture(name="export_facade")
+def _configure_real_export_facade(
+    live_server: LiveServer, cedar_dataset: CedarDataset
+) -> MCPClientFactory:
+    """Reuse the real registered facade lifecycle without additional fixture content.
 
     :param live_server: Isolated pytest Django server. Example: live_server.
-    :param actor: Cedar consumer. Example: Maria.
-    :return: Existing registered FastMCP instance. Example: _build_mcp().
+    :param cedar_dataset: Cedar actors and content. Example: workflow 6202.
+    :return: Shared real client factory. Example: open Maria's facade session.
     :raises RuntimeError: If token/server configuration fails.
     """
-    raise NotImplementedError()
+    return MCPClientFactory(MCPDataset(cedar_dataset, {}, {}), live_server.url, [])
 
 
+@async_to_sync
+async def _facade_call(
+    factory: MCPClientFactory,
+    entity: str,
+    target: Path,
+    *,
+    folder: str = _EXPORT_FOLDER,
+    options: dict[str, object] | None = None,
+    observe: Callable[[httpx.Request], None] | None = None,
+    discover: bool = False,
+) -> dict:
+    """Run a real registered tool and optionally observe the outgoing requests."""
+    tool_name = f"export_{entity}_to_local"
+    arguments = {
+        f"{entity}_id": _ENTITY_IDS[entity],
+        "target_directory": str(target),
+        "folder_name": folder,
+        **(options or {}),
+    }
+    async with factory.open(actor_username=_ACTOR, entrypoint="facade") as session:
+        if observe:
+            get_client().event_hooks["request"].append(observe)
+        if discover:
+            schema = next(
+                tool.inputSchema
+                for tool in await session.client.list_tools()
+                if tool.name == tool_name
+            )
+            assert set(schema["properties"]) == _EXPORT_PARAMETERS[entity]
+            assert schema["required"] == [f"{entity}_id"]
+        result = decode_tool_payload(
+            await session.client.call_tool(tool_name, arguments)
+        )
+    assert isinstance(result, dict)
+    return result
+
+
+def _cedar_actors(cedar: CedarDataset) -> tuple[User, User]:
+    """Return the existing eligible consumer and author from one baseline."""
+    return cedar.users_by_username[_ACTOR], cedar.users_by_username[_AUTHOR]
+
+
+def _current_award_ids() -> set[int]:
+    """Snapshot the ledger identities before an invocation."""
+    return set(KarmaAward.objects.values_list("pk", flat=True))
+
+
+@pytest.mark.parametrize("entity", ("workflow", "playbook"))
 def test_karma_export_facade_t1_with_multiple_files_awards_one_pair(
-    live_server: LiveServer, tmp_path: Path
+    entity: str, export_facade: MCPClientFactory, tmp_path: Path
 ) -> None:
     """Prove both registered exports over real HTTP, files and paired ledger.
 
-    :param live_server: Isolated real server. Example: live_server.
+    :param entity: The exported content kind. Example: "workflow".
+    :param export_facade: Isolated real server and fixture. Example: Maria's facade.
     :param tmp_path: Authorized temporary workspace. Example: Path("/tmp/t").
     :return: None after D's T1 assertions. Example: None.
     :raises AssertionError: If registration, files, totals or pair count differ.
     """
-    raise NotImplementedError()
+    cedar = export_facade.dataset.cedar
+    actor, author = _cedar_actors(cedar)
+    before = _current_award_ids()
+    result = _facade_call(export_facade, entity, tmp_path, discover=True)
+    root = tmp_path / _EXPORT_FOLDER
+    outputs = tuple(root.rglob("*.md"))
+    assert result["status"] == "exported"
+    assert result[f"{entity}_id"] == _ENTITY_IDS[entity]
+    assert len(outputs) == len(result["files_created"]) > 1
+    assert all(path.resolve().is_relative_to(root.resolve()) for path in outputs)
+    metadata = next(path for path in outputs if path.name == "_workflow.md")
+    workflow = cedar.workflows_by_pk[_CEDAR_WORKFLOW_ID]
+    assert f"# {workflow.name}" in metadata.read_text(encoding="utf-8")
+    assert any(
+        activity.name in path.read_text(encoding="utf-8")
+        for activity in cedar.activities_by_pk.values()
+        for path in outputs
+        if path != metadata
+    )
+    assert export_facade.request_paths == _expected_export_requests(entity)
+    _assert_cedar_export_pair(entity, actor, author, before)
 
 
 def _legacy_export(
@@ -276,9 +383,9 @@ def test_karma_export_service_t2_with_file_alias_outside_export_tree_rejects(
 
 
 @pytest.fixture
-def cedar_export_rule() -> tuple[User, User, Rule]:
+def cedar_export_rule(cedar_dataset: CedarDataset) -> tuple[User, User, Rule]:
     """Restore the Cedar actors and attach an actual workflow rule to export."""
-    cedar = load_cedar_baseline()
+    cedar = cedar_dataset
     rule = Rule.objects.create(
         playbook_id=_CEDAR_PLAYBOOK_ID,
         slug="export-check",
@@ -368,78 +475,380 @@ def test_karma_export_service_t2_with_secondary_root_escape_prevents_all_writes(
     assert KarmaAward.objects.count() == before
 
 
-def test_karma_export_with_mirrors_and_ade_files_awards_one_pair(
-    live_server: LiveServer, tmp_path: Path
-) -> None:
-    """Prove requested extra copies do not multiply awards.
+def _expected_export_requests(entity: str, receipts: int = 1) -> list[tuple[str, str]]:
+    """Expect precisely one bundle request and the stated receipt attempts."""
+    return [("POST", _BUNDLE_ROUTES[entity])] + [("POST", _RECEIPT_PATH)] * receipts
 
-    :param live_server: Real token-authenticated HTTP server. Example: live_server.
-    :param tmp_path: Canonical/mirror/ADE workspace. Example: Path("/tmp/t").
+
+def _playbook_copy_options(mirror: Path) -> dict[str, object]:
+    """Request an explicit mirror and both active rule directories."""
+    return {
+        "additional_targets": [str(mirror)],
+        "sync_root_rules": True,
+        "ade_targets": ["devin"],
+        "ade_target": "Cursor",
+        "force_apply": True,
+    }
+
+
+def test_karma_export_with_mirrors_and_ade_files_awards_one_pair(
+    export_facade: MCPClientFactory,
+    tmp_path: Path,
+    cedar_export_rule: tuple[User, User, Rule],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Observe every requested copy on disk at the first actual receipt POST.
+
+    :param export_facade: Real token HTTP factory. Example: Maria's registered facade.
+    :param tmp_path: Canonical/mirror/ADE workspace. Example: isolated temporary repo.
+    :param cedar_export_rule: Real linked rule and its actors. Example: export-check.
+    :param monkeypatch: Isolate workspace configuration. Example: MIMIR_DEV_ROOT.
     :return: None after actual-copy and pair assertions. Example: None.
     :raises AssertionError: If copies differ or awards multiply.
     """
-    raise NotImplementedError()
+    actor, author, rule = cedar_export_rule
+    before = _current_award_ids()
+    canonical, mirror = tmp_path / ".cursor/playbooks", tmp_path / "mirror"
+    monkeypatch.setenv("MIMIR_DEV_ROOT", str(tmp_path))
+    observed: set[Path] = set()
+
+    def observe(request: httpx.Request) -> None:
+        if request.url.path == _RECEIPT_PATH:
+            observed.update(path for path in tmp_path.rglob("*") if path.is_file())
+
+    result = _facade_call(
+        export_facade,
+        "playbook",
+        canonical.relative_to(tmp_path),
+        options=_playbook_copy_options(mirror.relative_to(tmp_path)),
+        observe=observe,
+    )
+    tree = canonical / _EXPORT_FOLDER
+    assert result["export_paths"] == [str(tree), str(mirror / _EXPORT_FOLDER)]
+    for relative in result["files_created"]:
+        assert (tree / relative).read_bytes() == (
+            mirror / _EXPORT_FOLDER / relative
+        ).read_bytes()
+        assert {tree / relative, mirror / _EXPORT_FOLDER / relative} <= observed
+    rule_file = tree / "rules" / f"{rule.slug}.mdc"
+    assert "alwaysApply: false" in rule_file.read_text(encoding="utf-8")
+    assert {entry["ade_target"] for entry in result["ade_rule_files"]} == {
+        "cursor",
+        "devin",
+    }
+    for entry in result["ade_rule_files"]:
+        path = tmp_path / entry["path"]
+        assert path in observed and path.read_text(encoding="utf-8") == entry["content"]
+    assert (
+        "alwaysApply: true" in (tmp_path / ".cursor/rules" / rule_file.name).read_text()
+    )
+    assert export_facade.request_paths == _expected_export_requests("playbook")
+    _assert_cedar_export_pair("playbook", actor, author, before)
+
+
+@pytest.mark.parametrize("existing_cursor_rule", (False, True))
+def test_karma_export_with_cursor_workflow_preserves_active_rules(
+    existing_cursor_rule: bool,
+    export_facade: MCPClientFactory,
+    tmp_path: Path,
+    cedar_export_rule: tuple[User, User, Rule],
+) -> None:
+    """Copy a missing active rule and preserve an existing different local rule."""
+    actor, author, rule = cedar_export_rule
+    before = _current_award_ids()
+    canonical = tmp_path / ".cursor/playbooks/Edda"
+    sibling = canonical.parent / "rules" / f"{rule.slug}.mdc"
+    active = canonical.parent.parent / "rules" / sibling.name
+    sentinel = "Local active override."
+    if existing_cursor_rule:
+        active.parent.mkdir(parents=True)
+        active.write_text(sentinel, encoding="utf-8")
+    result = _facade_call(export_facade, "workflow", canonical)
+    assert result["rule_export_paths"] == [str(sibling)]
+    assert rule.content in sibling.read_text(encoding="utf-8")
+    assert active.read_text(encoding="utf-8") == (
+        sentinel if existing_cursor_rule else sibling.read_text(encoding="utf-8")
+    )
+    assert result["active_cursor_rules_synchronized"] is not existing_cursor_rule
+    assert result["stale_or_missing_active_rules"] == (
+        [sibling.name] if existing_cursor_rule else []
+    )
+    assert export_facade.request_paths == _expected_export_requests("workflow")
+    _assert_cedar_export_pair("workflow", actor, author, before)
 
 
 def test_karma_export_with_second_independent_call_creates_new_identity(
-    live_server: LiveServer, tmp_path: Path
+    export_facade: MCPClientFactory, tmp_path: Path
 ) -> None:
     """Prove two intentional invocations are two distinct successful events.
 
-    :param live_server: Real HTTP server. Example: live_server.
+    :param export_facade: Real facade factory. Example: Maria's registered session.
     :param tmp_path: Actual file destination. Example: Path("/tmp/t").
     :return: None after four-row/two-UUID assertions. Example: None.
     :raises AssertionError: If independent invocations are deduplicated.
     """
-    raise NotImplementedError()
+    actor, author = _cedar_actors(export_facade.dataset.cedar)
+    before = _current_award_ids()
+    first = _facade_call(export_facade, "workflow", tmp_path)
+    identity = _assert_cedar_export_pair("workflow", actor, author, before)
+    root = tmp_path / _EXPORT_FOLDER
+    metadata = root / "_workflow.md"
+    original = metadata.read_bytes()
+    metadata.write_text(
+        "Local edits to replace on explicit re-export.", encoding="utf-8"
+    )
+    unrelated = root / "unrelated.md"
+    unrelated.write_text("Preserve this file.", encoding="utf-8")
+    second = _facade_call(export_facade, "workflow", tmp_path)
+    assert second == first and metadata.read_bytes() == original
+    assert unrelated.read_text(encoding="utf-8") == "Preserve this file."
+    delta = KarmaAward.objects.exclude(pk__in=before)
+    identities = {
+        UUID(value.rsplit(":", 1)[-1])
+        for value in delta.values_list("event_identity", flat=True)
+    }
+    assert delta.count() == 4 and len(identities) == 2 and identity in identities
+    assert actor.karma_awards.aggregate(total=Sum("points"))["total"] == 8210
+    assert author.karma_awards.aggregate(total=Sum("points"))["total"] == 12460
+    assert export_facade.request_paths == _expected_export_requests("workflow") * 2
 
 
-def test_karma_export_bundle_with_generation_only_creates_no_awards() -> None:
+def test_karma_export_bundle_with_generation_only_creates_no_awards(
+    cedar_dataset: CedarDataset,
+) -> None:
     """Prove both authenticated bundle endpoints are non-awarding.
 
+    :param cedar_dataset: Real eligible Cedar data. Example: Mike's released workflow.
     :return: None after real REST response/ledger assertions. Example: None.
     :raises AssertionError: If generating a bundle creates an award.
     """
-    raise NotImplementedError()
+    actor, _ = _cedar_actors(cedar_dataset)
+    client = _token_api_client(actor)
+    before = _current_award_ids()
+    for entity, route in _BUNDLE_ROUTES.items():
+        response = client.post(route, {"folder_name": _EXPORT_FOLDER}, format="json")
+        assert response.status_code == 200
+        bundle = response.json()
+        assert bundle[f"{entity}_id"] == _ENTITY_IDS[entity]
+        assert bundle["folder_name"] == _EXPORT_FOLDER
+        assert bundle["workflow_files" if entity == "workflow" else "workflows"]
+    assert _current_award_ids() == before
+
+
+def _token_api_client(actor: User) -> APIClient:
+    """Authenticate an actual Django REST client with its real fixture token."""
+    token, _ = Token.objects.get_or_create(user=actor)
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+    return client
+
+
+def _receipt_only_file_observer(
+    observed: list[tuple[dict, int]], path: Path, port: int, *, fail_attempts: int
+) -> Callable[[httpx.Request], None]:
+    """Observe actual completed files and route selected receipt attempts to a closed port."""
+
+    def observe(request: httpx.Request) -> None:
+        if request.url.path != _RECEIPT_PATH:
+            return
+        payload = json.loads(request.content)
+        assert request.headers["x-request-id"] == payload["event_identity"]
+        observed.append((payload, path.stat().st_mtime_ns))
+        if len(observed) <= fail_attempts:
+            request.url = request.url.copy_with(host="127.0.0.1", port=port)
+
+    return observe
 
 
 def test_karma_export_with_receipt_replay_preserves_single_pair(
-    live_server: LiveServer, tmp_path: Path
+    export_facade: MCPClientFactory, tmp_path: Path
 ) -> None:
     """Prove replaying a completed export receipt preserves rows and timestamps.
 
-    :param live_server: Real HTTP server. Example: live_server.
+    :param export_facade: Real facade factory. Example: Maria's registered session.
     :param tmp_path: Actual successful export destination. Example: Path("/tmp/t").
     :return: None after same-UUID receipt replay assertions. Example: None.
     :raises AssertionError: If retry duplicates or mutates committed awards.
     """
-    raise NotImplementedError()
+    actor, author = _cedar_actors(export_facade.dataset.cedar)
+    before = _current_award_ids()
+    metadata = tmp_path / _EXPORT_FOLDER / "_workflow.md"
+    observed: list[tuple[dict, int]] = []
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as unavailable:
+        unavailable.bind(("127.0.0.1", 0))
+        _facade_call(
+            export_facade,
+            "workflow",
+            tmp_path,
+            observe=_receipt_only_file_observer(
+                observed,
+                metadata,
+                unavailable.getsockname()[1],
+                fail_attempts=1,
+            ),
+        )
+    identity = _assert_cedar_export_pair("workflow", actor, author, before)
+    assert export_facade.request_paths == _expected_export_requests(
+        "workflow", receipts=2
+    )
+    assert len(observed) == 2 and observed[0] == observed[1]
+    payload, written_at = observed[0]
+    assert payload == {
+        "event_identity": str(identity),
+        "entity_type": "workflow",
+        "entity_id": _CEDAR_WORKFLOW_ID,
+        "channel": "export",
+    }
+    created = list(KarmaAward.objects.exclude(pk__in=before).order_by("pk").values())
+    replay = _token_api_client(actor).post(_RECEIPT_PATH, payload, format="json")
+    assert replay.status_code == 200
+    assert replay.json()["status"] == "replayed" and replay.json()["created_count"] == 0
+    assert (
+        list(KarmaAward.objects.exclude(pk__in=before).order_by("pk").values())
+        == created
+    )
+    assert metadata.stat().st_mtime_ns == written_at
 
 
+@pytest.mark.parametrize(
+    ("entity", "escape"),
+    (
+        ("workflow", "traversal"),
+        ("playbook", "traversal"),
+        ("workflow", "folder"),
+        ("playbook", "folder"),
+        ("workflow", "sibling"),
+        ("workflow", "active_directory"),
+        ("workflow", "active_leaf"),
+        ("playbook", "mirror"),
+        ("playbook", "active_directory"),
+        ("playbook", "active_leaf"),
+    ),
+)
 def test_karma_export_with_escaping_folder_or_symlink_rejects_before_write(
-    live_server: LiveServer, tmp_path: Path
+    entity: str,
+    escape: str,
+    export_facade: MCPClientFactory,
+    tmp_path: Path,
+    cedar_export_rule: tuple[User, User, Rule],
 ) -> None:
     """Prove real traversal/symlink escapes cannot produce outside files.
 
-    :param live_server: Real HTTP server. Example: live_server.
+    :param entity: Export kind. Example: "workflow".
+    :param escape: Traversal, symlink directory or leaf. Example: "active_leaf".
+    :param export_facade: Real HTTP server factory. Example: Maria's facade.
     :param tmp_path: Confined root and outside sentinel. Example: Path("/tmp/t").
+    :param cedar_export_rule: Real linked rule and actors. Example: export-check.
     :return: None after rejection/file/ledger assertions. Example: None.
     :raises AssertionError: If any outside mutation or award occurs.
     """
-    raise NotImplementedError()
+    _, _, rule = cedar_export_rule
+    before = _current_award_ids()
+    project, outside = tmp_path / "project", tmp_path / "outside"
+    outside.mkdir()
+    sentinel = outside / f"{rule.slug}.mdc"
+    sentinel.write_text("Unchanged outside file.", encoding="utf-8")
+    target = (
+        project / ".cursor/playbooks/Edda"
+        if entity == "workflow"
+        else project / ".cursor/playbooks"
+    )
+    mirror, active = project / "mirror", project / ".cursor/rules"
+    options = _playbook_copy_options(mirror) if entity == "playbook" else None
+    _install_export_escape(escape, target, mirror, active, sentinel)
+    project_paths = set(project.rglob("*"))
+    folder = "../outside" if escape == "traversal" else _EXPORT_FOLDER
+    with pytest.raises(ToolError, match="relative|escapes"):
+        _facade_call(export_facade, entity, target, folder=folder, options=options)
+    assert set(project.rglob("*")) == project_paths
+    if escape == "active_leaf":
+        assert (active.parent / "other" / sentinel.name).read_text(
+            encoding="utf-8"
+        ) == "Unchanged sibling file."
+    assert tuple(outside.iterdir()) == (sentinel,)
+    assert sentinel.read_text(encoding="utf-8") == "Unchanged outside file."
+    assert export_facade.request_paths == _expected_export_requests(entity, receipts=0)
+    assert _current_award_ids() == before
 
 
+def _install_export_escape(
+    escape: str, target: Path, mirror: Path, active: Path, sentinel: Path
+) -> None:
+    """Place a genuine outside alias at the selected output directory or leaf."""
+    if escape == "traversal":
+        return
+    alias = {
+        "folder": target / _EXPORT_FOLDER,
+        "sibling": target.parent / "rules",
+        "mirror": mirror / _EXPORT_FOLDER,
+        "active_directory": active,
+        "active_leaf": active / sentinel.name,
+    }[escape]
+    alias.parent.mkdir(parents=True)
+    if escape == "active_leaf":
+        sibling = active.parent / "other"
+        sibling.mkdir()
+        local_sentinel = sibling / sentinel.name
+        local_sentinel.write_text("Unchanged sibling file.", encoding="utf-8")
+        alias.symlink_to(local_sentinel)
+    else:
+        alias.symlink_to(sentinel.parent, target_is_directory=True)
+    assert alias.is_symlink()
+
+
+def _block_workflow_write(root: Path, actor: User) -> Path:
+    """Use the actual second bundle filename as a directory to provoke a write failure."""
+    bundle = (
+        _token_api_client(actor)
+        .post(
+            _BUNDLE_ROUTES["workflow"], {"folder_name": _EXPORT_FOLDER}, format="json"
+        )
+        .json()
+    )
+    blocked = root / _EXPORT_FOLDER / bundle["workflow_files"][1]["filename"]
+    blocked.mkdir(parents=True)
+    return blocked
+
+
+@pytest.mark.parametrize("blocked_at", ("workflow", "mirror", "ade"))
 def test_karma_export_with_partial_file_failure_creates_no_receipt(
-    live_server: LiveServer, tmp_path: Path
+    blocked_at: str,
+    export_facade: MCPClientFactory,
+    tmp_path: Path,
+    cedar_export_rule: tuple[User, User, Rule],
 ) -> None:
     """Use a real conflicting directory to fail a later file write.
 
-    :param live_server: Real HTTP server. Example: live_server.
+    :param blocked_at: Later output to block. Example: "mirror".
+    :param export_facade: Real HTTP factory. Example: Maria's registered facade.
     :param tmp_path: Workspace with later destination blocked. Example: Path("/tmp/t").
+    :param cedar_export_rule: Real linked rule and actors. Example: export-check.
     :return: None after failure and zero-award assertions. Example: None.
     :raises AssertionError: If partial completion sends a receipt.
     """
-    raise NotImplementedError()
+    actor, _, rule = cedar_export_rule
+    before = _current_award_ids()
+    target, mirror = tmp_path / ".cursor/playbooks", tmp_path / "mirror"
+    options = None
+    if blocked_at == "workflow":
+        entity = "workflow"
+        blocked = _block_workflow_write(target, actor)
+        first_file = "_workflow.md"
+    else:
+        entity = "playbook"
+        options = _playbook_copy_options(mirror)
+        blocked = (
+            mirror / _EXPORT_FOLDER / "playbook.md"
+            if blocked_at == "mirror"
+            else tmp_path / ".cursor/rules" / f"{rule.slug}.mdc"
+        )
+        blocked.mkdir(parents=True)
+        first_file = "playbook.md"
+    with pytest.raises(ToolError, match="Is a directory"):
+        _facade_call(export_facade, entity, target, options=options)
+    assert (target / _EXPORT_FOLDER / first_file).is_file() and blocked.is_dir()
+    assert export_facade.request_paths == _expected_export_requests(entity, receipts=0)
+    assert _current_award_ids() == before
 
 
 def test_karma_export_stdio_t3_with_success_returns_clean_jsonrpc(
@@ -456,31 +865,185 @@ def test_karma_export_stdio_t3_with_success_returns_clean_jsonrpc(
 
 
 def test_karma_export_log_story_happy(
-    live_server: LiveServer, tmp_path: Path, caplog: LogCaptureFixture
+    export_facade: MCPClientFactory, tmp_path: Path, caplog: LogCaptureFixture
 ) -> None:
     """Prove E's completed-export and receipt beats through real execution.
 
-    :param live_server: Real HTTP server. Example: live_server.
+    :param export_facade: Real HTTP factory. Example: Maria's registered facade.
     :param tmp_path: Actual workspace. Example: Path("/tmp/t").
     :param caplog: Captured structured logs. Example: caplog.
     :return: None after assert_log_story assertions. Example: None.
     :raises AssertionError: If any required safe beat is absent.
     """
-    raise NotImplementedError()
+    cedar = export_facade.dataset.cedar
+    actor, author = _cedar_actors(cedar)
+    before = _current_award_ids()
+    with capture_experts_logs(caplog, _FACADE_LOGGERS):
+        result = _facade_call(export_facade, "workflow", tmp_path)
+    identity = _assert_cedar_export_pair("workflow", actor, author, before)
+    context = (
+        f"event_identity={identity}",
+        f"entity_id={_CEDAR_WORKFLOW_ID}",
+        "entity_type=workflow",
+        "channel=export",
+    )
+    count = len(result["files_created"])
+    assert_log_story(
+        caplog,
+        where="facade_export",
+        beats={
+            "entry": ("| entry |", "tool=export_workflow_to_local", *context),
+            "validation": ("| validation |", f"destination_count={count}", *context),
+            "processing": (
+                "| processing |",
+                f"file_count={count}",
+                "files_written=true",
+                *context,
+            ),
+        },
+    )
+    assert_log_story(
+        caplog,
+        where="export_receipt",
+        beats={
+            "exit": ("| exit |", "receipt_status=applied", "created_count=2", *context),
+        },
+    )
+    assert_log_story(
+        caplog,
+        where="ConsumptionReceiptView.post",
+        beats={
+            "exit": (
+                "| exit |",
+                f"actor_id={actor.pk}",
+                "status=applied",
+                "created_count=2",
+                *context,
+            ),
+        },
+    )
+    export_logs = "\n".join(
+        record.getMessage()
+        for record in caplog.records
+        if record.name in _FACADE_LOGGERS
+    )
+    assert Token.objects.get(user=actor).key not in export_logs
+    assert cedar.workflows_by_pk[_CEDAR_WORKFLOW_ID].name not in export_logs
+    assert str(tmp_path) not in export_logs
 
 
+@pytest.mark.parametrize(
+    "failure", ("invalid_destination", "filesystem_failure", "receipt_unavailable")
+)
 def test_karma_export_log_story_reject(
-    live_server: LiveServer, tmp_path: Path, caplog: LogCaptureFixture
+    failure: str,
+    export_facade: MCPClientFactory,
+    tmp_path: Path,
+    caplog: LogCaptureFixture,
 ) -> None:
     """Prove confinement and partial-write errors never claim receipt success.
 
-    :param live_server: Real HTTP server. Example: live_server.
+    :param failure: Actual filesystem or receipt issue. Example: "filesystem_failure".
+    :param export_facade: Real HTTP factory. Example: Maria's registered facade.
     :param tmp_path: Rejected/blocked workspace. Example: Path("/tmp/t").
     :param caplog: Captured structured logs. Example: caplog.
     :return: None after reject-story assertions. Example: None.
     :raises AssertionError: If errors omit context or include false success.
     """
-    raise NotImplementedError()
+    actor, author = _cedar_actors(export_facade.dataset.cedar)
+    before = _current_award_ids()
+    if failure == "receipt_unavailable":
+        _assert_receipt_outage_story(
+            export_facade, tmp_path, caplog, actor, author, before
+        )
+        return
+    folder = "../../outside" if failure == "invalid_destination" else _EXPORT_FOLDER
+    if failure == "filesystem_failure":
+        _block_workflow_write(tmp_path, actor)
+    with capture_experts_logs(caplog, _FACADE_LOGGERS), pytest.raises(ToolError):
+        _facade_call(export_facade, "workflow", tmp_path, folder=folder)
+    operation = _facade_log_uuid(caplog)
+    completed = 1 if failure == "filesystem_failure" else 0
+    assert_log_story(
+        caplog,
+        where="facade_export",
+        beats={
+            "error": (
+                "| error |",
+                f"reason={failure}",
+                f"event_identity={operation}",
+                f"completed_file_count={completed}",
+                "receipt_sent=false",
+            ),
+        },
+    )
+    assert (
+        "files_written=true" not in caplog.text
+        and "export_receipt | exit |" not in caplog.text
+    )
+    assert export_facade.request_paths == _expected_export_requests(
+        "workflow", receipts=0
+    )
+    assert _current_award_ids() == before
+
+
+def _facade_log_uuid(caplog: LogCaptureFixture) -> UUID:
+    """Read the invocation UUID from the actual facade entry log."""
+    entry = next(
+        record.getMessage()
+        for record in caplog.records
+        if "facade_export | entry |" in record.getMessage()
+    )
+    return UUID(entry.split("event_identity=", 1)[1].split()[0])
+
+
+def _assert_receipt_outage_story(
+    factory: MCPClientFactory,
+    root: Path,
+    caplog: LogCaptureFixture,
+    actor: User,
+    author: User,
+    before: set[int],
+) -> None:
+    """Exhaust the real receipt connection and retry just the original attestation."""
+    metadata = root / _EXPORT_FOLDER / "_workflow.md"
+    observed: list[tuple[dict, int]] = []
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as unavailable:
+        unavailable.bind(("127.0.0.1", 0))
+        observer = _receipt_only_file_observer(
+            observed, metadata, unavailable.getsockname()[1], fail_attempts=2
+        )
+        with (
+            capture_experts_logs(caplog, _FACADE_LOGGERS),
+            pytest.raises(ToolError) as exc,
+        ):
+            _facade_call(factory, "workflow", root, observe=observer)
+    operation = _facade_log_uuid(caplog)
+    assert "files were written" in str(exc.value).lower()
+    assert f"event_identity={operation}" in str(exc.value)
+    assert_log_story(
+        caplog,
+        where="export_receipt",
+        beats={
+            "error": (
+                "| error |",
+                f"event_identity={operation}",
+                "files_written=true",
+                "receipt_status=failed",
+                "channel=export",
+            ),
+        },
+    )
+    assert "export_receipt | exit |" not in caplog.text
+    assert factory.request_paths == _expected_export_requests("workflow", receipts=2)
+    assert _current_award_ids() == before
+    assert len(observed) == 2 and observed[0] == observed[1]
+    payload, written_at = observed[0]
+    assert payload["event_identity"] == str(operation)
+    result = _token_api_client(actor).post(_RECEIPT_PATH, payload, format="json")
+    assert result.status_code == 200 and result.json()["status"] == "applied"
+    assert _assert_cedar_export_pair("workflow", actor, author, before) == operation
+    assert metadata.stat().st_mtime_ns == written_at
 
 
 @pytest.mark.parametrize(

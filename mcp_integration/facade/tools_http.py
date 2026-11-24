@@ -10,20 +10,18 @@ No Django, no ORM — only the standard library + httpx.
 
 from __future__ import annotations
 
-import httpx
-from typing import TYPE_CHECKING
+import logging
+from collections.abc import Callable, Iterator, Mapping
+from datetime import datetime
+from functools import partial
+from pathlib import Path
+from typing import Literal, NamedTuple, Optional
 from uuid import UUID, uuid4
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-import logging
-import os
-from datetime import datetime
-from pathlib import Path
-from typing import Literal, Optional
+import httpx
 
 from mcp_integration.facade.client import check_response, get_client, get_server_url
+from mcp_integration.facade.export_paths import confined_export_path
 from mcp_integration.facade.workspace_mount import (
     ensure_import_supported_on_server,
     ensure_readable_workspace_path,
@@ -37,6 +35,25 @@ _RECEIPT_ATTEMPTS = 2
 _RETRYABLE_RECEIPT_STATUS = {408, 429, 500, 502, 503, 504}
 _MCP_DETAIL_CHANNEL = "mcp_detail"
 _DETAIL_REJECT_LOG = "%s | branch | entity_id=%s event_identity=%s reason=read_rejected"
+_EXPORT_CHANNEL = "export"
+_ADE_RULE_FOLDERS = {"cursor": (".cursor", "rules"), "devin": (".windsurf", "rules")}
+
+
+class _ExportWrite(NamedTuple):
+    """One ordered output rooted in an approved workspace path."""
+
+    root: Path
+    folders: tuple[str, ...]
+    filename: str
+    content: str
+    only_if_missing: bool = False
+
+
+class _LocalExportPlan(NamedTuple):
+    """Complete ordered file work and the existing result assembled afterward."""
+
+    writes: tuple[_ExportWrite, ...]
+    build_result: Callable[[], dict]
 
 
 # ============================================================================
@@ -441,29 +458,6 @@ def set_predecessor(activity_id: int, predecessor_id: int) -> dict:
 # ============================================================================
 
 
-def _write_workflow_rule_files(
-    resolved_target: Path, rule_files: list
-) -> tuple[Path | None, list[str]]:
-    """
-    Write linked rule files next to the playbook/workflow export root.
-
-    :param resolved_target: Export target directory. Example: Path(".cursor/playbooks/Edda")
-    :param rule_files: ``[{"filename": "pytest.mdc", "content": "..."}]``
-    :return: (rules directory or None, absolute paths written)
-    """
-    if not rule_files:
-        return None, []
-    rules_dir = resolved_target.parent / "rules"
-    rules_dir.mkdir(parents=True, exist_ok=True)
-    written_paths = []
-    for file_entry in rule_files:
-        dest = rules_dir / file_entry["filename"]
-        dest.write_text(file_entry["content"], encoding="utf-8")
-        written_paths.append(str(dest))
-    logger.info("HTTP Tool: wrote %s rule files to %s", len(written_paths), rules_dir)
-    return rules_dir, written_paths
-
-
 def _find_cursor_rules_dir(resolved_target: Path) -> Path | None:
     """
     Locate ``.cursor/rules`` from a Cursor playbook export target.
@@ -477,29 +471,6 @@ def _find_cursor_rules_dir(resolved_target: Path) -> Path | None:
         if parent.name == "playbooks" and parent.parent.name == ".cursor":
             return parent.parent / "rules"
     return None
-
-
-def _copy_missing_cursor_rules(
-    cursor_rules_dir: Path, rule_paths: list[str]
-) -> list[str]:
-    """
-    Copy exported rules into ``.cursor/rules`` only when the file is absent.
-
-    :param cursor_rules_dir: Active Cursor rules directory
-    :param rule_paths: Absolute paths of just-written playbook rule files
-    :return: Absolute paths copied
-    """
-    cursor_rules_dir.mkdir(parents=True, exist_ok=True)
-    copied = []
-    for path in rule_paths:
-        src = Path(path)
-        dest = cursor_rules_dir / src.name
-        if dest.exists():
-            continue
-        dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-        copied.append(str(dest))
-        logger.info("HTTP Tool: copied missing Cursor rule %s", dest)
-    return copied
 
 
 def _cursor_rules_sync_report(
@@ -594,42 +565,25 @@ def export_workflow_to_local(
     :param folder_name: Folder name. Example: "FFE" (defaults to workflow slug)
     :return: Export result with file paths, rule paths, and Cursor sync status
     """
-    logger.info(
-        "HTTP Tool: export_workflow_to_local workflow=%s target=%s folder=%s",
-        workflow_id,
-        target_directory,
-        folder_name,
-    )
-    payload = {}
-    if folder_name:
-        payload["folder_name"] = folder_name
-    r = get_client().post(f"/api/workflows/{workflow_id}/export/", json=payload)
-    data = check_response(r, "export_workflow_to_local")
-
-    resolved_target = ensure_writable_workspace_path(
-        target_directory,
-        purpose="export",
-    )
-    wf_dir = resolved_target / data["folder_name"]
-    wf_dir.mkdir(parents=True, exist_ok=True)
-    for file_entry in data["workflow_files"]:
-        (wf_dir / file_entry["filename"]).write_text(
-            file_entry["content"], encoding="utf-8"
-        )
-    logger.info(
-        "HTTP Tool: wrote %s workflow files to %s",
-        len(data["workflow_files"]),
-        wf_dir,
+    return _run_local_export(
+        entity_type="workflow",
+        entity_id=workflow_id,
+        route=f"/api/workflows/{workflow_id}/export/",
+        target_directory=target_directory,
+        payload={"folder_name": folder_name} if folder_name else {},
+        planner=_preflight_workflow_export,
     )
 
-    rules_dir, rule_export_paths = _write_workflow_rule_files(
-        resolved_target, data.get("rule_files") or []
-    )
-    cursor_rules_dir = _find_cursor_rules_dir(resolved_target)
-    if cursor_rules_dir is not None and rule_export_paths:
-        _copy_missing_cursor_rules(cursor_rules_dir, rule_export_paths)
+
+def _workflow_export_result(
+    data: dict,
+    wf_dir: Path,
+    rules_dir: Path | None,
+    rule_export_paths: list[str],
+    cursor_rules_dir: Path | None,
+) -> dict:
+    """Report the files and active Cursor rule status in the existing result shape."""
     sync_report = _cursor_rules_sync_report(cursor_rules_dir, rule_export_paths)
-
     return {
         "status": "exported",
         "workflow_id": data["workflow_id"],
@@ -693,14 +647,7 @@ def export_playbook_to_local(
             sync_root_rules=True,
         )
     """
-    logger.info(
-        "HTTP Tool: export_playbook_to_local playbook=%s target=%s folder=%s ade_targets=%s",
-        playbook_id,
-        target_directory,
-        folder_name,
-        ade_targets,
-    )
-    payload: dict = {
+    payload: dict[str, object] = {
         "force_apply": force_apply,
         "sync_root_rules": sync_root_rules,
     }
@@ -710,64 +657,33 @@ def export_playbook_to_local(
         payload["ade_targets"] = ade_targets
     if ade_target:
         payload["ade_target"] = ade_target
-    r = get_client().post(f"/api/playbooks/{playbook_id}/export-local/", json=payload)
-    data = check_response(r, "export_playbook_to_local")
+    return _run_local_export(
+        entity_type="playbook",
+        entity_id=playbook_id,
+        route=f"/api/playbooks/{playbook_id}/export-local/",
+        target_directory=target_directory,
+        payload=payload,
+        planner=partial(
+            _preflight_playbook_export,
+            additional_targets=additional_targets,
+            sync_root_rules=sync_root_rules,
+            ade_targets=ade_targets,
+            ade_target=ade_target,
+        ),
+    )
 
-    resolved_target = ensure_writable_workspace_path(target_directory, purpose="export")
-    export_root = resolved_target / data["folder_name"]
-    export_root.mkdir(parents=True, exist_ok=True)
-    files_written = []
 
-    def _write(rel_dir: str, filename: str, content: str) -> None:
-        folder = export_root / rel_dir if rel_dir else export_root
-        folder.mkdir(parents=True, exist_ok=True)
-        (folder / filename).write_text(content, encoding="utf-8")
-        files_written.append(f"{rel_dir}/{filename}" if rel_dir else filename)
-
-    _write("", data["playbook_md"]["filename"], data["playbook_md"]["content"])
-    for rule in data.get("rule_files", []):
-        _write("rules", rule["filename"], rule["content"])
-    for agent in data.get("agent_files", []):
-        _write("agents", agent["filename"], agent["content"])
-    for skill in data.get("skill_files", []):
-        _write("skills", skill["filename"], skill["content"])
-    for artifact in data.get("artifact_files", []):
-        _write("artifacts", artifact["filename"], artifact["content"])
-    for wf in data.get("workflows", []):
-        for wf_file in wf.get("workflow_files", []):
-            _write(wf["folder_name"], wf_file["filename"], wf_file["content"])
-
-    extra_paths = []
-    for extra in additional_targets or []:
-        extra_root = (
-            ensure_writable_workspace_path(extra, purpose="export")
-            / data["folder_name"]
-        )
-        extra_root.mkdir(parents=True, exist_ok=True)
-        for rel in files_written:
-            src = export_root / rel
-            dest = extra_root / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-        extra_paths.append(str(extra_root))
-        logger.info("HTTP Tool: mirrored playbook export to %s", extra_root)
-
-    ade_rule_files = data.get("ade_rule_files") or []
-    if sync_root_rules and ade_rule_files:
-        dev_root = resolve_dev_root_from_export_target(resolved_target)
-        for entry in ade_rule_files:
-            dest = dev_root / entry["path"]
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(entry["content"], encoding="utf-8")
-            logger.info("HTTP Tool: synced ADE rule %s", dest)
-
+def _playbook_export_result(
+    data: dict, roots: tuple[Path, ...], files_written: list[str]
+) -> dict:
+    """Report canonical file names, requested roots and existing bundle metadata."""
     counts = data.get("counts", {})
     inline_md = data.get("inline_rules_markdown") or ""
     return {
         "status": "exported",
         "playbook_id": data["playbook_id"],
         "playbook_name": data["playbook_name"],
-        "export_paths": [str(export_root)] + extra_paths,
+        "export_paths": [str(root / data["folder_name"]) for root in roots],
         "workflows": counts.get("workflows", 0),
         "activities": counts.get("activities", 0),
         "rules": counts.get("rules", 0),
@@ -775,7 +691,7 @@ def export_playbook_to_local(
         "agents": counts.get("agents", 0),
         "artifacts": counts.get("artifacts", 0),
         "files_created": files_written,
-        "ade_rule_files": ade_rule_files,
+        "ade_rule_files": data.get("ade_rule_files") or [],
         "inline_rules_markdown": inline_md,
         "message": "Playbook exported successfully.",
     }
@@ -2212,8 +2128,8 @@ def _validate_consumption_receipt_response(
 
 
 def _preflight_workflow_export(
-    *, bundle: dict[str, object], resolved_target: Path
-) -> tuple[Path, ...]:
+    *, bundle: dict, resolved_target: Path
+) -> _LocalExportPlan:
     """Validate workflow, sibling rule and applicable Cursor destinations.
 
     Retain existing workspace guards for every root; call shared path guard.
@@ -2221,10 +2137,43 @@ def _preflight_workflow_export(
 
     :param bundle: Authorized REST bundle. Example: {"folder_name": "BPE"}.
     :param resolved_target: Guarded target. Example: Path("/repo/playbooks").
-    :return: Complete resolved destination tuple. Example: (Path("/repo/a.md"),).
+    :return: Complete write plan and workflow summary builder.
     :raises ValueError: If bundle paths are invalid or escape approved roots.
     """
-    raise NotImplementedError()
+    folder = bundle["folder_name"]
+    confined_export_path(resolved_target, folder)
+    wf_dir = resolved_target / folder
+    writes = [
+        _export_write(resolved_target, (folder,), entry)
+        for entry in bundle["workflow_files"]
+    ]
+    rule_files = bundle.get("rule_files") or []
+    cursor_dir = _find_cursor_rules_dir(resolved_target)
+    rules_dir = resolved_target.parent / "rules" if rule_files else None
+    rule_paths = []
+    if rules_dir is not None:
+        writes.extend(_workflow_rule_writes(rules_dir, rule_files))
+        rule_paths = [str(rules_dir / entry["filename"]) for entry in rule_files]
+        if cursor_dir is not None and cursor_dir != rules_dir:
+            writes.extend(
+                _workflow_rule_writes(cursor_dir, rule_files, only_if_missing=True)
+            )
+    return _LocalExportPlan(
+        tuple(writes),
+        partial(
+            _workflow_export_result, bundle, wf_dir, rules_dir, rule_paths, cursor_dir
+        ),
+    )
+
+
+def _workflow_rule_writes(
+    directory: Path, entries: list[dict], *, only_if_missing: bool = False
+) -> Iterator[_ExportWrite]:
+    """Approve the selected rule directory and plan the linked rule writes."""
+    root, folders = directory.parent, (directory.name,)
+    _approve_export_subdirectory(root, folders)
+    for entry in entries:
+        yield _export_write(root, folders, entry, only_if_missing=only_if_missing)
 
 
 def _record_completed_export(
@@ -2248,18 +2197,42 @@ def _record_completed_export(
     :raises PermissionError: If receipt revalidation denies access.
     :raises RuntimeError: If receipt remains unavailable after allowed retry.
     """
-    raise NotImplementedError()
+    trace = f"entity_type={entity_type} entity_id={entity_id} event_identity={event_identity} channel={_EXPORT_CHANNEL}"
+    try:
+        result = _post_consumption_receipt(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            event_identity=event_identity,
+            channel=_EXPORT_CHANNEL,
+        )
+    except (ValueError, PermissionError, RuntimeError) as exc:
+        logger.info(
+            "export_receipt | error | %s file_count=%s files_written=true receipt_status=failed",
+            trace,
+            files_written,
+        )
+        raise type(exc)(
+            f"Export files were written. The export receipt could not be confirmed. "
+            f"Retry only the receipt with event_identity={event_identity}."
+        ) from None
+    logger.info(
+        "export_receipt | exit | %s file_count=%s receipt_status=%s created_count=%s",
+        trace,
+        files_written,
+        result["status"],
+        result["created_count"],
+    )
 
 
 def _preflight_playbook_export(
     *,
-    bundle: dict[str, object],
+    bundle: dict,
     resolved_target: Path,
     additional_targets: list[str] | None,
     sync_root_rules: bool,
     ade_targets: list[str] | None,
     ade_target: str | None,
-) -> tuple[Path, ...]:
+) -> _LocalExportPlan:
     """Validate canonical, mirror and explicitly requested ADE destinations.
 
     Merge the actual singular/plural ADE requests and validate returned file
@@ -2273,7 +2246,211 @@ def _preflight_playbook_export(
     :param sync_root_rules: Whether ADE writes are requested. Example: True.
     :param ade_targets: Actual requested ADE keys. Example: ["cursor"].
     :param ade_target: Actual singular alias. Example: "devin".
-    :return: Complete confined destination tuple. Example: (Path("/repo/a.md"),).
+    :return: Complete write plan and playbook summary builder.
     :raises ValueError: If a root, child path or returned ADE destination is invalid.
     """
-    raise NotImplementedError()
+    targets = (
+        resolved_target,
+        *(
+            ensure_writable_workspace_path(target, purpose="export")
+            for target in additional_targets or []
+        ),
+    )
+    folder = bundle["folder_name"]
+    tree_files = tuple(_playbook_tree_files(bundle))
+    writes = []
+    for target in targets:
+        confined_export_path(target, folder)
+        writes.extend(
+            _export_write(target, (folder, *directories), entry)
+            for directories, entry in tree_files
+        )
+    if sync_root_rules:
+        writes.extend(
+            _playbook_ade_writes(
+                resolved_target,
+                ade_targets,
+                ade_target,
+                bundle.get("ade_rule_files") or [],
+            )
+        )
+    canonical_filenames = [
+        "/".join((*dirs, entry["filename"])) for dirs, entry in tree_files
+    ]
+    return _LocalExportPlan(
+        tuple(writes),
+        partial(_playbook_export_result, bundle, targets, canonical_filenames),
+    )
+
+
+def _playbook_tree_files(bundle: dict) -> Iterator[tuple[tuple[str, ...], dict]]:
+    """Enumerate canonical files once in the established output order."""
+    yield (), bundle["playbook_md"]
+    for directory, files_key in (
+        ("rules", "rule_files"),
+        ("agents", "agent_files"),
+        ("skills", "skill_files"),
+        ("artifacts", "artifact_files"),
+    ):
+        for entry in bundle.get(files_key, []):
+            yield (directory,), entry
+    for workflow in bundle.get("workflows", []):
+        for entry in workflow.get("workflow_files", []):
+            yield (workflow["folder_name"],), entry
+
+
+def _playbook_ade_writes(
+    target: Path,
+    ade_targets: list[str] | None,
+    ade_target: str | None,
+    entries: list[dict],
+) -> Iterator[_ExportWrite]:
+    """Approve explicitly requested file-based ADE roots and their actual entries."""
+    requested = {
+        key.strip().lower() for key in (*(ade_targets or []), ade_target or "")
+    }
+    folders_by_ade = {
+        key: folders for key, folders in _ADE_RULE_FOLDERS.items() if key in requested
+    }
+    if not folders_by_ade and not entries:
+        return
+    root = ensure_writable_workspace_path(
+        str(resolve_dev_root_from_export_target(target)), purpose="export"
+    )
+    for folders in folders_by_ade.values():
+        _approve_export_subdirectory(root, folders)
+    for entry in entries:
+        folders = folders_by_ade.get(entry["ade_target"])
+        if folders is None or entry["path"] != "/".join((*folders, entry["filename"])):
+            raise ValueError("The ADE file must use a requested export rule directory.")
+        yield _export_write(root, folders, entry)
+
+
+def _approve_export_subdirectory(root: Path, folders: tuple[str, ...]) -> None:
+    """Confine an implied directory to its parent tree and check its workspace mount."""
+    expected = _resolve_export_directories(root, folders)
+    guarded = ensure_writable_workspace_path(
+        str(root.joinpath(*folders)), purpose="export"
+    )
+    if guarded != expected:
+        raise ValueError("Export directory changed during validation.")
+
+
+def _resolve_export_directories(root: Path, folders: tuple[str, ...]) -> Path:
+    """Check each child tree against its own parent before resolving the leaves."""
+    for folder in folders:
+        root = confined_export_path(root, folder)
+    return root
+
+
+def _export_write(
+    root: Path, folders: tuple[str, ...], entry: dict, *, only_if_missing: bool = False
+) -> _ExportWrite:
+    """Capture a file's immutable content and workspace-relative destination."""
+    filename, content = entry["filename"], entry["content"]
+    if not isinstance(filename, str) or not isinstance(content, str):
+        raise ValueError("Invalid export file entry.")  # noqa: TRY004
+    return _ExportWrite(root, folders, filename, content, only_if_missing)
+
+
+def _resolve_export_write(write: _ExportWrite) -> Path:
+    """Resolve the output leaf within its independently confined directory."""
+    directory = _resolve_export_directories(write.root, write.folders)
+    return confined_export_path(directory, write.filename)
+
+
+def _write_export_file(write: _ExportWrite, expected: Path) -> int:
+    """Recheck the destination before creating parents and again before writing."""
+    if _resolve_export_write(write) != expected:
+        raise ValueError("Export destination changed after validation.")
+    if write.only_if_missing and expected.exists():
+        return 0
+    expected.parent.mkdir(parents=True, exist_ok=True)
+    if _resolve_export_write(write) != expected:
+        raise ValueError("Export destination changed after validation.")
+    if write.only_if_missing:
+        try:
+            with expected.open("x", encoding="utf-8") as active_rule:
+                active_rule.write(write.content)
+        except FileExistsError:
+            return 0
+    else:
+        expected.write_text(write.content, encoding="utf-8")
+    return 1
+
+
+def _write_export_plan(
+    prepare: Callable[[], _LocalExportPlan], trace: str
+) -> tuple[int, dict]:
+    """Validate all outputs, execute ordered writes, and prepare the existing result."""
+    completed = 0
+    try:
+        plan = prepare()
+        destinations = tuple(_resolve_export_write(write) for write in plan.writes)
+        logger.info(
+            "facade_export | validation | %s destination_count=%s",
+            trace,
+            len(destinations),
+        )
+        for write, destination in zip(plan.writes, destinations, strict=True):
+            completed += _write_export_file(write, destination)
+        result = plan.build_result()
+    except (OSError, ValueError) as exc:
+        reason = (
+            "filesystem_failure" if isinstance(exc, OSError) else "invalid_destination"
+        )
+        logger.info(
+            "facade_export | error | %s reason=%s completed_file_count=%s receipt_sent=false",
+            trace,
+            reason,
+            completed,
+        )
+        if isinstance(exc, OSError):
+            raise OSError(exc.errno, exc.strerror) from None
+        raise
+    logger.info(
+        "facade_export | processing | %s file_count=%s files_written=true",
+        trace,
+        completed,
+    )
+    return completed, result
+
+
+def _run_local_export(
+    *,
+    entity_type: Literal["workflow", "playbook"],
+    entity_id: int,
+    route: str,
+    target_directory: str,
+    payload: dict[str, object],
+    planner: Callable[..., _LocalExportPlan],
+) -> dict:
+    """Fetch the authorized export bundle, finish all local files, and attest success."""
+    event_identity = uuid4()
+    tool = f"export_{entity_type}_to_local"
+    trace = f"tool={tool} entity_type={entity_type} entity_id={entity_id} event_identity={event_identity} channel={_EXPORT_CHANNEL}"
+    logger.info("facade_export | entry | %s", trace)
+    try:
+        bundle = check_response(get_client().post(route, json=payload), tool)
+    except (httpx.TransportError, PermissionError, RuntimeError, ValueError):
+        logger.info(
+            "facade_export | error | %s reason=bundle_unavailable completed_file_count=0 receipt_sent=false",
+            trace,
+        )
+        raise
+    files_written, result = _write_export_plan(
+        lambda: planner(
+            bundle=bundle,
+            resolved_target=ensure_writable_workspace_path(
+                target_directory, purpose="export"
+            ),
+        ),
+        trace,
+    )
+    _record_completed_export(
+        entity_type=entity_type,
+        entity_id=entity_id,
+        event_identity=event_identity,
+        files_written=files_written,
+    )
+    return result

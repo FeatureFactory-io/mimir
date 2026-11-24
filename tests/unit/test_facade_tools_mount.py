@@ -2,10 +2,11 @@
 
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
 
 import mcp_integration.facade.tools_http as tools
-from mcp_integration.facade import workspace_mount as workspace_mount
+from mcp_integration.facade import workspace_mount
 from mcp_integration.facade.client import configure
 
 
@@ -22,9 +23,7 @@ def test_export_raises_in_docker_without_mount_before_write(
     monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: True)
     monkeypatch.delenv("MIMIR_DEV_ROOT", raising=False)
 
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
+    bundle = {
         "workflow_id": 8,
         "workflow_name": "Envision the System",
         "folder_name": "ESM",
@@ -33,9 +32,7 @@ def test_export_raises_in_docker_without_mount_before_write(
         ],
         "rule_files": [],
     }
-    mock_client = MagicMock()
-    mock_client.post.return_value = mock_response
-    monkeypatch.setattr(tools, "get_client", lambda: mock_client)
+    mock_client = _mock_export_client(monkeypatch, bundle)
 
     export_dir = tmp_path / "export"
     with pytest.raises(ValueError, match="MIMIR_DEV_ROOT"):
@@ -56,9 +53,7 @@ def test_export_writes_when_not_in_docker(
 ):
     monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: False)
 
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
+    bundle = {
         "workflow_id": 8,
         "workflow_name": "Envision the System",
         "folder_name": "ESM",
@@ -67,9 +62,7 @@ def test_export_writes_when_not_in_docker(
         ],
         "rule_files": [],
     }
-    mock_client = MagicMock()
-    mock_client.post.return_value = mock_response
-    monkeypatch.setattr(tools, "get_client", lambda: mock_client)
+    _mock_export_client(monkeypatch, bundle)
 
     export_dir = tmp_path / "export"
     result = tools.export_workflow_to_local(
@@ -105,12 +98,24 @@ def _workflow_export_bundle_with_rules() -> dict:
     }
 
 
-def _mock_workflow_export_client(monkeypatch, bundle: dict) -> MagicMock:
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = bundle
+def _mock_export_client(monkeypatch: pytest.MonkeyPatch, bundle: dict) -> MagicMock:
+    """Keep mount tests offline while returning the real facade response shapes."""
+
+    def post(path: str, *, json: dict, **_kwargs: object) -> httpx.Response:
+        data = bundle
+        if path == "/api/consumption-receipts/":
+            data = {
+                "event_identity": json["event_identity"],
+                "status": "applied",
+                "created_count": 2,
+                "occurred_at": "2026-11-24T12:00:00+00:00",
+            }
+        return httpx.Response(
+            200, json=data, request=httpx.Request("POST", f"https://example.test{path}")
+        )
+
     mock_client = MagicMock()
-    mock_client.post.return_value = mock_response
+    mock_client.post.side_effect = post
     monkeypatch.setattr(tools, "get_client", lambda: mock_client)
     return mock_client
 
@@ -122,7 +127,7 @@ def test_workflow_export_returns_full_rule_paths(
 ):
     """Issue #178: rule_files_created must include destination paths, not bare names."""
     monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: False)
-    _mock_workflow_export_client(monkeypatch, _workflow_export_bundle_with_rules())
+    _mock_export_client(monkeypatch, _workflow_export_bundle_with_rules())
 
     target = tmp_path / ".cursor" / "playbooks" / "Edda"
     result = tools.export_workflow_to_local(
@@ -147,7 +152,7 @@ def test_workflow_export_syncs_missing_cursor_root_rules(
 ):
     """Issue #178: Cursor playbook export copies missing rules to .cursor/rules/."""
     monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: False)
-    _mock_workflow_export_client(monkeypatch, _workflow_export_bundle_with_rules())
+    _mock_export_client(monkeypatch, _workflow_export_bundle_with_rules())
 
     target = tmp_path / ".cursor" / "playbooks" / "Edda"
     result = tools.export_workflow_to_local(
@@ -171,7 +176,7 @@ def test_workflow_export_does_not_overwrite_stale_cursor_rules(
 ):
     """Issue #178: existing different .cursor/rules copies stay; report stale."""
     monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: False)
-    _mock_workflow_export_client(monkeypatch, _workflow_export_bundle_with_rules())
+    _mock_export_client(monkeypatch, _workflow_export_bundle_with_rules())
 
     active = tmp_path / ".cursor" / "rules"
     active.mkdir(parents=True)
@@ -225,16 +230,6 @@ def _playbook_export_bundle() -> dict:
     }
 
 
-def _mock_playbook_export_client(monkeypatch, bundle: dict) -> MagicMock:
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = bundle
-    mock_client = MagicMock()
-    mock_client.post.return_value = mock_response
-    monkeypatch.setattr(tools, "get_client", lambda: mock_client)
-    return mock_client
-
-
 def test_playbook_export_raises_in_docker_without_mount_before_write(
     configured_client,
     tmp_path,
@@ -243,7 +238,7 @@ def test_playbook_export_raises_in_docker_without_mount_before_write(
     """Docker facade must not write playbook dump without MIMIR_DEV_ROOT bind."""
     monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: True)
     monkeypatch.delenv("MIMIR_DEV_ROOT", raising=False)
-    mock_client = _mock_playbook_export_client(monkeypatch, _playbook_export_bundle())
+    mock_client = _mock_export_client(monkeypatch, _playbook_export_bundle())
 
     export_dir = tmp_path / "playbooks"
     with pytest.raises(ValueError, match="MIMIR_DEV_ROOT"):
@@ -263,7 +258,7 @@ def test_playbook_export_writes_when_not_in_docker(
     monkeypatch,
 ):
     monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: False)
-    _mock_playbook_export_client(monkeypatch, _playbook_export_bundle())
+    _mock_export_client(monkeypatch, _playbook_export_bundle())
 
     export_dir = tmp_path / "playbooks"
     result = tools.export_playbook_to_local(
@@ -292,7 +287,7 @@ def test_playbook_export_docker_bind_mount_resolves_relative_target(
     monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: True)
     monkeypatch.setenv("MIMIR_DEV_ROOT", str(tmp_path))
     monkeypatch.setattr(workspace_mount, "is_bind_mount", lambda path: True)
-    _mock_playbook_export_client(monkeypatch, _playbook_export_bundle())
+    _mock_export_client(monkeypatch, _playbook_export_bundle())
 
     result = tools.export_playbook_to_local(
         playbook_id=3,
@@ -315,7 +310,7 @@ def test_playbook_export_additional_target_rejected_outside_dev_root(
     monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: True)
     monkeypatch.setenv("MIMIR_DEV_ROOT", str(tmp_path))
     monkeypatch.setattr(workspace_mount, "is_bind_mount", lambda path: True)
-    _mock_playbook_export_client(monkeypatch, _playbook_export_bundle())
+    mock_client = _mock_export_client(monkeypatch, _playbook_export_bundle())
 
     outside = tmp_path.parent / "ephemeral-outside-dev-root"
     with pytest.raises(ValueError, match="outside MIMIR_DEV_ROOT"):
@@ -326,8 +321,9 @@ def test_playbook_export_additional_target_rejected_outside_dev_root(
             additional_targets=[str(outside)],
         )
 
-    assert (tmp_path / ".cursor" / "playbooks" / "Edda" / "playbook.md").exists()
+    assert not (tmp_path / ".cursor" / "playbooks" / "Edda").exists()
     assert not (outside / "Edda").exists()
+    mock_client.post.assert_called_once()
 
 
 def test_playbook_export_sync_ade_rules_without_django_import(
@@ -347,7 +343,7 @@ def test_playbook_export_sync_ade_rules_without_django_import(
             "content": "---\nalwaysApply: true\n---\nUse pytest\n",
         }
     ]
-    _mock_playbook_export_client(monkeypatch, bundle)
+    _mock_export_client(monkeypatch, bundle)
 
     export_dir = tmp_path / ".cursor" / "playbooks"
     result = tools.export_playbook_to_local(
@@ -371,7 +367,7 @@ def test_playbook_export_additional_target_writes_when_not_in_docker(
     monkeypatch,
 ):
     monkeypatch.setattr(workspace_mount, "is_running_in_docker", lambda: False)
-    _mock_playbook_export_client(monkeypatch, _playbook_export_bundle())
+    _mock_export_client(monkeypatch, _playbook_export_bundle())
 
     primary = tmp_path / "cursor-playbooks"
     extra = tmp_path / "windsurf-playbooks"
