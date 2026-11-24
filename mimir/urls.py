@@ -40,6 +40,7 @@ from methodology import (
 )
 from methodology import views as methodology_views
 from methodology.api.bug_report_views import BugReportSubmitView
+from methodology.api.consumption_views import ConsumptionReceiptView
 from methodology.api.viewsets import ActivityViewSet, PlaybookViewSet, WorkflowViewSet
 from methodology.api.viewsets_resources import (
     AgentViewSet,
@@ -80,6 +81,11 @@ urlpatterns = [
     # API endpoints
     path("api/", include(router.urls)),
     path("api/auth/token/", obtain_auth_token, name="api_token_auth"),
+    path(
+        "api/consumption-receipts/",
+        ConsumptionReceiptView.as_view(),
+        name="api_consumption_receipt",
+    ),
     path(
         "api/feedback/report/",
         BugReportSubmitView.as_view(),
