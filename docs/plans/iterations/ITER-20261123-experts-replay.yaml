@@ -29,6 +29,16 @@ iteration:
     authority: Necessary content alignment and engineering repairs, verification, retries and shared-file reconciliation inside the approved 49 contracts proceed without repeated confirmations.
     retained_review: Material feature/scope changes and main merge, release and production promotion decisions.
     user_correction: Denis explicitly stated he never paused S04; the attributed recorded pause and derived status are withdrawn. S04 and independent approved work are active.
+  delivery_preparation:
+    build_only_dispatch:
+      status: prepared_not_dispatched
+      footprint:
+      - .github/workflows/build-and-deploy.yml
+      run_input: deploy_to_idle=false
+      default_compatibility: Published releases and default manual dispatch retain existing deployment behavior.
+      verification: YAML parsed and typed Boolean job guard checked against official GitHub documentation; live Actions run remains pending.
+    ambient_database_identity: Unverified. CDK can supply the same database URL to both environments; default idle migration must not be assumed isolated.
+    staging_arrangement: Exact candidate image in an owned isolated companion/database, with no ambient migrations or fixture seed.
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
     exact-AT runner implementation is N4. No product or scenario footprint expanded.
 conflict_map:

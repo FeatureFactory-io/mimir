@@ -6,12 +6,18 @@ name: Build and Deploy Mimir
 #   Then: Promote to Production workflow (promote.yml) after reviewing idle staging
 #     → promote-prod.sh: SHA guard, CNAME swap, prod smoke
 #
-# Pipeline runs ONLY on published GitHub releases (not on every push).
-# Push events only run tests + build (no EB deploy).
+# Runs on published releases or manual dispatch, not on every push.
+# Manual dispatch can build images without deploying or running ambient migrations.
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      deploy_to_idle:
+        description: Deploy to idle after building, including configured database migrations
+        type: boolean
+        required: true
+        default: true
 
 env:
   DOCKERHUB_IMAGE: featurefactory/mimir-mcp
@@ -196,7 +202,7 @@ jobs:
     if: >
       vars.AWS_ACCOUNT_ID != '' && (
         github.event_name == 'release' ||
-        github.event_name == 'workflow_dispatch'
+        (github.event_name == 'workflow_dispatch' && inputs.deploy_to_idle)
       )
 
     env:

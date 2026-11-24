@@ -513,3 +513,8 @@ S43 N1’s log contract requires the self-consumption actor, target playbook and
 
 
 S43 N1’s shared author_id log addition exposed an old exact S38 self-copy message expectation. Root keeps one consistent shared log schema across channels and reconciles the narrow expected-message update in `tests/integration/test_karma_copy.py` into S43 N1. The strict story gains the existing author ID; its other assertions and all S36/S38 behavior checks stay intact. A channel-specific production formatting branch is not introduced solely to retain the old test string. The initial compatibility failure and source commit remain recorded; final follow-up and integration gates follow without history rewriting or user questions.
+
+
+## Build-only preparation before isolated staging
+
+Source inspection shows ordinary manual dispatch also deploys idle, whose normal entrypoint runs configured database migrations; CDK can apply the same deploy-time DATABASE_URL to both physical environments. Live database identities are not yet compared, so absence of a CNAME swap is not evidence of database isolation. Root prepares the bounded Boolean `deploy_to_idle` dispatch input. Its default true preserves current release/manual behavior; an explicit false builds the candidate images and skips the entire deploy-idle job. YAML parses with the actual event keys preserved, and the Boolean inputs context follows official GitHub workflow syntax. No workflow has been dispatched, image pushed, database migrated or cloud setting changed. Actual CI must confirm skipped deployment before the owned companion is used. This is delivery configuration within the authorized staging task, separate from the forty-nine feature contracts.
