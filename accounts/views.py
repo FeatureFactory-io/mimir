@@ -1,20 +1,20 @@
 """Authentication views for user login and logout."""
 
 from __future__ import annotations
-from typing import TypedDict
-from django.core.exceptions import PermissionDenied
-from django.http import HttpRequest
-from methodology.models import ExpertProfile
-from methodology.services.experts_service import ExpertProjection, ExpertsService
+
 import logging
-from django.conf import settings
-from django.contrib.auth import authenticate, login as auth_login, logout
-from django.contrib.auth.models import User
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
+from typing import TypedDict
 from urllib.parse import quote
 
-from django.shortcuts import render, redirect
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate, logout
+from django.contrib.auth import login as auth_login
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
@@ -31,12 +31,25 @@ from accounts.models import (
     mark_onboarding_completed,
 )
 from accounts.services.email_service import EmailService
-from methodology.models import Playbook, ProcessImprovementProposal, TeamMembership
+from methodology.expert_views import _request_correlation_id
+from methodology.models import (
+    ExpertProfile,
+    Playbook,
+    ProcessImprovementProposal,
+    TeamMembership,
+)
+from methodology.services.expert_text import category_label, format_karma
+from methodology.services.experts_service import (
+    SOURCE_BUCKETS,
+    ExpertProjection,
+    ExpertsService,
+)
 
 logger = logging.getLogger(__name__)
 
 _PROFILE_PLAYBOOKS_LIMIT = 50
 _PROFILE_PIPS_LIMIT = 50
+_PROFILE_CONTEXT_LOG = "accounts.views._profile_contribution_context"
 
 
 def _redirect_if_authenticated(request):
@@ -291,17 +304,16 @@ def custom_logout_view(request):
 
 
 @login_required
-def profile_view(request):
-    """FOB profile: account fields, API token, PIPs, playbooks, and teams for the current user."""
+def profile_view(request: HttpRequest) -> HttpResponse:
+    """Render the current user's account profile and contribution context.
+
+    :param request: Authenticated request. Example: GET /auth/user/profile/.
+    :return: Account profile HTML. Example: HTTP 200 for the signed-in owner.
+    """
     user = request.user
-    logger.info(
-        "[PROFILE] Page GET user_id=%s username=%s",
-        user.pk,
-        user.username,
-    )
+    contributions = _profile_contribution_context(request)
     token, _ = Token.objects.get_or_create(user=user)
-    playbooks = _profile_playbooks_for(user)
-    pips = _profile_pips_for(user)
+    playbooks, pips = _profile_playbooks_for(user), _profile_pips_for(user)
     team_memberships = _profile_team_memberships_for(user)
     logger.info(
         "[PROFILE] Render user_id=%s playbook_count=%s pip_count=%s team_count=%s",
@@ -310,20 +322,18 @@ def profile_view(request):
         len(pips),
         team_memberships.count(),
     )
-    return render(
-        request,
-        "accounts/profile.html",
-        {
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
-            "username": user.username,
-            "api_token": token.key,
-            "playbooks": playbooks,
-            "pips": pips,
-            "team_memberships": team_memberships,
-        },
-    )
+    context = {
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "email": user.email,
+        "username": user.username,
+        "api_token": token.key,
+        "playbooks": playbooks,
+        "pips": pips,
+        "team_memberships": team_memberships,
+        **contributions,
+    }
+    return render(request, "accounts/profile.html", context)
 
 
 def _validate_profile_edit(first_name, last_name, email, current_user):
@@ -1015,11 +1025,25 @@ def _validate_profile_contribution_request(request: HttpRequest) -> int:
     :return: Owner primary key; example: 42.
     :raises PermissionDenied: If anonymous; example: missing session.
     :raises ValueError: If owner has no valid persisted ID; example: None.
-
-    Pseudocode: validate authentication and positive integer PK; log rejection;
-    return only request.user.pk, ignoring all subject query parameters.
     """
-    raise NotImplementedError()
+    user = getattr(request, "user", None)
+    user_id = getattr(user, "pk", None)
+    error: PermissionDenied | ValueError
+    if not getattr(user, "is_authenticated", False):
+        reason = "authentication_required"
+        error = PermissionDenied("An authenticated profile owner is required.")
+    elif type(user_id) is not int or user_id <= 0 or user._state.adding:
+        reason = "invalid_user_id"
+        error = ValueError("Profile owner must be a saved account with a positive ID.")
+    else:
+        return user_id
+    logger.info(
+        "accounts.views._validate_profile_contribution_request | "
+        "beat=validation outcome=rejected reason=%s request_id=%s",
+        reason,
+        _request_correlation_id(request),
+    )
+    raise error
 
 
 def _profile_stored_summary_for(user_id: int) -> str:
@@ -1028,11 +1052,15 @@ def _profile_stored_summary_for(user_id: int) -> str:
     :param user_id: Persisted subject PK; example: 42.
     :return: Stored paragraph or empty string; example: "Maria maintains...".
     :raises ValueError: If ID is invalid; example: -1.
-
-    Pseudocode: validate ID; fetch ExpertProfile contribution_summary only;
-    return empty text for an absent row or blank stored value.
     """
-    raise NotImplementedError()
+    if type(user_id) is not int or user_id <= 0:
+        raise ValueError("Profile owner ID must be a positive integer.")
+    summary = (
+        ExpertProfile.objects.filter(user_id=user_id)
+        .values_list("contribution_summary", flat=True)
+        .first()
+    )
+    return summary if summary and summary.strip() else ""
 
 
 def _profile_contribution_display(
@@ -1041,16 +1069,39 @@ def _profile_contribution_display(
     """Format an immutable numeric projection for the profile template.
 
     :param projection: S03 result; example: total_points=8200, category=Design.
-    :param summary: Stored escaped-at-render prose; example: "Maria maintains...".
+    :param summary: Stored prose for template autoescaping; example: "Maria maintains...".
     :return: Presentation context; example: formatted_karma="8,200".
     :raises ValueError: If numeric/source/category data is invalid.
     :raises TypeError: If summary is not text; example: None.
-
-    Pseudocode: validate projection/text; format integers with grouping; map
-    source labels in Released/PIP/Consumption/Learning order; preserve category
-    projection and build immutable row tuples; never calculate domain totals.
     """
-    raise NotImplementedError()
+    if not isinstance(projection, ExpertProjection):
+        raise ValueError("An expert projection is required.")  # noqa: TRY004
+    if not isinstance(summary, str):
+        raise TypeError("Profile contribution summary must be text.")
+    if tuple(label for label, _ in projection.source_points) != SOURCE_BUCKETS:
+        raise ValueError("Profile projection must contain the four sources in order.")
+    return {
+        "total_karma": projection.total_points,
+        "formatted_karma": format_karma(projection.total_points),
+        "primary_category": (
+            category_label(projection.primary_category)
+            if projection.primary_category is not None
+            else None
+        ),
+        "summary": summary,
+        "source_rows": tuple(
+            {"label": label, "points": points, "formatted_points": format_karma(points)}
+            for label, points in projection.source_points
+        ),
+        "category_rows": tuple(
+            {
+                "label": category_label(slug),
+                "points": points,
+                "formatted_points": format_karma(points),
+            }
+            for slug, points in projection.category_points
+        ),
+    }
 
 
 def _profile_contribution_context(
@@ -1062,9 +1113,34 @@ def _profile_contribution_context(
     :return: One namespaced value; example: {"contributions": display_context}.
     :raises PermissionDenied: If no authenticated owner is available.
     :raises ValueError: If the owner ID or projection violates its contract.
-
-    Pseudocode: validate owner; log entry; project_user(owner_id); read stored
-    prose; log stored/missing branch; format display; log body-free exit;
-    return contributions. Never create a token, award, profile or model call.
     """
-    raise NotImplementedError()
+    user_id = _validate_profile_contribution_request(request)
+    request_id = _request_correlation_id(request)
+    request.request_id = request_id
+    logger.info(
+        "%s | beat=entry actor_user_id=%s request_id=%s",
+        _PROFILE_CONTEXT_LOG,
+        user_id,
+        request_id,
+    )
+    projection = ExpertsService().project_user(user_id)
+    if projection.user_id != user_id:
+        raise ValueError("Profile projection must belong to the authenticated owner.")
+    summary = _profile_stored_summary_for(user_id)
+    logger.info(
+        "%s | beat=branch summary_state=%s subject_user_id=%s request_id=%s",
+        _PROFILE_CONTEXT_LOG,
+        "stored" if summary else "missing",
+        user_id,
+        request_id,
+    )
+    contributions = _profile_contribution_display(projection, summary)
+    logger.info(
+        "%s | beat=exit total_points=%s primary_category=%s source_count=%s request_id=%s",
+        _PROFILE_CONTEXT_LOG,
+        contributions["total_karma"],
+        contributions["primary_category"],
+        len(contributions["source_rows"]),
+        request_id,
+    )
+    return {"contributions": contributions}
