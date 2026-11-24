@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
+from http import HTTPStatus
 from uuid import UUID
 
 import pytest
@@ -15,9 +17,12 @@ from django.http import HttpResponse
 from django.test import Client
 from django.urls import reverse
 
-from methodology.models import EventChannel, KarmaAward
+from methodology.models import EventChannel, ExpertProfile, KarmaAward
+from methodology.services.experts_service import ExpertProjection, ExpertsService
 from methodology.services.karma_service import KarmaService
 from tests.support.experts_data import CedarDataset
+from tests.support.experts_html import find_by_test_id
+from tests.support.experts_logs import capture_experts_logs
 from tests.support.log_story import assert_log_story
 
 ACTIVITY_ID = 6203
@@ -27,6 +32,10 @@ EVENT_ID = UUID("55f41062-b673-4698-bf16-91f871b6408f")
 REQUEST_ID = "cedar-copy-receipt-01"
 RECEIPT_VIEW = "copy_success_receipt"
 CONSUMPTION_SERVICE = "KarmaService.award_successful_consumption"
+_MIKE_BASELINE_POINTS = 12_450
+_MARIA_BASELINE_POINTS = 8_200
+_MIKE_BASELINE_GUI_COPIES = 47
+_RECEIPT_LOGGERS = ("methodology.karma_views", "methodology.services.karma_service")
 
 
 def _payload() -> dict[str, object]:
@@ -409,14 +418,81 @@ def test_copy_receipt_log_story_reject(
     )
 
 
+@dataclass(frozen=True)
+class _SelfCopyState:
+    """Full persisted rows and live per-user projections before or after self-copy."""
+
+    rows: dict[str, list[dict[str, object]]]
+    projections: dict[int, ExpertProjection]
+
+
+def _self_copy_state() -> _SelfCopyState:
+    """Capture ordered rows and every real account's numerical projection.
+
+    :return: Live state. Example: Mike's projection with 47 eligible GUI copies.
+    """
+    rows = {
+        model.__name__: list(model.objects.order_by("pk").values())
+        for model in (KarmaAward, User, ExpertProfile)
+    }
+    experts = ExpertsService()
+    user_ids = User.objects.order_by("pk").values_list("pk", flat=True)
+    return _SelfCopyState(
+        rows, {user_id: experts.project_user(user_id) for user_id in user_ids}
+    )
+
+
+def _assert_self_copy_state_unchanged(before: _SelfCopyState) -> None:
+    """Compare complete domain state to a snapshot captured before the operation.
+
+    :param before: Prior ledger, users, profiles and projections. Example: Cedar.
+    :return: None after confirming all persisted values and aggregates match.
+    :raises AssertionError: If any saved row or live projection changes.
+    """
+    after = _self_copy_state()
+    for model_name, rows in before.rows.items():
+        if after.rows[model_name] != rows:
+            pytest.fail(f"Self-copy changed persisted {model_name} rows.")
+    if after.projections != before.projections:
+        pytest.fail("Self-copy changed a live expert projection.")
+
+
 @pytest.mark.django_db
-def test_award_successful_consumption_with_self_activity_returns_no_awards() -> None:
+def test_award_successful_consumption_with_self_activity_returns_no_awards(
+    cedar_dataset: CedarDataset,
+) -> None:
     """Prove authorized self-consumption has no domain effect.
 
-    :return: None after empty result, ledger and 12450/8200/47 assertions.
+    :param cedar_dataset: Real imported baseline. Example: Mike owns playbook 6201.
+    :return: None after empty result and unchanged ledger and projections.
     :raises AssertionError: If self-copy changes any award or projection.
     """
-    raise NotImplementedError()
+    mike = cedar_dataset.users_by_username["mchen"]
+    maria = cedar_dataset.users_by_username["mrodriguez"]
+    activity = cedar_dataset.activities_by_pk[ACTIVITY_ID]
+    playbook = activity.workflow.playbook
+    assert (activity.workflow_id, playbook.pk, playbook.author_id) == (
+        WORKFLOW_ID,
+        PLAYBOOK_ID,
+        mike.pk,
+    )
+    assert (playbook.visibility, playbook.status, playbook.category) == (
+        "public",
+        "released",
+        "development",
+    )
+    before = _self_copy_state()
+    mike_projection = before.projections[mike.pk]
+    assert mike_projection.total_points == _MIKE_BASELINE_POINTS
+    assert before.projections[maria.pk].total_points == _MARIA_BASELINE_POINTS
+    assert mike_projection.successful_gui_copy_count == _MIKE_BASELINE_GUI_COPIES
+
+    outcomes = KarmaService.award_successful_consumption(
+        mike, "activity", activity.pk, EVENT_ID, channel="gui_copy"
+    )
+
+    assert outcomes == ()
+    _assert_self_copy_state_unchanged(before)
 
 
 @pytest.mark.django_db
@@ -441,12 +517,85 @@ def test_copy_receipt_with_self_activity_without_csrf_returns_forbidden() -> Non
 
 @pytest.mark.django_db
 def test_copy_receipt_with_self_activity_log_story_happy(
+    cedar_dataset: CedarDataset,
     caplog: LogCaptureFixture,
 ) -> None:
     """Prove the real successful exclusion story without sensitive bodies.
 
-    :param caplog: INFO records from the strict-CSRF real request.
-    :return: None after correlated ordered beats and no-persistence assertions.
+    :param cedar_dataset: Real imported baseline. Example: Mike owns activity 6203.
+    :param caplog: Actual INFO capture. Example: service self-exclusion branch.
+    :return: None after correlated ordered beats and unchanged ledger assertions.
     :raises AssertionError: If logging omits exclusion or leaks request content.
     """
-    raise NotImplementedError()
+    mike = cedar_dataset.users_by_username["mchen"]
+    client, csrf_token = _self_copy_client(mike)
+    before = _self_copy_state()
+    with capture_experts_logs(caplog, _RECEIPT_LOGGERS):
+        response = _post_receipt(client, _payload(), HTTP_X_CSRFTOKEN=csrf_token)
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {"status": "skipped", "reason": "self_consumption"}
+    assert response.headers["X-Request-ID"] == REQUEST_ID
+    assert response.wsgi_request.user.pk == mike.pk
+    _assert_self_copy_log_story(caplog, mike.pk)
+    _assert_self_copy_state_unchanged(before)
+
+
+def _self_copy_client(mike: User) -> tuple[Client, str]:
+    """Load Mike's real copy control and obtain its live CSRF token.
+
+    :param mike: Persisted author. Example: Cedar's mchen account.
+    :return: Strict authenticated client and rendered masked CSRF token.
+    :raises AssertionError: If the activity or enabled receipt control is absent.
+    """
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(mike)
+    detail = client.get(_activity_url())
+    assert detail.status_code == HTTPStatus.OK
+    button = find_by_test_id(detail.content, "copy-prompt-btn")
+    attrs = dict(button.attributes)
+    assert button.name == "button" and "data-copy-prompt-trigger" in attrs
+    assert "disabled" not in attrs and attrs.get("aria-disabled") != "true"
+    assert attrs.get("data-copy-receipt-url") == reverse("karma_copy_receipt")
+    assert attrs.get("data-copy-receipt-entity-type") == "activity"
+    assert attrs.get("data-copy-receipt-entity-id") == str(ACTIVITY_ID)
+    csrf_token = attrs.get("data-copy-receipt-csrf")
+    assert csrf_token and settings.CSRF_COOKIE_NAME in client.cookies
+    return client, csrf_token
+
+
+def _assert_self_copy_log_story(caplog: LogCaptureFixture, actor_id: int) -> None:
+    """Require the five correlated log beats in order with only safe fields.
+
+    :param caplog: Actual INFO capture. Example: the self-copy receipt request.
+    :param actor_id: Persisted owner ID. Example: the PK of Cedar's Mike.
+    :return: None after confirming the safe ordered exclusion story.
+    :raises AssertionError: If a beat is missing, out of order or adds other fields.
+    """
+    request = f"request_id={REQUEST_ID}"
+    action = f"action_uuid={EVENT_ID}"
+    target = f"entity_type=activity entity_id={ACTIVITY_ID}"
+    service = f"channel=gui_copy {action} actor_id={actor_id} playbook_id={PLAYBOOK_ID}"
+    story = (
+        (RECEIPT_VIEW, "entry", f"{request} actor_id={actor_id} operation=gui_copy"),
+        (RECEIPT_VIEW, "validation", f"{request} {target} {action} validated"),
+        (CONSUMPTION_SERVICE, "validation", f"{service} authorized"),
+        (CONSUMPTION_SERVICE, "branch", f"{service} reason=self_consumption awards=0"),
+        (RECEIPT_VIEW, "exit", f"{request} {action} status=skipped"),
+    )
+    expected = [f"{where} | {beat} | {fields}" for where, beat, fields in story]
+    observed = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name in _RECEIPT_LOGGERS
+    ]
+    # An allowlist also excludes pair persistence and private request data.
+    if observed != expected:
+        pytest.fail("Self-copy receipt logs differed from the ordered safe story.")
+    for where in (RECEIPT_VIEW, CONSUMPTION_SERVICE):
+        beats = {
+            beat: (f"| {beat} |", fields)
+            for operation, beat, fields in story
+            if operation == where
+        }
+        assert_log_story(caplog, where=where, beats=beats)
