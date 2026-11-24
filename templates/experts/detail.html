@@ -1,4 +1,80 @@
 
-{# PIN S17: graduate EXPERTS-VIEW-01 from the approved Experts prototype after GO. #}
+{% extends "base.html" %}
+{% load l10n %}
 
-{# PIN S14: graduate EXPERTS-REACH-01 from the approved Experts prototype after GO. #}
+{% block title %}{% if person %}{{ person.name }}{% else %}Expert unavailable{% endif %}{% endblock %}
+
+{% block content %}
+{% if person %}
+<nav aria-label="Breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ back_url }}" data-testid="expert-back-link">Experts</a></li>
+    <li class="breadcrumb-item active text-break" aria-current="page">{{ person.name }}</li>
+  </ol>
+</nav>
+
+<header class="hg-page-header d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div class="text-break">
+    <h1 class="hg-page-title" data-testid="expert-name">{{ person.name }}</h1>
+    <span class="badge text-bg-light border" data-testid="expert-primary-category">{{ person.primary_category }}</span>
+    <span class="text-primary fw-semibold" data-testid="expert-karma-total">{{ person.formatted_karma }}</span>
+    <span class="text-muted">Karma</span>
+  </div>
+  {% if person.contact %}
+  <div role="toolbar" aria-label="Expert contact">
+    {% include "experts/_reach_out.html" with person=person only %}
+  </div>
+  {% endif %}
+</header>
+
+<div class="row g-4">
+  <section class="col-md-8" aria-labelledby="expert-contributions-title" data-testid="expert-read-column">
+    <div class="card hg-card">
+      <div class="card-body">
+        <h2 class="h5" id="expert-contributions-title">Public contributions</h2>
+        {% if person.summary %}
+        <p class="mb-0 text-break" data-testid="expert-contribution-summary">{{ person.summary }}</p>
+        {% else %}
+        <p class="text-muted mb-0" data-testid="expert-numeric-fallback">{{ person.numeric_fallback }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <aside class="col-md-4 d-flex flex-column gap-3" aria-label="Contribution evidence" data-testid="expert-context-rail">
+    {% if person.source_rows or person.category_rows %}
+    {% include "experts/_breakdown.html" with person=person only %}
+    {% endif %}
+    <section class="card hg-card" aria-labelledby="expert-public-playbooks-title" data-testid="expert-public-playbooks">
+      <div class="card-body">
+        <h2 class="h5" id="expert-public-playbooks-title">Public released playbooks</h2>
+        {% for book in person.public_playbooks %}
+        <div class="border-top pt-2 mt-2">
+          <h3 class="h6 text-break">{{ book.title }}</h3>
+          <p class="small text-muted mb-2">{% if book.category %}{{ book.category }} · {% endif %}v{{ book.version }}</p>
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'playbook_detail' book.pk %}"
+             aria-label="View {{ book.title }}" title="View released playbook"
+             data-testid="expert-playbook-{{ book.pk|unlocalize }}"><i class="fa-solid fa-book-open me-1" aria-hidden="true"></i>View</a>
+        </div>
+        {% empty %}
+        <p class="text-muted mb-0">No public released playbooks to show</p>
+        {% endfor %}
+      </div>
+    </section>
+  </aside>
+</div>
+{% else %}
+<div class="row justify-content-center mt-4">
+  <div class="col-md-8 col-lg-6">
+    <div class="card hg-card border-warning">
+      <div class="card-body text-center p-4">
+        <i class="fa-solid fa-triangle-exclamation text-warning fs-2 mb-3" aria-hidden="true"></i>
+        <h1 class="hg-page-title mb-3" data-testid="expert-unavailable">Expert unavailable</h1>
+        <a class="btn btn-primary" href="{% url 'experts_list' %}" title="Browse Experts"
+           data-testid="expert-unavailable-back-link"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Back to Experts</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

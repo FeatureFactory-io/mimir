@@ -3,11 +3,14 @@ from __future__ import annotations
 from uuid import UUID
 
 import pytest
+from django.http import HttpResponse
 from django.test import Client
 from django.urls import reverse
+from django.utils.html import escape
 
 from methodology.models import AgentInteraction, ExpertProfile, KarmaAward, Playbook
 from tests.support.experts_data import CedarDataset
+from tests.support.experts_html import element_text, find_by_test_id
 from tests.support.experts_logs import capture_experts_logs
 from tests.support.log_story import assert_log_story
 
@@ -18,39 +21,126 @@ _SERVICE_LOGGER = "methodology.services.experts_service"
 
 
 def test_public_detail_with_cedar_maria_returns_identity_and_complete_summary(
-    client: Client,
+    client: Client, cedar_dataset: CedarDataset
 ) -> None:
     """Prove exact identity and complete real stored prose.
 
     :param client: Real Django client. Example: authenticated Elena.
+    :param cedar_dataset: Imported Cedar fixture. Example: Maria's stored prose.
     :return: None. Example: all public values match Cedar ORM baseline.
     :raises AssertionError: For missing, altered or shortened content.
     """
-    raise NotImplementedError()
+    client.force_login(cedar_dataset.users_by_username["esvensson"])
+    response = client.get(_MARIA_PATH, {"category": "research"})
+
+    _assert_maria_identity_and_summary(response, cedar_dataset)
+    back_link = find_by_test_id(response.content, "expert-back-link")
+    assert ("href", "/experts/?category=research") in back_link.attributes
+    book = cedar_dataset.playbooks_by_pk[6101]
+    book_link = find_by_test_id(response.content, f"expert-playbook-{book.pk}")
+    assert ("href", reverse("playbook_detail", args=[book.pk])) in book_link.attributes
+    find_by_test_id(response.content, "karma-source-breakdown")
+    find_by_test_id(response.content, "karma-category-breakdown")
 
 
 def test_public_detail_with_guest_returns_same_public_identity_and_summary(
-    client: Client,
+    client: Client, cedar_dataset: CedarDataset
 ) -> None:
     """Prove anonymous readability without contact disclosure.
 
     :param client: Real anonymous client. Example: Bob.
+    :param cedar_dataset: Imported Cedar fixture. Example: Maria's account and prose.
     :return: None. Example: 200 and complete Maria paragraph without email.
     :raises AssertionError: For a redirect, altered prose or exposed email.
     """
-    raise NotImplementedError()
+    response = client.get(_MARIA_PATH)
+
+    _assert_maria_identity_and_summary(response, cedar_dataset)
+    maria = cedar_dataset.users_by_username["mrodriguez"]
+    assert "email" not in response.context["person"]
+    assert maria.email.encode() not in response.content
+    assert b"mailto:" not in response.content
 
 
 def test_public_detail_with_html_summary_escapes_untrusted_markup(
-    client: Client,
+    client: Client, cedar_dataset: CedarDataset
 ) -> None:
     """Prove stored prose is escaped rather than interpreted as markup.
 
-    :param client: Real client and ORM baseline. Example: Maria summary contains <script>.
+    :param client: Real anonymous client. Example: Bob.
+    :param cedar_dataset: Imported Cedar fixture. Example: Maria's persisted profile.
     :return: None. Example: escaped text with no executable script node.
     :raises AssertionError: When unsafe markup reaches the rendered document.
     """
-    raise NotImplementedError()
+    markup = '<script>alert("expert")</script> & <strong>example</strong>'
+    maria = cedar_dataset.users_by_username["mrodriguez"]
+    ExpertProfile.objects.filter(user=maria).update(contribution_summary=markup)
+    response = client.get(_MARIA_PATH)
+
+    assert response.status_code == 200
+    paragraph = find_by_test_id(response.content, "expert-contribution-summary")
+    assert paragraph.children == [markup]
+    assert escape(markup).encode() in response.content
+    assert markup.encode() not in response.content
+
+
+def _assert_maria_identity_and_summary(
+    response: HttpResponse, cedar_dataset: CedarDataset
+) -> None:
+    """Check the complete persisted paragraph and exact public identity.
+
+    :param response: Real public detail response. Example: GET /experts/mrodriguez/.
+    :param cedar_dataset: Imported Cedar fixture. Example: Maria's persisted profile.
+    :return: None after confirming the server-rendered identity and summary.
+    :raises AssertionError: For missing public fields or shortened text.
+    """
+    assert response.status_code == 200
+    assert any(
+        template.name == "experts/detail.html" for template in response.templates
+    )
+    assert b"<title>Maria Rodriguez</title>" in response.content
+    heading = find_by_test_id(response.content, "expert-name")
+    assert heading.name == "h1"
+    assert element_text(heading) == "Maria Rodriguez"
+    assert (
+        element_text(find_by_test_id(response.content, "expert-karma-total")) == "8,200"
+    )
+    assert (
+        element_text(find_by_test_id(response.content, "expert-primary-category"))
+        == "Design"
+    )
+    maria = cedar_dataset.users_by_username["mrodriguez"]
+    stored = ExpertProfile.objects.get(user=maria).contribution_summary
+    paragraph = find_by_test_id(response.content, "expert-contribution-summary")
+    assert paragraph.name == "p"
+    assert paragraph.children == [stored]
+
+
+@pytest.mark.parametrize("username", ["no-such-cedar-user", "nberg"])
+def test_public_detail_with_unavailable_subject_renders_navigable_404(
+    client: Client, cedar_dataset: CedarDataset, username: str
+) -> None:
+    """Check a generic accessible rejection with a route back to Experts.
+
+    :param client: Real anonymous client. Example: Bob.
+    :param cedar_dataset: Imported Cedar fixture. Example: Nora's zero-Karma account.
+    :param username: Requested account. Example: "nberg".
+    :return: None after checking the rejection inside the production shell.
+    :raises AssertionError: If the rejection exposes an identity or lacks navigation.
+    """
+    nora = cedar_dataset.users_by_username["nberg"]
+    response = client.get(reverse("expert_detail", args=[username]))
+
+    assert response.status_code == 404
+    heading = find_by_test_id(response.content, "expert-unavailable")
+    assert heading.name == "h1"
+    assert element_text(heading) == "Expert unavailable"
+    back_link = find_by_test_id(response.content, "expert-unavailable-back-link")
+    assert ("href", reverse("experts_list")) in back_link.attributes
+    find_by_test_id(response.content, "app-sidebar")
+    assert nora.get_full_name().encode() not in response.content
+    assert nora.email.encode() not in response.content
+    assert b'data-testid="expert-name"' not in response.content
 
 
 def test_public_detail_with_request_preserves_persisted_state(
