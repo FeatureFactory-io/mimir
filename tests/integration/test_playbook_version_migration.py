@@ -1,6 +1,7 @@
 """S02 — VERSIONING-27 data migration backfill (integer-era rows → Decimal X.Y metadata)."""
 
 import json
+from collections.abc import Iterator
 from decimal import Decimal
 
 import pytest
@@ -14,6 +15,21 @@ from django.utils import timezone
 from methodology.models.playbook_version import PlaybookVersion
 
 User = get_user_model()
+
+
+@pytest.fixture(autouse=True)
+def _restore_latest_schema(transactional_db: None) -> Iterator[None]:
+    """Restore every current migration leaf after historical schema assertions.
+
+    :param transactional_db: Test-owned runner outside rollback transactions.
+    :return: None; later tests receive the full current schema even on failure.
+    :raises MigrationError: Restoring the real migration graph fails.
+    """
+    targets = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        yield
+    finally:
+        MigrationExecutor(connection).migrate(targets)
 
 
 def _insert_legacy_playbook_version(

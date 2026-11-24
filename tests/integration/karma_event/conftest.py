@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
+from asgiref.sync import SyncToAsync
 from django.core.management import call_command
 from django.db import connection, connections
 from django.db.backends.base.base import BaseDatabaseWrapper
@@ -24,6 +25,8 @@ from tests.support.experts_data import (
     _validate_database_scope,
     load_cedar_baseline,
 )
+
+_THREAD_CONNECTION_TIMEOUT_SECONDS = 30
 
 
 @pytest.fixture(scope="session")
@@ -86,21 +89,68 @@ def django_db_setup(
 def _activate_race_sqlite(
     settings_dict: dict[str, Any],
 ) -> Iterator[BaseDatabaseWrapper]:
-    """Install the runner declaration for ORM threads and preserve the normal alias."""
+    """Isolate both real runner connections for the private SQLite lifetime.
+
+    :param settings_dict: Explicit settings for the owned private SQLite runner.
+    :return: Main-thread private wrapper; async ORM gets its own private wrapper.
+    :raises Exception: Propagates body or connection lifecycle failures.
+    """
     original = connections["default"]
     declared = connections.databases
     previous = declared["default"]
-    declared["default"] = settings_dict
-    sqlite = connections.create_connection("default")
-    connections["default"] = sqlite
+    executor = SyncToAsync.single_thread_executor
+    worker_original = executor.submit(_detach_runner_connection).result(
+        timeout=_THREAD_CONNECTION_TIMEOUT_SECONDS
+    )
+    sqlite = None
     try:
+        declared["default"] = settings_dict
+        sqlite = connections.create_connection("default")
+        connections["default"] = sqlite
         yield sqlite
     finally:
         try:
-            sqlite.close()
+            if sqlite is not None:
+                sqlite.close()
         finally:
+            try:
+                executor.submit(_restore_runner_connection, worker_original).result(
+                    timeout=_THREAD_CONNECTION_TIMEOUT_SECONDS
+                )
+            finally:
+                connections["default"] = original
+                declared["default"] = previous
+
+
+def _detach_runner_connection() -> BaseDatabaseWrapper | None:
+    """Detach an initialized wrapper on its actual owning executor thread.
+
+    :return: Existing default wrapper, or None without opening a connection.
+    :raises RuntimeError: Django cannot detach the current runner alias.
+    """
+    existing = next(
+        (db for db in connections.all(initialized_only=True) if db.alias == "default"),
+        None,
+    )
+    if existing is not None:
+        del connections["default"]
+    return existing
+
+
+def _restore_runner_connection(original: BaseDatabaseWrapper | None) -> None:
+    """Close only the private worker wrapper and restore its preserved alias.
+
+    :param original: Worker wrapper detached before the private scope, or None.
+    :return: None; later ORM calls use the original runner again.
+    :raises DatabaseError: The private connection fails to close.
+    """
+    private = _detach_runner_connection()
+    try:
+        if private is not None:
+            private.close()
+    finally:
+        if original is not None:
             connections["default"] = original
-            declared["default"] = previous
 
 
 def _declare_sqlite_test_file(directory: Path) -> CedarDatabaseScope:
