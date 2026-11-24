@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import logging
+from collections.abc import Callable
+from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -14,10 +18,19 @@ from behave import given, then, when
 from behave.runner import Context
 from django.db import connection
 from pytest_django.live_server_helper import LiveServer
+from rest_framework.authtoken.models import Token
 
 from mcp_integration.facade.client import get_client
 from methodology.models import EventChannel, KarmaAward
-from tests.support.karma_mcp import MCPClientFactory, decode_tool_payload
+from tests.support.experts_exports import (
+    assert_complete_self_export,
+    assert_owned_export_source,
+    assert_self_export_karma_unchanged,
+    capture_export_karma_state,
+)
+from tests.support.karma_mcp import MCPClientFactory, MCPDataset, decode_tool_payload
+
+logger = logging.getLogger(__name__)
 
 _WORKFLOW_ID = 6202
 _ACTIVITY_ID = 6203
@@ -61,13 +74,20 @@ def export_mikes_workflow(context: Context) -> None:
 
 
 async def _call_workflow_export(
-    factory: MCPClientFactory, actor_username: str, root: Path
+    factory: MCPClientFactory,
+    actor_username: str,
+    root: Path,
+    *,
+    response_hook: Callable[[httpx.Response], None] | None = None,
+    receipt_bytes: dict[Path, bytes] | None = None,
 ) -> tuple[dict[str, object], UUID, set[Path]]:
     """Run the registered facade and retain its real HTTP request evidence.
 
     :param factory: Bound to the real test-owned Django live server.
     :param actor_username: Cedar token owner. Example: "mrodriguez".
     :param root: Authorized temporary workspace. Example: Path("/tmp/t").
+    :param response_hook: Optional observer for the actual HTTP responses.
+    :param receipt_bytes: Optional output for exact file bytes at receipt dispatch.
     :return: Actual tool payload, receipt UUID and files present at receipt time.
     :raises AssertionError: Missing successful response or expected HTTP requests.
     """
@@ -75,9 +95,12 @@ async def _call_workflow_export(
     async with factory.open(
         actor_username=actor_username, entrypoint="facade"
     ) as session:
-        get_client().event_hooks["request"].append(
-            partial(_observe_receipt, receipts, root)
+        hooks = get_client().event_hooks
+        hooks["request"].append(
+            partial(_observe_receipt, receipts, root, receipt_bytes=receipt_bytes)
         )
+        if response_hook is not None:
+            hooks["response"].append(response_hook)
         result = decode_tool_payload(
             await session.client.call_tool(
                 "export_workflow_to_local",
@@ -105,17 +128,26 @@ def _observe_receipt(
     receipts: list[tuple[dict[str, object], set[Path]]],
     root: Path,
     request: httpx.Request,
+    *,
+    receipt_bytes: dict[Path, bytes] | None = None,
 ) -> None:
     """Observe real receipt content and files at dispatch without handling requests.
 
     :param receipts: Destination for the observed receipt and file paths.
     :param root: Owned workspace that may already contain export files.
     :param request: Actual outgoing request. Example: the token-authenticated POST.
+    :param receipt_bytes: Optional destination for observed bytes within the workspace.
     :return: None after recording receipt fields without headers or credentials.
+    :raises AssertionError: A file to be observed escapes the workspace.
     :raises ValueError: The outgoing receipt lacks valid JSON.
     """
     if request.url.path == _RECEIPT:
-        receipts.append((json.loads(request.content), _export_files(root)))
+        files = _export_files(root)
+        receipts.append((json.loads(request.content), files))
+        if receipt_bytes is not None:
+            for path in files:
+                assert path.resolve() == path and path.is_relative_to(root)
+                receipt_bytes[path] = path.read_bytes()
 
 
 def _export_files(root: Path) -> set[Path]:
@@ -199,7 +231,17 @@ def mike_has_valid_export_token(context: Context) -> None:
     :return: None. Example: authenticated Mike and global baseline captured.
     :raises AssertionError: Token, ownership or baseline totals are invalid.
     """
-    raise NotImplementedError()
+    cedar = context.cedar_dataset
+    mike = assert_owned_export_source(cedar)
+    context.self_export_karma_before = capture_export_karma_state()
+    token, _ = Token.objects.get_or_create(user=mike)
+    response = context.client.get(
+        f"/api/workflows/{_WORKFLOW_ID}/", HTTP_AUTHORIZATION=f"Token {token.key}"
+    )
+    assert response.status_code == 200 and response.json()["id"] == _WORKFLOW_ID
+    assert response.wsgi_request.user == mike
+    context.mcp_actor = mike
+    context.mcp_dataset = MCPDataset(cedar, {}, {})
 
 
 @when("he exports his own workflow 6202")
@@ -210,7 +252,49 @@ def export_own_workflow(context: Context) -> None:
     :return: None. Example: real successful export result and files retained.
     :raises AssertionError: Authorization, source ownership or export fails.
     """
-    raise NotImplementedError()
+    assert connection.vendor == "sqlite" and connection.is_in_memory_db()
+    workspace = TemporaryDirectory(prefix="mimir-experts-self-export-")
+    context.add_cleanup(workspace.cleanup)
+    root = Path(workspace.name).resolve()
+    responses: dict[str, dict[str, Any]] = {}
+    receipt_bytes: dict[Path, bytes] = {}
+    server = LiveServer("127.0.0.1")
+    try:
+        factory = MCPClientFactory(context.mcp_dataset, server.url, [])
+        started = datetime.now(UTC)
+        result, identity, _ = async_to_sync(_call_workflow_export)(
+            factory,
+            context.mcp_actor.username,
+            root,
+            response_hook=partial(_observe_self_export_response, responses),
+            receipt_bytes=receipt_bytes,
+        )
+        finished = datetime.now(UTC)
+    finally:
+        server.stop()
+    context.export_root = root
+    context.export_result = result
+    context.export_event_identity = identity
+    context.self_export_times = (started, finished)
+    context.self_export_responses = responses
+    context.self_export_receipt_bytes = receipt_bytes
+
+
+def _observe_self_export_response(
+    responses: dict[str, dict[str, Any]], response: httpx.Response
+) -> None:
+    """Capture successful bundle and receipt responses without substituting either.
+
+    :param responses: Observed response bodies keyed by route. Example: _BUNDLE.
+    :param response: Actual authenticated HTTP response. Example: export bundle.
+    :return: None. Example: retain the served content and original receipt outcome.
+    :raises AssertionError: An unexpected response or repeat requests occur.
+    """
+    path = response.request.url.path
+    assert path in (_BUNDLE, _RECEIPT) and path not in responses
+    assert response.status_code == 200
+    response.read()
+    responses[path] = response.json()
 
 
 @then("his total remains 12450")
@@ -221,4 +305,33 @@ def assert_own_export_changes_no_karma(context: Context) -> None:
     :return: None. Example: Mike12450, GUI47 and global ledger unchanged.
     :raises AssertionError: Incomplete output or any award/projection mutation.
     """
-    raise NotImplementedError()
+    root = context.export_root
+    started, finished = context.self_export_times
+    responses = context.self_export_responses
+    assert_complete_self_export(
+        result=context.export_result,
+        bundle=responses[_BUNDLE],
+        workspace=root,
+        started_at=started,
+        finished_at=finished,
+        folder=_FOLDER,
+        facade=True,
+    )
+    receipt_bytes = context.self_export_receipt_bytes
+    assert receipt_bytes == {path: path.read_bytes() for path in _export_files(root)}
+    assert responses[_RECEIPT] == {
+        "event_identity": str(context.export_event_identity),
+        "status": "skipped",
+        "created_count": 0,
+        "reason": "self_consumption",
+    }
+    assert_self_export_karma_unchanged(context.self_export_karma_before)
+    logger.info(
+        "self_workflow_export_at | exit | actor_id=%s workflow_id=%s "
+        "event_identity=%s file_count=%s receipt_reason=%s",
+        context.mcp_actor.pk,
+        _WORKFLOW_ID,
+        context.export_event_identity,
+        len(receipt_bytes),
+        responses[_RECEIPT]["reason"],
+    )
