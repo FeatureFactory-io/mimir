@@ -593,7 +593,7 @@ test-experts-s17:
 
 .PHONY: test-experts-s18-backend
 test-experts-s18-backend:
-	$(PYTHON) -m pytest tests/integration/test_experts_public_score_breakdown.py::test_public_score_breakdown_with_cedar_sources_reconciles tests/integration/test_experts_public_score_breakdown.py::test_public_score_breakdown_with_category_subtotals_keeps_separate_sections tests/integration/test_experts_public_score_breakdown.py::test_public_score_breakdown_with_new_ledger_event_reads_live_totals tests/integration/test_experts_public_score_breakdown.py::test_public_score_breakdown_with_repeated_get_preserves_domain_state tests/integration/test_experts_s18_behave.py::test_s18_behave_contract_with_exact_name_executes_without_skips -x
+	$(PYTHON) -m pytest tests/integration/test_experts_public_score_breakdown.py -x
 
 .PHONY: test-experts-s18-browser
 test-experts-s18-browser:
@@ -602,6 +602,7 @@ test-experts-s18-browser:
 .PHONY: test-experts-s18-at
 test-experts-s18-at:
 	$(PYTHON) -m pytest tests/integration/test_experts_acceptance_runner.py -k S18 -x
+	$(PYTHON) -m pytest tests/integration/test_experts_s18_behave.py -x
 
 .PHONY: test-experts-s18
 test-experts-s18:
