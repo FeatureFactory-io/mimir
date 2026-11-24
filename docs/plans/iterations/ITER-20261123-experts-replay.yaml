@@ -32,6 +32,8 @@ iteration:
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
     exact-AT runner implementation is N4. No product or scenario footprint expanded.
 conflict_map:
+  methodology/pip_views.py:
+  - S32
   methodology/services/copy_prompt_service.py:
   - S37
   tests/integration/test_pip_admin_review_view.py:
@@ -5580,6 +5582,7 @@ scenarios:
     skeleton_commit: 12f17b598a1c758b6c55d6b8acd879b9c8fbcd94
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - methodology/pip_views.py
     - Makefile
     - tests/integration/test_pip_admin_review_view.py
     - templates/pips/admin_review.html
@@ -5784,11 +5787,30 @@ scenarios:
           rules:
           - do-test-first
           - do-semantic-versioning-on-ui-elements
+      - id: N4a-staff-decision-serialization
+        title: Serialize both staff decision POST paths against current state
+        bpe: BPE-02
+        depends_on:
+        - N4-browser-finalization
+        footprint:
+        - methodology/pip_views.py
+        - methodology/services/pip_admin_service.py
+        - tests/integration/test_experts_karma_pip.py
+        - tests/integration/test_pip_admin_review_view.py
+        gate:
+          command: make test-experts-s32
+          compatibility_command: pytest tests/integration/test_pip_admin_review_view.py -x
+        guidance_bundle:
+          activity: BPE/BPE-02-Implement_Backend.md
+          rules:
+          - do-test-first
+          - do-not-mock-in-integration-tests
+        notes: Real separate-connection stale Finalize and Save Decisions requests overwrite terminal child decisions after publication and awards. Keep services authoritative; serialize and revalidate current parent state before any child decision/note write, and finalize in the same atomic boundary. Preserve callers, permissions and GET rendering. Require deterministic real two-connection stale requests, rollback and PostgreSQL verification, without another user question.
       - id: N5-definition-of-done
         title: Roll up behavior, log, three-example AT and browser evidence
         bpe: BPE-06
         depends_on:
-        - N4-browser-finalization
+        - N4a-staff-decision-serialization
         footprint: []
         gate:
           command: make test-experts-s32
@@ -8672,11 +8694,28 @@ scenarios:
           '
         mockup_graduation: not_applicable
         agent_proofs: []
+      - id: S42-N3a-legacy-ade-confinement
+        title: Confine legacy ADE leaves and recheck immediately before writes
+        bpe: BPE-02
+        depends_on:
+        - S42-N3-acceptance-and-stdio
+        footprint:
+        - methodology/services/playbook_export_service.py
+        - methodology/services/workflow_export_service.py
+        - tests/integration/test_karma_exports.py
+        gate:
+          command: make test-experts-s42
+        guidance_bundle:
+          activity: BPE/BPE-02-Implement_Backend.md
+          rules:
+          - do-test-first
+          - do-not-mock-in-integration-tests
+        notes: Real legacy ADE leaf symlink overwrites a workspace sibling and still awards. Preflight each ADE leaf relative to its approved active IDE rules directory, before every write; compare resolved destinations again after parent creation immediately before writing. Preserve known-file overwrite, unrelated files, self policy and return shapes. Add real filesystem regression and zero-award failure evidence.
       - id: S42-N4-definition-of-done
         title: Verify complete export behavior and minimal-image packaging
         bpe: BPE-06
         depends_on:
-        - S42-N3-acceptance-and-stdio
+        - S42-N3a-legacy-ade-confinement
         footprint: []
         tests:
         - test_karma_export_facade_t1_with_multiple_files_awards_one_pair
