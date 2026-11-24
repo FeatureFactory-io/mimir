@@ -62,7 +62,11 @@ def test_experts_design_with_baseline_omits_empty_state(client: Client) -> None:
         for node in _walk_elements(leaderboard)
     ]
     assert "experts-empty" not in test_ids
+    cards = [node for node in _walk_elements(leaderboard) if node.name == "article"]
     assert (
-        sum(test_id.startswith("experts-card-") for test_id in test_ids)
+        sum(
+            dict(card.attributes).get("data-testid", "").startswith("experts-card-")
+            for card in cards
+        )
         == _DESIGN_CARD_COUNT
     )

@@ -134,7 +134,7 @@ def test_category_selection_log_story_happy(
 
 
 def _ranked_usernames(response: HttpResponse) -> list[str]:
-    """Read the ordered contributor identities from the rendered leaderboard.
+    """Read ordered identities from contributor article containers only.
 
     :param response: Real Design response. Example: GET /experts/?category=design.
     :return: Usernames in DOM order. Example: ["sreed", "mrodriguez"].
@@ -145,6 +145,7 @@ def _ranked_usernames(response: HttpResponse) -> list[str]:
     return [
         value.removeprefix(card_prefix)
         for node in _walk_elements(leaderboard)
+        if node.name == "article"
         for name, value in node.attributes
         if name == "data-testid" and value.startswith(card_prefix)
     ]
