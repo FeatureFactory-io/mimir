@@ -146,10 +146,8 @@ class PublicContributionSummaryBoundary:
             failure = self._failure(code, trace, response)
         else:
             logger.info("%s | exit | %s outcome=success", _COMPLETE, details)
-            trace += (
-                SummaryTraceEvent("validation", "status=accepted"),
-                SummaryTraceEvent("exit", "outcome=success"),
-            )
+            validation = SummaryTraceEvent("validation", "status=accepted")
+            trace += (validation, SummaryTraceEvent("exit", "outcome=success"))
             return SummaryBoundaryResult(text, replace(response, content=text), trace)
         raise failure
 
