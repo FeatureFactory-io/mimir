@@ -39,6 +39,11 @@ iteration:
       verification: YAML parsed and typed Boolean job guard checked against official GitHub documentation; live Actions run remains pending.
     ambient_database_identity: Unverified. CDK can supply the same database URL to both environments; default idle migration must not be assumed isolated.
     staging_arrangement: Exact candidate image in an owned isolated companion/database, with no ambient migrations or fixture seed.
+  required_iteration_final_gates:
+  - make test-at-harness
+  - make test-at-experts
+  - make lint
+  final_gate_placement: The aggregate Experts gate includes S46, which depends on S45; it is required at iteration DoD after all49 contracts, not as a circular prerequisite to S45. Global lint remains required and its actual outcome must be recorded, never inferred from scoped lint. Remove WIP only from fully certified owning feature files before the final aggregate AT; require all83 server Examples with no selected skips/undefined.
   execution_note: N2 explicitly owns the already-scaffolded formatter/HTML/log helpers and their tests; generic
     exact-AT runner implementation is N4. No product or scenario footprint expanded.
 conflict_map:
@@ -6516,8 +6521,7 @@ scenarios:
           log_story_command: pytest tests/integration/karma_event/test_retry.py -k log_story -x
         additional_required_gates:
         - make test-at-harness
-        - make test-at-experts
-        - make lint
+        iteration_gate_handoff: Aggregate Experts AT and global lint remain mandatory iteration-final gates; this node cannot require S46 before its own dependency becomes complete.
         guidance_bundle:
           activity: BPE/BPE-06-Check_Definition_of_Done.md
           rules:
@@ -6701,6 +6705,8 @@ scenarios:
     skeleton_commit: 9a98cb57c229446921267d6162a39353be365b9b
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - Makefile
+    - tests/e2e/test_experts_cedar_nomination.py
     - docs/experts-replay/pin-evidence/S05.json
     - docs/features/steps/experts_handoff_steps.py
     - docs/plans/iterations/experts/S05-experts-list-05.md
@@ -6799,11 +6805,30 @@ scenarios:
           rules:
           - do-test-first
           - do-not-mock-in-integration-tests
+      - id: S05-N3a-composed-nomination
+        title: Certify the complete Cedar nomination and record automated UAT evidence
+        bpe: BPE-05
+        depends_on:
+        - S05-N3-browser
+        footprint:
+        - Makefile
+        - tests/e2e/test_experts_cedar_nomination.py
+        tests:
+        - test_cedar_nomination_with_elena_follows_evidence_and_records_contact_handoff
+        gate:
+          command: make test-experts-s05-journey
+        required_observation: Restore Cedar independently; start authenticated Elena at existing in-app Experts navigation; Design then Sofia evidence then return with Design retained then Maria full paragraph and source reconciliation then actual Accessibility Audit playbook/workflow and named activities then return to Maria and inspect mailto without external activation. Record external nomination text with candidate, public example, brief-specific reason, contact next action and availability unconfirmed; actual elapsed time, fixture hash, source revision and viewport. Label as automated UAT path, not human usability or staged deployment proof.
+        guidance_bundle:
+          activity: BPE/BPE-05-Implement_Journey_Certification_Tests.md
+          rules:
+          - do-test-first
+          - do-not-mock-in-integration-tests
+          - do-test-fixture-data-management
       - id: S05-N4-dod
         title: Review complete handoff evidence
         bpe: BPE-06
         depends_on:
-        - S05-N3-browser
+        - S05-N3a-composed-nomination
         footprint: []
         gate:
           command: make test-experts-s05

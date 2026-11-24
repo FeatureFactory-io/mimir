@@ -246,6 +246,22 @@ DoD node; DoD conjunctively runs relevant backend, exact acceptance, browser,
 log-story and agent-proof gates. Protocol checks are backend/acceptance nodes,
 not mislabeled browser certification. Missing/zero/skipped selection fails.
 
+The aggregate Experts acceptance gate covers downstream S46, which consumes
+S45. It therefore remains a mandatory iteration-final gate after all49, rather
+than a circular prerequisite to S45's own completion. Global `make lint` is also
+retained at iteration-final DoD and its actual outcome must be recorded; scoped
+lint cannot establish it. The harness health gate can run at either stage.
+Before final aggregate AT, remove WIP only from completely certified owning
+feature files and require all83expanded server cases without selected skips or
+undefined steps. This scheduling correction waives no verification obligation.
+
+S05's narrow list-to-Maria browser case alone cannot close its composed scope.
+The manifest adds a separate fresh N3a and mandatory browser gate for the full
+CEDAR-JOURNEY-01/UAT-18-01 nomination, before independent N4. It uses a new
+test-only file and the already approved route/data/contact policy; no product
+screen or feature is added. Record actual elapsed time and nomination evidence
+as an automated UAT path, keeping later deployed Saga and human review distinct.
+
 Backend and browser checks run in separate processes/settings. Browser command:
 
 ```text

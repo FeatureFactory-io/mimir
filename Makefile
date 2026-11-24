@@ -331,7 +331,7 @@ test-experts-s04:
 
 .PHONY: test-experts-s05-backend
 test-experts-s05-backend:
-	$(PYTHON) -m pytest tests/unit/test_expert_profile_handoff_html.py::test_extract_maria_profile_href_with_invalid_anchor_rejects tests/integration/test_experts_profile_handoff.py::test_maria_profile_handoff_with_design_card_displays_full_paragraph -x
+	$(PYTHON) -m pytest tests/unit/test_expert_profile_handoff_html.py tests/integration/test_experts_profile_handoff.py -x
 
 .PHONY: test-experts-s05-browser
 test-experts-s05-browser:
@@ -341,11 +341,16 @@ test-experts-s05-browser:
 test-experts-s05-at:
 	$(PYTHON) -m pytest tests/integration/test_experts_acceptance_runner.py -k S05 -x
 
+.PHONY: test-experts-s05-journey
+test-experts-s05-journey:
+	E2E_LIVE_SERVER_SCOPE=function $(PYTHON) -m pytest -c tests/e2e/pytest.ini -o addopts= -p no:playwright -p no:asyncio -p no:anyio tests/e2e/test_experts_cedar_nomination.py -x
+
 .PHONY: test-experts-s05
 test-experts-s05:
 	+$(MAKE) test-experts-s05-backend
 	+$(MAKE) test-experts-s05-at
 	+$(MAKE) test-experts-s05-browser
+	+$(MAKE) test-experts-s05-journey
 
 .PHONY: test-experts-s06-backend
 test-experts-s06-backend:
