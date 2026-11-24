@@ -3230,7 +3230,7 @@ scenarios:
       - S03
       - S17
     implementation_plan: docs/plans/iterations/experts/S14-experts-reach-01.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
@@ -4558,7 +4558,7 @@ scenarios:
       - S17
       - S14
     implementation_plan: docs/plans/iterations/experts/S04-experts-list-04.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
