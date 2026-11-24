@@ -627,7 +627,11 @@ def _assert_self_copy_log_story(caplog: LogCaptureFixture, actor_id: int) -> Non
         (RECEIPT_VIEW, "entry", f"{request} actor_id={actor_id} operation=gui_copy"),
         (RECEIPT_VIEW, "validation", f"{request} {target} {action} validated"),
         (CONSUMPTION_SERVICE, "validation", f"{service} authorized"),
-        (CONSUMPTION_SERVICE, "branch", f"{service} reason=self_consumption awards=0"),
+        (
+            CONSUMPTION_SERVICE,
+            "branch",
+            f"{service} author_id={actor_id} reason=self_consumption awards=0",
+        ),
         (RECEIPT_VIEW, "exit", f"{request} {action} status=skipped"),
     )
     expected = [f"{where} | {beat} | {fields}" for where, beat, fields in story]
