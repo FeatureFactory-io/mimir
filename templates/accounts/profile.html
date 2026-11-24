@@ -98,6 +98,31 @@
             </div>
         </div>
 
+        <section class="col-md-8" aria-labelledby="profile-contributions-heading">
+            <div class="card hg-card" data-testid="profile-karma-card">
+                <div class="card-body">
+                    <h2 class="h5" id="profile-contributions-heading">Your contributions</h2>
+                    <p{% if not contributions.summary %} class="mb-0"{% endif %}>
+                        <span class="h3 text-primary" data-testid="profile-karma-total">{{ contributions.formatted_karma }}</span> Karma ·
+                        <span class="badge text-bg-light border" data-testid="profile-primary-category">{{ contributions.primary_category|default:"No primary category" }}</span>
+                    </p>
+                    {% if contributions.summary %}
+                    <p id="own-contribution-summary" class="text-break" data-testid="profile-contribution-summary">{{ contributions.summary }}</p>
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                            aria-expanded="false" aria-controls="own-contribution-summary"
+                            title="Show or hide the full contribution summary" data-bs-toggle="tooltip"
+                            id="profile-summary-toggle"
+                            data-testid="profile-summary-toggle" hidden>
+                        <i class="fa-solid fa-chevron-down me-1" aria-hidden="true"></i><span>Show more</span>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+        <aside class="col-md-4" aria-label="Karma breakdown">
+            {% include "experts/_breakdown.html" with person=contributions source_breakdown_test_id="profile-karma-source-breakdown" category_breakdown_test_id="profile-karma-category-breakdown" only %}
+        </aside>
+
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -272,7 +297,38 @@
         });
     }
 })();
+
+(function () {
+    const summary = document.getElementById('own-contribution-summary');
+    const toggle = document.getElementById('profile-summary-toggle');
+    if (!summary || !toggle) return;
+
+    const collapsedClass = 'profile-summary-collapsed';
+    const label = toggle.querySelector('span');
+
+    function updatePreview() {
+        if (toggle.getAttribute('aria-expanded') === 'true') return;
+
+        summary.classList.add(collapsedClass);
+        const overflows = summary.scrollHeight > summary.clientHeight;
+        summary.classList.toggle(collapsedClass, overflows);
+        toggle.hidden = !overflows;
+    }
+
+    toggle.addEventListener('click', function () {
+        const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+        toggle.setAttribute('aria-expanded', String(expanded));
+        label.textContent = expanded ? 'Show less' : 'Show more';
+        if (expanded) {
+            summary.classList.remove(collapsedClass);
+        } else {
+            updatePreview();
+        }
+    });
+
+    updatePreview();
+    new ResizeObserver(updatePreview).observe(summary);
+    document.fonts.ready.then(updatePreview);
+})();
 </script>
 {% endblock %}
-
-{# PIN S10: graduate EXPERTS-PROFILE-01 from the approved Experts prototype after GO. #}

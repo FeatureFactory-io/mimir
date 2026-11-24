@@ -938,6 +938,16 @@ mark.mm-search-highlight {
   .analytics-consent > div { justify-content: flex-end; }
 }
 
-/* PIN S10: EXPERTS-PROFILE-01 wiring and interaction contract remains unimplemented until GO. */
+#own-contribution-summary.profile-summary-collapsed {
+  --profile-summary-preview-lines: 4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--profile-summary-preview-lines);
+  overflow: hidden;
+}
+
+#profile-summary-toggle[aria-expanded="true"] .fa-chevron-down {
+  transform: rotate(180deg);
+}
 
 /* PIN S04: EXPERTS-LIST-04 wiring and interaction contract remains unimplemented until GO. */
