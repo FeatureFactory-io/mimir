@@ -32,6 +32,8 @@ from tests.support.experts_logs import capture_experts_logs
 from tests.support.experts_privacy import _assert_private_markers_absent
 
 _MIKE = "mchen"
+_ELENA = "esvensson"
+_GUEST = "Bob"
 _LIST_PATH = "/experts/?category=development"
 _DETAIL_PATH = "/experts/mchen/"
 _OWN_PATH = "/auth/user/profile/"
@@ -55,11 +57,13 @@ class _ReadAudit:
 
 @pytest.mark.e2e
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("actor", [_GUEST, _ELENA], ids=["Bob", "Elena"])
 @pytest.mark.parametrize("viewport", [(390, 844), (1280, 800)])
 def test_numeric_fallback_with_reload_shows_updated_live_counts(
     page: Page,
     live_server_url: str,
     viewport: tuple[int, int],
+    actor: str,
     cedar_dataset: CedarDataset,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -68,20 +72,24 @@ def test_numeric_fallback_with_reload_shows_updated_live_counts(
     :param page: Function-scoped real browser page. Example: Chromium Page.
     :param live_server_url: Existing live-server URL. Example: http://localhost:8081.
     :param viewport: Width/height pixels. Example: (390, 844).
+    :param actor: Real login identity or anonymous Bob. Example: esvensson.
     :param cedar_dataset: Single real owned baseline. Example: Mike's missing prose.
     :param caplog: Actual generation logger observation. Example: empty during GETs.
     :return: None. Example: None after visible 2/47 then changed count on reload.
     :raises AssertionError: If fallback is stale, unreadable or fabricates prose.
     """
     page.set_viewport_size({"width": viewport[0], "height": viewport[1]})
+    _prepare_public_actor(page, live_server_url, actor)
     _assert_live_counts(cedar_dataset, 2, 47)
     with _observe_reads(page, caplog):
-        _follow_public_fallback(page, live_server_url, _BASE_HINT, cedar_dataset)
+        _follow_public_fallback(page, live_server_url, _BASE_HINT, cedar_dataset, actor)
     _change_live_counts(cedar_dataset)
     with _observe_reads(page, caplog):
-        _reload_public_fallback(page, _CHANGED_HINT, cedar_dataset)
-        _follow_public_fallback(page, live_server_url, _CHANGED_HINT, cedar_dataset)
-    assert not page.context.cookies(), "Anonymous discovery created cookies."
+        _reload_public_fallback(page, _CHANGED_HINT, cedar_dataset, actor)
+        _follow_public_fallback(
+            page, live_server_url, _CHANGED_HINT, cedar_dataset, actor
+        )
+    _assert_public_actor(page, cedar_dataset, actor)
 
 
 @pytest.mark.e2e
@@ -117,21 +125,71 @@ def test_numeric_fallback_with_own_profile_shows_no_expansion_control(
     assert ExpertProfile.objects.get(user=mike).contribution_summary == ""
 
 
+def _prepare_public_actor(page: Page, origin: str, actor: str) -> None:
+    """Use the native login form only for the required authenticated reader.
+
+    :param page: Existing real browser context. Example: fresh Chromium page.
+    :param origin: Owned live server origin. Example: http://localhost:8081.
+    :param actor: Allowed public reader. Example: esvensson or anonymous Bob.
+    :return: None after genuine form login or verified empty guest context.
+    :raises AssertionError: For an unsupported actor or unexpected guest identity.
+    """
+    assert actor in {_GUEST, _ELENA}, "Unsupported public reader."
+    assert not page.context.cookies() and not _session_identity(page)
+    if actor == _ELENA:
+        login(page, origin, _ELENA, CEDAR_PASSWORD)
+        assert _session_identity(page).get("_auth_user_id"), "Real login failed."
+
+
+def _assert_public_actor(page: Page, dataset: CedarDataset, actor: str) -> None:
+    """Prove actual role, navbar and contact policy without opening email.
+
+    :param page: Real Development list or Mike detail. Example: Elena's detail.
+    :param dataset: Actual persisted identities and permitted contact source.
+    :param actor: Expected reader. Example: esvensson or anonymous Bob.
+    :return: None after decoded identity and native authorization controls agree.
+    :raises AssertionError: For wrong identity, unauthorized contact or cookies.
+    """
+    identity = _session_identity(page)
+    user = page.get_by_test_id("user-display")
+    contact = page.get_by_test_id("experts-reach-out-mchen")
+    disabled = page.get_by_test_id("experts-reach-out-disabled-mchen")
+    if actor == _ELENA:
+        assert identity.get("_auth_user_id") == str(dataset.user_ids[_ELENA])
+        assert (
+            identity.get("_auth_user_backend")
+            == "django.contrib.auth.backends.ModelBackend"
+        )
+        assert identity.get("_auth_user_hash")
+        expect(user).to_have_text(_ELENA)
+        expect(contact).to_have_attribute(
+            "href", f"mailto:{dataset.users_by_username[_MIKE].email}"
+        )
+        expect(disabled).to_have_count(0)
+    else:
+        assert actor == _GUEST and not identity and not page.context.cookies()
+        expect(user).to_have_count(0)
+        expect(contact).to_have_count(0)
+        expect(disabled).to_be_disabled()
+
+
 def _follow_public_fallback(
-    page: Page, origin: str, expected: str, dataset: CedarDataset
+    page: Page, origin: str, expected: str, dataset: CedarDataset, actor: str
 ) -> None:
     """Follow Mike's actual card link into the production public detail.
 
-    :param page: Actual anonymous page. Example: Development list.
+    :param page: Actual guest or Elena page. Example: Development list.
     :param origin: Owned live origin. Example: http://localhost:8081.
     :param expected: Complete independent sentence. Example: exact 2/47.
     :param dataset: Real privacy probes. Example: persisted Cedar private rows.
+    :param actor: Expected real identity. Example: esvensson or anonymous Bob.
     :return: None after complete readable list and detail fallbacks.
     :raises AssertionError: For wrong navigation, privacy or missing-prose states.
     """
     _open_document(page, origin + _LIST_PATH)
     _assert_fallback(page, "experts-card-hint-mchen", expected)
-    _assert_private_markers_absent(page.content(), dataset, False)
+    _assert_public_actor(page, dataset, actor)
+    _assert_private_markers_absent(page.content(), dataset, actor == _ELENA)
     link = page.get_by_test_id("experts-view-profile-mchen")
     expect(link).to_have_attribute("href", _DETAIL_PATH)
     with page.expect_response(origin + _DETAIL_PATH) as navigation:
@@ -140,15 +198,18 @@ def _follow_public_fallback(
     assert navigation.value.request.redirected_from is None
     expect(page).to_have_url(origin + _DETAIL_PATH)
     _settle_document(page)
-    _assert_public_fallback(page, expected, dataset)
+    _assert_public_fallback(page, expected, dataset, actor)
 
 
-def _reload_public_fallback(page: Page, expected: str, dataset: CedarDataset) -> None:
+def _reload_public_fallback(
+    page: Page, expected: str, dataset: CedarDataset, actor: str
+) -> None:
     """Reload the real public document after controlled persisted-row changes.
 
     :param page: Actual Mike detail at the baseline numeric state.
     :param expected: Updated independent sentence. Example: exact 1/48.
     :param dataset: Real marker source. Example: Cedar baseline.
+    :param actor: Expected real identity. Example: esvensson or anonymous Bob.
     :return: None after actual HTTP200 and fresh readable counts.
     :raises AssertionError: For stale DOM, redirection or private disclosure.
     """
@@ -156,15 +217,18 @@ def _reload_public_fallback(page: Page, expected: str, dataset: CedarDataset) ->
     assert response is not None and response.status == HTTPStatus.OK
     assert response.request.redirected_from is None
     _settle_document(page)
-    _assert_public_fallback(page, expected, dataset)
+    _assert_public_fallback(page, expected, dataset, actor)
 
 
-def _assert_public_fallback(page: Page, expected: str, dataset: CedarDataset) -> None:
+def _assert_public_fallback(
+    page: Page, expected: str, dataset: CedarDataset, actor: str
+) -> None:
     """Inspect missing public prose and the complete privacy boundary.
 
     :param page: Actual Mike production detail. Example: /experts/mchen/.
     :param expected: Complete independent sentence. Example: exact 2/47.
     :param dataset: Real marker-bearing baseline. Example: Cedar accounts.
+    :param actor: Expected real identity. Example: esvensson or anonymous Bob.
     :return: None after exact fallback and absent fabricated summary.
     :raises AssertionError: For changed copy, private disclosure or invented prose.
     """
@@ -173,7 +237,8 @@ def _assert_public_fallback(page: Page, expected: str, dataset: CedarDataset) ->
     expect(page.get_by_test_id("expert-contribution-summary")).to_have_count(0)
     expect(page.get_by_test_id("profile-summary-toggle")).to_have_count(0)
     html = page.content()
-    _assert_private_markers_absent(html, dataset, False)
+    _assert_public_actor(page, dataset, actor)
+    _assert_private_markers_absent(html, dataset, actor == _ELENA)
     for book in Playbook.objects.filter(
         author_id=dataset.user_ids[_MIKE], visibility="private"
     ):
