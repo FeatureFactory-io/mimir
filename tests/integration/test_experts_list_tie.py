@@ -220,6 +220,7 @@ def _rendered_design_ranking(client: Client) -> list[tuple[str, str]]:
     cards: list[tuple[str, Element]] = [
         (test_id.removeprefix(_CARD_PREFIX), node)
         for node in _walk_elements(leaderboard)
+        if node.name == "article"
         for key, test_id in node.attributes
         if key == "data-testid" and test_id.startswith(_CARD_PREFIX)
     ]

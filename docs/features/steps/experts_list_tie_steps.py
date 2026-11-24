@@ -66,6 +66,7 @@ def assert_expert_precedes(
     usernames = tuple(
         value.removeprefix(_CARD_PREFIX)
         for node in _walk_elements(leaderboard)
+        if node.name == "article"
         for name, value in node.attributes
         if name == "data-testid" and value.startswith(_CARD_PREFIX)
     )
