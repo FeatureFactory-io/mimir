@@ -12,17 +12,13 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_safe
 
+from methodology.models import ExpertProfile
 from methodology.services.expert_card_presentation import (
     ExpertCardPresentation,
+    ExpertCardPresentationService,
 )
 from methodology.services.expert_contact_context import build_expert_contact_context
-from methodology.services.expert_text import (
-    CATEGORY_LABELS,
-    category_label,
-    display_initials,
-    format_karma,
-    format_numeric_fallback,
-)
+from methodology.services.expert_text import CATEGORY_LABELS, category_label
 from methodology.services.experts_service import (
     _CORRELATION_ID,
     ExpertProjection,
@@ -129,7 +125,7 @@ def _request_correlation_id(request: HttpRequest) -> str:
 def _ranked_people_context(
     request: HttpRequest, category: str, correlation_id: str
 ) -> dict[str, object]:
-    """Build ordered numeric list context and request-local contact presentation.
+    """Build ranked public cards and request-local contact presentation.
 
     :param request: Actual request/session. Example: Elena with category=design.
     :param category: Resolved canonical slug. Example: "design".
@@ -139,20 +135,22 @@ def _ranked_people_context(
     """
     projections = ExpertsService().list_leaders(category, correlation_id=correlation_id)
     label = category_label(category)
+    summaries = _stored_expert_card_summaries(tuple(row.user_id for row in projections))
+    cards = _build_expert_card_presentations(
+        projections, summaries, correlation_id=correlation_id
+    )
     people = tuple(
         {
-            "username": person.username,
-            "name": person.display_name,
-            "initials": display_initials(person.display_name),
+            "username": card.username,
+            "name": card.display_name,
+            "initials": card.initials,
             "total_points": person.total_points,
             "category_subtotal": dict(person.category_points)[category],
-            "formatted_karma": format_karma(person.total_points),
-            "primary_category": label,
-            "hint": format_numeric_fallback(
-                person.released_public_playbook_count, person.successful_gui_copy_count
-            ),
+            "formatted_karma": card.formatted_karma,
+            "primary_category": card.primary_category,
+            "hint": card.hint,
         }
-        for person in projections
+        for person, card in zip(projections, cards, strict=True)
     )
     return {
         "nav_section": "experts",
@@ -282,7 +280,13 @@ def _stored_expert_card_summaries(user_ids: Sequence[int]) -> Mapping[int, str |
     :return: User-ID-to-summary mapping. Example: {13: "Maria maintains…"}.
     :raises ValueError: If IDs are not positive integers.
     """
-    raise NotImplementedError()
+    if any(type(user_id) is not int or user_id <= 0 for user_id in user_ids):
+        raise ValueError("Expert subject IDs must be positive integers.")
+    return dict(
+        ExpertProfile.objects.filter(user_id__in=user_ids).values_list(
+            "user_id", "contribution_summary"
+        )
+    )
 
 
 def _build_expert_card_presentations(
@@ -299,4 +303,12 @@ def _build_expert_card_presentations(
     :return: Presentations in unchanged order. Example: (sofia_card, maria_card).
     :raises ValueError: If an input projection violates the public contract.
     """
-    raise NotImplementedError()
+    presenter = ExpertCardPresentationService()
+    return tuple(
+        presenter.present(
+            projection,
+            summaries_by_user_id.get(projection.user_id),
+            correlation_id=correlation_id,
+        )
+        for projection in projections
+    )

@@ -950,4 +950,44 @@ mark.mm-search-highlight {
   transform: rotate(180deg);
 }
 
-/* PIN S04: EXPERTS-LIST-04 wiring and interaction contract remains unimplemented until GO. */
+.experts-category-pills {
+  --bs-nav-pills-link-active-bg: var(--hg-primary);
+}
+
+.experts-card .expert-identification {
+  flex: 1 1 21rem;
+  min-width: 0;
+}
+
+.experts-card .expert-rank {
+  flex: 0 0 1.5rem;
+}
+
+.experts-card .expert-avatar {
+  --expert-avatar-size: 3rem;
+  flex: 0 0 var(--expert-avatar-size);
+  height: var(--expert-avatar-size);
+  background: var(--hg-primary-100);
+  color: var(--hg-primary);
+}
+
+.experts-card .expert-identity,
+.experts-card .expert-score {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.experts-card .expert-hint {
+  --experts-hint-lines: 2;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--experts-hint-lines);
+  overflow: hidden;
+}
+
+@media (max-width: 767.98px) {
+  .experts-card .expert-identification,
+  .experts-card .expert-card-actions {
+    flex-basis: 100%;
+  }
+}
