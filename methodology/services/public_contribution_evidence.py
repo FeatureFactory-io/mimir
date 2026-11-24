@@ -59,60 +59,145 @@ _ENTITY_FIELDS = {
     PipChange.ENTITY_ARTIFACT: (Artifact, "playbook", "name", "description", 200),
     PipChange.ENTITY_RULE: (Rule, "playbook", "title", "content", 200),
 }
-# Match the entire space-grouped value before any legacy ungrouped alternatives.
-_SPACE_GROUPED_NUMBER = r"\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[,.]\d+)?(?!\d)"
-_DIGIT_NUMBER = rf"(?:{_SPACE_GROUPED_NUMBER}|\d[\d,.]*)"
+# Horizontal whitespace keeps prose matches within a single source line.
+_SPACE = r"[^\S\r\n]"
+_LABEL_SEPARATOR = r"[^\S\r\n]|[-_\u2010\u2011]"
+_LABEL_GAP = rf"(?:{_LABEL_SEPARATOR})+"
+_LABEL_JOINER = rf"(?:{_LABEL_SEPARATOR})*"
+_NUMBER_GAP = r"[ \t\u00a0\u202f\u2010\u2011-]+"
+# Twenty-four tokens cover English numbers through billions, including "and"
+# between groups. Bounding the run also limits work on unstructured source text.
+_MAX_ADDITIONAL_NUMBER_WORDS = 23
 _NUMBER_WORD = (
     r"(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve"
     r"|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty"
     r"|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?"
-    r"|millions?|billions?)"
+    r"|millions?|billions?|dozen"
+    r"|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth"
+    r"|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth"
+    r"|eighteenth|nineteenth|twentieth|thirtieth|fortieth|fiftieth|sixtieth"
+    r"|seventieth|eightieth|ninetieth|hundredth|thousandth|millionth|billionth)\b"
 )
-_NUMBER = (
-    rf"(?:{_DIGIT_NUMBER}(?:st|nd|rd|th)?|{_NUMBER_WORD}"
-    rf"(?:[-\s]+(?:and[-\s]+)?{_NUMBER_WORD})*)"
+_DIGIT_NUMBER = (
+    r"(?:\d{1,3}(?:[ ,\u00a0\u202f]\d{3})+|\d+)(?:[.,]\d+)?(?:st|nd|rd|th)?\b"
 )
-# Require an explicit value connector for category metrics to allow versioned titles.
-_AGGREGATE_CLAIMS = re.compile(rf"""(?ix)
-    \b{_NUMBER}\s+(?:(?:{_CATEGORY_LABELS}|management|karma)\s+)?points\b
-    | \b{_NUMBER}\s+(?:(?:released|public|authored|published|accepted)\s+)*
-        (?:playbooks|pips|proposals|contributions|copies)\b
-    | \b(?:copied|downloaded)\s+{_NUMBER}\s+times\b
-    | \b(?:karma(?:\s+(?:total|score|points))?|total\s+score|category\s+point\s+subtotals?|copy\s+count)
-        (?:\s*[:=]\s*|\s+(?:(?:is|was|of|reached|rose\s+to)\s+)?){_NUMBER}\b
-    | \b(?:category|(?:{_CATEGORY_LABELS})(?:[-_\s]+category)?)(?:['’]s)?[-_\s]+
-        (?:score|points|(?:point[-_\s]+)?subtotals?|karma(?:[-_\s]+(?:total|score|points))?)
-        (?:\s*[:=]\s*|\s+(?:is|are|was|were|of|reached|rose\s+to)\s+){_NUMBER}\b
-    | \b(?:rank(?:ed)?|placed)\s*\#?\s*(?:{_NUMBER}|first|second|third)\b
-    | \b(?:position|number)\s*\#?\s*{_NUMBER}\s+on\s+the\s+leaderboard\b
-    | \b(?:first|second|third|top\s+{_NUMBER})\s+(?:place|rank|on\s+the\s+leaderboard)\b
-    """)
-_SENSITIVE_TEXT = re.compile(
-    r"""(?ix)
-    -----BEGIN\ [A-Z\ ]*PRIVATE\ KEY-----[\s\S]*?(?:-----END\ [A-Z\ ]*PRIVATE\ KEY-----|\Z)
-    | (?<=://)[^\s/@]+:[^\s/@]+(?=@)
-    | \b[\w.%+!-]+@[\w.-]+\.[a-z]{2,}\b
-    | \b(?:api[-_\ ]?key|access[-_\ ]?token|auth[-_\ ]?token|client[-_\ ]?secret|password)
-        \s*["']?\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s;,]+)
-    | \bbearer\s+[a-z0-9._~+/=-]+
-    | \b(?:sk-(?:ant-|proj-)?|gh[pousr]_|github_pat_|xox[baprs]-)[a-z0-9_-]{12,}\b
-    | \b(?:AKIA|ASIA)[A-Z0-9]{16}\b
-    | \beyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+\b
-    | \b[a-f0-9]{40}\b
-    """
-    rf"""
-    | \b(?:total[-_\ ]+karma|karma(?:[-_\ ]+(?:total|score|points))?|category[-_\ ]+points
-           |copy[-_\ ]+count|released[-_\ ]+playbook[-_\ ]+count)
-        \s*[:=]?\s*{_DIGIT_NUMBER}
-    | \b{_DIGIT_NUMBER}\s+(?:karma(?:\s+points)?|copies|released\s+playbooks)\b
-    """
-    # An explicit value connector keeps versioned titles like Design Score 2.0.
-    rf"""
-    | \b(?:category|(?:{_CATEGORY_LABELS})(?:[-_\ ]+category)?)[-_\ ]+
-        (?:score|points|(?:point[-_\ ]+)?subtotal|karma(?:[-_\ ]+(?:score|points|total))?)
-        (?:\s*[:=]\s*|\s+(?:is|was|of)\s+)(?:{_SPACE_GROUPED_NUMBER}|\d+(?:[,.]\d+)*)
-    """
+_WRITTEN_NUMBER = (
+    rf"{_NUMBER_WORD}(?:{_NUMBER_GAP}(?:and{_NUMBER_GAP})?{_NUMBER_WORD})"
+    rf"{{0,{_MAX_ADDITIONAL_NUMBER_WORDS}}}"
 )
+# Consume the value as a unit. A trailing pattern may not backtrack into its
+# grouped digits or ordinal words to match the shorter cardinal prefix.
+_NUMBER = rf"(?>{_DIGIT_NUMBER}|{_WRITTEN_NUMBER})"
+_PROSE_CONNECTOR = (
+    rf"{_SPACE}+(?:is|are|was|were|of|at|reached|rose{_SPACE}+to|stands?{_SPACE}+at)"
+    rf"{_SPACE}+"
+)
+_ASSIGNMENT_SEPARATOR = r"[:=–—]"
+_PUNCTUATION_CONNECTOR = rf"{_SPACE}*{_ASSIGNMENT_SEPARATOR}{_SPACE}*"
+_VALUE_CONNECTOR = rf"(?:{_PUNCTUATION_CONNECTOR}|{_PROSE_CONNECTOR})"
+_OPTIONAL_CONNECTOR = rf"(?:{_VALUE_CONNECTOR}|{_SPACE}*)"
+_VALUE_QUALIFIER = (
+    rf"(?:(?:about|around|roughly|approximately|over|under|at{_SPACE}+(?:least|most))"
+    rf"{_SPACE}+)?"
+)
+_VALUE = rf"{_VALUE_QUALIFIER}{_NUMBER}"
+_COUNT_NOUN = (
+    rf"(?:(?:released|public|authored|published|accepted){_LABEL_GAP})*"
+    r"(?:playbooks?|pips?|proposals?|contributions?|copies|copy)"
+)
+_KARMA_LABEL = rf"karma(?:{_LABEL_GAP}(?:total|score|points))?"
+_CATEGORY_METRIC = (
+    rf"(?:category|(?:{_CATEGORY_LABELS})(?:{_LABEL_GAP}category)?)(?:['’]s)?{_LABEL_GAP}"
+    rf"(?:score|points|(?:points?{_LABEL_GAP})?(?:subtotals?|totals?)|{_KARMA_LABEL})"
+)
+_LEADERBOARD = rf"(?:the{_SPACE}+)?(?:(?:{_CATEGORY_LABELS}){_SPACE}+)?leaderboard"
+_PERCENT_SUFFIX = rf"(?:{_SPACE}*%|{_SPACE}+percent\b)?"
+_REDACTED = "[redacted]"
+_CREDENTIAL_LABEL = (
+    rf"(?:api{_LABEL_JOINER}(?:key|token)|(?:access|auth){_LABEL_JOINER}token"
+    rf"|client{_LABEL_JOINER}secret|password)"
+)
+_CREDENTIAL_CONNECTOR = (
+    rf"(?:\s*{_ASSIGNMENT_SEPARATOR}\s*|{_SPACE}+(?:is|was){_SPACE}+)"
+)
+_CREDENTIAL_VALUE = (
+    r"""(?:"[^"\r\n]*"|'[^'\r\n]*'|`[^`\r\n]*`|[^\s;,()[\]{}<>"'`]+(?<![.!?:]))"""
+)
+_CREDENTIAL_PATTERNS = (
+    r"-----BEGIN\ [A-Z\ ]*PRIVATE\ KEY-----[\s\S]*?(?:-----END\ [A-Z\ ]*PRIVATE\ KEY-----|\Z)",
+    r"(?<=://)[^\s/@]+:[^\s/@]+(?=@)",
+    r"\b[\w.%+!-]+@[\w.-]+\.[a-z]{2,}\b",
+    rf"""\b{_CREDENTIAL_LABEL}["']?{_CREDENTIAL_CONNECTOR}{_CREDENTIAL_VALUE}""",
+    rf"\bbearer{_SPACE}+[a-z0-9._~+/=-]+(?<![.])",
+    r"\b(?:sk-(?:ant-|proj-)?|gh[pousr]_|github_pat_|xox[baprs]-)[a-z0-9_-]{12,}\b",
+    r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b",
+    r"\beyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+\b",
+    r"\b[a-f0-9]{40}\b",
+)
+_AGGREGATE_PATTERNS = (
+    rf"\b{_NUMBER}{_SPACE}+(?:(?:{_CATEGORY_LABELS}|management|karma){_SPACE}+)?points\b",
+    rf"\b{_NUMBER}{_SPACE}+{_COUNT_NOUN}\b",
+    rf"\b{_NUMBER}{_SPACE}+karma\b",
+    rf"\b(?:copied|downloaded){_SPACE}+{_VALUE}{_SPACE}+times\b",
+    (
+        rf"\b(?:total{_LABEL_GAP}(?:karma|score|points)|{_KARMA_LABEL}|"
+        rf"category{_LABEL_GAP}(?:points|point{_LABEL_GAP}subtotals?))\b"
+        rf"{_OPTIONAL_CONNECTOR}{_VALUE}{_PERCENT_SUFFIX}"
+    ),
+    rf"\b{_COUNT_NOUN}{_LABEL_GAP}(?:counts?|totals?)\b{_OPTIONAL_CONNECTOR}{_VALUE}",
+    rf"\btotal{_LABEL_GAP}{_COUNT_NOUN}\b{_VALUE_CONNECTOR}{_VALUE}",
+    (
+        rf"\b(?:counts?|(?:total{_LABEL_GAP})?number){_LABEL_GAP}of{_LABEL_GAP}"
+        rf"{_COUNT_NOUN}\b{_OPTIONAL_CONNECTOR}{_VALUE}"
+    ),
+    # A named category requires an explicit connector to preserve Design Score 2.0.
+    rf"\b{_CATEGORY_METRIC}\b{_VALUE_CONNECTOR}{_VALUE}{_PERCENT_SUFFIX}",
+    rf"\b(?:rank(?:ed)?|placed)\b{_OPTIONAL_CONNECTOR}\#?{_SPACE}*{_VALUE}",
+    rf"\b(?:position|number){_SPACE}*\#?{_SPACE}*{_VALUE}{_SPACE}+on{_SPACE}+{_LEADERBOARD}\b",
+    (
+        rf"\b(?:top{_SPACE}+)?{_NUMBER}{_SPACE}+"
+        rf"(?:place|rank|on{_SPACE}+{_LEADERBOARD})\b"
+    ),
+)
+_POLICY_FLAGS = re.IGNORECASE | re.VERBOSE
+# The boundary also checks its string metadata for recognizable credentials.
+_SENSITIVE_TEXT = re.compile("|".join(_CREDENTIAL_PATTERNS), _POLICY_FLAGS)
+_PUBLIC_TEXT_PATTERNS = tuple(
+    re.compile(pattern, _POLICY_FLAGS)
+    for pattern in (*_CREDENTIAL_PATTERNS, *_AGGREGATE_PATTERNS, re.escape(_REDACTED))
+)
+
+
+def _redact_public_text(text: str) -> str:
+    """Replace matching sensitive or mutable claims in a public source field.
+
+    :param text: Published field. Example: "Karma total is 900."
+    :return: Scrubbed field. Example: "[redacted]."
+    """
+    # Match against the original field. A replacement could hide a label from
+    # another rule or leave a trailing number fragment from an overlapping match.
+    spans = sorted(
+        match.span()
+        for pattern in _PUBLIC_TEXT_PATTERNS
+        for match in pattern.finditer(text)
+    )
+    parts: list[str] = []
+    end = 0
+    for start, match_end in spans:
+        if not parts or start > end:
+            parts.extend((text[end:start], _REDACTED))
+        end = max(end, match_end)
+    parts.append(text[end:])
+    return "".join(parts)
+
+
+def _contains_restricted_summary_text(text: str) -> bool:
+    """Recognize the same restricted forms in an assembled model paragraph.
+
+    :param text: Validated plain prose. Example: "Her Karma total is 900."
+    :return: Whether it contains a restricted span. Example: True.
+    """
+    return any(pattern.search(text) for pattern in _PUBLIC_TEXT_PATTERNS)
 
 
 @dataclass(frozen=True)
@@ -409,8 +494,7 @@ class PublicContributionEvidenceService:
         """
         if not isinstance(text, str):
             raise ValueError("Public evidence text must be a string.")  # noqa: TRY004
-        safe_text = _SENSITIVE_TEXT.sub("[redacted]", text)
-        return _AGGREGATE_CLAIMS.sub("[redacted]", safe_text)
+        return _redact_public_text(text)
 
     def _validate_snapshot(
         self, evidence: PublicContributionEvidence

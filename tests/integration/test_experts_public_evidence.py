@@ -204,7 +204,7 @@ def test_collect_with_category_score_claim_redacts_the_mutable_value(
         ),
         pytest.param(
             "Maria ranked first on the Design leaderboard.",
-            "Maria [redacted] on the Design leaderboard",
+            "Maria [redacted]",
             id="ordinal-rank",
         ),
         pytest.param(
@@ -223,6 +223,141 @@ def test_collect_with_category_score_claim_redacts_the_mutable_value(
             id="legacy-released-count",
         ),
         pytest.param(
+            "Her released playbook count is 7,200.",
+            "Her [redacted]",
+            id="ordinary-released-playbook-count",
+        ),
+        pytest.param(
+            "Her count of released playbooks was seven thousand two hundred.",
+            "Her [redacted]",
+            id="count-of-released-playbooks",
+        ),
+        pytest.param(
+            "Her total number of published PIPs stands at 47.",
+            "Her [redacted]",
+            id="number-of-published-pips",
+        ),
+        pytest.param(
+            "Her public_playbook_count = 7\u00a0200.",
+            "Her [redacted]",
+            id="underscored-count-nonbreaking-space",
+        ),
+        pytest.param(
+            "Her copy count was 2\u202f047 copies.",
+            "Her [redacted]",
+            id="overlapping-count-narrow-nonbreaking-space",
+        ),
+        pytest.param(
+            "Her copy count was forty-seven copies.",
+            "Her [redacted]",
+            id="overlapping-written-copy-count",
+        ),
+        pytest.param(
+            "Her total copies: 2,047.",
+            "Her [redacted]",
+            id="total-before-count-noun",
+        ),
+        pytest.param(
+            "Her total karma — 8,200.",
+            "Her [redacted]",
+            id="total-karma-dash-separator",
+        ),
+        pytest.param(
+            "Her category_points: 910.",
+            "Her [redacted]",
+            id="generic-category-points-label",
+        ),
+        pytest.param(
+            "Her Design_category-point-subtotal stands at 7 200.",
+            "Her [redacted]",
+            id="named-category-mixed-separators",
+        ),
+        pytest.param(
+            "Her Design subtotal was about 8,200.",
+            "Her [redacted]",
+            id="metric-qualifier",
+        ),
+        pytest.param(
+            "Her Design score is 82.5 percent.",
+            "Her [redacted]",
+            id="decimal-score-with-unit",
+        ),
+        pytest.param(
+            "Maria ranked twenty-first on the Design leaderboard.",
+            "Maria [redacted]",
+            id="compound-ordinal-rank",
+        ),
+        pytest.param(
+            "Maria placed one hundred and twenty-first overall.",
+            "Maria [redacted] overall",
+            id="written-ordinal-with-scale",
+        ),
+        pytest.param(
+            "Maria ranked twenty\u2011first overall.",
+            "Maria [redacted] overall",
+            id="ordinal-with-nonbreaking-hyphen",
+        ),
+        pytest.param(
+            "Maria ranked 1,021st on the Design leaderboard.",
+            "Maria [redacted]",
+            id="comma-grouped-numeric-ordinal",
+        ),
+        pytest.param(
+            "Maria is in twenty-first place.",
+            "Maria is in [redacted]",
+            id="written-ordinal-before-place",
+        ),
+        pytest.param(
+            "Her API key is mint-fixture-secret-3918.",
+            "Her [redacted]",
+            id="credential-prose-is",
+        ),
+        pytest.param(
+            'Her API token was "fixture value: 8,200".',
+            "Her [redacted]",
+            id="credential-prose-was-quoted",
+        ),
+        pytest.param(
+            "Her access_token: fixture-token-271.",
+            "Her [redacted]",
+            id="credential-colon-label",
+        ),
+        pytest.param(
+            "Her access token:\nfixture-token-273.",
+            "Her [redacted]",
+            id="credential-colon-next-line",
+        ),
+        pytest.param(
+            "Her client-secret=fixture-token-272.",
+            "Her [redacted]",
+            id="credential-equals-label",
+        ),
+        pytest.param(
+            "Her client secret is Bearer fixture-token-928.",
+            "Her [redacted]",
+            id="overlapping-labelled-and-bearer-credential",
+        ),
+        pytest.param(
+            "Maria can be reached at s27-fixture@example.com.",
+            "Maria can be reached at [redacted]",
+            id="email-address",
+        ),
+        pytest.param(
+            "Maria shared [redacted].",
+            "Maria shared [redacted]",
+            id="already-redacted-output",
+        ),
+        pytest.param(
+            "Maria uses 2 workflow steps to review focus order.",
+            None,
+            id="useful-number-in-guidance",
+        ),
+        pytest.param(
+            "Maria documents how to rotate the API key.",
+            None,
+            id="credential-guidance-without-value",
+        ),
+        pytest.param(
             "Maria uses Design Score 2.0 in checklist version 2.1.",
             None,
             id="versioned-title-and-guidance",
@@ -234,7 +369,7 @@ def test_collect_with_category_score_claim_redacts_the_mutable_value(
         ),
     ],
 )
-def test_s27_summary_with_shared_metric_policy_filters_request_and_output(
+def test_s27_summary_with_shared_text_policy_filters_request_and_output(
     s27_case: Mapping[str, Any], sentence: str, redacted: str | None
 ) -> None:
     """Exercise one sentence through published ORM guidance and model output.
@@ -248,8 +383,9 @@ def test_s27_summary_with_shared_metric_policy_filters_request_and_output(
     before = "Use Design Score 2.0 to review keyboard focus in version 2.1."
     after = "Use the checklist to verify focus order."
     _append_cedar_focus_guidance(f"{before} {sentence} {after}")
-    call = _complete_s27_metric_probe(s27_case["subject_id"], sentence, redacted)
+    call = _complete_s27_policy_probe(s27_case["subject_id"], sentence, redacted)
     (message,) = call.messages
+    assert message.role == "user" and call.max_tokens == 1024
     begin, payload, end = message.content.splitlines()
     assert (begin, end) == ("BEGIN PUBLIC EVIDENCE JSON", "END PUBLIC EVIDENCE JSON")
     assert all(
@@ -262,12 +398,8 @@ def test_s27_summary_with_shared_metric_policy_filters_request_and_output(
         if fact["title"] == _FOCUS_ACTIVITY and fact["kind"] == "authored"
     )
     assert "Check the focus order." in guidance
-    _, opening, remainder = guidance.partition(f"{before} ")
-    recorded_sentence, closing, _ = remainder.partition(f" {after}")
-    assert opening and closing
-    assert recorded_sentence.removesuffix(".") == (redacted or sentence).removesuffix(
-        "."
-    )
+    expected = sentence if redacted is None else f"{redacted}."
+    assert guidance.splitlines()[-1] == f"{before} {expected} {after}"
 
 
 def _append_cedar_focus_guidance(text: str) -> None:
@@ -282,7 +414,7 @@ def _append_cedar_focus_guidance(text: str) -> None:
     matching.update(guidance=f"{activity.guidance}\n{text}")
 
 
-def _complete_s27_metric_probe(
+def _complete_s27_policy_probe(
     subject_id: int, sentence: str, redacted: str | None
 ) -> ScriptedLLMCall:
     """Return the actual request after the boundary accepts or rejects the reply.
@@ -295,12 +427,18 @@ def _complete_s27_metric_probe(
     """
     llm = ScriptedLLM([sentence])
     boundary = PublicContributionSummaryBoundary(PublicContributionEvidenceService())
-    if redacted is None:
-        result = boundary.complete(subject_id, llm=llm, correlation_id="s27-metrics")
-        assert result.text == sentence
-    else:
-        with pytest.raises(SummaryBoundaryError, match="^output_validation_failed$"):
-            boundary.complete(subject_id, llm=llm, correlation_id="s27-metrics")
+    with CaptureQueriesContext(connection) as queries:
+        if redacted is None:
+            result = boundary.complete(subject_id, llm=llm, correlation_id="s27-policy")
+            assert result.text == sentence
+        else:
+            with pytest.raises(
+                SummaryBoundaryError, match="^output_validation_failed$"
+            ):
+                boundary.complete(subject_id, llm=llm, correlation_id="s27-policy")
+    commands = {query["sql"].split(maxsplit=1)[0].upper() for query in queries}
+    assert "SELECT" in commands
+    assert commands <= {"SELECT", "BEGIN", "COMMIT", "SAVEPOINT", "RELEASE"}
     (call,) = llm.calls
     return call
 

@@ -11,12 +11,11 @@ from html import unescape
 
 from methodology.llm.base import LLMMessage, LLMResponse
 from methodology.services.public_contribution_evidence import (
-    _AGGREGATE_CLAIMS,
     _MAX_DATABASE_ID,
-    _SENSITIVE_TEXT,
     MAX_EVIDENCE_CHARACTERS,
     PublicContributionEvidence,
     PublicContributionFact,
+    _contains_restricted_summary_text,
 )
 
 MAX_SUMMARY_TOKENS = 1024
@@ -32,11 +31,6 @@ _MARKUP = re.compile(r"""(?mx)
     | (?<!\w)(?P<emphasis>\*{1,3}|_{1,3}|~~)(?=\S).+?(?<=\S)(?P=emphasis)(?!\w)
     """)
 _CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
-_CREDENTIAL_CLAIMS = re.compile(r"""(?ix)
-    \[redacted\]
-    | \b(?:api[-_\ ]?(?:key|token)|access[-_\ ]?token|auth[-_\ ]?token|client[-_\ ]?secret|password)
-       \s*(?:[:=]|\bis\b|\bwas\b)\s*\S+
-    """)
 # A period inside a decimal or customary abbreviation is not a sentence break.
 _PROSE_ABBREVIATION = re.compile(r"\b(?:Mr|Mrs|Ms|Dr|Prof|e\.g|i\.e)\.(?=\s)")
 _SENTENCE_END = re.compile(r"[.!?]+[\"'”’»)\]]*(?=\s|$|[^\W\d_])")
@@ -211,12 +205,10 @@ def _validate_sensitive_and_score_claims(
         or not 0 < evidence.subject_id <= _MAX_DATABASE_ID
     ):
         raise ValueError("Malformed public evidence snapshot.")
-    if _SENSITIVE_TEXT.search(text) or _CREDENTIAL_CLAIMS.search(text):
+    if _contains_restricted_summary_text(text):
         raise ValueError(
             "Summary response contains sensitive or mutable aggregate material."
         )
-    if _AGGREGATE_CLAIMS.search(text):
-        raise ValueError("Summary response contains a mutable aggregate claim.")
 
 
 def _count_sentences(text: str) -> int:

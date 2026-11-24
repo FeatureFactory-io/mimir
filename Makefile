@@ -770,7 +770,7 @@ test-experts-s27-backend:
 	$(PYTHON) -m pytest \
 		tests/integration/test_experts_public_evidence.py::test_collect_with_cedar_privacy_variant_returns_only_published_public_facts \
 		tests/integration/test_experts_public_evidence.py::test_collect_with_category_score_claim_redacts_the_mutable_value \
-		tests/integration/test_experts_public_evidence.py::test_s27_summary_with_shared_metric_policy_filters_request_and_output \
+		tests/integration/test_experts_public_evidence.py::test_s27_summary_with_shared_text_policy_filters_request_and_output \
 		tests/integration/test_experts_public_evidence.py::test_collect_with_partial_or_unpublished_decisions_excludes_ineligible_changes \
 		tests/integration/test_experts_public_evidence.py::test_collect_with_invalid_subject_rejects_before_model_call \
 		tests/integration/test_experts_public_evidence.py::test_build_summary_prompt_with_public_evidence_preserves_layers_and_bounds \
