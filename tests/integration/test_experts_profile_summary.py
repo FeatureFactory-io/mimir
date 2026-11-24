@@ -6,12 +6,13 @@ from http import HTTPStatus
 
 import pytest
 from django.test import Client, TestCase, override_settings
+from django.test.html import parse_html
 from django.urls import reverse
 
 from methodology.llm.base import LLMError
 from methodology.models import AgentInteraction, ExpertProfile, KarmaAward
 from tests.support.experts_data import CEDAR_PASSWORD, CedarDataset
-from tests.support.experts_html import element_text, find_by_test_id
+from tests.support.experts_html import _walk_elements, element_text, find_by_test_id
 from tests.support.scripted_llm import ScriptedLLM
 
 pytestmark = pytest.mark.django_db
@@ -69,6 +70,32 @@ def test_profile_summary_markup_with_long_paragraph_links_button_to_region(
     :param cedar_dataset: Isolated ORM baseline. Example: Maria's long summary.
     :return: None. Example: one native toggle controls the unique summary region.
     :raises AssertionError: If ARIA, native type, uniqueness or account hooks differ.
-    :raises NotImplementedError: Until the approved proof is implemented.
     """
-    raise NotImplementedError()
+    maria = cedar_dataset.users_by_username["mrodriguez"]
+    paragraph = ExpertProfile.objects.get(user=maria).contribution_summary
+    assert len(paragraph.split(". ")) == _MARIA_SUMMARY_SENTENCES
+    assert client.login(username=maria.username, password=CEDAR_PASSWORD)
+    response = client.get(reverse("profile"))
+
+    assert response.status_code == HTTPStatus.OK
+    html = response.content
+    summary = find_by_test_id(html, "profile-contribution-summary")
+    assert element_text(summary) == paragraph
+    toggle = find_by_test_id(html, "profile-summary-toggle")
+    attributes = dict(toggle.attributes)
+    assert toggle.name == "button"
+    assert attributes.get("type") == "button"
+    assert attributes.get("aria-expanded") == "false"
+    assert element_text(toggle) == "Show more"
+    assert attributes.get("aria-label", "Show more") == "Show more"
+    assert "aria-labelledby" not in attributes
+
+    controlled_id = attributes.get("aria-controls", "")
+    assert len(controlled_id.split()) == 1
+    target_id = ("id", controlled_id)
+    assert target_id in summary.attributes
+    elements = _walk_elements(parse_html(html.decode(response.charset)))
+    assert sum(target_id in element.attributes for element in elements) == 1
+
+    for test_id in ("profile-edit-btn", "profile-token-field", "profile-token-copy"):
+        find_by_test_id(html, test_id)
