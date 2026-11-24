@@ -2981,7 +2981,7 @@ scenarios:
       - S03
       - S10
     implementation_plan: docs/plans/iterations/experts/S12-experts-profile-03.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S03
@@ -4104,7 +4104,7 @@ scenarios:
       - S03
       - S27
     implementation_plan: docs/plans/iterations/experts/S23-galdr-summary-01.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
