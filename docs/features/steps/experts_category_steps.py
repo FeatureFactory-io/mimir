@@ -1,41 +1,68 @@
 from __future__ import annotations
 
-from behave import then, when
-
-from behave import given
+from behave import given, then, when
 from behave.runner import Context
+
+from methodology.models import KarmaAward, Playbook
+from methodology.services.experts_service import ExpertProjection, ExpertsService
+from tests.support.experts_category_ties import CategoryTieDataset, load_category_tie
+
+_TIED_CATEGORY_POINTS = {"development": 5_000, "design": 5_000}
+_TIED_TOTAL = 10_000
+_CATEGORY_LABELS = dict(Playbook.CATEGORY_CHOICES)
 
 
 @given("the isolated {variant} data")
 def isolated_category_data(context: Context, variant: str) -> None:
-    """Build real isolated variant, preserving shared baseline references.
-    :param context: Transactional Behave context.
-    :param variant: TIE01 or TIE02.
-    :return: None.
-    :raises ValueError: Unknown variant.
+    """Build the historical variant in the scenario's isolated test database.
+
+    :param context: Transactional Behave context with the baseline already loaded.
+    :param variant: Historical tie fixture. Example: "TIE01".
+    :return: None. Example: context.category_tie contains the Development tie case.
+    :raises ValueError: For an unknown variant or a conflicting test fixture.
+    :raises AssertionError: If the shared Cedar identities change.
     """
-    raise NotImplementedError()
+    tie = load_category_tie(variant)
+    assert tie.baseline.user_ids == context.cedar_dataset.user_ids
+    assert tie.baseline.playbook_ids == context.cedar_dataset.playbook_ids
+    context.category_tie = tie
 
 
 @when("the user's primary playbook category is projected")
 def project_primary_category(context: Context) -> None:
-    """Call S03 canonical projection and capture before/after ledger.
-    :param context: Context containing CategoryTieDataset.
-    :return: None.
-    :raises RuntimeError: Variant was not prepared.
+    """Capture the real ledger and ask the canonical service for the projection.
+
+    :param context: Behave context containing the loaded CategoryTieDataset.
+    :return: None. Example: context.category_projection holds the actual total.
+    :raises RuntimeError: If the variant was not prepared.
+    :raises ValueError: If the persisted variant user cannot be projected.
     """
-    raise NotImplementedError()
+    tie: CategoryTieDataset | None = getattr(context, "category_tie", None)
+    if tie is None:
+        raise RuntimeError("Load the Cedar tie variant before projecting its category.")
+    context.category_ledger_before = tuple(
+        KarmaAward.objects.order_by("pk").values_list()
+    )
+    context.category_projection = ExpertsService().project_user(tie.user.pk)
 
 
 @then("the result is {category}")
 def category_result(context: Context, category: str) -> None:
-    """Assert actual canonical result, 10,000 total and unchanged awards.
-    :param context: Context containing actual projection.
-    :param category: Expected display category; example: "Design".
-    :return: None.
-    :raises AssertionError: Category, arithmetic or snapshot differs.
+    """Verify the real category decision, projected points and unchanged ledger.
+
+    :param context: Behave context with the actual service projection and prior ledger.
+    :param category: Expected Gherkin display category. Example: "Design".
+    :return: None. Example: the Design tie still totals 10,000 after the query.
+    :raises AssertionError: If the category, totals or complete ledger differ.
     """
-    raise NotImplementedError()
+    projection: ExpertProjection = context.category_projection
+    assert projection.primary_category is not None, "No primary category was projected."
+    assert _CATEGORY_LABELS.get(projection.primary_category) == category
+    assert projection.total_points == _TIED_TOTAL
+    assert dict(projection.category_points) == _TIED_CATEGORY_POINTS
+    assert context.category_ledger_before == tuple(
+        KarmaAward.objects.order_by("pk").values_list()
+    )
 
 
 @when('Elena selects the "{category}" playbook category')
