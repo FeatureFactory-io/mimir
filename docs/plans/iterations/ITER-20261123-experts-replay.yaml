@@ -3905,7 +3905,7 @@ scenarios:
           - do-follow-commit-convention
           - do-github-issues
     implementation_plan: docs/plans/iterations/experts/S22-experts-view-06.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S17
@@ -7194,7 +7194,7 @@ scenarios:
       - S11
       - S17
     implementation_plan: docs/plans/iterations/experts/S24-galdr-summary-02.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S23
