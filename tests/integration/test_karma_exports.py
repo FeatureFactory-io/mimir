@@ -1683,6 +1683,7 @@ def _assert_no_self_export_award_or_error(
         or "reason=eligible" in message
         or "outcome=awarded" in message
         or "status=applied" in message
+        or "status=staged" in message
         for message in related
     )
 

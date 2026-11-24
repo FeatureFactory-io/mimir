@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 from collections.abc import Iterator
 from copy import deepcopy
 from dataclasses import replace
@@ -18,9 +20,54 @@ from django.db.backends.sqlite3.base import DatabaseWrapper
 from tests.support import experts_data
 from tests.support.experts_data import CedarDatabaseScope
 
+_COUNTERFEIT_SQLITE_RUNTIME = """
+import json
+import os
+import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory, gettempdir
+from uuid import uuid4
+
+import django
+
+django.setup()
+from django.db import connections
+from tests.support.experts_data import CedarDatabaseScope, load_cedar_baseline
+
+if sys.argv[1] == "import-pytest":
+    import pytest
+else:
+    assert "pytest" not in sys.modules
+assert "pytest_django" not in sys.modules
+os.environ["PYTEST_CURRENT_TEST"] = "tests/unit/test_claim.py::test_claim (call)"
+sqlite = connections["default"]
+assert sqlite.vendor == "sqlite" and sqlite.connection is None
+with TemporaryDirectory(dir=Path(gettempdir()).resolve()) as directory:
+    database = Path(directory) / "test.sqlite3"
+    database.touch(mode=0o600)
+    marker = database.with_name("owner.json")
+    marker.touch(mode=0o600)
+    owner = uuid4().hex
+    marker.write_text(
+        json.dumps({"database": str(database), "owner_id": owner, "pid": os.getpid()}),
+        encoding="utf-8",
+    )
+    sqlite.settings_dict["NAME"] = str(database)
+    sqlite.settings_dict["TEST"]["NAME"] = str(database)
+    scope = CedarDatabaseScope("test", str(database), marker, owner)
+    try:
+        load_cedar_baseline(database.with_name("must-not-read.json"), scope=scope)
+    except ValueError as error:
+        assert "runner-owned" in str(error), error
+    else:
+        raise AssertionError("Counterfeit pytest environment was accepted.")
+    assert sqlite.connection is None
+    assert database.read_bytes() == b""
+"""
+
 
 @pytest.fixture
-def owned_sqlite(
+def sqlite_test_file(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[tuple[CedarDatabaseScope, DatabaseWrapper]]:
     """Declare a private real SQLite file while keeping the test runner's DB intact."""
@@ -45,6 +92,30 @@ def owned_sqlite(
             sqlite.close()
 
 
+@pytest.fixture
+def owned_sqlite(
+    sqlite_test_file: tuple[CedarDatabaseScope, DatabaseWrapper],
+    request: pytest.FixtureRequest,
+) -> Iterator[tuple[CedarDatabaseScope, DatabaseWrapper]]:
+    """Register the real Django wrapper's claim from the active pytest fixture."""
+    scope, _sqlite = sqlite_test_file
+    with experts_data._register_sqlite_test_scope(scope, request):
+        yield sqlite_test_file
+
+
+@pytest.fixture(params=("unregistered", "expired"))
+def unregistered_sqlite(
+    sqlite_test_file: tuple[CedarDatabaseScope, DatabaseWrapper],
+    request: pytest.FixtureRequest,
+) -> tuple[CedarDatabaseScope, DatabaseWrapper]:
+    """Provide an owned file with no live registration during the test call."""
+    if request.param == "expired":
+        scope, sqlite = sqlite_test_file
+        with experts_data._register_sqlite_test_scope(scope, request):
+            assert sqlite.connection is None
+    return sqlite_test_file
+
+
 def _write_marker(marker: Path, database: Path, owner_id: str, pid: int) -> None:
     """Write the exact local test-run owner proof consumed by the guard."""
     marker.write_text(
@@ -64,7 +135,43 @@ def test_check_file_scope_with_runner_owned_database_uses_live_pragma(
     assert sqlite.connection is not None
 
 
-@pytest.mark.parametrize("case", ("wrong-module", "wrong-environment", "no-pytest"))
+def test_check_file_scope_with_active_unregistered_pytest_rejects_before_opening(
+    unregistered_sqlite: tuple[CedarDatabaseScope, DatabaseWrapper],
+) -> None:
+    """A real running pytest process must have registered the specific file."""
+    scope, sqlite = unregistered_sqlite
+    assert os.environ["PYTEST_CURRENT_TEST"].endswith("(call)")
+    with pytest.raises(ValueError, match="runner-owned"):
+        experts_data._validate_database_scope(scope)
+    assert sqlite.connection is None
+
+
+@pytest.mark.parametrize("pytest_import", ("without-pytest", "import-pytest"))
+def test_check_file_scope_with_counterfeit_standalone_runner_rejects_before_import(
+    pytest_import: str,
+) -> None:
+    """Django outside pytest rejects an otherwise matching proof before SQL or seed I/O."""
+    environment = {
+        **os.environ,
+        "DATABASE_URL": "",
+        "DJANGO_SETTINGS_MODULE": "mimir.settings.test",
+        "MIMIR_ENV": "test",
+    }
+    result = subprocess.run(
+        [sys.executable, "-c", _COUNTERFEIT_SQLITE_RUNTIME, pytest_import],
+        env=environment,
+        cwd=Path(settings.BASE_DIR),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "case", ("wrong-module", "wrong-environment", "no-pytest", "wrong-node", "teardown")
+)
 def test_check_file_scope_with_invalid_runtime_rejects_before_opening(
     owned_sqlite: tuple[CedarDatabaseScope, DatabaseWrapper],
     monkeypatch: pytest.MonkeyPatch,
@@ -76,8 +183,13 @@ def test_check_file_scope_with_invalid_runtime_rejects_before_opening(
         monkeypatch.setenv("DJANGO_SETTINGS_MODULE", "mimir.settings.prod")
     elif case == "wrong-environment":
         monkeypatch.setattr(settings, "MIMIR_ENV", "prod")
-    else:
+    elif case == "no-pytest":
         monkeypatch.delenv("PYTEST_CURRENT_TEST")
+    elif case == "wrong-node":
+        monkeypatch.setenv("PYTEST_CURRENT_TEST", "other.py::test_node (call)")
+    else:
+        marker = os.environ["PYTEST_CURRENT_TEST"].removesuffix(" (call)")
+        monkeypatch.setenv("PYTEST_CURRENT_TEST", f"{marker} (teardown)")
     with pytest.raises(ValueError, match="runner-owned"):
         experts_data._validate_database_scope(scope)
     assert sqlite.connection is None

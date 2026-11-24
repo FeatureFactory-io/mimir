@@ -348,10 +348,11 @@ def _assert_mcp_success_logs(
                 "category=design",
                 "reason=eligible",
             ),
-            "applied": (
+            "staged": (
                 "| exit |",
                 canonical,
                 "created_count=2",
+                "transaction=pending",
                 f"occurred_at={timestamp}",
             ),
             "duplicate": (

@@ -20,6 +20,7 @@ from methodology.services.karma_service import AwardSpec, KarmaService
 from tests.support.experts_data import (
     CedarDatabaseScope,
     CedarDataset,
+    _register_sqlite_test_scope,
     _validate_database_scope,
     load_cedar_baseline,
 )
@@ -27,11 +28,12 @@ from tests.support.experts_data import (
 
 @pytest.fixture(scope="session")
 def owned_race_sqlite(
-    django_db_blocker: DjangoDbBlocker,
+    django_db_blocker: DjangoDbBlocker, request: pytest.FixtureRequest
 ) -> Iterator[tuple[CedarDatabaseScope, dict[str, Any]] | None]:
     """Build a session-private SQLite lane with Django's real test DB creation.
 
     :param django_db_blocker: The real pytest-django database access guard.
+    :param request: The pytest fixture request for the initial test setup.
     :return: SQLite ownership and runner settings, or None for PostgreSQL.
     :raises OSError: If the runner cannot create private local files.
     """
@@ -45,6 +47,7 @@ def owned_race_sqlite(
         runner_settings = deepcopy(connections.databases["default"])
         runner_settings["TEST"]["NAME"] = scope.database_name
         with (
+            _register_sqlite_test_scope(scope, request),
             _activate_race_sqlite(runner_settings) as sqlite,
             django_db_blocker.unblock(),
         ):
@@ -59,18 +62,23 @@ def owned_race_sqlite(
 def django_db_setup(
     django_db_setup: None,
     owned_race_sqlite: tuple[CedarDatabaseScope, dict[str, Any]] | None,
+    request: pytest.FixtureRequest,
 ) -> Iterator[CedarDatabaseScope | None]:
     """Use the private alias for the full S45 lifecycle, including pytest flush.
 
     :param django_db_setup: Existing pytest-django session setup, kept independent.
     :param owned_race_sqlite: Session-private file and its Django configuration.
+    :param request: The pytest fixture request for this test's alias activation.
     :return: Explicit SQLite proof or None under standard PostgreSQL isolation.
     """
     if owned_race_sqlite is None:
         yield django_db_setup
         return
     scope, runner_settings = owned_race_sqlite
-    with _activate_race_sqlite(runner_settings):
+    with (
+        _register_sqlite_test_scope(scope, request),
+        _activate_race_sqlite(runner_settings),
+    ):
         yield scope
 
 

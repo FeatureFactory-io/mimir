@@ -39,7 +39,9 @@ from methodology.models import (
     KarmaAward,
     PipChange,
     Playbook,
+    PlaybookVersion,
     ProcessImprovementProposal,
+    Workflow,
 )
 from methodology.services.karma_service import (
     AwardOutcome,
@@ -58,6 +60,8 @@ _LOGGER = "methodology.services.karma_service"
 _PERSIST_LOG = "KarmaService.persist_awards"
 _MATCH_LOG = "KarmaService._assert_matching_event"
 _EVENT_LOG = "KarmaService._persist_event_atomic"
+_CONSUMPTION_LOG = "KarmaService.award_successful_consumption"
+_RELEASE_LOG = "KarmaService.award_first_release"
 _AWARD_FIELDS = ("pk", *AwardSpec.__dataclass_fields__)
 _PRIVATE_BODY = "Private staffing note hidden@example.test cedar-secret-token"
 _ACTOR = "mrodriguez"
@@ -78,6 +82,72 @@ RecordingResult = tuple[AwardOutcome, ...] | ValidationError | OperationalError
 
 class _CancelOuterTransaction(Exception):
     """Roll back otherwise-successful Cedar actions through the real owner."""
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("commit", (False, True), ids=("rollback", "commit"))
+def test_consumption_log_story_with_outer_transaction_reports_pending_pair(
+    cedar_dataset: CedarDataset, caplog: LogCaptureFixture, commit: bool
+) -> None:
+    """Keep the logged pair pending inside commit and rollback paths alike."""
+    actor = cedar_dataset.users_by_username[_ACTOR]
+    identity = f"consumption:gui_copy:{actor.pk}:{_ACTION_ID}"
+    with capture_experts_logs(caplog, (_LOGGER,)), transaction.atomic():
+        outcomes = KarmaService.award_successful_consumption(
+            actor, "activity", _ACTIVITY_ID, _ACTION_ID, channel="gui_copy"
+        )
+        assert len(outcomes) == 2 and all(outcome.created for outcome in outcomes)
+        assert len(_event_rows(identity)) == 2
+        context = (f"event_identity={identity}", "transaction=pending")
+        assert_log_story(
+            caplog,
+            where=_CONSUMPTION_LOG,
+            beats={
+                "stage": ("| processing |", "status=staged", *context),
+                "exit": ("| exit |", "created_count=2", *context),
+            },
+        )
+        if not commit:
+            transaction.set_rollback(True)
+    assert len(_event_rows(identity)) == (2 if commit else 0)
+    assert "status=applied" not in caplog.text
+    assert "transaction=committed" not in caplog.text
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("commit", (False, True), ids=("rollback", "commit"))
+def test_first_release_log_story_with_outer_transaction_reports_pending_award(
+    cedar_dataset: CedarDataset, caplog: LogCaptureFixture, commit: bool
+) -> None:
+    """Prove the service record qualifies the award until publication commits."""
+    book = cedar_dataset.playbooks_by_pk[6302]
+    author = cedar_dataset.users_by_username["nberg"]
+    Workflow.objects.create(playbook=book, name="Workshop preparation", order=1)
+    identity = KarmaService.first_release_identity(book.pk)
+    receipt = PlaybookVersion.objects.filter(playbook=book, version_number="1.0")
+    correlation_id = "s45-release-outer-transaction"
+    with capture_experts_logs(caplog, (_LOGGER,)), transaction.atomic():
+        result = PlaybookService.release_playbook_with_award(
+            book.pk,
+            author,
+            description="Initial workshop release",
+            correlation_id=correlation_id,
+        )
+        assert result.first_release_award.created and receipt.exists()
+        assert len(_event_rows(identity)) == 1
+        context = (f"correlation_id={correlation_id}", "transaction=pending")
+        assert_log_story(
+            caplog,
+            where=_RELEASE_LOG,
+            beats={"exit": ("| exit |", "created=true", "points=5000", *context)},
+        )
+        if not commit:
+            transaction.set_rollback(True)
+    book.refresh_from_db()
+    assert book.status == ("released" if commit else "draft")
+    assert receipt.exists() is commit
+    assert len(_event_rows(identity)) == int(commit)
+    assert "transaction=committed" not in caplog.text
 
 
 def _event_rows(event_identity: str) -> tuple[dict[str, object], ...]:

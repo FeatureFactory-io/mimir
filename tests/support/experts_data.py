@@ -6,14 +6,17 @@ import json
 import os
 import re
 import stat
+import sys
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from tempfile import gettempdir
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import dj_database_url
 from django.conf import settings
@@ -51,6 +54,9 @@ from methodology.services.experts_service import (
 )
 from methodology.services.pip_service import PIPService
 
+if TYPE_CHECKING:
+    from pytest import FixtureRequest
+
 CEDAR_PASSWORD = "Cedar-fictional-tests-only-2026"
 CEDAR_BASELINE_TIME_ISO = "2026-11-22T00:00:00+00:00"
 _CEDAR_SOURCE = (
@@ -66,6 +72,9 @@ _AWARD_UNITS = {
 }
 _TEST_SETTINGS = {"mimir.settings", "mimir.settings.test", "mimir.settings.e2e"}
 _TEST_OWNER_ID = re.compile(r"[0-9a-f]{32}")
+_UNREGISTERED_SQLITE_SCOPE = (
+    "Cedar requires a runner-owned SQLite file registered by an active pytest fixture."
+)
 _LOCAL_POSTGRES_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
 _DEMO_OWNER_IDS = {"mimir-experts-demo", "mimir-experts-demo-host"}
 _INITIAL_RELEASE = "1.0"
@@ -81,6 +90,11 @@ class CedarDatabaseScope:
     database_name: str
     ownership_manifest: Path | None = None
     owner_id: str | None = None
+
+
+_SQLITE_TEST_REGISTRATION: ContextVar[
+    tuple[CedarDatabaseScope, FixtureRequest, int] | None
+] = ContextVar("cedar_sqlite_test_registration", default=None)
 
 
 @dataclass(frozen=True)
@@ -270,6 +284,74 @@ def _validate_sqlite_test_scope(scope: CedarDatabaseScope) -> None:
         ) from error
     if recorded != {"database": str(database), "owner_id": owner, "pid": os.getpid()}:
         raise ValueError("Cedar file database ownership does not match this process.")
+    _require_registered_sqlite_scope(scope)
+
+
+@contextmanager
+def _register_sqlite_test_scope(
+    scope: CedarDatabaseScope, request: FixtureRequest
+) -> Iterator[None]:
+    """Bind a file claim to the pytest fixture that activates its Django alias.
+
+    :param scope: Exact claim for the owned temporary file.
+    :param request: The activating fixture's runner-supplied request.
+    :return: Registration valid while the fixture and its triggering test are active.
+    :raises ValueError: If the request is outside actual pytest fixture setup.
+    """
+    if _active_fixture_phase(request) != "setup":
+        raise ValueError(_UNREGISTERED_SQLITE_SCOPE)
+    token = _SQLITE_TEST_REGISTRATION.set((scope, request, os.getpid()))
+    try:
+        yield
+    finally:
+        _SQLITE_TEST_REGISTRATION.reset(token)
+
+
+def _active_fixture_phase(request: FixtureRequest) -> Literal["setup", "call"] | None:
+    """Match a fixture request to the real runner's current collected test.
+
+    :param request: The actual pytest fixture request, including a session fixture.
+    :return: The test phase held by that request, or None for inactive claims.
+    """
+    # The data importer is also used by standalone demo and Behave runtimes.
+    pytest_module = sys.modules.get("pytest")
+    if (
+        pytest_module is None
+        or not isinstance(request, pytest_module.FixtureRequest)
+        or request.fixturename is None
+    ):
+        return None
+    # A session-scoped request's .node is the session, so use the triggering item.
+    item = request._pyfuncitem
+    session = request.session
+    stack = session._setupstate.stack
+    if (
+        item.session is not session
+        or item is not next(reversed(stack), None)
+        or stack[item][1] is not None
+        or not any(collected is item for collected in session.items)
+    ):
+        return None
+    marker = os.environ.get("PYTEST_CURRENT_TEST")
+    node_id = item.nodeid.replace("\x00", "(null)")
+    for phase in ("setup", "call"):
+        if marker == f"{node_id} ({phase})":
+            return phase
+    return None
+
+
+def _require_registered_sqlite_scope(scope: CedarDatabaseScope) -> None:
+    """Reject file claims outside their activated test before opening SQLite."""
+    registration = _SQLITE_TEST_REGISTRATION.get()
+    if registration is not None:
+        registered_scope, request, pid = registration
+        if (
+            registered_scope is scope
+            and pid == os.getpid()
+            and _active_fixture_phase(request) is not None
+        ):
+            return
+    raise ValueError(_UNREGISTERED_SQLITE_SCOPE)
 
 
 def _validate_private_test_paths(database: Path, marker: Path) -> None:

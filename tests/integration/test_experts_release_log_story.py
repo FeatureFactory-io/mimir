@@ -92,6 +92,7 @@ def test_karma_release_log_story_happy(caplog: pytest.LogCaptureFixture) -> None
                 "category=product",
                 "created=true",
                 "points=5000",
+                "transaction=pending",
                 correlation,
             ),
         },

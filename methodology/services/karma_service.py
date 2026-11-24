@@ -220,7 +220,8 @@ class KarmaService:
             logger.info("%s | branch | %s %s", _RELEASE_LOG, result, trace)
         recipient = f"recipient_id={spec.recipient_id} category={spec.category}"
         points = spec.points if outcome.created else 0
-        result = f"created={str(outcome.created).lower()} points={points}"
+        state = "committed" if connection.get_autocommit() else "pending"
+        result = f"created={str(outcome.created).lower()} points={points} transaction={state}"
         logger.info("%s | exit | %s %s %s", _RELEASE_LOG, recipient, result, trace)
         return outcome
 
@@ -435,10 +436,10 @@ class KarmaService:
         outcomes = service.persist_awards(specs, correlation_id=identity)
         award = outcomes[0].award
         assert award is not None
-        status = "applied" if outcomes[0].created else "replayed"
+        status = "staged" if outcomes[0].created else "replayed"
         recipients = f"learner_id={actor.pk} author_id={specs[1].recipient_id}"
         details = f"{recipients} points={_CONSUMPTION_POINTS} status={status}"
-        event = f"event_identity={identity}"
+        event = f"event_identity={identity} transaction=pending"
         logger.info(f"{operation} | processing | {event} {details}")
         created = sum(outcome.created for outcome in outcomes)
         result = f"created_count={created}" if created else "duplicate"
