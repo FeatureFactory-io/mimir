@@ -914,24 +914,30 @@ mark.mm-search-highlight {
   background: var(--bs-body-bg, #fff);
   border: 1px solid var(--bs-border-color, #dee2e6);
   border-radius: 0.75rem;
-  bottom: 1rem;
-  box-shadow: 0 1rem 2.5rem rgba(26, 31, 46, 0.22);
+  box-shadow: var(--bs-box-shadow-sm);
   display: flex;
+  flex-shrink: 0;
   gap: 1rem;
   justify-content: space-between;
-  left: 50%;
-  max-width: min(44rem, calc(100vw - 2rem));
+  margin: 0 auto 1rem;
+  max-width: 44rem;
   padding: 1rem;
-  position: fixed;
-  transform: translateX(-50%);
-  width: 100%;
-  z-index: 1090;
+  width: calc(100% - 2rem);
 }
 
 .analytics-consent[hidden] { display: none; }
 .analytics-consent p { margin: 0; }
-.analytics-consent > div { display: flex; gap: 0.5rem; flex-shrink: 0; }
+.analytics-consent > div { display: flex; gap: 0.5rem; flex-shrink: 0; flex-wrap: wrap; }
 .analytics-settings { display: block; margin: 0 1rem 1rem auto; position: static; }
+
+/* Let the guest graph shell share its fixed viewport with the preference controls. */
+body.mm-content-browser[data-analytics-enabled="true"] > .mm-app-shell {
+  min-height: 0;
+}
+
+body.mm-content-browser[data-analytics-enabled="true"] .mm-app-sidebar .offcanvas-body {
+  overflow-y: auto;
+}
 
 @media (max-width: 620px) {
   .analytics-consent { align-items: stretch; flex-direction: column; }
