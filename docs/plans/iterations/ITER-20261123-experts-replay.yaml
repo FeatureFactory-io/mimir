@@ -48,6 +48,9 @@ conflict_map:
   docs/features/steps/experts_steps.py:
   - S03
   - S18
+  docs/features/steps/experts_summary_submission_steps.py:
+  - S27
+  - S23
   docs/features/steps/experts_summary_steps.py:
   - S27
   - S25
@@ -1372,6 +1375,7 @@ scenarios:
     codebase_footprint:
     - docs/experts-replay/pin-evidence/S27.json
     - docs/features/steps/experts_summary_steps.py
+    - docs/features/steps/experts_summary_submission_steps.py
     - docs/plans/iterations/experts/S27-galdr-summary-05.md
     - methodology/services/contribution_summary_boundary.py
     - methodology/services/contribution_summary_prompts.py
@@ -1584,6 +1588,7 @@ scenarios:
         - S27-N3-read-only-boundary
         footprint:
         - docs/features/steps/experts_summary_steps.py
+        - docs/features/steps/experts_summary_submission_steps.py
         gate:
           command: make test-experts-s27-at
         guidance_bundle:
@@ -1614,7 +1619,7 @@ scenarios:
       scenario_dependencies:
       - S03
     implementation_plan: docs/plans/iterations/experts/S27-galdr-summary-05.md
-    status: implementation_in_progress
+    status: repairing_after_review
     github_issue: null
     semantic_dependencies:
     - S03
@@ -1872,7 +1877,7 @@ scenarios:
       scenario_dependencies:
       - S03
     implementation_plan: docs/plans/iterations/experts/S30-karma-release-01.md
-    status: implementation_in_progress
+    status: complete
     github_issue: null
     semantic_dependencies:
     - S03
@@ -2051,7 +2056,7 @@ scenarios:
       scenario_dependencies:
       - S03
     implementation_plan: docs/plans/iterations/experts/S47-karma-category-01.md
-    status: skeleton_unimplemented
+    status: waiting_shared_owner_repair
     github_issue: null
     semantic_dependencies:
     - S03

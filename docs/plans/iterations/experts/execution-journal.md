@@ -121,3 +121,22 @@ jedao_recommendation: A: approve the prepared one-line shared-style fix and add 
 await_human_decision: true
 <!-- /ESCALATE -->
 - User question was submitted through the async input tool. No answer is assumed. S17 source fixes stop while S27, S30 and independent S01 work continue. No GitHub record was created, per the user's publication waiver.
+
+## S30 COMPLETE; S01 and S27 handoffs
+
+- S30/N4 c6c7de212610228356f220e08cab99776c6d6cff: one real Chromium journey, actual login/modal CSRF POST, v1.0/description/single Product 5,000 award, exact earned alert and Alex/Nora order. Ninety-two trace frames retained.
+- S30/N5 NODE_PASS: 34 backend cases, one exact AT/six steps, one Chromium, three named logs; separate full log module passed four including HTTP earned/not-earned branches. Independent source audit verified all ten planned log beats, atomic rollback, immutable first receipt and original API, no mocks or source/architecture escape. PG races and whole iteration still pending. S30 is complete.
+- Root integrated pre-Experts CI selection after the parallel release/evidence/navigation changes: 1,636 passed, three inherited skips, 72 warnings in 119.05s. This supplements scenario gates, not unfinished contracts.
+- S01/N1 58b01bea0a5693546c72fe158bd2e3f85eda52af: 31 backend, one log, 60 with inherited nav regressions. N2 d5a74c9c0ad507af118c0fc451c11f26b3162b4b: two real HTML link-follow cases. N3 431766be8dc169bf8d225a2309ea3f1c3d390e23: exact EXPERTS-LIST-01, one case/seven steps. Browser worker is active. DEBUG prototype duplication from the unmodified manual append is separately recorded; production has one canonical entry.
+- S27/N3 9d75e0f303e48a22324ba7d9bdb8286aaae00ee2: nine combined, three agent proofs, five log cases; ScriptedLLM is the only stand-in, zero database writes. N4 d8d6574fbfb81e62a245e99f117d97fc75acb7ef: exact GALDR-SUMMARY-05, one case/seven steps. A test-only shared Hana background binding was reconciled in the manifest and conflict map; S23 already depends on S27.
+
+## S27 first DoD review FAILED; bounded owner repairs
+
+- Automated rollup passed 69 backend, one exact AT, seven log and three agent cases. Manual review nevertheless proved `Maria's Design score is 7,200.` survives both public-text redaction and output validation, violating the already agreed mutable-metric exclusion. The contract is not narrowed to hide it.
+- Fresh original N1 owner is adding a real source-text regression and input redaction fix inside its existing footprint. Fresh N2 output repair follows sequentially to preserve shared-test ownership. N3 boundary has a separate one-line concision correction (31 body lines) before fresh final review. No live-provider/persistence claim.
+
+## S47 test-only construction awaits S03 instrumentation
+
+- Actual fixture/ORM behavior: 13 cases passed. Strict log tests found no resolver-decision records, while the four existing list-level logs were correctly captured. Test edits remain unstaged. Repeated unchanged failing selectors were diagnostic observations; no source repair has yet been attempted.
+- The required trace needs real numeric account/correlation, two tied candidates/10,000 total, released-count vs alphabetical reason, selected category and unchanged total. No mocked/synthetic log or weakened assertion is accepted.
+- A fresh bounded S03/N2 follow-up owns the already approved experts_service.py path, preserves the pure resolver/signatures and adds the agreed decision trace in query orchestration. This is the first targeted source fix for the missing planned instrumentation, not a S47 production footprint expansion. A fresh S47 worker will finish its test gate after that repair.
