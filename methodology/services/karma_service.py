@@ -554,8 +554,9 @@ class KarmaService:
         :return: None after one INFO entry record.
         :raises ValueError: Propagates invalid logging configuration errors.
         """
+        actor_id = actor.pk if isinstance(actor, (User, AnonymousUser)) else None
         logger.info(
-            f"{_CONSUMPTION_LOG} | entry | {trace} actor_id={actor.pk} "
+            f"{_CONSUMPTION_LOG} | entry | {trace} actor_id={actor_id} "
             f"entity_type={entity_type} entity_id={entity_id}"
         )
 

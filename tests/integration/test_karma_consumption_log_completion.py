@@ -165,3 +165,28 @@ def test_consumption_log_story_with_excluded_actor_completes_without_mutation(
     assert result == ()
     assert _state() == before
     _assert_story(caplog, actor, kind, entity_id, author, creator, role)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("actor", (None, 1), ids=("none", "integer"))
+def test_consumption_log_story_with_invalid_actor_preserves_permission_error(
+    cedar_dataset: CedarDataset, caplog: LogCaptureFixture, actor: Any
+) -> None:
+    """Keep unsupported actor rejection owned by the existing authorization path.
+
+    :param cedar_dataset: Real isolated baseline. Example: CedarDataset.
+    :param caplog: Actual entry capture. Example: actor_id=None.
+    :param actor: Unsupported boundary value. Example: None.
+    :return: None after the unchanged PermissionError and full ledger snapshot.
+    :raises AssertionError: Logging changes authorization failure or mutates evidence.
+    """
+    assert cedar_dataset.users_by_username["mchen"].is_staff
+    before = _state()
+    with capture_experts_logs(caplog, (_LOGGER,)), pytest.raises(PermissionError):
+        KarmaService.award_successful_consumption(
+            actor, "activity", 6203, _ACTION, channel="mcp_detail"
+        )
+    assert _state() == before
+    messages = [r.getMessage() for r in caplog.records if _OPERATION in r.getMessage()]
+    assert len(messages) == 1 and "| entry |" in messages[0]
+    assert "actor_id=None" in messages[0]
