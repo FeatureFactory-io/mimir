@@ -3745,7 +3745,7 @@ scenarios:
           - do-assert-log-story
           - do-github-issues
     implementation_plan: docs/plans/iterations/experts/S21-experts-view-05.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S17
