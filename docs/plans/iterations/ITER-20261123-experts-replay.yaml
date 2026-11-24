@@ -4014,6 +4014,41 @@ scenarios:
           - do-assert-log-story
           - do-assert-agent-story
           - do-follow-commit-convention
+      - id: R1-lifecycle-boundary-compatibility
+        title: Reconcile persistable request IDs and malformed-provider recovery after independent review
+        bpe: BPE-02
+        depends_on:
+        - N4-definition-of-done
+        footprint:
+        - methodology/services/pip_service.py
+        - methodology/services/contribution_summary_service.py
+        - methodology/services/contribution_summary_factory.py
+        - methodology/services/galdr_client.py
+        - methodology/services/galdr_engine.py
+        - methodology/models/agent_interaction.py
+        - tests/integration/test_experts_summary_submission.py
+        - tests/unit/test_contribution_summary_adapter.py
+        - tests/unit/test_galdr_batch_context.py
+        gate:
+          command: make test-experts-s23
+          log_story_command: make test-experts-s23-log
+          agent_proof_command: make test-experts-s23-agent
+        authority: First targeted repair after independent S23 review; original S23 component paths and routine unit-test compatibility addition
+        constraints:
+        - Normalize persistence-rejected request identifiers before use without weakening credential filtering.
+        - Preserve normal submission recovery on malformed default provider configuration and existing explicit-port and disabled-stub behavior.
+        - Update old SDK unit transport fixtures without weakening output-budget or truncation oracles.
+        - Keep all provider work outside locks and all submission Karma unchanged.
+      - id: N5-independent-retry-review
+        title: Independently recheck lifecycle boundary repairs and complete contract
+        bpe: BPE-06
+        depends_on:
+        - R1-lifecycle-boundary-compatibility
+        footprint: []
+        gate:
+          command: make test-experts-s23
+          log_story_command: make test-experts-s23-log
+          agent_proof_command: make test-experts-s23-agent
       scenario_dependencies:
       - S03
       - S27
