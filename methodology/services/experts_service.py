@@ -13,8 +13,14 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.db.models import Count, Sum
 
-from methodology.models import EventChannel, KarmaAward, Playbook
-from methodology.services.expert_text import CATEGORY_LABELS, category_label
+from methodology.models import EventChannel, ExpertProfile, KarmaAward, Playbook
+from methodology.services.expert_text import (
+    CATEGORY_LABELS,
+    category_label,
+    display_initials,
+    format_karma,
+    format_numeric_fallback,
+)
 
 logger = logging.getLogger(__name__)
 LEADERBOARD_LIMIT = 5
@@ -28,6 +34,8 @@ SOURCE_BUCKET_BY_KIND = {
 }
 _CORRELATION_ID = re.compile(r"[A-Za-z0-9._:-]{1,100}")
 _LIST_LOG = "ExpertsService.list_leaders"
+_DETAIL_LOG = "ExpertsService.public_detail"
+_DETAIL_SOURCE_LABELS = {"Released": "Released playbooks", "PIP": "PIP contributions"}
 
 
 @dataclass(frozen=True)
@@ -406,21 +414,53 @@ class ExpertsService:
 
         :param username: Exact account name. Example: "mrodriguez".
         :param correlation_id: Safe request identifier. Example: "cedar-s17".
-        :return: Allowlisted public payload. Example: {"name": "Maria Rodriguez", ...}.
+        :return: Allowlisted public payload. Example: Maria's identity, Karma and evidence.
         :raises ValueError: For malformed inputs.
         :raises LookupError: For a missing or nonpositive contributor.
         """
-        raise NotImplementedError()
+        if not isinstance(correlation_id, str) or not _CORRELATION_ID.fullmatch(
+            correlation_id
+        ):
+            raise ValueError("A safe request correlation ID is required.")
+        try:
+            subject = cls._detail_subject(username)
+            projection = cls().project_user(subject.pk)
+            if projection.total_points <= 0:
+                raise LookupError("Public expert unavailable.")
+        except LookupError:
+            logger.info(
+                "%s | branch | reason=missing_or_ineligible correlation_id=%s",
+                _DETAIL_LOG,
+                correlation_id,
+            )
+            raise
+        public_books = cls._detail_public_books(subject.pk)
+        detail = cls._detail_payload(subject, projection, public_books)
+        cls._detail_log(detail, correlation_id=correlation_id)
+        return detail
 
     @classmethod
     def _detail_subject(cls, username: str) -> AbstractUser:
         """Resolve a subject without exposing account fields.
 
-        :param username: Validated username. Example: "mrodriguez".
+        :param username: Exact username to resolve. Example: "mrodriguez".
         :return: Internal user for projection only. Example: Maria's persisted user.
         :raises LookupError: When the account does not exist.
+        :raises ValueError: For a malformed username.
         """
-        raise NotImplementedError()
+        user_model = get_user_model()
+        username_limit = user_model._meta.get_field("username").max_length
+        if (
+            not isinstance(username, str)
+            or not username.strip()
+            or len(username) > username_limit
+            or "\x00" in username
+        ):
+            raise ValueError("A valid expert username is required.")
+        try:
+            return user_model.objects.only("id").get(username=username)
+        except user_model.DoesNotExist:
+            raise LookupError("Public expert unavailable.") from None
 
     @classmethod
     def _detail_public_books(cls, subject_id: int) -> tuple[PublicExpertBook, ...]:
@@ -430,7 +470,16 @@ class ExpertsService:
         :return: Allowlisted evidence ordered deterministically. Example: ({"pk": 6101, ...},).
         :raises ValueError: For an invalid subject key.
         """
-        raise NotImplementedError()
+        if type(subject_id) is not int or subject_id <= 0:
+            raise ValueError("Expert account ID must be a positive integer.")
+        books = (
+            Playbook.objects.filter(
+                author_id=subject_id, visibility="public", status="released"
+            )
+            .only("id", "name", "version", "category", "visibility", "status")
+            .order_by("name", "pk")
+        )
+        return tuple(cls._detail_book(book) for book in books)
 
     @staticmethod
     def _detail_book(playbook: Playbook) -> PublicExpertBook:
@@ -440,7 +489,17 @@ class ExpertsService:
         :return: Public display fields. Example: {"pk": 6101, "version": "1.0", ...}.
         :raises ValueError: If visibility or release preconditions fail.
         """
-        raise NotImplementedError()
+        if playbook.visibility != "public" or playbook.status != "released":
+            raise ValueError(
+                "Public expert evidence requires a public released playbook."
+            )
+        return {
+            "pk": playbook.pk,
+            "title": playbook.name,
+            "version": str(playbook.version),
+            # Older released playbooks can have no recognized category.
+            "category": CATEGORY_LABELS.get(playbook.category, ""),
+        }
 
     @classmethod
     def _detail_payload(
@@ -452,13 +511,45 @@ class ExpertsService:
         """Combine foundation numeric values and unchanged stored public prose.
 
         :param subject: Internal subject. Example: Maria's user.
-        :param projection: S03 numeric projection. Example: total 8200, primary Design.
+        :param projection: Eligible numeric projection. Example: total 8200, primary Design.
         :param public_books: Safe evidence. Example: Accessibility Audit Playbook v1.0.
         :return: Escapable public values only. Example: summary equals the stored paragraph.
-        :raises LookupError: When total Karma is not positive.
         :raises ValueError: When the projection contract is invalid.
         """
-        raise NotImplementedError()
+        if projection.user_id != subject.pk or projection.primary_category is None:
+            raise ValueError(
+                "Public expert identity and primary category must be resolved."
+            )
+        summary = (
+            ExpertProfile.objects.filter(user_id=subject.pk)
+            .values_list("contribution_summary", flat=True)
+            .first()
+        )
+        return {
+            "subject_id": projection.user_id,
+            "username": projection.username,
+            "name": projection.display_name,
+            "initials": display_initials(projection.display_name),
+            "total_karma": projection.total_points,
+            "formatted_karma": format_karma(projection.total_points),
+            "primary_category": category_label(projection.primary_category),
+            "summary": summary or "",
+            "numeric_fallback": format_numeric_fallback(
+                len(public_books), projection.successful_gui_copy_count
+            ),
+            "source_rows": tuple(
+                {
+                    "label": _DETAIL_SOURCE_LABELS.get(source, source),
+                    "points": format_karma(points),
+                }
+                for source, points in projection.source_points
+            ),
+            "category_rows": tuple(
+                {"label": category_label(category), "points": format_karma(points)}
+                for category, points in projection.category_points
+            ),
+            "public_playbooks": public_books,
+        }
 
     @staticmethod
     def _detail_log(detail: PublicExpertDetail, *, correlation_id: str) -> None:
@@ -467,9 +558,15 @@ class ExpertsService:
         :param detail: Safe detail projection. Example: Maria's 8200-point payload.
         :param correlation_id: Shared request ID. Example: "cedar-s17".
         :return: None. Example: no value.
-        :raises ValueError: When correlation identity is invalid.
         """
-        raise NotImplementedError()
+        logger.info(
+            "%s | processing | correlation_id=%s subject_id=%s summary_present=%s public_playbook_count=%s",
+            _DETAIL_LOG,
+            correlation_id,
+            detail["subject_id"],
+            bool(detail["summary"].strip()),
+            len(detail["public_playbooks"]),
+        )
 
 
 class PublicExpertBook(TypedDict):

@@ -205,12 +205,15 @@ def _experts_routes() -> list[URLPattern]:
 
 
 def _expert_detail_urlpatterns() -> list[URLPattern]:
-    """Declare the future public expert-detail route.
+    """Declare the public expert-detail route.
 
     :return: Route declarations. Example: /experts/<str:username>/ named expert_detail.
-    :raises NotImplementedError: Until the authorized backend slice wires the route.
     """
-    raise NotImplementedError()
+    return [
+        path(
+            "experts/<str:username>/", expert_views.expert_detail, name="expert_detail"
+        )
+    ]
 
 
 def _karma_copy_receipt_route() -> "URLPattern":
@@ -225,3 +228,4 @@ def _karma_copy_receipt_route() -> "URLPattern":
 # PIN S39: wire the reviewed KARMA-MCP-01 collaborators after PIN-05 GO; preserve current behavior.
 
 urlpatterns.extend(_experts_routes())
+urlpatterns.extend(_expert_detail_urlpatterns())

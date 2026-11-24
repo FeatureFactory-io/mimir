@@ -1,4 +1,4 @@
-"""Public direct Experts list delivery using the existing Django shell."""
+"""Public Experts delivery using the existing Django shell."""
 
 from __future__ import annotations
 
@@ -32,6 +32,8 @@ from methodology.services.experts_service import (
 logger = logging.getLogger(__name__)
 _DEFAULT_CATEGORY = "development"
 _LIST_LOG = "experts_list"
+_DETAIL_LOG = "expert_detail"
+_DETAIL_TEMPLATE = "experts/detail.html"
 
 
 @require_safe
@@ -158,15 +160,43 @@ def _ranked_people_context(category: str, correlation_id: str) -> dict[str, obje
     }
 
 
+@require_safe
 def expert_detail(request: HttpRequest, username: str) -> HttpResponse:
     """Render a public expert using real projections and production chrome.
 
     :param request: Django GET. Example: anonymous or Elena's authenticated request.
     :param username: Route account name. Example: "mrodriguez".
-    :return: HTML response. Example: status 200, experts/detail.html.
-    :raises Http404: For a missing, invalid or nonpositive expert.
+    :return: Public HTML or a generic 404. Example: status 200, experts/detail.html.
     """
-    raise NotImplementedError()
+    correlation_id = _detail_correlation_id(request)
+    request.request_id = correlation_id
+    logger.info(
+        "%s | entry | operation=public_expert_detail authenticated=%s correlation_id=%s",
+        _DETAIL_LOG,
+        request.user.is_authenticated,
+        correlation_id,
+    )
+    try:
+        detail = ExpertsService.public_detail(username, correlation_id=correlation_id)
+    except (LookupError, ValueError):
+        logger.info(
+            "%s | branch | reason=expert_unavailable correlation_id=%s",
+            _DETAIL_LOG,
+            correlation_id,
+        )
+        response = render(
+            request, _DETAIL_TEMPLATE, {"nav_section": "experts"}, status=404
+        )
+    else:
+        response = render(request, _DETAIL_TEMPLATE, _detail_context(request, detail))
+    logger.info(
+        "%s | exit | status=%s template=%s correlation_id=%s",
+        _DETAIL_LOG,
+        response.status_code,
+        _DETAIL_TEMPLATE,
+        correlation_id,
+    )
+    return response
 
 
 def _detail_correlation_id(request: HttpRequest) -> str:
@@ -176,7 +206,7 @@ def _detail_correlation_id(request: HttpRequest) -> str:
     :return: Safe correlation string. Example: "cedar-s17".
     :raises ValueError: For an unusable request object.
     """
-    raise NotImplementedError()
+    return _request_correlation_id(request)
 
 
 def _detail_context(
@@ -189,7 +219,23 @@ def _detail_context(
     :return: Template context. Example: {"person": detail, "nav_section": "experts", ...}.
     :raises ValueError: For malformed projection values.
     """
-    raise NotImplementedError()
+    category = request.GET.get("category")
+    if category not in CATEGORY_LABELS:
+        category = next(
+            (
+                slug
+                for slug, label in CATEGORY_LABELS.items()
+                if label == detail["primary_category"]
+            ),
+            None,
+        )
+    if category is None:
+        raise ValueError("Public expert breadcrumb requires a recognized category.")
+    return {
+        "person": detail,
+        "nav_section": "experts",
+        "back_url": f"{reverse('experts_list')}?{urlencode({'category': category})}",
+    }
 
 
 def _with_expert_contacts(

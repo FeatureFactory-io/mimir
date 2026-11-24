@@ -1,9 +1,20 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import pytest
 from django.test import Client
+from django.urls import reverse
+
+from methodology.models import AgentInteraction, ExpertProfile, KarmaAward, Playbook
+from tests.support.experts_data import CedarDataset
+from tests.support.experts_logs import capture_experts_logs
+from tests.support.log_story import assert_log_story
 
 pytestmark = pytest.mark.django_db
+_MARIA_PATH = "/experts/mrodriguez/"
+_VIEW_LOGGER = "methodology.expert_views"
+_SERVICE_LOGGER = "methodology.services.experts_service"
 
 
 def test_public_detail_with_cedar_maria_returns_identity_and_complete_summary(
@@ -42,36 +53,242 @@ def test_public_detail_with_html_summary_escapes_untrusted_markup(
     raise NotImplementedError()
 
 
-def test_public_detail_with_request_preserves_persisted_state(client: Client) -> None:
+def test_public_detail_with_request_preserves_persisted_state(
+    client: Client, cedar_dataset: CedarDataset
+) -> None:
     """Prove a detail read neither awards nor refreshes summaries.
 
     :param client: Real Django client. Example: Elena GETs Maria.
+    :param cedar_dataset: Real Cedar dataset. Example: contains Elena and Maria.
     :return: None. Example: identical ledger, summary metadata and trace counts.
     :raises AssertionError: When a read causes persistence effects.
     """
-    raise NotImplementedError()
+    client.force_login(cedar_dataset.users_by_username["esvensson"])
+    awards = list(KarmaAward.objects.order_by("pk").values())
+    profiles = list(ExpertProfile.objects.order_by("pk").values())
+    interactions = list(AgentInteraction.objects.order_by("pk").values())
+
+    response = client.get(_MARIA_PATH)
+
+    assert response.status_code == 200
+    assert list(KarmaAward.objects.order_by("pk").values()) == awards
+    assert list(ExpertProfile.objects.order_by("pk").values()) == profiles
+    assert list(AgentInteraction.objects.order_by("pk").values()) == interactions
 
 
 def test_public_detail_with_cedar_baseline_exposes_only_public_projection(
-    client: Client,
+    client: Client, cedar_dataset: CedarDataset
 ) -> None:
     """Prove the detail payload contains only approved display fields.
 
     :param client: Real Django client. Example: Bob GETs Maria.
+    :param cedar_dataset: Real Cedar dataset. Example: Maria's own released evidence.
     :return: None. Example: no raw account and only public released book payloads.
     :raises AssertionError: For a private object, email or unexpected payload key.
     """
-    raise NotImplementedError()
+    maria = cedar_dataset.users_by_username["mrodriguez"]
+    for status in ("draft", "active", "disabled"):
+        Playbook.objects.create(
+            author=maria,
+            name=status,
+            category="design",
+            visibility="public",
+            status=status,
+        )
+    summary = ExpertProfile.objects.get(user=maria).contribution_summary
+    book = cedar_dataset.playbooks_by_pk[6101]
+    assert reverse("expert_detail", kwargs={"username": maria.username}) == _MARIA_PATH
+    response = client.get(_MARIA_PATH, {"category": "research"})
+
+    assert response.status_code == 200
+    assert response.context["back_url"] == "/experts/?category=research"
+    assert response.context["person"] == {
+        "subject_id": maria.pk,
+        "username": "mrodriguez",
+        "name": "Maria Rodriguez",
+        "initials": "MR",
+        "total_karma": 8200,
+        "formatted_karma": "8,200",
+        "primary_category": "Design",
+        "summary": summary,
+        "numeric_fallback": "1 released playbook · 0 copies",
+        "source_rows": (
+            {"label": "Released playbooks", "points": "5,000"},
+            {"label": "PIP contributions", "points": "1,600"},
+            {"label": "Consumption", "points": "1,200"},
+            {"label": "Learning", "points": "400"},
+        ),
+        "category_rows": (
+            {"label": "Design", "points": "7,200"},
+            {"label": "Development", "points": "1,000"},
+        ),
+        "public_playbooks": (
+            {"pk": book.pk, "title": book.name, "category": "Design", "version": "1.0"},
+        ),
+    }
+    assert any(
+        template.name == "experts/detail.html" for template in response.templates
+    )
 
 
+def test_public_detail_with_legacy_release_preserves_public_projection(
+    client: Client, cedar_dataset: CedarDataset
+) -> None:
+    """Keep a blank-category released book visible and the expert eligible.
+
+    :param client: Real Django client. Example: Bob GETs Maria.
+    :param cedar_dataset: Imported real dataset. Example: Maria's public playbook 6101.
+    :return: None. Example: the public book retains its blank display category.
+    :raises AssertionError: If a legacy category suppresses eligible evidence or identity.
+    """
+    book = cedar_dataset.playbooks_by_pk[6101]
+    Playbook.objects.filter(pk=book.pk).update(category="")
+    response = client.get(_MARIA_PATH, {"category": "unknown"})
+
+    assert response.status_code == 200
+    assert response.context["back_url"] == "/experts/?category=design"
+    detail = response.context["person"]
+    assert detail["primary_category"] == "Design"
+    assert detail["numeric_fallback"] == "1 released playbook · 0 copies"
+    assert detail["public_playbooks"] == (
+        {"pk": book.pk, "title": book.name, "version": "1.0", "category": ""},
+    )
+
+
+def test_public_detail_with_no_public_books_preserves_positive_projection(
+    client: Client, cedar_dataset: CedarDataset
+) -> None:
+    """Use persisted points to establish eligibility independently of evidence.
+
+    :param client: Real Django client. Example: Bob GETs Sam.
+    :param cedar_dataset: Imported real dataset. Example: Sam has historical awards.
+    :return: None. Example: Sam has 4,800 points and no public book rows.
+    :raises AssertionError: If an empty evidence list suppresses the expert.
+    """
+    sam = cedar_dataset.users_by_username["skim"]
+    response = client.get(reverse("expert_detail", kwargs={"username": sam.username}))
+
+    assert response.status_code == 200
+    assert response.context["person"]["total_karma"] == 4800
+    assert response.context["person"]["public_playbooks"] == ()
+
+
+@pytest.mark.parametrize("request_id", ["cedar-s17", "invalid@example.invalid"])
 def test_public_detail_log_story_happy(
-    client: Client, caplog: pytest.LogCaptureFixture
+    client: Client,
+    cedar_dataset: CedarDataset,
+    caplog: pytest.LogCaptureFixture,
+    request_id: str,
 ) -> None:
     """Prove correlated detail logs without sensitive content.
 
     :param client: Real client. Example: GET with request ID cedar-s17.
+    :param cedar_dataset: Real Cedar dataset. Example: Maria's persisted contribution.
     :param caplog: Captured INFO records. Example: entry, processing and exit.
+    :param request_id: Incoming header. Example: "cedar-s17".
     :return: None. Example: assert_log_story verifies each declared beat.
     :raises AssertionError: For missing beats or leaked prose/email/sentinels.
     """
-    raise NotImplementedError()
+    maria = cedar_dataset.users_by_username["mrodriguez"]
+    with capture_experts_logs(caplog, (_VIEW_LOGGER, _SERVICE_LOGGER)):
+        response = client.get(_MARIA_PATH, headers={"X-Request-ID": request_id})
+    assert response.status_code == 200
+    feature_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name in (_VIEW_LOGGER, _SERVICE_LOGGER)
+    ]
+    detail_logs = "\n".join(feature_messages)
+    correlation_id = response.headers["X-Request-ID"]
+    if request_id == "cedar-s17":
+        assert correlation_id == request_id
+    else:
+        assert str(UUID(correlation_id)) == correlation_id
+        assert request_id not in detail_logs
+
+    correlation = f"correlation_id={correlation_id}"
+    assert_log_story(
+        caplog,
+        where="expert_detail",
+        beats={
+            "entry": (
+                "| entry |",
+                "authenticated=False",
+                "operation=public_expert_detail",
+                correlation,
+            ),
+            "exit": (
+                "| exit |",
+                "status=200",
+                "template=experts/detail.html",
+                correlation,
+            ),
+        },
+    )
+    assert_log_story(
+        caplog,
+        where="ExpertsService.public_detail",
+        beats={
+            "processing": (
+                "| processing |",
+                f"subject_id={maria.pk}",
+                "summary_present=True",
+                "public_playbook_count=1",
+                correlation,
+            )
+        },
+    )
+    assert [
+        message.split(" | ")[1]
+        for message in feature_messages
+        if message.startswith(("expert_detail |", "ExpertsService.public_detail |"))
+    ] == ["entry", "processing", "exit"]
+    assert maria.username not in detail_logs
+    assert maria.email not in detail_logs
+    assert "Cedar Bid Pricing" not in detail_logs
+    assert "Internal staffing notes for Cedar" not in detail_logs
+    assert ExpertProfile.objects.get(user=maria).contribution_summary not in detail_logs
+
+
+@pytest.mark.parametrize("username", ["no-such-cedar-user", "nberg"])
+def test_public_detail_log_story_reject(
+    client: Client,
+    cedar_dataset: CedarDataset,
+    caplog: pytest.LogCaptureFixture,
+    username: str,
+) -> None:
+    """Prove both rejection paths use one generic response and safe log story.
+
+    :param client: Real client. Example: anonymous Bob.
+    :param cedar_dataset: Imported real data. Example: Nora's zero-point account.
+    :param caplog: Captured INFO records. Example: entry, branch and exit.
+    :param username: Requested account. Example: "nberg".
+    :return: None. Example: both branches report the same reason and status.
+    :raises AssertionError: If a branch reveals the subject or its eligibility.
+    """
+    nora = cedar_dataset.users_by_username["nberg"]
+    correlation = "correlation_id=cedar-s17-missing"
+    with capture_experts_logs(caplog, (_VIEW_LOGGER, _SERVICE_LOGGER)):
+        response = client.get(
+            f"/experts/{username}/", headers={"X-Request-ID": "cedar-s17-missing"}
+        )
+    assert response.status_code == 404
+    assert nora.email.encode() not in response.content
+    assert all(
+        username not in record.getMessage()
+        for record in caplog.records
+        if record.name in (_VIEW_LOGGER, _SERVICE_LOGGER)
+    )
+    assert_log_story(
+        caplog,
+        where="ExpertsService.public_detail",
+        beats={"branch": ("| branch |", "reason=missing_or_ineligible", correlation)},
+    )
+    assert_log_story(
+        caplog,
+        where="expert_detail",
+        beats={
+            "branch": ("| branch |", "reason=expert_unavailable", correlation),
+            "exit": ("| exit |", "status=404", correlation),
+        },
+    )
