@@ -92,9 +92,19 @@ class CedarDatabaseScope:
     owner_id: str | None = None
 
 
-_SQLITE_TEST_REGISTRATION: ContextVar[
-    tuple[CedarDatabaseScope, FixtureRequest, int] | None
-] = ContextVar("cedar_sqlite_test_registration", default=None)
+@dataclass(slots=True)
+class _SQLiteTestRegistration:
+    """Lifetime of one fixture's SQLite claim, shared by any context copies."""
+
+    scope: CedarDatabaseScope
+    request: FixtureRequest
+    pid: int
+    active: bool = True
+
+
+_SQLITE_TEST_REGISTRATION: ContextVar[_SQLiteTestRegistration | None] = ContextVar(
+    "cedar_sqlite_test_registration", default=None
+)
 
 
 @dataclass(frozen=True)
@@ -300,10 +310,13 @@ def _register_sqlite_test_scope(
     """
     if _active_fixture_phase(request) != "setup":
         raise ValueError(_UNREGISTERED_SQLITE_SCOPE)
-    token = _SQLITE_TEST_REGISTRATION.set((scope, request, os.getpid()))
+    registration = _SQLiteTestRegistration(scope, request, os.getpid())
+    token = _SQLITE_TEST_REGISTRATION.set(registration)
     try:
         yield
     finally:
+        # Reset restores the local binding only. Copies still hold this registration.
+        registration.active = False
         _SQLITE_TEST_REGISTRATION.reset(token)
 
 
@@ -341,17 +354,21 @@ def _active_fixture_phase(request: FixtureRequest) -> Literal["setup", "call"] |
 
 
 def _require_registered_sqlite_scope(scope: CedarDatabaseScope) -> None:
-    """Reject file claims outside their activated test before opening SQLite."""
+    """Require live authority in the current pytest item before opening SQLite.
+
+    :param scope: Exact private file claim registered by the fixture.
+    :return: None if the registration and its pytest item are still active.
+    :raises ValueError: If the current context has no matching live registration.
+    """
     registration = _SQLITE_TEST_REGISTRATION.get()
-    if registration is not None:
-        registered_scope, request, pid = registration
-        if (
-            registered_scope is scope
-            and pid == os.getpid()
-            and _active_fixture_phase(request) is not None
-        ):
-            return
-    raise ValueError(_UNREGISTERED_SQLITE_SCOPE)
+    if (
+        registration is None
+        or not registration.active
+        or registration.scope is not scope
+        or registration.pid != os.getpid()
+        or _active_fixture_phase(registration.request) is None
+    ):
+        raise ValueError(_UNREGISTERED_SQLITE_SCOPE)
 
 
 def _validate_private_test_paths(database: Path, marker: Path) -> None:
