@@ -54,6 +54,7 @@ from mcp_integration.facade.server import _build_mcp
 from methodology.models import Activity, Agent, Artifact, Phase, Rule, Skill
 from methodology.services.experts_service import ExpertsService
 from tests.support.experts_data import (
+    CedarDatabaseScope,
     CedarDataset,
     _resolve_database_scope,
     _verify_sqlite_target,
@@ -895,6 +896,7 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         server_url: str,
         root: Path,
         include_summaries: bool = False,
+        database_scope: CedarDatabaseScope | None = None,
     ) -> None:
         """Capture explicit backend, actor and owned subprocess paths.
 
@@ -904,6 +906,7 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         :param server_url: Real facade backend, or empty for legacy. Example: live_server.url.
         :param root: Pytest-owned subprocess directory. Example: tmp_path.
         :param include_summaries: Complete S23 invariants required. Example: True.
+        :param database_scope: Explicit live file-runner proof, or None for normal runners.
         :return: None. Example: unopened protocol client.
         :raises ValueError: Invalid dependencies/ownership.
         """
@@ -919,6 +922,7 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
         self.entrypoint, self.actor_username = entrypoint, actor_username
         self.dataset, self.server_url, self.root = dataset, server_url, root
         self.include_summaries = include_summaries
+        self.database_scope = database_scope
         self._process: Popen[bytes] | None = None
         self._database: MCPSubprocessDatabase | None = None
         self._resources = ExitStack()
@@ -1077,7 +1081,7 @@ class StdioMCPClient(AbstractContextManager["StdioMCPClient"]):
                 Path(directory).resolve()
             )
             return
-        _resolve_database_scope(None)
+        _resolve_database_scope(self.database_scope)
         _, self._token = _load_actor_and_token(self.dataset, self.actor_username)
 
     def _start_process(self) -> None:

@@ -48,6 +48,19 @@ _RECEIPT_ERRORS = (ValueError, ObjectDoesNotExist, PermissionError, ValidationEr
 ReceiptChannel = Literal["mcp_detail", "export"]
 
 
+class _RejectedReceiptPayload(ValueError):
+    """A controlled parse failure carrying only a validated optional action UUID."""
+
+    def __init__(self, event_identity: UUID | None) -> None:
+        """Keep safe identity apart from rejected body content.
+
+        :param event_identity: Unique canonical UUID, or None when untrusted.
+        :return: None; the exception message contains no request values.
+        """
+        super().__init__("Consumption receipt has invalid fields.")
+        self.event_identity = event_identity
+
+
 @dataclass(frozen=True)
 class ConsumptionReceiptPayload:
     """Validated receipt fields; actor and award properties are absent."""
@@ -61,8 +74,8 @@ class ConsumptionReceiptPayload:
 class ConsumptionReceiptView(APIView):
     """Accept explicit authenticated consumption attestations."""
 
-    authentication_classes = [HeaderTokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes = (HeaderTokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def post(self, request: Request) -> Response:
         """Validate receipt and delegate once to the shared consumption service.
@@ -87,17 +100,34 @@ class ConsumptionReceiptView(APIView):
                 actor, *args, channel=receipt.channel
             )
         except _RECEIPT_ERRORS as error:
-            response = self._error_response(error)
-            reason = response.data["reason"]
-            logger.info(
-                "%s | branch | %s reason=%s awards=0", _RECEIPT_LOG, trace, reason
-            )
-            return response
+            return self._rejected_response(error, trace)
         result = self._result_payload(outcomes, receipt.event_identity)
         counts = f"status={result['status']} created_count={result['created_count']}"
         outcome = f"{counts} occurred_at={result.get('occurred_at')}"
         logger.info("%s | exit | %s %s", _RECEIPT_LOG, trace, outcome)
         return Response(result)
+
+    def _rejected_response(self, error: Exception, trace: str) -> Response:
+        """Log a recognized rejection with only validated safe identity metadata.
+
+        :param error: Controlled boundary failure, e.g. unknown payload fields.
+        :param trace: Safe actor/request and any already validated target fields.
+        :return: Existing sanitized response, e.g. invalid_payload HTTP400.
+        :raises Exception: An unrecognized error, e.g. unexpected persistence failure.
+        """
+        if (
+            isinstance(error, _RejectedReceiptPayload)
+            and error.event_identity is not None
+        ):
+            trace += f" event_identity={error.event_identity}"
+        response = self._error_response(error)
+        logger.info(
+            "%s | branch | %s reason=%s awards=0",
+            _RECEIPT_LOG,
+            trace,
+            response.data["reason"],
+        )
+        return response
 
     def _parse_receipt(self, request: Request) -> ConsumptionReceiptPayload:
         """Parse exactly the four allowed fields.
@@ -112,8 +142,20 @@ class ConsumptionReceiptView(APIView):
         payload = request.read(_MAX_RECEIPT_BYTES + 1)
         if len(payload) > _MAX_RECEIPT_BYTES:
             raise ValueError("Consumption receipt exceeds the size limit.")
-        # Preserve JSON member pairs to detect duplicate keys before dict conversion.
+        # Retain pairs until both uniqueness and the field allowlist are checked.
         pairs = json.loads(payload.decode("utf-8"), object_pairs_hook=tuple)
+        try:
+            return self._validate_receipt_pairs(pairs)
+        except ValueError as error:
+            raise _RejectedReceiptPayload(self._rejected_identity(pairs)) from error
+
+    def _validate_receipt_pairs(self, pairs: object) -> ConsumptionReceiptPayload:
+        """Validate exact fields before treating any client reference as trusted.
+
+        :param pairs: Decoded JSON object pairs, e.g. four permitted fields.
+        :return: Immutable validated consumption payload.
+        :raises ValueError: Nonobject/duplicate/unknown fields or invalid values.
+        """
         if not isinstance(pairs, tuple) or len(pairs) != len(_RECEIPT_FIELDS):
             raise ValueError("A receipt must specify exactly the permitted fields.")
         fields = dict(pairs)
@@ -127,6 +169,22 @@ class ConsumptionReceiptView(APIView):
             self._parse_event_identity(fields["event_identity"]),
             self._parse_channel(fields["channel"]),
         )
+
+    def _rejected_identity(self, pairs: object) -> UUID | None:
+        """Extract one canonical action for correlation without accepting the body.
+
+        :param pairs: Bounded, successfully decoded JSON object pairs.
+        :return: Safe normalized UUID, or None for duplicate/invalid identity.
+        """
+        if not isinstance(pairs, tuple):
+            return None
+        actions = [value for key, value in pairs if key == "event_identity"]
+        if len(actions) != 1:
+            return None
+        try:
+            return self._parse_event_identity(actions[0])
+        except ValueError:
+            return None
 
     def _validate_field_names(self, payload: Mapping[str, object]) -> None:
         """Reject unknown fields, including actor and award overrides.
