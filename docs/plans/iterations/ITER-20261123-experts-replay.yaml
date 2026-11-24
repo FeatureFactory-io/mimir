@@ -33,6 +33,9 @@ conflict_map:
   - S36
   Makefile:
   - S36
+  - S04
+  - S23
+  - S27
   tests/integration/test_copy_prompt.py:
   - S36
   docs/features/steps/experts_category_steps.py:
@@ -3752,6 +3755,8 @@ scenarios:
     skeleton_commit: 7937a04b8d70ae75bba714ab0529ddb63cb5e7f5
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/unit/test_galdr_batch_context.py
+    - Makefile
     - .env.example
     - docs/experts-replay/pin-evidence/S23.json
     - docs/features/steps/experts_summary_submission_steps.py
@@ -4021,6 +4026,7 @@ scenarios:
         - N3-submission-acceptance
         triggered_by_failed_review: N4-definition-of-done
         footprint:
+        - Makefile
         - methodology/services/pip_service.py
         - methodology/services/contribution_summary_service.py
         - methodology/services/contribution_summary_factory.py
@@ -4504,6 +4510,7 @@ scenarios:
     skeleton_commit: 8f8542607e41a4773c6403ddd15b0566f2399c73
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - Makefile
     - docs/experts-replay/pin-evidence/S04.json
     - docs/features/steps/experts_card_steps.py
     - docs/plans/iterations/experts/S04-experts-list-04.md
@@ -5932,6 +5939,10 @@ scenarios:
         footprint:
         - docs/features/steps/karma_mcp_steps.py
         - tests/integration/test_karma_mcp.py
+        tests:
+        - test_mcp_client_factory_with_different_actors_restores_context_and_auth
+        - test_legacy_detail_and_collections_with_async_guard_use_safe_orm
+        supplemental_gate: pytest tests/integration/test_karma_mcp.py -k 'client_factory or legacy_detail_and_collections' -x
         gate:
           command: make test-experts-s39-at
         acceptance_command: DJANGO_SETTINGS_MODULE=mimir.settings.acceptance .venv/bin/python manage.py behave
