@@ -1198,6 +1198,22 @@ scenarios:
         - Preserve focus, native button semantics, expansion states and complete stored prose.
         - Keep the useful explanation accessible without placing a popup over the paragraph.
         - S11 owns the new deterministic reading/occlusion browser assertion and full recapture.
+      - id: R2-collapse-visible-reading
+        title: Keep the restored paragraph and focused toggle below the actual fixed header
+        bpe: BPE-03
+        depends_on:
+        - R1-summary-toggle-reading
+        footprint:
+        - templates/accounts/profile.html
+        approved_additional_helpers:
+        - revealCollapsedPreview
+        gate:
+          command: make test-experts-s11-browser
+          regression_command: make test-experts-s10-backend
+        constraints:
+        - Scroll only when the newly collapsed region is obscured or outside the viewport.
+        - Preserve focus, summary text, expansion semantics and unchanged page position when already readable.
+        - Test automation observes viewport bounds without forcing scroll to hide defects.
       scenario_dependencies:
       - S03
       - S17
@@ -2884,6 +2900,7 @@ scenarios:
     skeleton_commit: e14a42ad76ed1aaf24845bd478c7d541732ce480
     structural_reconciliation_commit: 39d598328d438d09723b6eb14574fbf92fab71c9
     codebase_footprint:
+    - tests/unit/test_experts_html.py
     - docs/experts-replay/pin-evidence/S12.json
     - docs/features/steps/experts_profile_steps.py
     - docs/plans/iterations/experts/S12-experts-profile-03.md
@@ -2996,6 +3013,31 @@ scenarios:
           - do-not-mock-in-integration-tests
           - do-follow-commit-convention
           - pytest
+      - id: R1-public-source-format
+        title: Preserve exact own and public source-table display contracts in the shared assertion
+        bpe: BPE-04
+        depends_on:
+        - N3-production-browser
+        triggered_by_failed_review: N4-definition-of-done
+        footprint:
+        - tests/support/experts_html.py
+        - tests/integration/test_experts_profile_sources.py
+        - tests/unit/test_experts_html.py
+        gate:
+          command: make test-experts-s12-backend
+          compatibility_command: pytest tests/unit/test_experts_html.py tests/integration/test_experts_own_profile.py tests/integration/test_profile_page.py -x
+        constraints:
+        - Preserve Mapping[str,int] and selector-specific exact formatting, including grouped public values and raw own-profile values.
+        - Do not accept malformed comma grouping or weaken labels, order, scope or totals.
+        - No production UI change is required.
+      - id: N5-public-helper-reuse-review
+        title: Independently certify shared public reuse and complete own-profile source contract
+        bpe: BPE-06
+        depends_on:
+        - R1-public-source-format
+        footprint: []
+        gate:
+          command: make test-experts-s12
       scenario_dependencies:
       - S03
       - S10
@@ -4786,7 +4828,7 @@ scenarios:
       - S17
       - S14
     implementation_plan: docs/plans/iterations/experts/S04-experts-list-04.md
-    status: implementation_in_progress
+    status: complete
     user_correction:
       statement: I never did it
       interpretation: The attributed S04 pause was not a user instruction; withdraw the derived pause and continue the approved engineering work.
