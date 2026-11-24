@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import pytest
 from e2e_helpers import login
 from playwright.sync_api import Locator, Page, expect
@@ -20,6 +22,31 @@ DETAIL_VIEWPORTS = (
 BOOTSTRAP_MD_WIDTH = 768
 LAYOUT_TOLERANCE_PX = 1
 MARIA_DETAIL_PATH = "/experts/mrodriguez/"
+READING_SCROLL_LIMIT = 20
+READING_SCROLL_FRACTION = 0.5
+READING_SETTLE_TIMEOUT_MS = 5000
+logger = logging.getLogger(__name__)
+_READING_LINE_STATE = """(element, fraction) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const header = document.querySelector('[data-testid="realm-navbar"]');
+    const top = Math.max(0, header.getBoundingClientRect().bottom);
+    const lines = Array.from(range.getClientRects());
+    const readable = [], covered = [];
+    lines.forEach((line, index) => {
+        if (line.top < top || line.bottom > innerHeight) return;
+        const y = (line.top + line.bottom) / 2;
+        const points = [line.left + 1, (line.left + line.right) / 2, line.right - 1];
+        if (points.every(x => element.contains(document.elementFromPoint(x, y)))) {
+            readable.push(index);
+        } else {
+            covered.push(index);
+        }
+    });
+    return {count: lines.length, readable, covered, scrollY,
+        step: Math.max(1, Math.floor((innerHeight - top) * fraction)),
+        maxScroll: document.documentElement.scrollHeight - innerHeight};
+}"""
 
 
 @pytest.fixture
@@ -77,7 +104,7 @@ def test_public_detail_with_required_viewport_preserves_read_context_recipe(
         "document.documentElement.scrollWidth === document.documentElement.clientWidth"
     )
     _assert_untruncated_summary(summary, stored_maria_summary)
-    _assert_summary_has_no_visible_occlusion(summary)
+    _read_all_summary_lines(summary)
 
     page.get_by_test_id("expert-back-link").click(trial=True)
     context_rail.get_by_test_id("expert-playbook-6101").click(trial=True)
@@ -187,3 +214,41 @@ def _assert_summary_has_no_visible_occlusion(summary: Locator) -> None:
             return covered;
         }""")
     assert not covered, f"Public contribution text is obscured: {covered}"
+
+
+def _read_all_summary_lines(summary: Locator) -> None:
+    """Require every line to be readable through native document scrolling.
+
+    :param summary: Complete public paragraph. Example: Maria's nine sentences.
+    :return: None once every rendered line has passed three-point hit testing.
+    :raises AssertionError: Text is covered or cannot enter the reading area.
+    """
+    page = summary.page
+    page.keyboard.press("Home")
+    page.wait_for_function("scrollY === 0", timeout=READING_SETTLE_TIMEOUT_MS)
+    _assert_summary_has_no_visible_occlusion(summary)
+    expected = summary.evaluate(_READING_LINE_STATE, READING_SCROLL_FRACTION)["count"]
+    assert expected > 0, "No rendered paragraph lines were selected"
+    seen: set[int] = set()
+    logger.info(
+        "expert_detail_reading | entry | viewport=%s line_count=%s",
+        page.viewport_size,
+        expected,
+    )
+    for _ in range(READING_SCROLL_LIMIT):
+        state = summary.evaluate(_READING_LINE_STATE, READING_SCROLL_FRACTION)
+        assert state["count"] == expected, "Paragraph reflowed while reading"
+        assert not state["covered"], "A line in the reading area is obscured"
+        seen.update(state["readable"])
+        if len(seen) == expected:
+            logger.info("expert_detail_reading | exit | readable_lines=%s", len(seen))
+            return
+        target = min(state["scrollY"] + state["step"], state["maxScroll"])
+        assert target > state["scrollY"], "Unread lines cannot be reached"
+        page.mouse.wheel(0, state["step"])
+        page.wait_for_function(
+            "target => Math.abs(scrollY - target) <= 1",
+            arg=target,
+            timeout=READING_SETTLE_TIMEOUT_MS,
+        )
+    raise AssertionError("Not all paragraph lines became readable by scrolling")
