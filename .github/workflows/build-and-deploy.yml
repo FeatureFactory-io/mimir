@@ -23,6 +23,11 @@ on:
         type: boolean
         required: true
         default: false
+      wake_idle:
+        description: Bring the existing idle environment online before preflight; no candidate deployment
+        type: boolean
+        required: true
+        default: false
 
 env:
   DOCKERHUB_IMAGE: featurefactory/mimir-mcp
@@ -297,9 +302,47 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Next step:** trigger the **Promote to Production** workflow (\`promote.yml\`) after reviewing the idle URL." >> $GITHUB_STEP_SUMMARY
 
+  wake_idle:
+    name: Bring existing idle environment online
+    if: github.event_name == 'workflow_dispatch' && inputs.wake_idle
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: mimir-idle-power
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Require preflight mode and no candidate deployment
+        env:
+          PREFLIGHT_ONLY: ${{ inputs.preflight_only }}
+          DEPLOY_TO_IDLE: ${{ inputs.deploy_to_idle }}
+        run: |
+          test "$PREFLIGHT_ONLY" = true
+          test "$DEPLOY_TO_IDLE" = false
+      - name: Checkout existing power workflow
+        uses: actions/checkout@v4
+      - name: Configure existing deployment connection
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Start only the environment without the production CNAME
+        env:
+          EB_APP: mimir
+          EB_ENV_A: mimir-prod
+          EB_ENV_B: mimir-idle
+          PROD_CNAME_SUBSTRING: mimir-prod.eba-
+          EB_IDLE_WAIT_SSM: '1'
+        run: bash scripts/eb_idle_power.sh start
+
   staging-preflight:
     name: Read-only staging identity and capacity
-    if: github.event_name == 'workflow_dispatch' && inputs.preflight_only
+    needs: wake_idle
+    if: >-
+      always() && github.event_name == 'workflow_dispatch' && inputs.preflight_only &&
+      (needs.wake_idle.result == 'success' || needs.wake_idle.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -371,7 +414,6 @@ jobs:
           PY_SUBNET_IDS
           mapfile -t SUBNET_IDS < preflight-receipts/subnet-ids.txt
           aws ec2 describe-subnets --subnet-ids "${SUBNET_IDS[@]}" --query 'Subnets[].{SubnetId:SubnetId,VpcId:VpcId,AvailabilityZone:AvailabilityZone,MapPublicIpOnLaunch:MapPublicIpOnLaunch,AvailableIpAddressCount:AvailableIpAddressCount}' --output json > preflight-receipts/subnets.json
-          aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 --query Parameter.Value --output text > preflight-receipts/amazon-linux-x86-ami.txt
       - name: Verify idle instance ownership and SSM availability
         id: host
         env:
