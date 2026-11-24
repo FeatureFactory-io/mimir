@@ -2849,7 +2849,7 @@ scenarios:
           command. Require positive counts and no skips. Confirm one handler, S10-owned CSS, unchanged paragraph
           and retained account controls; resolve living-spec mapping before claiming EXPERTS-PROFILE-02 done.
     implementation_plan: docs/plans/iterations/experts/S11-experts-profile-02.md
-    status: skeleton_unimplemented
+    status: implementation_in_progress
     github_issue: null
     semantic_dependencies:
     - S10
@@ -4744,7 +4744,14 @@ scenarios:
       - S17
       - S14
     implementation_plan: docs/plans/iterations/experts/S04-experts-list-04.md
-    status: implementation_in_progress
+    status: awaiting_repair_decision
+    pending_repair_decision:
+      finding: Strict validator accepts a false recapture acquisition revision in copied evidence.
+      review: /Users/denispetelin/Desktop/RIPL-Experts-Production/review/S04-recapture-provenance.md
+      patch: /Users/denispetelin/Desktop/RIPL-Experts-Production/review/S04-recapture-provenance.patch
+      sha256: 15f013e39be0484fa690c33388743405aec455ff42a50e10f736348c96d314f9
+      source_untouched_pending_decision: true
+      question: Approve the two-file fix and continued necessary repairs inside all 49 contracts, retaining main merge, release and production promotion review.
     github_issue: null
     semantic_dependencies:
     - S03

@@ -784,7 +784,8 @@ test-experts-s27-backend:
 		tests/integration/test_experts_public_evidence.py::test_build_summary_prompt_with_public_evidence_preserves_layers_and_bounds \
 		tests/integration/test_experts_public_evidence.py::test_build_summary_prompt_with_malformed_evidence_rejects_invalid_shape \
 		tests/integration/test_experts_public_evidence.py::test_validate_summary_response_with_boundary_or_unsafe_output_enforces_contract \
-		tests/unit/test_agent_test_support.py::test_scripted_llm_with_recorded_call_preserves_request_and_exhaustion -x
+		tests/unit/test_agent_test_support.py::test_scripted_llm_with_recorded_call_preserves_request_and_exhaustion \
+		tests/unit/test_request_id_privacy.py -x
 
 .PHONY: test-experts-s27-log
 test-experts-s27-log:

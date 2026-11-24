@@ -8,10 +8,11 @@ Every HTTP request to Mimir now gets a unique request ID that's tracked througho
 
 ### 1. Request ID Middleware (`mimir/middleware.py`)
 - Generates a unique UUID for each request
-- Can accept `X-Request-ID` header from upstream systems (load balancers, API gateways)
+- Preserves a safe `X-Request-ID` from upstream systems: 1–100 letters, digits, periods, underscores or hyphens, beginning with a letter or digit
+- Replaces absent, malformed or credential-like IDs with one UUID before request context or logs are published
 - Stores request ID on the request object as `request.request_id`
 - Returns request ID in response headers as `X-Request-ID`
-- Logs request start/end/errors with the request ID
+- Logs request start/end/errors with the safe request ID; request-start attribution uses the server-side actor ID
 
 ### 2. Logging Filter (`mimir/logging_filters.py`)
 - Adds request ID to every log message
@@ -20,6 +21,7 @@ Every HTTP request to Mimir now gets a unique request ID that's tracked througho
 ### 3. Thread-Local Storage (`mimir/request_local.py`)
 - Stores current request in thread-local storage
 - Allows logging filter to access request ID from anywhere in the codebase
+- Defines the pure shared correlation/credential policy without importing Django models during logging startup
 
 ## Log Format
 
@@ -27,12 +29,12 @@ All logs now include request ID:
 
 **File logs (verbose):**
 ```
-[2025-11-28 10:30:45] [INFO    ] [REQ:a1b2c3d4-5678-90ef-ghij-klmnopqrstuv] [PID:12345:TID:67890] [accounts/views.py:85] [views.login_view] User maria attempting login
+[2025-11-28 10:30:45] [INFO    ] [REQ:a1b2c3d4-5678-49ab-8cde-0123456789ab] [PID:12345:TID:67890] [accounts/views.py:85] [views.login_view] User maria attempting login
 ```
 
 **Console logs (simple):**
 ```
-[REQ:a1b2c3d4-5678-90ef-ghij-klmnopqrstuv] INFO User maria logged in successfully
+[REQ:a1b2c3d4-5678-49ab-8cde-0123456789ab] INFO User maria logged in successfully
 ```
 
 ## Usage
@@ -44,7 +46,7 @@ Access the request ID directly from the request object:
 ```python
 def my_view(request):
     request_id = request.request_id
-    logger.info(f"Processing request for user {request.user.username}")
+    logger.info("Processing request actor_id=%s", request.user.pk)
     # The log message will automatically include the request ID
 ```
 
@@ -55,12 +57,12 @@ The response includes the request ID in headers:
 ```bash
 curl -I http://localhost:8000/dashboard/
 # Response includes:
-# X-Request-ID: a1b2c3d4-5678-90ef-ghij-klmnopqrstuv
+# X-Request-ID: a1b2c3d4-5678-49ab-8cde-0123456789ab
 ```
 
 ### Propagating from Upstream
 
-If you have a load balancer or API gateway generating request IDs, pass it along:
+If you have a load balancer or API gateway generating safe request IDs, pass it along:
 
 ```bash
 curl -H "X-Request-ID: my-custom-tracking-id" http://localhost:8000/api/
@@ -68,13 +70,15 @@ curl -H "X-Request-ID: my-custom-tracking-id" http://localhost:8000/api/
 # X-Request-ID: my-custom-tracking-id
 ```
 
+Unsafe values are never echoed as request IDs. The generated replacement is used by request logs, response headers and the PIP summary interaction. The PIP view reads the validated `request.request_id`; its raw-header fallback remains only for direct callers without middleware. Background records retain `NO_REQUEST`.
+
 ### Searching Logs
 
 To trace a specific request through all logs:
 
 ```bash
 # Find all log entries for a specific request
-grep "REQ:a1b2c3d4-5678-90ef-ghij-klmnopqrstuv" logs/app.log
+grep "REQ:a1b2c3d4-5678-49ab-8cde-0123456789ab" logs/app.log
 
 # See the full journey of a request
 grep "REQ:a1b2c3d4" logs/app.log | grep -E "(REQUEST_START|REQUEST_END|REQUEST_ERROR)"
@@ -92,13 +96,13 @@ grep "REQ:a1b2c3d4" logs/app.log | grep -E "(REQUEST_START|REQUEST_END|REQUEST_E
 
 ```
 1. User hits /auth/user/login/
-   [REQ:abc-123] [REQUEST_START] GET /auth/user/login/ - User: anonymous
+   [REQ:abc-123] [REQUEST_START] GET /auth/user/login/ actor_id=anonymous
 
 2. Login form displayed
    [REQ:abc-123] Displaying login form
 
 3. User submits credentials
-   [REQ:def-456] [REQUEST_START] POST /auth/user/login/ - User: anonymous
+   [REQ:def-456] [REQUEST_START] POST /auth/user/login/ actor_id=anonymous
    [REQ:def-456] Login attempt for username: maria, remember_me: True
    [REQ:def-456] User maria logged in with remember me (30 days session)
 
@@ -106,7 +110,7 @@ grep "REQ:a1b2c3d4" logs/app.log | grep -E "(REQUEST_START|REQUEST_END|REQUEST_E
    [REQ:def-456] [REQUEST_END] POST /auth/user/login/ - Status: 302
 
 5. Dashboard loads
-   [REQ:ghi-789] [REQUEST_START] GET /dashboard/ - User: maria
+   [REQ:ghi-789] [REQUEST_START] GET /dashboard/ actor_id=42
    [REQ:ghi-789] User maria accessing dashboard
    [REQ:ghi-789] [REQUEST_END] GET /dashboard/ - Status: 200
 ```
