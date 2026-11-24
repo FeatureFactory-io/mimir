@@ -201,6 +201,7 @@ feature_execution_graph:
     depends_on:
     - N1-consumption-receipt
     footprint:
+    - tests/integration/test_copy_prompt.py
     - static/js/copy_prompt.js
     - templates/activities/_embed.html
     - templates/activities/detail.html
@@ -218,7 +219,8 @@ feature_execution_graph:
     - tests/integration/test_copy_prompt.py
     - tests/integration/test_karma_copy.py
     gate:
-      command: pytest tests/integration/test_copy_prompt.py tests/integration/test_karma_copy.py -x
+      command: pytest tests/integration/test_copy_prompt.py -x
+      regression_command: make test-experts-s36-backend
     guidance_bundle:
       activity: BPE/BPE-03-Implement_Frontend.md
       rules:
