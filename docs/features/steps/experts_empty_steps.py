@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from behave import then
 from behave.runner import Context
+
 from tests.support.experts_html import (
     assert_no_expert_cards,
     assert_other_empty_message,
@@ -16,7 +17,7 @@ def no_contributor_cards(context: Context) -> None:
     :return: None after successful HTTP and zero-card assertions.
     :raises AssertionError: If the response or leaderboard violates the contract.
     """
-    raise NotImplementedError()
+    assert_no_expert_cards(context.response)
 
 
 @then('she sees "No experts in Other yet — release a playbook to be the first"')
@@ -27,4 +28,4 @@ def other_empty_message(context: Context) -> None:
     :return: None after exact message and Other-current assertions.
     :raises AssertionError: If actual rendered text or selected category differs.
     """
-    raise NotImplementedError()
+    assert_other_empty_message(context.response)
