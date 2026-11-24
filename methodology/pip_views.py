@@ -697,6 +697,7 @@ def _submit_admin_review(
     :param pip: Proposal loaded before the service transaction.
     :param action: Recognized form action. Example: save_decisions.
     :return: Redirect to the review page or the decided proposal.
+    :raises DatabaseError: If the real finalization cannot access its storage.
     """
     decisions = {
         change.pk: (
@@ -711,7 +712,12 @@ def _submit_admin_review(
                 pip, request.user, decisions=decisions
             )
             label = finalized.get_status_display().lower()
-            messages.success(request, f"PIP {label} — changes applied.")
+            outcome = (
+                "no changes applied"
+                if finalized.status == PipModel.STATUS_REJECTED
+                else "changes applied"
+            )
+            messages.success(request, f"PIP {label} — {outcome}.")
             return redirect("pip_detail", pk=pip.pk)
         PIPAdminService.save_decisions(pip, request.user, decisions)
         messages.success(request, "Decisions saved.")
