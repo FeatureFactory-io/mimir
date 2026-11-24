@@ -167,16 +167,16 @@ feature_execution_graph:
       - do-not-mock-in-integration-tests
       - pytest
   - id: S24-N2-acceptance
-    title: Bind the exact stored-summary acceptance contract
+    title: Verify complementary server checks and browser contract mapping
     bpe: BPE-04
     depends_on:
     - S24-N1-stored-read-contract
-    footprint:
-    - docs/features/steps/experts_stored_summary_steps.py
+    footprint: []
     gate:
       command: make test-experts-s24-server
-      expected_scenarios: 1
-      expected_steps: 6
+      expected_passed: 2
+      require_positive_selection: true
+      notes: Read-only mapping review; the sole original five-step contract is browser-certified at N3.
     guidance_bundle:
       activity: BPE/BPE-04-Implement_Feature_Acceptance_Tests.md
       rules:
