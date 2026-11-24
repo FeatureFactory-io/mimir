@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import socket
 from collections.abc import Callable
 from pathlib import Path
@@ -25,13 +26,20 @@ from methodology.services.playbook_export_service import PlaybookExportService
 from methodology.services.workflow_export_service import WorkflowExportService
 from tests.support.experts_data import CedarDataset, load_cedar_baseline
 from tests.support.experts_logs import capture_experts_logs
-from tests.support.karma_mcp import MCPClientFactory, MCPDataset, decode_tool_payload
+from tests.support.karma_mcp import (
+    MCPCase,
+    MCPClientFactory,
+    MCPDataset,
+    StdioMCPClient,
+    decode_tool_payload,
+)
 from tests.support.log_story import assert_log_story
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
 _CEDAR_PLAYBOOK_ID = 6201
 _CEDAR_WORKFLOW_ID = 6202
+_CEDAR_ACTIVITY_ID = 6203
 _EXPORT_FOLDER = "cedar"
 _ACTOR = "mrodriguez"
 _AUTHOR = "mchen"
@@ -851,17 +859,103 @@ def test_karma_export_with_partial_file_failure_creates_no_receipt(
     assert _current_award_ids() == before
 
 
+@pytest.mark.parametrize("entity", ("workflow", "playbook"))
 def test_karma_export_stdio_t3_with_success_returns_clean_jsonrpc(
-    live_server: LiveServer, tmp_path: Path
+    entity: str, live_server: LiveServer, cedar_dataset: CedarDataset, tmp_path: Path
 ) -> None:
     """Prove actual facade stdio registration, clean output and paired effects.
 
+    :param entity: Existing export variant. Example: "workflow".
     :param live_server: Isolated server shared with subprocess. Example: live_server.
+    :param cedar_dataset: Restored Cedar baseline. Example: workflow 6202.
     :param tmp_path: Subprocess workspace. Example: Path("/tmp/t").
     :return: None after protocol/file/ledger assertions. Example: None.
     :raises AssertionError: If stdout is polluted or effects differ.
     """
-    raise NotImplementedError()
+    actor, author = _cedar_actors(cedar_dataset)
+    before = _current_award_ids()
+    workspace = tmp_path.resolve()
+    case = _stdio_export_case(entity, workspace)
+    with StdioMCPClient(
+        entrypoint="facade",
+        actor_username=actor.username,
+        dataset=MCPDataset(cedar_dataset, {}, {}),
+        server_url=live_server.url,
+        root=workspace,
+    ) as wire:
+        schemas = {tool["name"]: tool["inputSchema"] for tool in wire.list_tools()}
+        assert set(schemas[case.tool_name]["properties"]) == _EXPORT_PARAMETERS[entity]
+        assert schemas[case.tool_name]["required"] == [f"{entity}_id"]
+        assert _current_award_ids() == before
+        result = wire.call(case)
+    wire.assert_protocol_clean()
+    _assert_stdio_export_files(entity, workspace, result, cedar_dataset)
+    identity = _assert_cedar_export_pair(entity, actor, author, before)
+    assert re.findall(r"HTTP Request: (.+)", wire.stderr) == [
+        f'POST {live_server.url}{route} "HTTP/1.1 200 OK"'
+        for route in (case.route, _RECEIPT_PATH)
+    ]
+    assert re.search(
+        rf"export_receipt \| exit \| .*event_identity={identity} .*"
+        r"receipt_status=applied created_count=2",
+        wire.stderr,
+    )
+
+
+def _stdio_export_case(entity: str, workspace: Path) -> MCPCase:
+    """Build the existing public export call for one owned stdio workspace.
+
+    :param entity: Registered export kind. Example: "workflow".
+    :param workspace: Actual child working directory. Example: Path("/tmp/t").
+    :return: Tool name, public arguments and real bundle route.
+    :raises KeyError: The export kind is unsupported.
+    """
+    tool = f"export_{entity}_to_local"
+    return MCPCase(
+        name=tool,
+        actor_username=_ACTOR,
+        tool_name=tool,
+        fixture_key=f"mike_{entity}",
+        arguments={
+            f"{entity}_id": _ENTITY_IDS[entity],
+            "target_directory": str(workspace / "exports"),
+            "folder_name": _EXPORT_FOLDER,
+        },
+        route=_BUNDLE_ROUTES[entity],
+        expected={},
+    )
+
+
+def _assert_stdio_export_files(
+    entity: str, workspace: Path, result: object, cedar: CedarDataset
+) -> None:
+    """Compare the actual child output tree with its response and Cedar content.
+
+    :param entity: Registered export kind. Example: "playbook".
+    :param workspace: Isolated subprocess workspace.
+    :param result: Actual tools/call payload.
+    :param cedar: Original workflow and activity content.
+    :return: None after checking every written file.
+    :raises AssertionError: Missing, misplaced or different output files.
+    """
+    assert isinstance(result, dict) and result["status"] == "exported"
+    assert result[f"{entity}_id"] == _ENTITY_IDS[entity]
+    root = workspace / "exports" / _EXPORT_FOLDER
+    paths = [result["export_path"]] if entity == "workflow" else result["export_paths"]
+    assert paths == [str(root)]
+    outputs = {root / filename for filename in result["files_created"]}
+    assert len(outputs) == len(result["files_created"]) > 1
+    assert all(path.resolve().is_relative_to(root) for path in outputs)
+    rules = {Path(path) for path in result.get("rule_export_paths", ())}
+    assert all(path.resolve().is_relative_to(workspace / "rules") for path in rules)
+    assert {path for path in workspace.rglob("*") if path.is_file()} == outputs | rules
+    content = {path.name: path.read_text(encoding="utf-8") for path in outputs}
+    assert all(text.strip() for text in content.values())
+    assert (
+        f"# {cedar.workflows_by_pk[_CEDAR_WORKFLOW_ID].name}" in content["_workflow.md"]
+    )
+    activity = cedar.activities_by_pk[_CEDAR_ACTIVITY_ID]
+    assert any(f"# Activity: {activity.name}" in text for text in content.values())
 
 
 def test_karma_export_log_story_happy(

@@ -42,6 +42,7 @@ _DETAIL_CHANNEL = EventChannel.MCP_DETAIL
 _RECEIPT_PATH = "/api/consumption-receipts/"
 _POINTS_PER_AWARD = 5
 _MIKE_PLAYBOOK_ID = 6201
+_MIKE_WORKFLOW_ID = 6202
 _DESIGN_PIP_KEY = "HIST-MARIA-DESIGN-01"
 
 
@@ -305,7 +306,21 @@ def maria_mcp_token(context: Context) -> None:
     :return: None; example: real authenticated Django client ready.
     :raises AssertionError: Maria baseline or token authentication differs.
     """
-    raise NotImplementedError()
+    cedar = context.cedar_dataset
+    actor = cedar.users_by_username[_ACTOR_USERNAMES["Maria"]]
+    workflow = cedar.workflows_by_pk[_MIKE_WORKFLOW_ID]
+    awards = KarmaAward.objects.order_by("pk").values()
+    baseline = list(awards)
+    token, _ = Token.objects.get_or_create(user=actor)
+    response = context.client.get(
+        f"/api/workflows/{workflow.pk}/", HTTP_AUTHORIZATION=f"Token {token.key}"
+    )
+    assert response.status_code == 200 and response.json()["id"] == workflow.pk
+    assert response.wsgi_request.user == actor
+    assert list(awards.all()) == baseline
+    context.mcp_actor = actor
+    context.mcp_dataset = MCPDataset(cedar, {}, {})
+    context.mcp_awards_before = baseline
 
 
 @when("she calls list_activities")
