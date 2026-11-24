@@ -2,7 +2,31 @@ from __future__ import annotations
 
 import pytest
 
-from tests.support.experts_html import element_text, find_by_test_id
+from tests.support.experts_html import (
+    assert_karma_source_rows,
+    element_text,
+    find_by_test_id,
+)
+
+_PUBLIC_SOURCE_TABLE = """
+<span data-testid="expert-karma-total">8,200</span>
+<table data-testid="karma-source-breakdown">
+  <thead><tr><th scope="col">Source</th><th scope="col">Karma</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Released playbooks</th><td>{released}</td></tr>
+    <tr><th scope="row">PIP contributions</th><td>1,600</td></tr>
+    <tr><th scope="row">Consumption</th><td>1,200</td></tr>
+    <tr><th scope="row">Learning</th><td>400</td></tr>
+  </tbody>
+  <tfoot><tr><th scope="row">Total</th><td>8,200</td></tr></tfoot>
+</table>
+"""
+_PUBLIC_SOURCES = {
+    "Released playbooks": 5000,
+    "PIP contributions": 1600,
+    "Consumption": 1200,
+    "Learning": 400,
+}
 
 
 def test_find_by_test_id_with_matching_root_includes_root() -> None:
@@ -54,3 +78,40 @@ def test_element_text_with_non_element_raises_value_error() -> None:
     """Require a parsed Django Element."""
     with pytest.raises(ValueError):
         element_text("plain text")
+
+
+@pytest.mark.parametrize("released", ["5000", "50,00"])
+def test_assert_karma_source_rows_with_wrong_public_grouping_rejects(
+    released: str,
+) -> None:
+    """Reject public source amounts that use the wrong digit grouping.
+
+    :param released: Rendered released points. Example: "50,00".
+    :return: None when the helper rejects the format.
+    :raises AssertionError: If a public amount bypasses exact formatting.
+    """
+    with pytest.raises(AssertionError, match="Released playbooks"):
+        assert_karma_source_rows(
+            _PUBLIC_SOURCE_TABLE.format(released=released),
+            _PUBLIC_SOURCES,
+            "expert-karma-total",
+            8200,
+        )
+
+
+@pytest.mark.parametrize("points", [True, -1])
+def test_assert_karma_source_rows_with_invalid_points_rejects(points: int) -> None:
+    """Require semantic nonnegative integers for the expected amounts.
+
+    :param points: Invalid expected contribution. Example: True.
+    :return: None when the helper rejects the expected amount.
+    :raises AssertionError: If the invalid expectation bypasses validation.
+    """
+    expected = _PUBLIC_SOURCES | {"Learning": points}
+    with pytest.raises(AssertionError, match="nonnegative integers"):
+        assert_karma_source_rows(
+            _PUBLIC_SOURCE_TABLE.format(released="5,000"),
+            expected,
+            "expert-karma-total",
+            sum(expected.values()),
+        )

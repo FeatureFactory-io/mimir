@@ -1,4 +1,4 @@
-"""Verify own-profile score sources against the isolated Cedar award ledger."""
+"""Verify profile score sources against the isolated Cedar award ledger."""
 
 from __future__ import annotations
 
@@ -20,6 +20,12 @@ from tests.support.experts_html import (
 )
 
 _CEDAR_SOURCES = {"Released": 5000, "PIP": 1600, "Consumption": 1200, "Learning": 400}
+_PUBLIC_CEDAR_SOURCES = {
+    "Released playbooks": 5000,
+    "PIP contributions": 1600,
+    "Consumption": 1200,
+    "Learning": 400,
+}
 _CEDAR_TOTAL = 8200
 _CEDAR_AWARD_KINDS = {
     "release": 5000,
@@ -91,6 +97,27 @@ def test_profile_sources_with_cedar_ledger_reconcile(
         for child in category.children
         if isinstance(child, Element)
     ] == [("dt", "Design"), ("dd", "7200"), ("dt", "Development"), ("dd", "1000")]
+
+
+@pytest.mark.django_db
+def test_profile_sources_with_public_detail_reconcile_grouped_values(
+    client: Client, cedar_dataset: CedarDataset
+) -> None:
+    """Prove the shared assertion works on the actual guest-facing profile.
+
+    :param client: Real Django test client. Example: an anonymous visitor.
+    :param cedar_dataset: Imported Cedar ledger and accounts. Example: CedarDataset.
+    :return: None. Example: public sources display 5,000/1,600/1,200/400.
+    :raises AssertionError: If the public response or reconciliation differs.
+    """
+    maria = cedar_dataset.users_by_username["mrodriguez"]
+    response = client.get(reverse("expert_detail", args=[maria.username]))
+    assert response.status_code == HTTPStatus.OK
+    assert not response.context["user"].is_authenticated
+    assert "experts/detail.html" in [template.name for template in response.templates]
+    assert_karma_source_rows(
+        response.text, _PUBLIC_CEDAR_SOURCES, "expert-karma-total", _CEDAR_TOTAL
+    )
 
 
 @pytest.mark.django_db
