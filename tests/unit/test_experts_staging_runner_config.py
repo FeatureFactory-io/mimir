@@ -469,7 +469,10 @@ def test_image_cache_reserve_with_three_exact_records_excludes_resident_bytes(
         ("Os", "windows"),
         ("Architecture", "arm64"),
         ("Size", True),
-        ("Size", 1),
+        ("Size", 0),
+        ("Size", -1),
+        ("Size", 20 * 1024**3),
+        ("Size", 20 * 1024**3 + 1),
         ("Id", "latest"),
         ("Id", "sha256:" + "A" * 64),
         ("RepoDigests", ["mimir:latest"]),
@@ -664,3 +667,32 @@ def test_create_app_role_with_explicit_socket_matches_bootstrap_directory(
         else ast.literal_eval(target)
     )
     assert actual == "/var/run/postgresql"
+
+
+def test_image_cache_reserve_with_observed_idle_sizes_uses_digest_identity(
+    modules: dict[str, ModuleType],
+) -> None:
+    """Accept measured exact images despite engine-dependent size accounting.
+
+    :param modules: Actual contract implementation, without any cloud call.
+    :return: None when the real copied records prove all three resident images.
+    :raises AssertionError: CI storage-size representation is used as identity.
+    """
+    manifest, observed = _runtime_manifest(), json.loads(_OBSERVED_IDLE_CACHE_JSON)
+    for role, row in observed.items():
+        manifest[f"{role}_image"] = row["RepoDigests"][0]
+    manifest["build_receipt"]["web_digest"] = manifest["web_image"].split("@")[1]
+    manifest["image_sizes"] = {
+        "web": 286_723_520,
+        "browser": 750_259_047,
+        "postgres": 166_208_812,
+    }
+    assert all(
+        observed[role]["Size"] != size for role, size in manifest["image_sizes"].items()
+    )
+    assert modules["contract"].image_cache_reserve(manifest, observed) == 1024**3
+
+
+# Actual read-only CI45526140670 metadata, source receipt SHA256
+# 13ba76346cb63685e40b67b32c092f163d27fdb8c061227fa6e152dfb6c0e1d8.
+_OBSERVED_IDLE_CACHE_JSON = '{"web":{"Id":"sha256:5d250803bac2ea5a1c545246d82b5a5eded74eec52451bf7eacef5738839ed61","RepoDigests":["411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:e7f6e2170fd6250a9b6c3f635ceb2b90d0dfbe81ed337c10180c0a903ca5e1ba"],"Os":"linux","Architecture":"amd64","Size":827361988},"browser":{"Id":"sha256:06420e0e4d82040e23ef50eec215ca9be5e1b66683ffc5df426268996ed013e4","RepoDigests":["411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:a74104c8fb4ff8a02dd053ee2584868d91dd4273f058b690faf0875684c5e368"],"Os":"linux","Architecture":"amd64","Size":1904824872},"postgres":{"Id":"sha256:a026aff735540e5492c2ac4a782edd7dffa9b3b816dbda710d63b7a84f2c9b82","RepoDigests":["postgres@sha256:07abc3f43c9395b0bdbbab36bc25ddb0e8d83cd4fcafb5fb7d6abe14ff156dd8"],"Os":"linux","Architecture":"amd64","Size":468060783}}'

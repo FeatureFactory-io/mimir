@@ -36,6 +36,7 @@ _RUNTIME_KEYS = {
 MIN_AVAILABLE_MEMORY = 1400 * 1024 * 1024
 MIN_AVAILABLE_DISK = 4 * 1024 * 1024 * 1024
 LIVE_DISK_RESERVE = 1024**3
+MAX_IMAGE_SIZE = 20 * 1024**3
 
 
 def image_cache_reserve(
@@ -56,28 +57,25 @@ def image_cache_reserve(
     }:
         return cold
     matched = all(
-        cached_image_matches(manifest[f"{role}_image"], size, observations[role])
-        for role, size in manifest["image_sizes"].items()
+        cached_image_matches(manifest[f"{role}_image"], observations[role])
+        for role in manifest["image_sizes"]
     )
     return LIVE_DISK_RESERVE if matched else cold
 
 
-def cached_image_matches(reference: str, size: int, actual: Mapping[str, Any]) -> bool:
-    """Check one real immutable Linux/amd64 cache record without tag inference.
+def cached_image_matches(reference: str, actual: Mapping[str, Any]) -> bool:
+    """Check immutable Linux/amd64 identity with bounded actual host metadata.
 
     :param reference: Exact validated image digest reference.
-    :param size: Positive immutable image size from the candidate CI receipt.
     :param actual: Whitelisted real Docker image metadata.
-    :return: Whether digest, architecture, identity and size all match.
+    :return: Whether digest/platform match and the host's own size is bounded.
     """
     if not isinstance(actual, Mapping) or not isinstance(reference, str):
         return False
     identity, digests = actual.get("Id"), actual.get("RepoDigests")
     return (
-        type(size) is int
-        and size > 0
-        and type(actual.get("Size")) is int
-        and actual["Size"] == size
+        type(actual.get("Size")) is int
+        and 0 < actual["Size"] < MAX_IMAGE_SIZE
         and actual.get("Os") == "linux"
         and actual.get("Architecture") == "amd64"
         and isinstance(identity, str)
@@ -277,7 +275,8 @@ def validate_runtime_manifest(manifest: Mapping[str, Any]) -> int:
     validate_runtime_images(manifest, image)
     sizes = manifest.get("image_sizes", {})
     if set(sizes) != {"web", "browser", "postgres"} or any(
-        type(size) is not int or not 0 < size < 20 * 1024**3 for size in sizes.values()
+        type(size) is not int or not 0 < size < MAX_IMAGE_SIZE
+        for size in sizes.values()
     ):
         raise ValueError("Actual positive image sizes are required before host pulls.")
     return max(MIN_AVAILABLE_DISK, sum(sizes.values()) + 1024**3)
