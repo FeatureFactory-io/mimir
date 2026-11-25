@@ -191,9 +191,11 @@ def _assert_cards(page: Page) -> None:
     last_bottom = float("-inf")
     for username, email in zip(_NAMES, _CONTACTS, strict=True):
         card = page.get_by_test_id(f"experts-card-{username}")
-        box = card.bounding_box()
-        assert box is not None and box["y"] >= last_bottom
-        last_bottom = box["y"] + box["height"]
+        top, bottom = card.evaluate(
+            "el => { const b=el.getBoundingClientRect(); return [b.top+scrollY,b.bottom+scrollY]; }"
+        )
+        assert top >= last_bottom
+        last_bottom = bottom
         _card_geometry(card)
         _full_text(card.get_by_test_id("expert-card-name"))
         _full_text(card.get_by_test_id("expert-card-karma"))

@@ -494,6 +494,7 @@ def _assert_detail(page: Page, oracle: GuestOracle) -> None:
     assert summary.inner_text() == oracle.summary
     _assert_full_paragraph(summary)
     _assert_breakdown(page)
+    _assert_public_book_identity(page)
     read, rail = (
         page.get_by_test_id(hook)
         for hook in ("expert-read-column", "expert-context-rail")
@@ -834,3 +835,21 @@ def _tooltip_geometry(page: Page, tooltip: Locator) -> None:
     size = page.viewport_size
     assert size is not None
     assert_guest_tooltip_in_viewport(page, tooltip, (size["width"], size["height"]))
+
+
+def _assert_public_book_identity(page: Page) -> None:
+    """Read the actual single released baseline playbook with its version.
+
+    :param page: Real baseline Maria public detail, guest or signed in.
+    :return: None when Accessibility Audit Playbook v1.0 is the public evidence.
+    :raises AssertionError: Public identity/version differs from Cedar baseline.
+    """
+    books = page.get_by_test_id("expert-public-playbooks")
+    expect(books.get_by_role("link")).to_have_count(1)
+    expect(
+        books.get_by_role("heading", name="Accessibility Audit Playbook", exact=True)
+    ).to_be_visible()
+    expect(books).to_contain_text("Design · v1.0")
+    expect(books.get_by_test_id("expert-playbook-6101")).to_have_attribute(
+        "href", "/playbooks/6101/"
+    )
