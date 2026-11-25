@@ -132,6 +132,63 @@ def test_request_verification_with_false_success_nonce_rejects(scope: Path) -> N
     server.join(timeout=5)
 
 
+def test_start_server_with_socket_replaced_before_thread_keeps_foreign_inode(
+    scope: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = scope / "verify.sock"
+    clients: list[socket.socket] = []
+    foreign: list[socket.socket] = []
+    calls: list[bool] = []
+
+    class DelayedThread:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+        def start(self) -> None:
+            client = socket.socket(socket.AF_UNIX)
+            client.settimeout(5)
+            client.connect(str(path))
+            clients.append(client)
+            path.unlink()
+            replacement = socket.socket(socket.AF_UNIX)
+            replacement.bind(str(path))
+            replacement.listen(1)
+            foreign.append(replacement)
+            self.actual = threading.Thread(**self.kwargs)
+            self.actual.start()
+
+    monkeypatch.setattr(worker, "Thread", DelayedThread)
+    server = worker.start_server(scope, _NONCE, lambda: calls.append(True))
+    expected = path.lstat().st_ino
+    try:
+        clients[0].sendall(b"wrong-packet")
+        clients[0].shutdown(socket.SHUT_WR)
+        assert clients[0].recv(1024) == b'{"status":"FAILED"}'
+        server.actual.join(timeout=5)
+        assert path.lstat().st_ino == expected and not calls
+    finally:
+        for connection in clients + foreign:
+            connection.close()
+
+
+def test_start_server_with_thread_start_failure_removes_only_its_socket(
+    scope: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailedThread:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def start(self) -> None:
+            raise RuntimeError("Thread cannot start")
+
+    monkeypatch.setattr(worker, "Thread", FailedThread)
+    with pytest.raises(RuntimeError, match="Thread cannot start"):
+        worker.start_server(scope, _NONCE, lambda: pytest.fail("must not execute"))
+    assert not (scope / "verify.sock").exists()
+
+
 def test_worker_module_with_isolated_import_does_not_initialize_django() -> None:
     script = f"import sys; sys.path.insert(0,{str(_RUNTIME)!r}); import suite_worker_verify; assert 'django' not in sys.modules"
     result = subprocess.run(

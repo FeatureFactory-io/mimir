@@ -116,7 +116,11 @@ def respond(connection: socket.socket, nonce: str, verify: Callable[[], None]) -
 
 
 def serve(
-    listener: socket.socket, path: Path, nonce: str, verify: Callable[[], None]
+    listener: socket.socket,
+    path: Path,
+    nonce: str,
+    verify: Callable[[], None],
+    identity: tuple[int, int],
 ) -> None:
     """Serve one attempt and release only this worker's socket.
 
@@ -124,10 +128,9 @@ def serve(
     :param path: Private socket file to release on completion.
     :param nonce: Immutable manifest nonce.
     :param verify: Original full loaded-worker verification callback.
+    :param identity: Bound device/inode captured before the thread handoff.
     :return: None after one attempt or bounded startup inactivity.
     """
-    metadata = path.lstat()
-    identity = (metadata.st_dev, metadata.st_ino)
     try:
         with listener:
             connection, _ = listener.accept()
@@ -152,16 +155,23 @@ def start_server(root: Path, nonce: str, verify: Callable[[], None]) -> Thread:
     if not callable(verify):
         raise TypeError("Private verification callback is not callable.")
     listener = socket.socket(socket.AF_UNIX)
+    identity = None
     try:
         listener.bind(str(path))
+        metadata = path.lstat()
+        identity = (metadata.st_dev, metadata.st_ino)
         os.chmod(path, 0o600)
         listener.settimeout(_ACCEPT_TIMEOUT_SECONDS)
         listener.listen(1)
-        server = Thread(target=serve, args=(listener, path, nonce, verify), daemon=True)
+        server = Thread(
+            target=serve, args=(listener, path, nonce, verify, identity), daemon=True
+        )
         server.start()
         return server
     except Exception:
         listener.close()
+        if identity is not None:
+            remove_owned_socket(path, identity)
         raise
 
 
