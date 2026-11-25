@@ -615,3 +615,52 @@ def test_allowed_evidence_name_with_private_failure_variant_rejects(
     :raises AssertionError: The new artifact admission broadens unexpectedly.
     """
     assert modules["remote"].allowed_evidence_name(Path(name)) is False
+
+
+def _docker_arguments_from_source(method_name: str) -> list[ast.expr]:
+    """Read a concrete Docker call without replacing its runtime implementation.
+
+    :param method_name: Actual host method; e.g. create_app_role.
+    :return: The single Docker invocation's concrete argument expressions.
+    :raises AssertionError: The source no longer has one such invocation.
+    """
+    tree = ast.parse((_RUNTIME / "remote.py").read_text())
+    method = next(
+        n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == method_name
+    )
+    calls = [
+        n
+        for n in ast.walk(method)
+        if isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Name)
+        and n.func.id == "docker"
+    ]
+    assert len(calls) == 1
+    return calls[0].args
+
+
+def test_create_app_role_with_explicit_socket_matches_bootstrap_directory(
+    modules: dict[str, ModuleType],
+) -> None:
+    """Keep the actual post-start SQL client on the verified writable socket.
+
+    :param modules: Actual host control module and its source constants.
+    :return: None after the concrete SQL invocation matches the default socket.
+    :raises AssertionError: Role creation would connect to a different directory.
+    """
+    args = _docker_arguments_from_source("create_app_role")
+    host_index = (
+        next(
+            i
+            for i, value in enumerate(args)
+            if isinstance(value, ast.Constant) and value.value == "-h"
+        )
+        + 1
+    )
+    target = args[host_index]
+    actual = (
+        getattr(modules["remote"], target.id)
+        if isinstance(target, ast.Name)
+        else ast.literal_eval(target)
+    )
+    assert actual == "/var/run/postgresql"

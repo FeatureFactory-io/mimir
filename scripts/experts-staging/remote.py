@@ -76,13 +76,14 @@ _DB_BINDS = (
     ("pg-admin-password", "/run/secrets/pg-password", True),
 )
 # The image clears PGHOST for its setup client, which uses this default socket.
+_POSTGRES_SOCKET_DIRECTORY = "/var/run/postgresql"
 _POSTGRES_SOCKET_TMPFS = (
-    "/var/run/postgresql:rw,nosuid,size=1m,uid=999,gid=999,mode=3775"
+    _POSTGRES_SOCKET_DIRECTORY + ":rw,nosuid,size=1m,uid=999,gid=999,mode=3775"
 )
 _POSTGRES_SERVER = (
     "postgres",
     "-c",
-    "unix_socket_directories=/var/run/postgresql",
+    f"unix_socket_directories={_POSTGRES_SOCKET_DIRECTORY}",
     "-c",
     "shared_buffers=32MB",
     "-c",
@@ -601,7 +602,7 @@ def create_app_role(root: Path, nonce: str, name: str) -> str:
         name,
         "psql",
         "-h",
-        "/tmp",
+        _POSTGRES_SOCKET_DIRECTORY,
         "-U",
         "postgres",
         "-d",
