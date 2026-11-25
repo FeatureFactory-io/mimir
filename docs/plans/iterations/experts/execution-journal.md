@@ -1958,3 +1958,53 @@ source total1319.576seconds. The original failed export and its timestamp
 warnings are preserved. The final movie remains unfinished until a corrected
 export passes actual duration, full decode, continuity and visual/audio checks.
 No new cloud execution or production database access was performed for film QA.
+
+### Final film and editable source handoff — independently accepted
+
+The corrected movie is
+`/Users/denispetelin/Desktop/RIPL-Experts-Production/delivery/Experts-From-Idea-to-Staging.mp4`,
+SHA256 `f9c778476e7fdc8ab4ec66b7c53fa2b9ed3a8bd9dee0325d7a7d7eda520993af`,
+94,542,594 bytes. Actual duration is 1319.583008 seconds (21:59.583), with
+31,670 frames at 24 fps and 1319.576 seconds of stereo 48 kHz audio. The exact
+first-21 source and approved Scenes 22 v4, 23 v2, 24, 25 v2 and 26 v2 appear
+once in order. Approved male Qwen3 Aiden narration is retained.
+
+Two short joins remain rejected and preserved. Decoder parameter changes in
+the mixed original first-21 source caused filter reinitialization and clock
+resets during the joins; original packet DTS remained monotonic. A bounded
+57-second check proved disabled reinitialization across the first actual
+transition. Each of six unchanged source components was then normalized
+separately with invariant formats, explicit frame/sample counts and continuous
+counter clocks before the final join. Actual full movie packet timing now
+passes, with zero DTS warnings; six ordinary stereo-layout advisories are
+recorded. No source art, application behavior or approved voice was recreated.
+
+Full audio/video decode, finite audio, zero clipping and all five component
+boundaries pass. Root independently viewed 13 frames decoded from the actual
+final movie, including the later first-21 range transition, current composite
+verdict, actual UAT fixture/contact proof, external recommendation and final
+sentence. Twenty-four independent decoded waveform windows contain 23 speech
+matches at zero lag (minimum correlation 0.9999592) and one explicitly silent
+window. This is signal/lineage verification, not subjective listening. Root
+verification SHA256 is
+`fca34978f58f38408bebc8afbac9102154b696ba486e32b9ef046ad1a596e8e1`.
+
+Independent final handoff accepts the exact movie, readable README, 59 source
+index path/hash records and all 16 delivered native PowerPoint files containing
+124 selected slides. Fourteen are exact prepared-source copies; two are verified
+selections within their own deck. There is no cross-deck merge claim. Genuine
+screenshots remain images; motion/audio and Scene 17's existing media are
+separately indexed. The source index SHA256 is
+`5ffe1464f771dcb891b92243216d5476ddb0c0580c0d616709960d368f0ca7bb`;
+final independent handoff verification SHA256 is
+`6f60ca2b9a8afb0ad180c1c04cee5de1de0f436d82e55f5a8d49ccffeababa03`.
+
+Storyboard Page, local HTML and active progress are synchronized at revision95.
+The film is complete. All 49 original Experts contracts and the scoped 20-step,
+11-case UAT composite are independently accepted. The original failed runs and
+producer flags remain unchanged; this is not one successful full eleven-case
+run or a human usability study. Selected passing staging sessions were temporary
+and cleaned; ordinary idle was not deployed/promoted and their address is not
+a persistent demo. Global lint, Analytics and the older failed self-copy private
+evidence retention remain open and unwaived. No project-wide DoD, main merge,
+release, production database read/copy or production promotion is granted.

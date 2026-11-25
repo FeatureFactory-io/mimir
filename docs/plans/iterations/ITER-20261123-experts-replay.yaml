@@ -9992,7 +9992,7 @@ iteration_convergence_followups:
     - tests/unit/test_karma_sqlite_lifecycle.py
     preserves: Production behavior unchanged; restore the actual async worker wrapper and current schema leaves after owned test lifetimes.
   isolated_idle_runner:
-    status: experts_uat_composite_independently_accepted_film_final_export_pending
+    status: experts_uat_composite_independently_accepted_film_complete
     footprint:
     - .github/workflows/build-and-deploy.yml
     - scripts/experts-staging/
@@ -10080,3 +10080,17 @@ iteration_convergence_followups:
     - Real loopback SDK transport outside provider private internals.
     - Empty collection opt-in only at the collection caller; generic, malformed and isError results stay strict.
     - System Graphviz is required by SAO and installed in CI; app graph behavior is unchanged.
+  final_movie_delivery:
+    status: FINAL_LOCAL_HANDOFF_PASS
+    movie: /Users/denispetelin/Desktop/RIPL-Experts-Production/delivery/Experts-From-Idea-to-Staging.mp4
+    movie_sha256: f9c778476e7fdc8ab4ec66b7c53fa2b9ed3a8bd9dee0325d7a7d7eda520993af
+    actual_container_seconds: 1319.583008
+    actual_audio_seconds: 1319.576
+    actual_video_frames: 31670
+    native_editable_files: 16
+    selected_native_slides: 124
+    source_index_sha256: 5ffe1464f771dcb891b92243216d5476ddb0c0580c0d616709960d368f0ca7bb
+    independent_handoff_verification_sha256: 6f60ca2b9a8afb0ad180c1c04cee5de1de0f436d82e55f5a8d49ccffeababa03
+    root_picture_audio_verification_sha256: fca34978f58f38408bebc8afbac9102154b696ba486e32b9ef046ad1a596e8e1
+    storyboard_sequence: 95
+    qualification: Completed local film and source package. Independent Experts UAT accepted by the documented nine-plus-two composite; original failures remain preserved. Temporary passing staging sessions cleaned; no promise of a live temporary demo. Global lint, Analytics and older private evidence retention remain open. No project-wide DoD, main merge, release, production database access or production promotion.
