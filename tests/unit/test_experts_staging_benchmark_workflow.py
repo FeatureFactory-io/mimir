@@ -97,6 +97,7 @@ def test_benchmark_proof_with_fixed_build_receipt_binds_candidate_source() -> No
     assert set(workflow["on"]["workflow_dispatch"]["inputs"]) == {
         "web_memory_mib",
         "browser_memory_mib",
+        "resource_profile",
     }
     job = workflow["jobs"]["benchmark"]
     assert job["env"]["CANDIDATE_SHA"] == "04c9432bce7eac5ec34a090bc5e8ec4fa06f409d"
@@ -144,3 +145,29 @@ def test_benchmark_browser_experiment_with_dispatch_requires_closed_credential_f
     assert '--browser-memory-mib "$EXPERIMENT_BROWSER_MEMORY_MIB"' in command
     assert "sudo /usr/bin/env -i /usr/bin/python3" in command
     assert "${{" not in command
+
+
+def test_aggregate_profile_with_dispatch_requires_explicit_closed_coupled_choice() -> (
+    None
+):
+    """Keep aggregate ownership opt-in and reject incompatible caps before launch.
+
+    :return: None after closed profile, gate and clean process arguments agree.
+    :raises AssertionError: Parent mode is implicit, uncoupled or untested.
+    """
+    workflow = _workflow()
+    option = workflow["on"]["workflow_dispatch"]["inputs"]["resource_profile"]
+    assert option["default"] == "default"
+    assert option["options"] == ["default", "aggregate1024"]
+    steps = workflow["jobs"]["benchmark"]["steps"]
+    step = next(s for s in steps if s.get("name", "").startswith("Run the genuine"))
+    assert (
+        step["env"]["EXPERIMENT_RESOURCE_PROFILE"] == "${{ inputs.resource_profile }}"
+    )
+    command = step["run"]
+    assert 'case "$EXPERIMENT_RESOURCE_PROFILE" in default|aggregate1024)' in command
+    assert 'test "$EXPERIMENT_WEB_MEMORY_MIB" = 384' in command
+    assert 'test "$EXPERIMENT_BROWSER_MEMORY_MIB" = 768' in command
+    assert '--resource-profile "$EXPERIMENT_RESOURCE_PROFILE"' in command
+    gate = next(s["run"] for s in steps if s.get("name", "").startswith("Validate"))
+    assert "test_experts_staging_aggregate.py" in gate

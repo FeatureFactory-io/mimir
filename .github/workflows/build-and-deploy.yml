@@ -15,6 +15,12 @@ on:
         required: true
         default: '512'
         options: ['512', '768']
+      resource_profile:
+        description: Explicit owned aggregate experiment on this disposable CI runner
+        type: choice
+        required: true
+        default: default
+        options: [default, aggregate1024]
 
 permissions:
   contents: read
@@ -44,7 +50,7 @@ jobs:
         run: python -m pip install boto3 pytest pyyaml
       - name: Validate runtime guards and benchmark-only workflow
         run: |
-          python -m pytest -p no:cacheprovider -c /dev/null --confcutdir=tests/unit tests/unit/test_experts_staging_runner_contract.py tests/unit/test_experts_staging_runner_config.py tests/unit/test_experts_staging_benchmark.py tests/unit/test_experts_staging_benchmark_workflow.py tests/unit/test_experts_staging_capture_contract.py -k 'not test_workflow_with_normal_defaults_has_no_implicit_companion_dispatch and not test_workflow_with_untrusted_selectors_uses_environment_and_guards_before_aws' -q
+          python -m pytest -p no:cacheprovider -c /dev/null --confcutdir=tests/unit tests/unit/test_experts_staging_runner_contract.py tests/unit/test_experts_staging_runner_config.py tests/unit/test_experts_staging_benchmark.py tests/unit/test_experts_staging_benchmark_workflow.py tests/unit/test_experts_staging_capture_contract.py tests/unit/test_experts_staging_aggregate.py -k 'not test_workflow_with_normal_defaults_has_no_implicit_companion_dispatch and not test_workflow_with_untrusted_selectors_uses_environment_and_guards_before_aws' -q
       - name: Download successful immutable candidate build receipt
         uses: actions/download-artifact@v4
         with:
@@ -72,11 +78,17 @@ jobs:
         env:
           EXPERIMENT_WEB_MEMORY_MIB: ${{ inputs.web_memory_mib }}
           EXPERIMENT_BROWSER_MEMORY_MIB: ${{ inputs.browser_memory_mib }}
+          EXPERIMENT_RESOURCE_PROFILE: ${{ inputs.resource_profile }}
         run: |
           set -euo pipefail
           case "$EXPERIMENT_WEB_MEMORY_MIB" in 384|256) ;; *) exit 2 ;; esac
           case "$EXPERIMENT_BROWSER_MEMORY_MIB" in 512|768) ;; *) exit 2 ;; esac
-          sudo /usr/bin/env -i /usr/bin/python3 "$GITHUB_WORKSPACE/scripts/experts-staging/benchmark.py" --prepared-output "$GITHUB_WORKSPACE/experts-readiness" --web-memory-mib "$EXPERIMENT_WEB_MEMORY_MIB" --browser-memory-mib "$EXPERIMENT_BROWSER_MEMORY_MIB" --output "$GITHUB_WORKSPACE/benchmark-public"
+          case "$EXPERIMENT_RESOURCE_PROFILE" in default|aggregate1024) ;; *) exit 2 ;; esac
+          if test "$EXPERIMENT_RESOURCE_PROFILE" = aggregate1024; then
+            test "$EXPERIMENT_WEB_MEMORY_MIB" = 384
+            test "$EXPERIMENT_BROWSER_MEMORY_MIB" = 768
+          fi
+          sudo /usr/bin/env -i /usr/bin/python3 "$GITHUB_WORKSPACE/scripts/experts-staging/benchmark.py" --prepared-output "$GITHUB_WORKSPACE/experts-readiness" --web-memory-mib "$EXPERIMENT_WEB_MEMORY_MIB" --browser-memory-mib "$EXPERIMENT_BROWSER_MEMORY_MIB" --resource-profile "$EXPERIMENT_RESOURCE_PROFILE" --output "$GITHUB_WORKSPACE/benchmark-public"
       - name: Retain vetted numeric and actual browser evidence
         if: always()
         uses: actions/upload-artifact@v4
