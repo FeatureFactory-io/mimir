@@ -545,7 +545,7 @@ jobs:
           instance_id = 'i-0f9603f1b45a08879'
           args = ['aws', 'ssm', 'get-command-invocation', '--command-id',
                   command_id, '--instance-id', instance_id, '--output', 'json']
-          actual = json.loads(subprocess.check_output(args, timeout=60))
+          actual = json.loads(subprocess.check_output(args, stderr=subprocess.PIPE, timeout=60))
           assert actual['CommandId'] == command_id and actual['InstanceId'] == instance_id
           private_error = actual.get('StandardErrorContent', '')
           frames = re.findall(r'File "[^"\n]*/(remote|contract)\.py", line (\d+), in ([A-Za-z_][A-Za-z_0-9]*)', private_error)
