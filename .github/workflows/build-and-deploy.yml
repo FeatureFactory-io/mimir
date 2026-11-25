@@ -29,6 +29,12 @@ on:
         required: true
         default: core
         options: [core, full]
+      experts_resource_profile:
+        description: Default resources or explicit measured shared 1 GiB staging trial
+        type: choice
+        required: true
+        default: default
+        options: [default, aggregate1024]
       experts_candidate_run_id:
         description: Successful build-only Actions run with exact candidate image receipt
         type: string
@@ -567,6 +573,7 @@ jobs:
       AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
       GH_TOKEN: ${{ github.token }}
       EXPERTS_SUITE: ${{ inputs.experts_suite }}
+      RESOURCE_PROFILE: ${{ inputs.experts_resource_profile }}
       BROWSER_IMAGE: 411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:a74104c8fb4ff8a02dd053ee2584868d91dd4273f058b690faf0875684c5e368
       POSTGRES_IMAGE: postgres@sha256:07abc3f43c9395b0bdbbab36bc25ddb0e8d83cd4fcafb5fb7d6abe14ff156dd8
     steps:
@@ -581,6 +588,7 @@ jobs:
           test "$PREFLIGHT_ONLY" = false
           test "$WAKE_IDLE" = false
           case "$EXPERTS_SUITE" in core|full) ;; *) exit 2 ;; esac
+          case "$RESOURCE_PROFILE" in default|aggregate1024) ;; *) exit 2 ;; esac
           [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$AWS_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]
@@ -595,7 +603,7 @@ jobs:
       - name: Install only control-plane validation dependencies
         run: python -m pip install boto3 pytest pyyaml
       - name: Verify fail-closed runner contracts
-        run: python -m pytest -p no:cacheprovider -c /dev/null --confcutdir=tests/unit tests/unit/test_experts_staging_runner_contract.py tests/unit/test_experts_staging_runner_config.py tests/unit/test_experts_staging_suite.py tests/unit/test_experts_staging_suite_workflow.py tests/unit/test_experts_staging_saga_contract.py tests/unit/test_experts_staging_saga_trace.py tests/unit/test_experts_staging_saga_guest.py tests/unit/test_experts_staging_saga_visual.py tests/unit/test_experts_staging_saga_summary_contract.py -q
+        run: python -m pytest -p no:cacheprovider -c /dev/null --confcutdir=tests/unit tests/unit/test_experts_staging_runner_contract.py tests/unit/test_experts_staging_runner_config.py tests/unit/test_experts_staging_suite.py tests/unit/test_experts_staging_suite_workflow.py tests/unit/test_experts_staging_resource_workflow.py tests/unit/test_experts_staging_resource_profile.py tests/unit/test_experts_staging_aggregate.py tests/unit/test_experts_staging_capture_contract.py tests/unit/test_experts_staging_saga_contract.py tests/unit/test_experts_staging_saga_trace.py tests/unit/test_experts_staging_saga_guest.py tests/unit/test_experts_staging_saga_visual.py tests/unit/test_experts_staging_saga_summary_contract.py -q
       - name: Download exact candidate build receipt
         uses: actions/download-artifact@v4
         with:
@@ -603,14 +611,29 @@ jobs:
           run-id: ${{ inputs.experts_candidate_run_id }}
           github-token: ${{ github.token }}
           path: candidate-receipt
+      - name: Verify immutable measured resource proof
+        if: inputs.experts_resource_profile == 'aggregate1024'
+        run: |
+          set -euo pipefail
+          gh api --method GET repos/FeatureFactory-io/mimir/actions/artifacts/14991594192/zip > measured-resource-proof.zip
+          python scripts/experts-staging/download_resource_proof.py \
+            --archive measured-resource-proof.zip --output measured-resource-proof
       - name: Verify actual successful build-only run and prepare source proof
         id: experts-source
         run: |
           set -euo pipefail
+          RESOURCE_PROOF_ARGS=()
+          if [[ "$RESOURCE_PROFILE" = aggregate1024 ]]; then
+            RESOURCE_PROOF_ARGS=(
+              --resource-proof-result measured-resource-proof/benchmark-result.json
+              --resource-proof-source measured-resource-proof/benchmark-source.json
+            )
+          fi
           python scripts/experts-staging/controller.py prepare \
             --receipt candidate-receipt/candidate-image-identities.json \
             --revision "$CANDIDATE_SHA" --run-id "$CANDIDATE_RUN_ID" \
-            --account "$AWS_ACCOUNT_ID" --output experts-readiness
+            --account "$AWS_ACCOUNT_ID" --output experts-readiness \
+            --resource-profile "$RESOURCE_PROFILE" "${RESOURCE_PROOF_ARGS[@]}"
       - name: Configure existing deployment connection
         uses: aws-actions/configure-aws-credentials@v4
         with:
