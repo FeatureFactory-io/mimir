@@ -1222,3 +1222,29 @@ they are specification-reading views, not generated app screens or fabricated
 staging output. Four approved-Aiden closing narration drafts have finite,
 unclipped audio and reviewed transcript semantics. Success wording remains
 conditional on actual staging acceptance; Scene23 awaits its real Saga verdict.
+
+### 2026-11-25 — explicit UAT story and successful candidate image build
+
+Denis considered a production-database clone, then explicitly declined it:
+“OK, lets not bring the prod db in. But I think showing uat/** test still makes
+sense”. No production data was read, copied or restored for that proposal.
+Continue with the owned synthetic Cedar database. Storyboard sequence74 now
+opens Scene22 on the actual `tests/uat/e2e-uat-flow.feature` Journey18 source,
+showing literal DO/SEE steps before the task timer begins. The real browser then
+follows Sofia's comparison, Maria's evidence/contact and Bob's restrictions.
+It is labeled agent-operated UAT, with actual elapsed time, visual observations,
+expected/observed evidence and verdict. No human usability study is claimed.
+The local HTML and progress record match the verified canonical Page update.
+
+CI45516980492 has completed successfully on exact04c9432. Both immutable image
+digests are retained in `planning/candidate-image-45516980492/`:
+web `sha256:e7f6e2170fd6250a9b6c3f635ceb2b90d0dfbe81ed337c10180c0a903ca5e1ba`;
+facade `sha256:edf7a63a3e4f019a3abd24469534cc513836a850e468b10886dc26bd1f739c72`.
+The normal idle deployment job skipped. The independently reviewed1acf85d runner
+is now used to request only the isolated Cedar core-readiness mode through CI.
+That request is not a successful staging, visual or full Saga verdict. Actual
+runtime results, evidence transfer and exact-owned cleanup must still be checked.
+The actual isolated dispatch is CI45521369866 on reviewed runner1acf85d, with
+candidate04c9432/build45516980492. All ordinary test/build/deployment/wake/preflight
+jobs skip in this mode. It currently prepares its browser derivative from the
+exact candidate image; that state is not yet an observed host/browser pass.

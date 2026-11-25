@@ -10,6 +10,8 @@ iteration:
     production_deployment: prohibited
     production_promotion: prohibited
     application_data_boundary: No ambient shared idle/production database migrations, seed, reset or Cedar import.
+    production_database_clone: Explicitly declined by Denis; no production database read, copy or restore is added to this assignment.
+    uat_story: Show the actual tests/uat DO/SEE script, independent agent-operated staging browser, visual observations and actual report/verdict as an additional verification layer.
     domain_examples: Playbook release and Karma award scenarios remain permitted only inside the owned test environment; they do not release the Mimir application.
   doctrine_version: '2.1'
   created_at: '2026-11-23'
@@ -40,12 +42,12 @@ iteration:
     user_correction: Denis explicitly stated he never paused S04; the attributed recorded pause and derived status are withdrawn. S04 and independent approved work are active.
   delivery_preparation:
     build_only_dispatch:
-      status: candidate_ci_tests_passed_image_build_running_no_deployment
+      status: candidate_ci_tests_and_images_success_no_normal_deployment
       footprint:
       - .github/workflows/build-and-deploy.yml
       run_input: deploy_to_idle=false
       default_compatibility: Published releases and default manual dispatch retain existing deployment behavior.
-      verification: CI45516980492 on exact04c9432 passed3340tests with3baseline skips and zero failures/errors in983.31seconds. Image build remains running. Inputs deploy_to_idle=false, preflight_only=false, wake_idle=false and experts_staging_only=false. No candidate deployment or application release is claimed.
+      verification: CI45516980492 on exact04c9432 completed successfully;3340tests passed with3baseline skips and zero failures/errors in983.31seconds, both images built, immutable digest receipt downloaded. Web digest sha256:e7f6e2170fd6250a9b6c3f635ceb2b90d0dfbe81ed337c10180c0a903ca5e1ba. Inputs deploy_to_idle=false, preflight_only=false, wake_idle=false and experts_staging_only=false. Normal deployment skipped; no application release is claimed.
     read_only_ci_preflight:
       status: completed_existing_idle_online
       wake_run_id: 45502266783
@@ -58,7 +60,7 @@ iteration:
       source_validation: Existing CI wake and read-only capacity preflight passed; app test/build/deploy jobs skipped. No candidate deployed.
     ambient_database_identity: SAO declares shared huginn-db/logical mimir for both physical environments. Ambient secret URLs were not read; no default migration or Cedar seed is authorized by staging preparation.
     staging_arrangement: Exact candidate image in an owned isolated companion/database, with no ambient migrations or fixture seed.
-    candidate_deployment_status: Held pending successful candidate image build. Exact1acf85d staging guard repair independently passed80tests, real hostPython3.9.6 receipt checks and local Chromium suppression/control; reviewed runner pushed to iteration branch. Actual Linux/idle readiness and full staged Saga remain unverified.
+    candidate_deployment_status: Isolated core readiness CI45521369866 dispatched on reviewed runner1acf85d using successful candidate04c9432/build45516980492. Normal deployment, wake and preflight disabled. Actual Linux/idle readiness and full staged Saga remain unverified until observed receipts exist.
     owned_postgres_scope_followup:
       owner_scenario: S45
       status: real_postgres_verified
