@@ -114,6 +114,7 @@ def observe_viewport(
         "fonts": fonts,
         "path": path,
         "computed_design": measured_shell(page),
+        "capture_scroll_y": page.evaluate("scrollY"),
         "ranks": [person.username for person in people],
     }
     write_record(output, name + ".json", row)
@@ -144,13 +145,15 @@ def _scroll_to_capture_start(page: Page) -> None:
     """Position the browser viewport after real keyboard checks before acquisition.
 
     :param page: Real native page after the complete keyboard sequence.
-    :return: None once native document scrolling reaches and settles at the top.
-    :raises AssertionError: Actual scrolling does not settle.
-    :raises TimeoutError: The browser viewport fails to reach the capture position.
+    :return: None once the real title is readable below the native navbar.
+    :raises AssertionError: Actual scrolling does not settle or obscures the title.
     """
     page.evaluate("window.scrollTo({top:0,left:0,behavior:'instant'})")
-    page.wait_for_function("scrollY === 0", timeout=5000)
     cards._wait_for_scroll_to_settle(page)
+    title = page.get_by_role("heading", name="Experts", exact=True).bounding_box()
+    navbar = page.get_by_test_id("realm-navbar").bounding_box()
+    assert title is not None and navbar is not None
+    assert title["y"] >= navbar["y"] + navbar["height"]
 
 
 def _check_native_list(
