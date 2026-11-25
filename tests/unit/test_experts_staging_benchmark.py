@@ -630,3 +630,221 @@ def test_publish_result_with_unsafe_extra_entry_retains_safe_failure(
     assert recorded["status"] == "FAILED" and recorded["public_ownership"] == "FAILED"
     assert recorded["publication_exception"] == "ValueError"
     assert "DO_NOT_EXPORT" not in json.dumps(recorded)
+
+
+def test_host_observations_with_actual_numeric_rows_survives_extra_private_fields(
+    metrics: ModuleType,
+) -> None:
+    record = metrics.parse_memory(_COUNTERS, "db", 2048)
+    measured = {
+        "roles": {
+            "db": {
+                "memory": record,
+                "docker": {**_state("db"), "private": "DO_NOT_EXPORT"},
+            },
+            "web": {
+                "measurement_exception": "RuntimeError",
+                "measurement_reason": "UNCLASSIFIED",
+            },
+            "browser": {
+                "measurement_exception": "ValueError",
+                "measurement_reason": "INPUT_PATH_REJECTED",
+            },
+        }
+    }
+    published = metrics.host_observations(measured)
+    assert published["roles"]["db"]["memory"] == record
+    assert published["roles"]["db"]["docker"]["memory_bytes"] == 192 * 1024 * 1024
+    assert "DO_NOT_EXPORT" not in json.dumps(published)
+    assert published["roles"]["browser"]["measurement_reason"] == "INPUT_PATH_REJECTED"
+
+
+def test_failure_reason_with_known_and_arbitrary_messages_exports_closed_enums(
+    metrics: ModuleType,
+) -> None:
+    assert (
+        metrics.failure_reason(ValueError("Unknown evidence directory."))
+        == "EXPORT_DIRECTORY_REJECTED"
+    )
+    assert (
+        metrics.failure_reason(ValueError("Actual role measurement is incomplete."))
+        == "ROLE_MEASUREMENT_INCOMPLETE"
+    )
+    assert metrics.failure_reason(RuntimeError("SECRET_DATABASE_URL")) == "UNCLASSIFIED"
+    assert (
+        metrics.failure_reason(FileNotFoundError("PRIVATE_PATH")) == "FILE_UNAVAILABLE"
+    )
+
+
+def test_finish_with_rejected_export_preserves_closed_reason_without_secret_name(
+    driver: ModuleType, tmp_path: Path
+) -> None:
+    root, public = tmp_path / "foreign", tmp_path / "public"
+    (root / "output").mkdir(parents=True)
+    public.mkdir(mode=0o700)
+    (root / "output/PRIVATE_SECRET_NAME.env").write_text("SECRET_CONTENT")
+    result = {"status": "FAILED", "observations": {"retained": True}}
+    driver.finish(root, "a" * 32, {}, public, result)
+    assert result["export_reason"] == "EXPORT_MEMBER_REJECTED"
+    assert result["observations"] == {"retained": True}
+    assert "PRIVATE_SECRET_NAME" not in json.dumps(
+        result
+    ) and "SECRET_CONTENT" not in json.dumps(result)
+    assert result["export_rejected_shapes"] == [
+        {"top_category": "root_file", "kind": "file", "depth": 1, "extension": "other"}
+    ]
+    assert not list(public.iterdir())
+
+
+def test_browser_failure_with_actual_traceback_exports_only_known_source_frame(
+    metrics: ModuleType,
+) -> None:
+    source = _RUNTIME / "browser.py"
+    first_line = metrics.browser_ranges(source)["capture"][0]
+    text = (
+        "\n" * (first_line - 1)
+        + 'def capture():\n    raise AssertionError("SECRET_CONTENT")\ncapture()\n'
+    )
+    code = compile(text, str(source), "exec")
+    try:
+        exec(code, {})  # noqa: S102 - fixed literal constructs a real traceback.
+    except AssertionError as error:
+        record = metrics.browser_failure(error, source)
+    assert record["exception_class"] == "AssertionError"
+    assert record["source_frames"] == [{"function": "capture", "line": first_line + 1}]
+    assert "SECRET_CONTENT" not in json.dumps(record) and str(source) not in json.dumps(
+        record
+    )
+    assert metrics.validate_browser_failure(record) == record
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("exception_class", "SECRET_CONTENT"),
+        ("private_output_exported", True),
+        ("extra", "SECRET_CONTENT"),
+        ("source_frames", [{"function": "private_function", "line": 1}]),
+    ],
+)
+def test_validate_browser_failure_with_untrusted_fields_rejects(
+    metrics: ModuleType, field: str, value: Any
+) -> None:
+    record = {
+        "status": "FAILED",
+        "exception_class": "AssertionError",
+        "source_frames": [],
+        "private_output_exported": False,
+    }
+    record[field] = value
+    with pytest.raises(ValueError):
+        metrics.validate_browser_failure(record)
+
+
+@pytest.mark.parametrize("line", [True, 0, -1, 1, 1000, 1001, "60"])
+def test_validate_browser_frame_with_wrong_type_or_function_range_rejects(
+    metrics: ModuleType, line: Any
+) -> None:
+    with pytest.raises(ValueError):
+        metrics.validate_browser_frame({"function": "capture", "line": line})
+
+
+def test_read_browser_diagnostic_with_link_or_extra_private_fields_rejects(
+    driver: ModuleType, tmp_path: Path
+) -> None:
+    output = tmp_path / "output"
+    output.mkdir()
+    source = tmp_path / "PRIVATE_SECRET_NAME.json"
+    source.write_text('{"private":"SECRET_CONTENT"}')
+    diagnostic = output / "browser-diagnostic.json"
+    diagnostic.symlink_to(source)
+    linked = driver.read_browser_diagnostic(tmp_path)
+    assert linked["status"] == "REJECTED" and linked["reason"] == "INPUT_PATH_REJECTED"
+    diagnostic.unlink()
+    diagnostic.write_text(source.read_text())
+    invalid = driver.read_browser_diagnostic(tmp_path)
+    assert invalid["reason"] == "BROWSER_DIAGNOSTIC_REJECTED"
+    assert "PRIVATE_SECRET_NAME" not in json.dumps(
+        invalid
+    ) and "SECRET_CONTENT" not in json.dumps(invalid)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("memory_bytes", "SECRET_CONTENT"),
+        ("pids", True),
+        ("restarts", -1),
+        ("exit_code", 2**64),
+    ],
+)
+def test_host_docker_with_invalid_numeric_fields_omits_without_guessing(
+    metrics: ModuleType, field: str, value: Any
+) -> None:
+    state = _state()
+    state[field] = value
+    state["private"] = "SECRET_CONTENT"
+    result = metrics.host_docker(state)
+    assert field not in result and "private" not in result
+    assert "SECRET_CONTENT" not in json.dumps(result)
+
+
+def test_host_observations_with_private_event_names_rejects_record(
+    metrics: ModuleType,
+) -> None:
+    memory = metrics.parse_memory(_COUNTERS, "db", 2048)
+    memory["events"]["PRIVATE_SECRET_NAME"] = 0
+    result = metrics.host_observations({"roles": {"db": {"memory": memory}}})
+    assert result["roles"]["db"] == {"measurement_reason": "OBSERVATION_REJECTED"}
+    assert "PRIVATE_SECRET_NAME" not in json.dumps(result)
+
+
+def test_rejected_export_shapes_with_many_unknown_members_is_closed_and_bounded(
+    controls: ModuleType, tmp_path: Path
+) -> None:
+    for index in range(20):
+        (tmp_path / f"PRIVATE_SECRET_NAME_{index}.json").write_text("SECRET_CONTENT")
+    shapes = controls.rejected_export_shapes(tmp_path)
+    assert len(shapes) == 16
+    assert all(
+        row
+        == {
+            "top_category": "root_file",
+            "kind": "file",
+            "depth": 1,
+            "extension": "json",
+        }
+        for row in shapes
+    )
+    assert "PRIVATE_SECRET_NAME" not in json.dumps(
+        shapes
+    ) and "SECRET_CONTENT" not in json.dumps(shapes)
+
+
+def test_export_public_with_actual_numeric_host_data_and_rejected_member_preserves_data(
+    driver: ModuleType, metrics: ModuleType, tmp_path: Path
+) -> None:
+    root, public = tmp_path / "owned", tmp_path / "public"
+    (root / "output").mkdir(parents=True)
+    public.mkdir()
+    (root / "output/PRIVATE_SECRET_NAME.env").write_text("SECRET_CONTENT")
+    memory = metrics.parse_memory(_COUNTERS, "db", 2048)
+    result = {
+        "status": "FAILED",
+        "observations": metrics.host_observations(
+            {"roles": {"db": {"memory": memory}}}
+        ),
+    }
+    driver.export_public(root, public, result)
+    assert (
+        result["export"] == "FAILED"
+        and result["export_reason"] == "EXPORT_MEMBER_REJECTED"
+    )
+    assert result["observations"]["roles"]["db"]["memory"] == memory
+    driver.publish_result(public, result)
+    saved = json.loads((public / "benchmark-result.json").read_text())
+    assert saved["observations"] == result["observations"]
+    assert "PRIVATE_SECRET_NAME" not in json.dumps(
+        saved
+    ) and "SECRET_CONTENT" not in json.dumps(saved)
+    assert {p.name for p in public.iterdir()} == {"benchmark-result.json"}

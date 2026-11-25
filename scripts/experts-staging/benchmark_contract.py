@@ -39,6 +39,7 @@ _PUBLIC_NAMES = {
     "benchmark-source.json",
     "benchmark-memory.json",
     "browser-memory.json",
+    "browser-diagnostic.json",
 }
 _MAX_FILE_BYTES = 2 * 1024 * 1024
 _MAX_EXPORT_BYTES = 128 * 1024 * 1024
@@ -273,3 +274,68 @@ def copy_public_file(path: Path, destination: Path, relative: Path) -> dict[str,
         "bytes": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),
     }
+
+
+def rejected_export_shapes(source: Path) -> list[dict[str, Any]]:
+    """Describe only rejected member shapes, never names, paths or contents.
+
+    :param source: Actual owned public evidence directory.
+    :return: At most16 closed shape records, or an empty result when inaccessible.
+    """
+    if source.resolve() != source or not source.is_dir():
+        return []
+    result = []
+    for path in sorted(source.rglob("*")):
+        relative = path.relative_to(source)
+        metadata = path.lstat()
+        linked = stat.S_ISLNK(metadata.st_mode) or path.resolve() != path
+        directory = stat.S_ISDIR(metadata.st_mode)
+        unknown_directory = directory and str(relative) not in {"screenshots", "video"}
+        unsafe_file = not directory and (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or not public_name(relative)
+        )
+        if linked or unknown_directory or unsafe_file:
+            result.append(export_shape(path, relative))
+        if len(result) == 16:
+            break
+    return result
+
+
+def export_shape(path: Path, relative: Path) -> dict[str, Any]:
+    """Project an unknown member onto a closed category, kind, depth and extension.
+
+    :param path: Actual member, read only for its metadata.
+    :param relative: Relative member; raw strings never leave this function.
+    :return: Fixed enums and bounded numeric depth only.
+    """
+    kind = member_kind(path.lstat().st_mode)
+    parts = relative.parts
+    category = (
+        parts[0]
+        if parts[0] in {"screenshots", "video"}
+        else "root_file" if len(parts) == 1 and kind == "file" else "other"
+    )
+    extension = relative.suffix.lstrip(".")
+    if extension not in {"json", "png", "zip", "webm"}:
+        extension = "other" if extension else "none"
+    return {
+        "top_category": category,
+        "kind": kind,
+        "depth": min(len(parts), 32),
+        "extension": extension,
+    }
+
+
+def member_kind(mode: int) -> str:
+    """Classify only the actual file type, without exporting metadata or names.
+
+    :param mode: Actual lstat mode bits.
+    :return: Closed file/directory/symlink/other enum.
+    """
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISDIR(mode):
+        return "directory"
+    return "file" if stat.S_ISREG(mode) else "other"

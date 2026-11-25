@@ -21,12 +21,19 @@ from benchmark_contract import (
     SOURCE,
     publish_owner,
     read_json,
+    rejected_export_shapes,
     reviewed_bytes,
     safe_export,
     validate_cache,
     validate_prepared,
 )
-from benchmark_metrics import parse_memory, require_headroom
+from benchmark_metrics import (
+    failure_reason,
+    host_observations,
+    parse_memory,
+    require_headroom,
+    validate_browser_failure,
+)
 
 _MIB = 1024 * 1024
 _MEMORY_PROBE = "cat /sys/fs/cgroup/memory.peak /sys/fs/cgroup/memory.max /sys/fs/cgroup/memory.events"
@@ -231,11 +238,11 @@ def memory_records(root: Path, nonce: str, names: dict[str, str]) -> dict[str, A
         try:
             records[role] = capture_role(root, nonce, names[role], role)
         except Exception as error:  # noqa: BLE001 - safe classification.
-            records[role] = {"measurement_exception": failure(error)}
+            records[role] = {
+                "measurement_exception": failure(error),
+                "measurement_reason": failure_reason(error),
+            }
     result = {"roles": records, "sum_of_individual_peaks_is_not_simultaneous": True}
-    remote.private_file(
-        root / "output/benchmark-memory.json", json.dumps(result, indent=2)
-    )
     return result
 
 
@@ -327,11 +334,7 @@ def finish(
         result.update(
             status="FAILED", cleanup="FAILED", cleanup_exception=failure(error)
         )
-    try:
-        result["evidence"] = safe_export(root / "output", output)
-        result["export"] = "SUCCESS"
-    except Exception as error:  # noqa: BLE001 - sanitize every owned boundary failure.
-        result.update(status="FAILED", export="FAILED", export_exception=failure(error))
+    export_public(root, output, result)
     if result.get("cleanup") == "SUCCESS" and result.get("export") == "SUCCESS":
         remote.verify_root(root, nonce)
         shutil.rmtree(root)
@@ -481,6 +484,7 @@ def capture_role(root: Path, nonce: str, name: str, role: str) -> dict[str, Any]
             result["memory"] = parse_memory(text, role, remote._LIMITS[role][0] * _MIB)
     except Exception as error:  # noqa: BLE001 - retain safe state.
         result["measurement_exception"] = failure(error)
+        result["measurement_reason"] = failure_reason(error)
     return result
 
 
@@ -506,31 +510,73 @@ def validate_measurements(result: dict[str, Any]) -> None:
 def measure_and_finish(
     root: Path, nonce: str, names: dict[str, str], output: Path, result: dict[str, Any]
 ) -> None:
-    """Measure before cleanup even on failure, then always settle owned resources.
+    """Measure before cleanup even on failure, then settle exact owned resources.
 
     :param root: Owned runtime directory.
-    :param nonce: Positive ownership identity.
+    :param nonce: Positive owner identity.
     :param names: Only owned resource names.
     :param output: Safe public export directory.
-    :param result: Original phase/failure receipt to retain.
-    :return: None with explicit metric, cleanup and export status.
+    :param result: Original phase/failure receipt, preserving safe observations.
+    :return: None with actual metric, cleanup and export status.
     """
     try:
-        measured = memory_records(root, nonce, names)
-        validate_measurements(measured)
-        result["measurement"] = "SUCCESS"
-        if result["status"] == "CORE_WORKLOAD_PASSED_MEASUREMENT_PENDING":
-            result.update(
-                status="MEASURED_CORE_ONLY_NOT_STAGING_ACCEPTANCE", phase="completed"
-            )
-    except Exception as error:  # noqa: BLE001 - no private exception prose is exported.
+        retain_measurements(root, nonce, names, result)
+    except Exception as error:  # noqa: BLE001 - fixed enum and class only.
         if result["status"] != "FAILED":
             result["phase"] = "measurement"
         result.update(
-            status="FAILED", measurement="FAILED", measurement_exception=failure(error)
+            status="FAILED",
+            measurement="FAILED",
+            measurement_exception=failure(error),
+            measurement_reason=failure_reason(error),
         )
     finally:
         finish(root, nonce, names, output, result)
+
+
+def retain_measurements(
+    root: Path, nonce: str, names: dict[str, str], result: dict[str, Any]
+) -> None:
+    """Put sanitized numeric observations in HOST result before any exporter check.
+
+    :param root: Owned private root.
+    :param nonce: Positive owner identity.
+    :param names: Exact allocated resources.
+    :param result: Curated independent host result.
+    :return: None after actual complete measurements pass.
+    :raises Exception: Counters, receipt writing or actual runtime checks fail.
+    """
+    result["browser_diagnostic"] = read_browser_diagnostic(root)
+    measured = memory_records(root, nonce, names)
+    result["observations"] = host_observations(measured)
+    remote.private_file(
+        root / "output/benchmark-memory.json", json.dumps(measured, indent=2)
+    )
+    validate_measurements(measured)
+    result["measurement"] = "SUCCESS"
+    if result["status"] == "CORE_WORKLOAD_PASSED_MEASUREMENT_PENDING":
+        result.update(
+            status="MEASURED_CORE_ONLY_NOT_STAGING_ACCEPTANCE", phase="completed"
+        )
+
+
+def read_browser_diagnostic(root: Path) -> dict[str, Any]:
+    """Independently validate observer frames even when the bulk exporter rejects.
+
+    :param root: Actual private owned root.
+    :return: Validated closed failure diagnostic or fixed unavailable reason.
+    """
+    path = root / "output/browser-diagnostic.json"
+    if not path.exists() and not path.is_symlink():
+        return {"status": "NOT_RECORDED"}
+    try:
+        return validate_browser_failure(read_json(path))
+    except Exception as error:  # noqa: BLE001 - never expose diagnostic input text.
+        return {
+            "status": "REJECTED",
+            "exception_class": failure(error),
+            "reason": failure_reason(error),
+        }
 
 
 def select_envelope(web_memory: int, result: dict[str, Any]) -> None:
@@ -606,6 +652,27 @@ def publish_result(output: Path, result: dict[str, Any]) -> None:
         descriptor = os.open(path, os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW)
         with os.fdopen(descriptor, "w") as stream:
             json.dump(result, stream, indent=2)
+
+
+def export_public(root: Path, output: Path, result: dict[str, Any]) -> None:
+    """Keep bulk export fail-closed while retaining only fixed failure/shape enums.
+
+    :param root: Owned runtime and original evidence directory.
+    :param output: Fresh independent HOST publication directory.
+    :param result: Safe HOST result, including numeric observations.
+    :return: None with explicit actual export success or safe rejection metadata.
+    """
+    try:
+        result["evidence"] = safe_export(root / "output", output)
+        result["export"] = "SUCCESS"
+    except Exception as error:  # noqa: BLE001 - sanitize every owned boundary failure.
+        result.update(
+            status="FAILED",
+            export="FAILED",
+            export_exception=failure(error),
+            export_reason=failure_reason(error),
+        )
+        result["export_rejected_shapes"] = rejected_export_shapes(root / "output")
 
 
 if __name__ == "__main__":
