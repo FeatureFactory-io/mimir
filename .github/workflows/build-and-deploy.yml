@@ -661,6 +661,13 @@ jobs:
                      'image_sizes': {name: value['Size'] for name, value in images.items()}}
           Path('experts-readiness/image-runtime-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           PY
+      - name: Verify immutable browser imports before any host execution
+        if: inputs.experts_suite == 'full' || inputs.experts_resource_profile == 'aggregate960'
+        run: |
+          set -euo pipefail
+          python scripts/experts-staging/probe_browser_imports.py \
+            --output experts-readiness --images experts-readiness/image-runtime-receipt.json \
+            --suite "$EXPERTS_SUITE"
       - name: Execute only owned companion and export actual browser artifacts
         run: |
           set -euo pipefail
