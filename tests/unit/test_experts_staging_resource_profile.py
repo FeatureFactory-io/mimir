@@ -443,3 +443,56 @@ def test_cleanup_with_positive_loaded_unit_and_missing_marker_refuses_all_mutati
         resource_runtime.cleanup(tmp_path, manifest, Adapter)
     assert len(calls) == 1 and "ListUnitsByPatterns" in calls[0]
     assert not (tmp_path / "aggregate-owner.json").exists()
+
+
+def test_capture_role_with_missing_observer_preserves_known_docker_oom_and_restarts(
+    module: ModuleType, manifest: dict, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real missing-file control with modeled curated Docker acquisition, no host ops."""
+    row = {"oom_killed": True, "restarts": 2}
+
+    class Adapter:
+        @staticmethod
+        def assert_resource(*args: object) -> None:
+            return None
+
+    run = resource_runtime.ResourceRun(tmp_path, manifest, Adapter)
+    monkeypatch.setattr(resource_runtime, "container_row", lambda *args: row)
+    monkeypatch.setattr(resource_runtime, "verify_stopped_browser", lambda *args: None)
+    result = resource_runtime.capture_role(run, {"browser": "owned-browser"}, "browser")
+    assert result == {
+        "memory": {"status": "UNAVAILABLE"},
+        "oom_killed": True,
+        "restarts": 2,
+        "member_verified": True,
+    }
+    parent, roles = _measurements(module)
+    roles["browser"] = result
+    payload = module.receipt_payload(manifest, parent, roles)
+    raw = module.canonical(payload)
+    assert module.checked_receipt(raw, manifest, False)["roles"]["browser"] == result
+    derivative = suite_export._special_receipt(
+        "resource-receipt.json", payload, raw, manifest
+    )
+    assert derivative["roles"]["browser"]["oom_killed"] is True
+    assert derivative["roles"]["browser"]["restarts"] == 2
+    suite_archive.verify_resource_record(
+        {"resource-receipt.json": derivative}, manifest, False
+    )
+    with pytest.raises(ValueError):
+        suite_archive.verify_resource_record(
+            {"resource-receipt.json": derivative}, manifest, True
+        )
+    with pytest.raises(ValueError):
+        module.checked_receipt(raw, manifest, True)
+
+
+def test_verified_receipt_with_unavailable_memory_never_passes_partial_transport_mode(
+    module: ModuleType, manifest: dict
+) -> None:
+    parent, roles = _measurements(module)
+    roles["browser"]["memory"] = {"status": "UNAVAILABLE"}
+    record = module.receipt_payload(manifest, parent, roles)
+    record["status"] = "VERIFIED"
+    with pytest.raises(ValueError):
+        module.checked_receipt(module.canonical(record), manifest, False)

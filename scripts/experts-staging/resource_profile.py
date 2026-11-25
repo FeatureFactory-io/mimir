@@ -219,7 +219,7 @@ def checked_receipt(
         raise ValueError("Canonical exact resource receipt required.")
     validate_images(manifest)
     checked_identity(record)
-    validate_measurements(record, passing)
+    validate_measurements(record, passing or record["status"] == "VERIFIED")
     return record
 
 
@@ -333,6 +333,8 @@ def checked_role(row: dict[str, Any], role: str, passing: bool) -> None:
         or type(row["member_verified"]) is not bool
     ):
         raise ValueError("Closed actual Docker observations required.")
+    if row["memory"] == {"status": "UNAVAILABLE"} and not passing:
+        return
     checked_memory(row["memory"], role, passing)
     if passing and (row["oom_killed"] or row["restarts"] or not row["member_verified"]):
         raise ValueError("Actual Docker exhaustion or membership failure.")

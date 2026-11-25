@@ -169,17 +169,12 @@ def capture_role(run: ResourceRun, names: dict[str, str], role: str) -> dict[str
         run.root, "container", names[role], run.manifest["nonce"]
     )
     row = container_row(run.remote, run.root, names[role])
-    if role == "browser":
-        verify_stopped_browser(run, row)
-        memory = browser_record(run.root, run.manifest)
-    else:
-        run.member(role, names)
-        memory = role_memory(run, names[role], role)
+    memory, member = capture_memory(run, names, role, row)
     return {
         "memory": memory,
         "oom_killed": row["oom_killed"],
         "restarts": row["restarts"],
-        "member_verified": run.members.get(role, False),
+        "member_verified": member,
     }
 
 
@@ -396,3 +391,28 @@ def start(run: ResourceRun | None) -> None:
     if run is not None:
         run.start()
         run.guard()
+
+
+def capture_memory(
+    run: ResourceRun, names: dict[str, str], role: str, row: dict[str, Any]
+) -> tuple[dict[str, Any], bool]:
+    """Preserve known Docker state if actual counters cannot be obtained.
+
+    :param run: Explicit positive invocation state.
+    :param names: Exact owned container names.
+    :param role: Fixed actual role.
+    :param row: Already acquired curated Docker identity.
+    :return: Actual memory or explicit unavailable slot, with actual membership flag.
+    :raises Exception: Curated Docker acquisition errors remain outside this helper.
+    """
+    member = False
+    try:
+        if role == "browser":
+            verify_stopped_browser(run, row)
+            member = True
+            return browser_record(run.root, run.manifest), member
+        run.member(role, names)
+        member = True
+        return role_memory(run, names[role], role), member
+    except Exception:  # noqa: BLE001 - fixed unavailable observation, no raw errors.
+        return {"status": "UNAVAILABLE"}, member
