@@ -1195,3 +1195,30 @@ finite ScriptedLLM provider port may be substituted; actual ORM, HTTP, normal
 submission/decision, native clipboard and browser observations remain required.
 This work does not broaden the delivery boundary beyond staging and its own
 positively identified test database. No main merge or production step follows.
+
+### 2026-11-25 — full candidate CI tests pass; staging still unverified
+
+The complete test job138878835672 in CI45516980492 on exact04c9432 passed:
+3,340 passed,3 baseline skips,6,936 warnings,983.31 seconds, zero failures/errors.
+The actual job log is retained as `planning/ci-candidate-45516980492-test.log`.
+Its successful job status does not mean Codecov accepted an upload: that external
+service rejected tokenless reporting, while the actual test-results artifact
+upload succeeded. The image build is still running; no digest is inferred yet.
+Deployment and both idle operations remain disabled in this build-only run.
+
+Fresh independent review of exact1acf85d passed80guard tests with zero skips,
+actual host Python3.9.6 round-trips of11receipts plus strict unsafe-file negatives,
+and a real local Chromium worker-suppression check with successful control.
+All2,012source blobs remained unchanged, zero overlays. Verification SHA-256:
+`a37db99202eb7704f4907df838ca3e58169732aa489cabfab5f00b1a0a843e41`.
+Evidence: `planning/staging-guard-independent-20261125/`.
+Only the reviewed1acf85d runner was pushed to the iteration branch. No cloud
+dispatch or staging acceptance is claimed by this local review. The original
+runner rejection is retained rather than overwritten.
+
+The source-supported lessons are now committed in this directory's `lessons.md`.
+Three reviewed native comic frames prepare Scene24.2's Maria/Priya comparison;
+they are specification-reading views, not generated app screens or fabricated
+staging output. Four approved-Aiden closing narration drafts have finite,
+unclipped audio and reviewed transcript semantics. Success wording remains
+conditional on actual staging acceptance; Scene23 awaits its real Saga verdict.
