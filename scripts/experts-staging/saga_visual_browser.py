@@ -100,9 +100,7 @@ def observe_viewport(
     _check_native_list(page, output, oracle, people, path, size)
     shared.capture_private_values(page)
     expect(page.get_by_test_id("user-display")).to_have_text("esvensson")
-    page.mouse.wheel(0, -page.evaluate("document.documentElement.scrollHeight"))
-    cards._wait_for_scroll_to_settle(page)
-    assert page.evaluate("scrollY") == 0
+    _scroll_to_capture_start(page, size)
     fonts = loaded_fonts(page)
     name = f"visual-{oracle['case']}-{size[0]}-{size[1]}.png"
     target = output / "screenshots" / name
@@ -120,6 +118,21 @@ def observe_viewport(
     write_record(output, name + ".json", row)
     assert "Montserrat" in fonts and "Font Awesome 6 Pro" in fonts
     return row
+
+
+def _scroll_to_capture_start(page: Page, size: list[int]) -> None:
+    """Use actual pointer/wheel input after responsive resizing before acquisition.
+
+    :param page: Real native page after the complete keyboard sequence.
+    :param size: Actual current CSS viewport dimensions.
+    :return: None once native document scrolling reaches and settles at the top.
+    :raises AssertionError: Actual scrolling does not settle.
+    :raises TimeoutError: Native wheel input fails to reach the capture position.
+    """
+    page.mouse.move(size[0] / 2, size[1] / 2)
+    page.mouse.wheel(0, -page.evaluate("document.documentElement.scrollHeight"))
+    page.wait_for_function("scrollY === 0", timeout=5000)
+    cards._wait_for_scroll_to_settle(page)
 
 
 def _check_native_list(
@@ -223,11 +236,7 @@ def run_visual_case(browser: Browser, case: str, output: Path) -> dict[str, Any]
     shared._OUTPUT, shared._FIXTURE = output, _FIXTURE
     (output / "screenshots").mkdir()
     binding = shared.start_private_capture()
-    context = browser.new_context(
-        ignore_https_errors=False,
-        service_workers="block",
-        viewport={"width": 1280, "height": 800},
-    )
+    context = _new_context(browser, output)
     context.tracing.start(screenshots=True, snapshots=True, sources=True)
     successful = False
     try:
@@ -246,6 +255,46 @@ def run_visual_case(browser: Browser, case: str, output: Path) -> dict[str, Any]
         context.tracing.stop(path=str(output / "private/saga-trace-original.zip"))
         context.close()
         try:
-            shared.finish_evidence(case, successful)
+            _finish_acquisition(output, case, successful)
         finally:
             shared._PRIVATE_VALUES.reset(binding)
+
+
+def _new_context(browser: Browser, output: Path) -> BrowserContext:
+    """Create native media with explicit encoded geometry rather than defaults.
+
+    :param browser: Actual Chromium with the caller's genuine owned SPKI trust.
+    :param output: Validated owned mode0700 acquisition root.
+    :return: Fresh secure context with native1280x800 recording dimensions.
+    """
+    return browser.new_context(
+        ignore_https_errors=False,
+        service_workers="block",
+        viewport={"width": 1280, "height": 800},
+        record_video_dir=str(output / "video"),
+        record_video_size={"width": 1280, "height": 800},
+    )
+
+
+def _finish_acquisition(output: Path, case: str, successful: bool) -> None:
+    """Publish a safe trace derivative and exact actual native video identity.
+
+    :param output: Owned original acquisition root after actual context closure.
+    :param case: Explicit long/missing variant.
+    :param successful: Actual complete seven-size browser result.
+    :return: None after failure quarantine or completed media hash publication.
+    :raises AssertionError: The expected actual native video is absent or empty.
+    """
+    shared.finish_evidence(case, successful)
+    if successful:
+        videos = list((output / "video").glob("*.webm"))
+        assert len(videos) == 1 and videos[0].stat().st_size > 0
+        video = {
+            "case": case,
+            "video": videos[0].name,
+            "sha256": hashlib.sha256(videos[0].read_bytes()).hexdigest(),
+            "record_video_size": {"width": 1280, "height": 800},
+            "viewport_policy": "native_seven_size_matrix_scaled_by_browser_into_declared_recording_size",
+            "original_native_video": True,
+        }
+        write_record(output, "saga-visual-video.json", video)
