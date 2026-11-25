@@ -317,6 +317,7 @@ def _unit_row(module: ModuleType, owner: object, role: str) -> dict:
         "Transient": "yes",
         "ControlGroup": "/" + module.parent_name(owner.nonce),
         "ActiveState": "active",
+        "KillMode": "process",
     }
 
 
@@ -367,16 +368,9 @@ def test_cleanup_with_keeper_stop_failure_keeps_parent_and_private_proof(
     module: ModuleType, owner: object, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls = []
-    path = tmp_path / "simulated-kernel-parent"
-    path.mkdir()
-    (path / module.unit_name(owner, "keeper")).mkdir()
+    path = _keeper_tree(module, owner, tmp_path, monkeypatch)
     marker = owner.root / "private-retained-proof.json"
     module.private_json(marker, {"source": "original"})
-    monkeypatch.setattr(module, "check_owner", lambda own: None)
-    monkeypatch.setattr(
-        module, "show_unit", lambda own, role: _unit_row(module, own, role)
-    )
-    monkeypatch.setattr(module, "group_path", lambda own, row: path)
 
     def rejected_stop(own: object, argv: list[str]) -> tuple[int, str]:
         calls.append(argv[9])
@@ -402,3 +396,314 @@ def test_failure_projection_with_private_extra_fields_rejects(
         module.validate_failure_record({**allowed, "private": "PRIVATE_SENTINEL"})
     with pytest.raises(ValueError):
         module.validate_failure_record({**allowed, "operation": ["PRIVATE_SENTINEL"]})
+
+
+def _keeper_tree(
+    module: ModuleType, owner: object, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    """Construct a real-file/metadata model; no host manager or kernel is used."""
+    path = tmp_path / "cleanup-tree-model"
+    path.mkdir()
+    (path / "cgroup.procs").write_text("")
+    (path / "cgroup.events").write_text("populated 1\nfrozen 0\n")
+    keeper = path / module.unit_name(owner, "keeper")
+    keeper.mkdir()
+    (keeper / "cgroup.procs").write_text("123\n")
+    monkeypatch.setattr(module, "check_owner", lambda own: None)
+    monkeypatch.setattr(module, "group_path", lambda own, row: path)
+    monkeypatch.setattr(
+        module,
+        "pid_group",
+        lambda pid: "/"
+        + module.parent_name(owner.nonce)
+        + "/"
+        + module.unit_name(owner, "keeper"),
+    )
+
+    def metadata(own: object, role: str) -> dict:
+        row = _unit_row(module, own, role)
+        row["MainPID"] = "123" if role == "keeper" else "0"
+        row["ControlGroup"] += (
+            "/" + module.unit_name(own, "keeper") if role == "keeper" else ""
+        )
+        return row
+
+    monkeypatch.setattr(module, "show_unit", metadata)
+    return path
+
+
+@pytest.mark.parametrize("case", ["nested_subgroup", "extra_pid", "parent_pid"])
+def test_cleanup_with_unknown_keeper_subgroup_or_pid_refuses_before_any_stop(
+    module: ModuleType,
+    owner: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    case: str,
+) -> None:
+    path = _keeper_tree(module, owner, tmp_path, monkeypatch)
+    keeper = path / module.unit_name(owner, "keeper")
+    if case == "nested_subgroup":
+        child = keeper / "foreign.scope"
+        child.mkdir()
+        (child / "cgroup.procs").write_text("456\n")
+    elif case == "extra_pid":
+        (keeper / "cgroup.procs").write_text("123\n456\n")
+    else:
+        (path / "cgroup.procs").write_text("456\n")
+    calls = []
+
+    def stop_boundary(own: object, role: str) -> None:
+        calls.append(role)
+        raise RuntimeError("UNIT_STOP_BOUNDARY_NO_COMMAND_EXECUTED")
+
+    monkeypatch.setattr(module, "stop_owned", stop_boundary)
+    with pytest.raises(ValueError):
+        module.cleanup(owner, [])
+    assert calls == []
+    assert keeper.exists()
+
+
+def test_cleanup_with_clean_exact_mainpid_tree_reaches_keeper_stop_boundary(
+    module: ModuleType, owner: object, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _keeper_tree(module, owner, tmp_path, monkeypatch)
+    calls = []
+
+    def stop_boundary(own: object, role: str) -> None:
+        calls.append(role)
+        raise RuntimeError("UNIT_STOP_BOUNDARY_NO_COMMAND_EXECUTED")
+
+    monkeypatch.setattr(module, "stop_owned", stop_boundary)
+    with pytest.raises(RuntimeError, match="UNIT_STOP_BOUNDARY"):
+        module.cleanup(owner, [])
+    assert calls == ["keeper"]
+
+
+def test_loaded_absence_with_successful_empty_manager_lookup_never_reads_properties(
+    module: ModuleType, owner: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = []
+
+    def protocol(own: object, argv: list[str]) -> tuple[int, str]:
+        calls.append(argv)
+        if "ListUnitsByPatterns" in argv:
+            return 0, "a(ssssssouso) 0\n"
+        return (
+            0,
+            "Id="
+            + module.unit_name(owner, "parent")
+            + "\nLoadState=loaded\nTransient=no\n",
+        )
+
+    monkeypatch.setattr(module, "invoke", protocol)
+    assert module.show_unit(owner, "parent") is None
+    assert len(calls) == 1 and "ListUnitsByPatterns" in calls[0]
+    assert "/usr/bin/systemctl" not in calls[0]
+
+
+def test_fresh_start_uses_loaded_only_lookup_before_atomic_creation(
+    module: ModuleType, owner: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = []
+
+    def protocol(own: object, argv: list[str]) -> tuple[int, str]:
+        calls.append(argv)
+        if "ListUnitsByPatterns" in argv:
+            return 0, "a(ssssssouso) 0\n"
+        if "StartTransientUnit" in argv:
+            raise RuntimeError("UNIT_CREATE_BOUNDARY_NO_COMMAND_EXECUTED")
+        return 0, "LoadState=loaded\nTransient=no\n"
+
+    monkeypatch.setattr(module, "invoke", protocol)
+    with pytest.raises(RuntimeError, match="UNIT_CREATE_BOUNDARY"):
+        module.start(owner)
+    assert all("ListUnitsByPatterns" in argv for argv in calls[:-1])
+    assert "StartTransientUnit" in calls[-1]
+
+
+def _loaded_reply(module: ModuleType, owner: object, role: str) -> str:
+    """Model the documented busctl typed array, never a real manager reply."""
+    name = module.unit_name(owner, role)
+    path = "/org/freedesktop/systemd1/unit/" + name.replace(".", "_2e")
+    return f'a(ssssssouso) 1 "{name}" "private description" "loaded" "active" "running" "" "{path}" 0 "" "/"\n'
+
+
+def test_loaded_unit_with_exact_positive_array_reads_properties_only_after_presence(
+    module: ModuleType, owner: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = []
+
+    def protocol(own: object, argv: list[str]) -> tuple[int, str]:
+        calls.append(argv)
+        if "ListUnitsByPatterns" in argv:
+            return 0, _loaded_reply(module, owner, "parent")
+        return 0, "LoadState=loaded\nId=" + module.unit_name(owner, "parent") + "\n"
+
+    monkeypatch.setattr(module, "invoke", protocol)
+    assert module.show_unit(owner, "parent")["LoadState"] == "loaded"
+    assert len(calls) == 2 and "ListUnitsByPatterns" in calls[0]
+    assert calls[0][-4:] == ["asas", "0", "1", module.unit_name(owner, "parent")]
+    assert calls[1][0] == "/usr/bin/systemctl"
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        "",
+        "a(ssssssouso) 0 EXTRA",
+        "a(ssssssouso) 2",
+        "a(s) 0",
+        'a(ssssssouso) 1 "foreign.slice" "d" "loaded" "active" "running" "" "/foreign" 0 "" "/"',
+        'a(ssssssouso) 1 "unterminated',
+    ],
+)
+def test_loaded_unit_with_malformed_or_foreign_array_rejects_not_absent(
+    module: ModuleType, owner: object, reply: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(module, "invoke", lambda own, argv: (0, reply))
+    with pytest.raises(ValueError):
+        module.loaded_unit(owner, "parent")
+
+
+def test_loaded_unit_with_command_error_never_infers_absence(
+    module: ModuleType, owner: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(module, "invoke", lambda own, argv: (1, "a(ssssssouso) 0"))
+    with pytest.raises(RuntimeError):
+        module.loaded_unit(owner, "parent")
+
+
+def test_await_absent_with_loaded_then_empty_never_reads_unit_properties(
+    module: ModuleType, owner: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = []
+    replies = iter([_loaded_reply(module, owner, "parent"), "a(ssssssouso) 0"])
+
+    def protocol(own: object, argv: list[str]) -> tuple[int, str]:
+        calls.append(argv)
+        assert "ListUnitsByPatterns" in argv
+        return 0, next(replies)
+
+    monkeypatch.setattr(module, "invoke", protocol)
+    monkeypatch.setattr(module.time, "sleep", lambda seconds: None)
+    module.await_absent(owner, "parent")
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize("pids", ["123\n123\n", "0\n", "-1\n", "123 456\n", "00123\n"])
+def test_cleanup_with_untrustworthy_keeper_pid_file_refuses_every_stop(
+    module: ModuleType,
+    owner: object,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    pids: str,
+) -> None:
+    path = _keeper_tree(module, owner, tmp_path, monkeypatch)
+    (path / module.unit_name(owner, "keeper") / "cgroup.procs").write_text(pids)
+    stops = []
+    monkeypatch.setattr(module, "stop_owned", lambda own, role: stops.append(role))
+    with pytest.raises(ValueError):
+        module.cleanup(owner, [])
+    assert stops == []
+
+
+def test_stop_owned_with_late_foreign_keeper_pid_rechecks_before_command(
+    module: ModuleType, owner: object, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = _keeper_tree(module, owner, tmp_path, monkeypatch)
+    parent = module.show_unit(owner, "parent")
+    module.no_foreign_children(owner, parent)
+    (path / module.unit_name(owner, "keeper") / "cgroup.procs").write_text("123\n456\n")
+    calls = []
+    monkeypatch.setattr(module, "invoke", lambda own, argv: calls.append(argv))
+    with pytest.raises(ValueError):
+        module.stop_owned(owner, "keeper")
+    assert calls == []
+
+
+def test_stop_owned_parent_with_late_unknown_process_retains_all_units(
+    module: ModuleType, owner: object, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = _keeper_tree(module, owner, tmp_path, monkeypatch)
+    (path / "cgroup.procs").write_text("456\n")
+    calls = []
+    monkeypatch.setattr(module, "invoke", lambda own, argv: calls.append(argv))
+    with pytest.raises(ValueError):
+        module.stop_owned(owner, "parent")
+    assert calls == []
+
+
+def test_keeper_properties_with_owned_service_only_select_process_kill_mode(
+    module: ModuleType, owner: object
+) -> None:
+    assert ("KillMode", "s", ["process"]) in module.keeper_properties(owner)
+    assert not any(
+        name == "KillMode" for name, _, _ in module.unit_properties(owner, "parent")
+    )
+
+
+def test_cleanup_with_wrong_actual_keeper_kill_mode_refuses_stop(
+    module: ModuleType, owner: object, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _keeper_tree(module, owner, tmp_path, monkeypatch)
+    original = module.show_unit
+
+    def properties(own: object, role: str) -> dict:
+        row = original(own, role)
+        if role == "keeper":
+            row["KillMode"] = "control-group"
+        return row
+
+    monkeypatch.setattr(module, "show_unit", properties)
+    stops = []
+    monkeypatch.setattr(module, "stop_owned", lambda own, role: stops.append(role))
+    with pytest.raises(ValueError):
+        module.cleanup(owner, [])
+    assert stops == []
+
+
+def test_stop_owned_with_empty_failed_parent_confirms_absence_without_loading(
+    module: ModuleType, owner: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent = _unit_row(module, owner, "parent")
+    parent.update(ControlGroup="", ActiveState="failed", MainPID="0")
+    monkeypatch.setattr(
+        module, "show_unit", lambda own, role: parent if role == "parent" else None
+    )
+    calls = []
+
+    def protocol(own: object, argv: list[str]) -> tuple[int, str]:
+        calls.append(argv)
+        return 0, "a(ssssssouso) 0" if "ListUnitsByPatterns" in argv else 'o "/job"'
+
+    monkeypatch.setattr(module, "invoke", protocol)
+    module.stop_owned(owner, "parent")
+    assert len(calls) == 2
+    assert "StopUnit" in calls[0] and "ListUnitsByPatterns" in calls[1]
+
+
+def test_process_ids_with_symlinked_receipt_rejects_foreign_file(
+    module: ModuleType, tmp_path: Path
+) -> None:
+    root = tmp_path / "group"
+    root.mkdir()
+    private = tmp_path / "foreign-members"
+    private.write_text("123\n")
+    (root / "cgroup.procs").symlink_to(private)
+    with pytest.raises(ValueError, match="Aliased"):
+        module.process_ids(root)
+    assert private.read_text() == "123\n"
+
+
+def test_command_failure_with_loaded_lookup_preserves_lookup_not_stop_enum(
+    module: ModuleType, owner: object
+) -> None:
+    module.record_command_failure(
+        owner,
+        module.loaded_arguments(owner, "parent"),
+        1,
+        "org.freedesktop.DBus.Error.AccessDenied",
+    )
+    row = module.checked_private(owner.root / "aggregate-command-failure.json")
+    module.validate_failure_record(row)
+    assert row["operation"] == "LOOKUP_PARENT"

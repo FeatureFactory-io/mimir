@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import time
 from dataclasses import dataclass
@@ -26,9 +27,15 @@ _FIELDS = (
     "MainPID",
     "MemoryMax",
     "MemorySwapMax",
+    "KillMode",
 )
 _ROOT = Path("/sys/fs/cgroup")
 _FORMAT = "mimir-experts-owned-aggregate-v1"
+_OPERATIONS = {
+    action + "_" + role
+    for action in ("START", "STOP", "LOOKUP")
+    for role in ("PARENT", "KEEPER")
+}
 
 
 @dataclass(frozen=True)
@@ -404,6 +411,69 @@ def private_failure(owner: Owner, stderr: str) -> None:
         stream.write(stderr.encode()[: max(0, 32768 - metadata.st_size)])
 
 
+def loaded_unit(owner: Owner, role: str) -> bool:
+    """Query loaded units without loading absent slice names.
+
+    :param owner: Source-bound private identity.
+    :param role: Exact parent or keeper.
+    :return: Positive loaded presence or successful empty lookup.
+    :raises RuntimeError: Manager lookup failed.
+    :raises ValueError: Typed exact-name reply is invalid.
+    """
+    name = unit_name(owner, role)
+    code, text = invoke(owner, loaded_arguments(owner, role))
+    if code:
+        raise RuntimeError("Owned aggregate loaded-unit lookup failed.")
+    return parse_loaded(text, name)
+
+
+def loaded_arguments(owner: Owner, role: str) -> list[str]:
+    """Build a manager enumeration that cannot autoload missing units.
+
+    :param owner: Source-bound private identity.
+    :param role: Exact derived unit role.
+    :return: Fixed exact literal pattern, empty state filter and typed ABI.
+    """
+    return [
+        "/usr/bin/busctl",
+        "--system",
+        "--timeout=15",
+        "call",
+        "org.freedesktop.systemd1",
+        "/org/freedesktop/systemd1",
+        "org.freedesktop.systemd1.Manager",
+        "ListUnitsByPatterns",
+        "asas",
+        "0",
+        "1",
+        unit_name(owner, role),
+    ]
+
+
+def parse_loaded(text: str, name: str) -> bool:
+    """Validate the successful manager array before admitting presence/absence.
+
+    :param text: Bounded private busctl reply.
+    :param name: Exact literal requested unit, never a wildcard.
+    :return: Whether the sole exact unit is already loaded.
+    :raises ValueError: Signature, count, identity or object path differs.
+    """
+    tokens = shlex.split(text)
+    if tokens == ["a(ssssssouso)", "0"]:
+        return False
+    expected = "/org/freedesktop/systemd1/unit/" + name.replace(".", "_2e")
+    if (
+        len(tokens) != 12
+        or tokens[:2] != ["a(ssssssouso)", "1"]
+        or tokens[2] != name
+        or tokens[8] != expected
+        or not re.fullmatch(r"[0-9]+", tokens[9])
+        or not tokens[11].startswith("/")
+    ):
+        raise ValueError("Invalid aggregate loaded-unit acquisition.")
+    return True
+
+
 def show_unit(owner: Owner, role: str) -> dict[str, str] | None:
     """Inspect only whitelisted properties of the exact derived unit.
 
@@ -413,6 +483,8 @@ def show_unit(owner: Owner, role: str) -> dict[str, str] | None:
     :raises RuntimeError: The actual manager cannot be read.
     :raises ValueError: Unexpected or duplicate property output.
     """
+    if not loaded_unit(owner, role):
+        return None
     code, text = invoke(
         owner,
         [
@@ -423,14 +495,24 @@ def show_unit(owner: Owner, role: str) -> dict[str, str] | None:
             unit_name(owner, role),
         ],
     )
+    return parse_properties(code, text)
+
+
+def parse_properties(code: int, text: str) -> dict[str, str]:
+    """Validate the positive-loaded unit property read without absence inference.
+
+    :param code: Actual property acquisition status.
+    :param text: Bounded private properties.
+    :return: Whitelisted unique loaded-unit properties.
+    :raises ValueError: Duplicate or unknown property appears.
+    :raises RuntimeError: Unit disappeared or acquisition failed.
+    """
     values = {}
     for line in text.splitlines():
         key, separator, value = line.partition("=")
         if not separator or key not in _FIELDS or key in values:
             raise ValueError("Invalid aggregate unit property acquisition.")
         values[key] = value
-    if values.get("LoadState") == "not-found":
-        return None
     if code or values.get("LoadState") != "loaded":
         raise RuntimeError("Owned aggregate unit read failed.")
     return values
@@ -519,6 +601,7 @@ def verify_keeper(owner: Owner, row: dict[str, str]) -> None:
     expected = "/" + parent_name(owner.nonce) + "/" + unit_name(owner, "keeper")
     if (
         row.get("ControlGroup") != expected
+        or row.get("KillMode") != "process"
         or pid_group(counter(row.get("MainPID", "0"))) != expected
     ):
         raise ValueError("Aggregate keeper is outside its owned parent.")
@@ -532,7 +615,7 @@ def start(owner: Owner) -> None:
     :raises Exception: Actual unit creation or kernel proof fails.
     """
     for role in ("parent", "keeper"):
-        if show_unit(owner, role) is not None:
+        if loaded_unit(owner, role):
             raise ValueError("Aggregate unit name already exists.")
     code, _ = invoke(owner, start_arguments(owner, "parent"))
     if code:
@@ -681,10 +764,8 @@ def await_absent(owner: Owner, role: str) -> None:
     :raises RuntimeError: Unit removal was not proved within the bound.
     """
     for _ in range(50):
-        row = show_unit(owner, role)
-        if row is None:
+        if not loaded_unit(owner, role):
             return
-        require_unit_identity(owner, role, row)
         time.sleep(0.1)
     raise RuntimeError("Aggregate unit absence was not confirmed.")
 
@@ -726,9 +807,102 @@ def no_foreign_children(owner: Owner, parent: dict[str, str]) -> None:
     :raises ValueError: Foreign or lingering Docker descendants remain.
     """
     path = group_path(owner, parent)
-    directories = [item.name for item in path.iterdir() if item.is_dir()]
-    if any(name != unit_name(owner, "keeper") for name in directories):
+    directories = [
+        item for item in path.iterdir() if item.is_dir() or item.is_symlink()
+    ]
+    if any(item.name != unit_name(owner, "keeper") for item in directories):
         raise ValueError("Refusing aggregate cleanup with unknown descendants.")
+    if process_ids(path):
+        raise ValueError("Refusing aggregate cleanup with unknown parent processes.")
+    for directory in directories:
+        require_keeper_tree(owner, directory)
+
+
+def process_ids(path: Path) -> tuple[int, ...]:
+    """Read a real unaliased group's strictly positive unique process IDs.
+
+    :param path: Positively bounded cgroup directory.
+    :return: Actual current members, without accepting duplicates.
+    :raises ValueError: Aliased directory, malformed PID or duplicates.
+    """
+    if path.is_symlink() or path.resolve() != path:
+        raise ValueError("Aliased aggregate cgroup directory.")
+    member_file = path / "cgroup.procs"
+    if member_file.is_symlink():
+        raise ValueError("Aliased aggregate process file.")
+    with member_file.open() as stream:
+        text = stream.read(32769)
+    if len(text) > 32768:
+        raise ValueError("Aggregate process acquisition exceeded its bound.")
+    lines = text.splitlines()
+    if any(not re.fullmatch(r"[1-9][0-9]{0,9}", line) for line in lines):
+        raise ValueError("Invalid aggregate process acquisition.")
+    identifiers = tuple(int(line) for line in lines)
+    if len(identifiers) != len(set(identifiers)):
+        raise ValueError("Duplicate aggregate process acquisition.")
+    return identifiers
+
+
+def require_keeper_tree(owner: Owner, path: Path) -> None:
+    """Reject every keeper descendant and any PID except its fresh MainPID.
+
+    :param owner: Positive private identity.
+    :param path: Exact direct keeper cgroup.
+    :return: None only for empty stopped or singly owned live keeper.
+    :raises ValueError: Nested subgroup, alias or foreign process exists.
+    """
+    if any(item.is_dir() or item.is_symlink() for item in path.iterdir()):
+        raise ValueError("Refusing aggregate cleanup with unknown keeper descendants.")
+    identifiers = process_ids(path)
+    row = show_unit(owner, "keeper")
+    if row is None:
+        if identifiers:
+            raise ValueError("Unowned aggregate keeper processes remain.")
+        return
+    require_unit_identity(owner, "keeper", row)
+    pid = counter(row.get("MainPID", "0"))
+    expected = "/" + parent_name(owner.nonce) + "/" + unit_name(owner, "keeper")
+    if (
+        pid == 0
+        and row.get("ActiveState") in {"inactive", "failed"}
+        and not identifiers
+        and row.get("ControlGroup") in {"", expected}
+        and row.get("KillMode") == "process"
+    ):
+        return
+    verify_keeper(owner, row)
+    if identifiers != (pid,):
+        raise ValueError("Refusing aggregate cleanup with unknown keeper processes.")
+
+
+def require_stop_tree(owner: Owner, role: str, row: dict[str, str]) -> None:
+    """Repeat the actual tree proof immediately before a unit stop request.
+
+    :param owner: Positive private identity.
+    :param role: Exact stop role.
+    :param row: Fresh manager properties.
+    :return: None only after the relevant process boundary is proved.
+    :raises ValueError: Any foreign actor or remaining child is observed.
+    """
+    if role == "keeper":
+        parent = show_unit(owner, "parent")
+        if parent is None:
+            raise ValueError("Keeper cannot stop without its owned parent.")
+        require_unit_identity(owner, "parent", parent)
+        no_foreign_children(owner, parent)
+        path = group_path(owner, parent) / unit_name(owner, "keeper")
+        if path.exists():
+            require_keeper_tree(owner, path)
+        elif row.get("MainPID") != "0" or row.get("ActiveState") not in {
+            "inactive",
+            "failed",
+        }:
+            raise ValueError("Aggregate keeper process group is missing.")
+    elif not empty_failed_parent(owner, row):
+        path = group_path(owner, row)
+        no_foreign_children(owner, row)
+        if populated(path) or any(item.is_dir() for item in path.iterdir()):
+            raise ValueError("Aggregate parent is not empty before stop.")
 
 
 def stop_owned(owner: Owner, role: str) -> None:
@@ -743,6 +917,7 @@ def stop_owned(owner: Owner, role: str) -> None:
     if row is None:
         return
     require_unit_identity(owner, role, row)
+    require_stop_tree(owner, role, row)
     code, _ = invoke(owner, stop_arguments(owner, role))
     if code:
         raise RuntimeError("Owned aggregate unit stop failed.")
@@ -787,6 +962,7 @@ def keeper_properties(owner: Owner) -> list[tuple[str, str, list[str]]]:
     return [
         ("Slice", "s", [parent_name(owner.nonce)]),
         ("Type", "s", ["simple"]),
+        ("KillMode", "s", ["process"]),
         ("User", "s", ["nobody"]),
         ("NoNewPrivileges", "b", ["true"]),
         ("CapabilityBoundingSet", "t", ["0"]),
@@ -867,6 +1043,23 @@ def child_bounds(role: str, row: dict[str, Any]) -> bool:
     )
 
 
+def command_action(argv: list[str]) -> str:
+    """Classify only the fixed manager operations used by this runtime.
+
+    :param argv: Reviewed fixed manager command vector.
+    :return: Closed action enum for the private failure projection.
+    :raises ValueError: Unexpected operation is never mislabeled as cleanup.
+    """
+    actions = {
+        "StartTransientUnit": "START",
+        "StopUnit": "STOP",
+        "ListUnitsByPatterns": "LOOKUP",
+    }
+    if len(argv) <= 7 or argv[7] not in actions:
+        raise ValueError("Unknown aggregate manager operation.")
+    return actions[argv[7]]
+
+
 def record_command_failure(
     owner: Owner, argv: list[str], code: int, stderr: str
 ) -> None:
@@ -881,7 +1074,7 @@ def record_command_failure(
     path = owner.root / "aggregate-command-failure.json"
     if path.exists() or path.is_symlink():
         return
-    action = "START" if "StartTransientUnit" in argv else "STOP"
+    action = command_action(argv)
     role = "PARENT" if unit_name(owner, "parent") in argv else "KEEPER"
     known = (
         "InvalidArgs",
@@ -920,7 +1113,6 @@ def validate_failure_record(row: dict[str, Any]) -> None:
     :return: None only for the closed safe projection.
     :raises ValueError: Schema, code or closed enums differ.
     """
-    operations = {"START_PARENT", "START_KEEPER", "STOP_PARENT", "STOP_KEEPER"}
     errors = {
         "InvalidArgs",
         "AccessDenied",
@@ -933,7 +1125,7 @@ def validate_failure_record(row: dict[str, Any]) -> None:
     if (
         set(row) != {"operation", "return_code", "manager_error"}
         or not isinstance(row["operation"], str)
-        or row["operation"] not in operations
+        or row["operation"] not in _OPERATIONS
         or type(row["return_code"]) is not int
         or not -255 <= row["return_code"] <= 255
         or not isinstance(row["manager_error"], str)
