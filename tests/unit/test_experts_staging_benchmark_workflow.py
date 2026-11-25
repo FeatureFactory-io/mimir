@@ -94,7 +94,10 @@ def test_benchmark_proof_with_fixed_build_receipt_binds_candidate_source() -> No
     :raises AssertionError: Candidate identity can be redirected by a caller.
     """
     workflow = _workflow()
-    assert set(workflow["on"]["workflow_dispatch"]["inputs"]) == {"web_memory_mib"}
+    assert set(workflow["on"]["workflow_dispatch"]["inputs"]) == {
+        "web_memory_mib",
+        "browser_memory_mib",
+    }
     job = workflow["jobs"]["benchmark"]
     assert job["env"]["CANDIDATE_SHA"] == "04c9432bce7eac5ec34a090bc5e8ec4fa06f409d"
     assert job["env"]["CANDIDATE_RUN_ID"] == "45516980492"
@@ -112,3 +115,32 @@ def test_benchmark_proof_with_fixed_build_receipt_binds_candidate_source() -> No
     )
     assert '--revision "$CANDIDATE_SHA"' in prepare
     assert '--run-id "$CANDIDATE_RUN_ID"' in prepare
+
+
+def test_benchmark_browser_experiment_with_dispatch_requires_closed_credential_free_choice() -> (
+    None
+):
+    """Require a closed CI-only browser experiment without expanding deployment.
+
+    :return: None after choice, shell admission and clean process arguments agree.
+    :raises AssertionError: Arbitrary memory or inherited credentials can enter.
+    """
+    workflow = _workflow()
+    option = workflow["on"]["workflow_dispatch"]["inputs"]["browser_memory_mib"]
+    assert option["default"] == "512"
+    assert option["options"] == ["512", "768"]
+    step = next(
+        s
+        for s in workflow["jobs"]["benchmark"]["steps"]
+        if s.get("name")
+        == "Run the genuine owned workload without the job credential environment"
+    )
+    assert (
+        step["env"]["EXPERIMENT_BROWSER_MEMORY_MIB"]
+        == "${{ inputs.browser_memory_mib }}"
+    )
+    command = step["run"]
+    assert 'case "$EXPERIMENT_BROWSER_MEMORY_MIB" in 512|768)' in command
+    assert '--browser-memory-mib "$EXPERIMENT_BROWSER_MEMORY_MIB"' in command
+    assert "sudo /usr/bin/env -i /usr/bin/python3" in command
+    assert "${{" not in command

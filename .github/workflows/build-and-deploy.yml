@@ -9,6 +9,12 @@ on:
         required: true
         default: '384'
         options: ['384', '256']
+      browser_memory_mib:
+        description: CI-only browser finalization diagnostic; idle defaults stay unchanged
+        type: choice
+        required: true
+        default: '512'
+        options: ['512', '768']
 
 permissions:
   contents: read
@@ -65,10 +71,12 @@ jobs:
       - name: Run the genuine owned workload without the job credential environment
         env:
           EXPERIMENT_WEB_MEMORY_MIB: ${{ inputs.web_memory_mib }}
+          EXPERIMENT_BROWSER_MEMORY_MIB: ${{ inputs.browser_memory_mib }}
         run: |
           set -euo pipefail
           case "$EXPERIMENT_WEB_MEMORY_MIB" in 384|256) ;; *) exit 2 ;; esac
-          sudo /usr/bin/env -i /usr/bin/python3 "$GITHUB_WORKSPACE/scripts/experts-staging/benchmark.py" --prepared-output "$GITHUB_WORKSPACE/experts-readiness" --web-memory-mib "$EXPERIMENT_WEB_MEMORY_MIB" --output "$GITHUB_WORKSPACE/benchmark-public"
+          case "$EXPERIMENT_BROWSER_MEMORY_MIB" in 512|768) ;; *) exit 2 ;; esac
+          sudo /usr/bin/env -i /usr/bin/python3 "$GITHUB_WORKSPACE/scripts/experts-staging/benchmark.py" --prepared-output "$GITHUB_WORKSPACE/experts-readiness" --web-memory-mib "$EXPERIMENT_WEB_MEMORY_MIB" --browser-memory-mib "$EXPERIMENT_BROWSER_MEMORY_MIB" --output "$GITHUB_WORKSPACE/benchmark-public"
       - name: Retain vetted numeric and actual browser evidence
         if: always()
         uses: actions/upload-artifact@v4
