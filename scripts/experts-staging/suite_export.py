@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import re
@@ -203,6 +204,14 @@ def capture_names() -> set[str]:
 
     :return: Finite reviewed JSON/PNG names.
     """
+    return _step_capture_names() | _size_capture_names()
+
+
+def _step_capture_names() -> set[str]:
+    """Enumerate source-owned UAT step acquisitions.
+
+    :return: Exact finite step image/metadata names.
+    """
     result = set()
     for case, steps in _STEPS.items():
         for step in steps:
@@ -216,6 +225,15 @@ def capture_names() -> set[str]:
                             "screenshots/" + stem + "-viewport.png",
                         }
                     )
+    return result
+
+
+def _size_capture_names() -> set[str]:
+    """Enumerate source-owned seven-size screenshots and trace chunks.
+
+    :return: Exact finite matrix image/trace/metadata names.
+    """
+    result = set()
     for width, height in _SIZES:
         result.update(
             {
@@ -335,20 +353,7 @@ def _selected_identity(record: dict[str, Any], result: dict[str, Any]) -> None:
     for key in ("status", "case", "exception_class"):
         if key not in record:
             continue
-        allowed = (
-            _STATUSES
-            if key == "status"
-            else (
-                {r.case for r in FULL_CASES}
-                | {
-                    f"guest-{screen}-{w}-{h}"
-                    for w, h in _SIZES
-                    for screen in ("list", "profile")
-                }
-                if key == "case"
-                else _EXCEPTIONS
-            )
-        )
+        allowed = _identity_values(key)
         if type(record[key]) is not str or record[key] not in allowed:
             raise ValueError("Unreviewed receipt identity value.")
         result[key] = record[key]
@@ -365,6 +370,22 @@ def _selected_identity(record: dict[str, Any], result: dict[str, Any]) -> None:
             ):
                 raise ValueError("Exact immutable revision required.")
             result[key] = record[key]
+
+
+def _identity_values(key: str) -> set[str]:
+    """Return only the closed values for one selected receipt field.
+
+    :param key: Fixed status, case or exception_class field.
+    :return: Reviewed finite identity values.
+    """
+    if key == "status":
+        return _STATUSES
+    if key == "exception_class":
+        return _EXCEPTIONS
+    captures = {
+        f"guest-{screen}-{w}-{h}" for w, h in _SIZES for screen in ("list", "profile")
+    }
+    return {row.case for row in FULL_CASES} | captures
 
 
 def _selected_observations(record: dict[str, Any], result: dict[str, Any]) -> None:
@@ -632,6 +653,7 @@ def _isolation_receipt(
     if (
         not isinstance(record, list)
         or len(record) != 3
+        or not all(isinstance(row, dict) for row in record)
         or {r.get("role") for r in record} != {"web", "db", "browser"}
     ):
         raise ValueError("Actual three-role isolation receipt required.")
@@ -685,7 +707,11 @@ def _private_values(root: Path) -> tuple[bytes, ...]:
             for line in environment.read_text().splitlines()
             if line.startswith(("DJANGO_SECRET_KEY=", "DATABASE_URL="))
         )
-    return encode_private_values(values)
+    encoded = {base64.b64encode(value.encode()).decode() for value in values}
+    encoded.update(
+        base64.urlsafe_b64encode(value.encode()).decode() for value in values
+    )
+    return encode_private_values(values | encoded)
 
 
 def _core_trace(root: Path, secrets: tuple[bytes, ...]) -> None:
