@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import importlib.util
 import sys
@@ -17,6 +18,33 @@ sys.modules[_SPEC.name] = contract
 _SPEC.loader.exec_module(contract)
 _SHA = "a" * 40
 _ACCOUNT = "411113550285"
+
+
+def test_run_readiness_with_browser_context_blocks_service_workers() -> None:
+    """Require the actual public context call to disable routing bypasses.
+
+    :return: None when workers are blocked and TLS validation remains enabled.
+    :raises AssertionError: The concrete browser context options are unsafe.
+    """
+    tree = ast.parse((_PATH.parent / "browser.py").read_text())
+    readiness = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "run_readiness"
+    )
+    contexts = [
+        node
+        for node in ast.walk(readiness)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "new_context"
+    ]
+    assert len(contexts) == 1
+    options = {keyword.arg: keyword.value for keyword in contexts[0].keywords}
+    assert (
+        ast.literal_eval(options.get("service_workers", ast.Constant(None))) == "block"
+    )
+    assert ast.literal_eval(options["ignore_https_errors"]) is False
 
 
 def _receipt() -> dict[str, object]:

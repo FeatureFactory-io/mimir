@@ -270,19 +270,18 @@ def run_readiness(browser: Browser) -> None:
 
     :param browser: Actual Chromium process on the idle host.
     :return: None after genuine core readiness observations are saved.
-    :raises Exception: Actual readiness errors are retained and re-raised.
-    """
+    :raises Exception: Actual readiness errors are retained and re-raised."""
     context = browser.new_context(
         ignore_https_errors=False,
+        service_workers="block",
         record_video_dir=str(_OUTPUT / "video"),
         record_video_size={"width": 1280, "height": 720},
     )
     blocked: list[str] = []
     context.route("**/*", lambda route: restrict_requests(route, blocked))
     context.tracing.start(screenshots=True, snapshots=True, sources=True)
-    started = monotonic()
     try:
-        perform_readiness(context, browser.version, blocked, started)
+        perform_readiness(context, browser.version, blocked, monotonic())
     except Exception as error:
         write_json(
             "browser-failure.json",

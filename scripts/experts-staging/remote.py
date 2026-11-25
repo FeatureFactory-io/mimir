@@ -819,6 +819,7 @@ def allowed_evidence_name(path: Path) -> bool:
     :return: Whether the concrete artifact is an expected safe output.
     """
     fixed = {
+        "health.json",
         "public-copy.json",
         "seed-receipt.json",
         "post-browser-state.json",
@@ -833,15 +834,13 @@ def allowed_evidence_name(path: Path) -> bool:
         "screenshots/guest-native-clipboard.png",
     }
     name = path.as_posix()
-    return (
+    return bool(
         name in fixed
-        or bool(
-            re.fullmatch(
-                r"(?:screenshots/)?guest-(?:list|profile)-[0-9]{3,4}-[0-9]{3,4}-attempt-[12]\.(?:json|png)",
-                name,
-            )
+        or re.fullmatch(
+            r"(?:screenshots/)?guest-(?:list|profile)-[0-9]{3,4}-[0-9]{3,4}-attempt-[12]\.(?:json|png)",
+            name,
         )
-        or bool(re.fullmatch(r"video/[a-f0-9]{32}\.webm", name))
+        or re.fullmatch(r"video/[a-f0-9]{32}\.webm", name)
     )
 
 

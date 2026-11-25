@@ -20,6 +20,19 @@ _ROOT = Path(__file__).resolve().parents[2]
 _RUNTIME = _ROOT / "scripts/experts-staging"
 _ACCOUNT = "411113550285"
 _REVISION = "a" * 40
+_PUBLIC_RECEIPTS = (
+    "health.json",
+    "public-copy.json",
+    "seed-receipt.json",
+    "post-browser-state.json",
+    "source-identity.json",
+    "image-source-verification.json",
+    "source-manifest.json",
+    "browser-readiness.json",
+    "browser-failure.json",
+    "runtime-isolation.json",
+    "capacity.json",
+)
 
 
 def _load(name: str) -> ModuleType:
@@ -213,18 +226,57 @@ def test_launcher_with_real_package_has_no_credentials_urls_or_unsafe_extraction
 def test_evidence_export_with_real_regular_files_preserves_bytes(
     modules: dict[str, ModuleType], tmp_path: Path
 ) -> None:
+    """Round-trip every emitted fixed public receipt through a real gzip archive.
+
+    :param modules: Actual control modules, without cloud or HTTP substitutions.
+    :param tmp_path: Owned real filesystem directory; no ambient data is touched.
+    :return: None when archived bytes equal the unchanged originals.
+    :raises AssertionError: A receipt is missing, changed or unexpectedly added.
+    """
     output = tmp_path / "output"
     output.mkdir()
-    path = output / "browser-readiness.json"
-    path.write_text('{"status":"SMOKE_ONLY_UAT_PENDING"}')
+    original = {
+        name: ('{"receipt":"' + name + '"}\n').encode() for name in _PUBLIC_RECEIPTS
+    }
+    for name, payload in original.items():
+        (output / name).write_bytes(payload)
     files = modules["remote"].evidence_files(output)
     archive = modules["remote"].package_evidence(tmp_path, files)
     with tarfile.open(archive) as package:
-        assert package.getnames() == ["browser-readiness.json"]
-        assert package.extractfile("browser-readiness.json").read() == path.read_bytes()
+        assert set(package.getnames()) == set(original)
+        for name, payload in original.items():
+            assert package.extractfile(name).read() == payload
+            assert (output / name).read_bytes() == payload
 
 
-@pytest.mark.parametrize("mode", ["symlink", "hardlink", "secret_suffix"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "health.json.env",
+        "health.json.bak",
+        "private/health.json",
+        "health-secret.json",
+        "../health.json",
+        "/health.json",
+        "unknown.json",
+    ],
+)
+def test_allowed_evidence_name_with_health_variants_rejects(
+    modules: dict[str, ModuleType], name: str
+) -> None:
+    """Permit only the exact public health receipt, never a broader name pattern.
+
+    :param modules: Actual imported control modules; no cloud operations occur.
+    :param name: Undeclared, private or unsafe relative artifact spelling.
+    :return: None when the concrete artifact name is rejected.
+    :raises AssertionError: The health allowlist becomes broader than intended.
+    """
+    assert modules["remote"].allowed_evidence_name(Path(name)) is False
+
+
+@pytest.mark.parametrize(
+    "mode", ["symlink", "hardlink", "secret_suffix", "unknown", "private_health"]
+)
 def test_evidence_export_with_real_foreign_links_or_credentials_rejects(
     modules: dict[str, ModuleType], tmp_path: Path, mode: str
 ) -> None:
@@ -233,11 +285,16 @@ def test_evidence_export_with_real_foreign_links_or_credentials_rejects(
     outside = tmp_path / "private.json"
     outside.write_text("PRIVATE_SENTINEL")
     if mode == "symlink":
-        (output / "browser-readiness.json").symlink_to(outside)
+        (output / "health.json").symlink_to(outside)
     if mode == "hardlink":
-        (output / "browser-readiness.json").hardlink_to(outside)
+        (output / "health.json").hardlink_to(outside)
     if mode == "secret_suffix":
         (output / "app.env").write_text("PRIVATE_SENTINEL")
+    if mode == "unknown":
+        (output / "unknown.json").write_text("PRIVATE_SENTINEL")
+    if mode == "private_health":
+        (output / "private").mkdir()
+        (output / "private/health.json").write_text("PRIVATE_SENTINEL")
     with pytest.raises(ValueError):
         modules["remote"].evidence_files(output)
 
