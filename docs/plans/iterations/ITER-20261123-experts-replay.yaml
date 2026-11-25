@@ -9992,7 +9992,7 @@ iteration_convergence_followups:
     - tests/unit/test_karma_sqlite_lifecycle.py
     preserves: Production behavior unchanged; restore the actual async worker wrapper and current schema leaves after owned test lifetimes.
   isolated_idle_runner:
-    status: full11_eight_verified_three_failed_staging_not_accepted
+    status: full11_repair_retry_running_after_eight_verified_three_failed_staging_not_accepted
     footprint:
     - .github/workflows/build-and-deploy.yml
     - scripts/experts-staging/
@@ -10008,7 +10008,7 @@ iteration_convergence_followups:
     - Deployment held until complete gates and independent review; main merge, release and promotion retain human review.
     local_full_suite_source: 9acf7fc34918da549e19bd8c8698a431cce9c380
     local_capture_preparation: Six fresh local cases; 180 original PNGs and six native videos. Independent final capture review remains separate from staging acceptance.
-    reviewed_controller: 7f21c1af9fcdef0edb1322ff04c76b393593107e
+    reviewed_controller: b574dbbc94a19f003583ef51d189fdf13825314d
     historical_1280_controller_checks_each_environment: 593
     current_controller_actual_linux_checks: 617
     original_full_staging_run: 45550540519
@@ -10022,6 +10022,8 @@ iteration_convergence_followups:
     actual_entrypoint_core_result: CASE_VERIFIED with actual617Linux checks and immutable-image imports;15PNG/2nativevideos; domain unchanged; complete owned cleanup; core only, fullUAT pending.
     actual_entrypoint_full_run: 45564582929
     actual_entrypoint_full_result: Eight CASE_VERIFIED; guest-public and summary-acceptance recorded memory-limit events; copy-self browser failed before captures. All11 owned/private cleanup successful;617Linux checks/import pass; normal5skip; fullUAT and independent visual acceptance pending.
+    actual_repair_retry_run: 45572474749
+    actual_repair_retry_result: Starting actual650Linux checks and exact-image import before full11 execution. Guest pages close between complete viewport journeys; original summary oracle runs in its loaded worker; copy-self safe source diagnostics added. All405 app files, images, limits, reserve and zero-exhaustion acceptance unchanged; actual fit and full UAT acceptance pending.
     resource_profile:
       explicit_trial: aggregate960
       default_initial_guard_mib: 1400

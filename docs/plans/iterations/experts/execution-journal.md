@@ -1838,3 +1838,32 @@ note media are available for closing-scene preparation. Storyboard/Page/local
 HTML/progress90 record this partial result. No production DB access/copy, normal
 deployment, merge, release or promotion. Global893lintFAIL/Analytics finding
 remain unwaived; final film incomplete.
+
+### Full repair retry 45572474749 — actual results pending
+
+Frozen controlb574dbbc94a19f003583ef51d189fdf13825314d, fixed app04/images/build
+unchanged. Runtime82f7a5b releases the actual guest page only after each entire
+viewport journey and trace chunk, retaining all seven original actions/captures;
+strict finite source-location diagnostics preserve copy-self's original error
+classification without exporting exception text. Root4470451 removes a duplicate
+Django verification interpreter from summary's384MiB container: the original
+complete suite_runtime.verify runs in its already loaded worker under the
+existing observation lock. No new HTTP route or replacement oracle. Review
+rejected447's socket identity capture after thread handoff; f9e24e9 captures the
+bound dev/inode before handoff and guards startup cleanup too. Real RED2/GREEN2
+regressions and the original independent failure are retained. b574 changes only
+the wrong-nonce test peer to wait for actual request EOF; runtime identicalf9.
+
+Full650checks pass both environments on exactf9; final test-only successor's
+23IPCchecks pass both. Independent19real host3.9IPCcontrols pass, report SHA
+`f1444a03029547d9cbce6c53f3f14f2eb6ece91ae06037d51928d17febff8bd8`.
+Root separately reviews guest lifecycle/closed diagnostics; original405app
+hashes remain identical. These are preparation proofs, not actual memory fit or
+whole UAT acceptance. No limit/reserve/acceptance reduction.
+
+Actual CI45572474749/job139062259768 starts2026-11-25T07:59:44Z on exactb574;
+all five normal jobs SKIP. Full eleven-case retry will repeat fresh CI contracts,
+immutable image imports, live idle guards, owned synthetic DB and final evidence
+checks. Source video/CLI artifacts and all prior failures remain preserved.
+Storyboard/Page/localHTML/progress91 agree. No prod DB access/copy, normal
+deployment, main merge, release or promotion; global893/Analytics remain open.
