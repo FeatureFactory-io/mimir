@@ -32,6 +32,7 @@ RUNTIME_FILES = (
     "experts_staging_settings.py",
     "verify_image.py",
     "web_entry.py",
+    "aggregate.py",
     "benchmark_observer.py",
     "benchmark_metrics.py",
 )

@@ -119,6 +119,13 @@ def controls(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
         monkeypatch.setitem(sys.modules, name, _load(name))
     module = _load("benchmark_contract")
     monkeypatch.setitem(sys.modules, "benchmark_contract", module)
+    spec = importlib.util.spec_from_file_location(
+        "aggregate", _RUNTIME / "aggregate.py"
+    )
+    assert spec and spec.loader
+    actual = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, "aggregate", actual)
+    spec.loader.exec_module(actual)
     return module
 
 
@@ -574,7 +581,7 @@ def test_observer_and_driver_with_reviewed_source_preserve_real_browser_and_clea
         and n.func.attr in forbidden
     ]
     source = (_RUNTIME / "benchmark.py").read_text()
-    assert "measure_and_finish(root, nonce, names, output, result)" in source
+    assert "measure_and_finish(root, nonce, names, output, result, owner)" in source
     assert 'os.environ["DOCKER_CONFIG"] = str(root / "docker-config")' in source
 
 
@@ -1310,3 +1317,77 @@ def test_safe_export_with_page_prefixed_link_rejects_before_copy(
     with pytest.raises(ValueError):
         controls.safe_export(source, public)
     assert not list(public.iterdir())
+
+
+def test_optional_parent_with_default_none_preserves_actual_common_db_browser_vectors(
+    driver: ModuleType, tmp_path: Path
+) -> None:
+    nonce = "a" * 32
+    names = driver.remote.resource_names(nonce)
+    manifest = {"nonce": nonce, "browser_image": "immutable-browser"}
+    for role in ("db", "web", "browser"):
+        normal = driver.remote.container_arguments(nonce, names, role)
+        assert normal == driver.remote.container_arguments(nonce, names, role, None)
+        parented = driver.remote.container_arguments(
+            nonce, names, role, "mimirexperts" + nonce + ".slice"
+        )
+        index = parented.index("--cgroup-parent")
+        assert parented[index + 1] == "mimirexperts" + nonce + ".slice"
+        assert parented[:index] + parented[index + 2 :] == normal
+    assert driver.remote.database_arguments(
+        tmp_path, nonce, names, "pg"
+    ) == driver.remote.database_arguments(tmp_path, nonce, names, "pg", None)
+    assert driver.remote.browser_arguments(
+        tmp_path, manifest, names
+    ) == driver.remote.browser_arguments(tmp_path, manifest, names, None)
+    with pytest.raises(ValueError):
+        driver.remote.container_arguments(nonce, names, "web", "system.slice")
+
+
+def test_aggregate_profile_cli_is_closed_and_preserves_default_mode(
+    driver: ModuleType, tmp_path: Path
+) -> None:
+    argv = [
+        "--prepared-output",
+        str(tmp_path),
+        "--web-memory-mib",
+        "384",
+        "--output",
+        str(tmp_path / "new"),
+    ]
+    assert driver.arguments(argv).resource_profile == "default"
+    assert (
+        driver.arguments(
+            [*argv, "--resource-profile", "aggregate1024"]
+        ).resource_profile
+        == "aggregate1024"
+    )
+    with pytest.raises(SystemExit):
+        driver.arguments([*argv, "--resource-profile", "arbitrary-parent"])
+
+
+def test_benchmark_finish_source_requires_parent_cleanup_before_success_and_private_removal() -> (
+    None
+):
+    tree = ast.parse((_RUNTIME / "benchmark.py").read_text())
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "finish"
+    )
+    block = next(node for node in function.body if isinstance(node, ast.Try))
+    statements = [ast.unparse(node) for node in block.body]
+    assert statements[0].startswith("remote.cleanup(")
+    assert statements[1].startswith("cleanup_aggregate(")
+    assert statements[2] == "result['cleanup'] = 'SUCCESS'"
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "update"
+        for node in ast.walk(block.handlers[0])
+    )
+    removal = next(node for node in function.body if isinstance(node, ast.If))
+    assert (
+        ast.unparse(removal.test)
+        == "result.get('cleanup') == 'SUCCESS' and result.get('export') == 'SUCCESS'"
+    )

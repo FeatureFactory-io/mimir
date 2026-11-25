@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import aggregate
 import contract
 import remote
 from benchmark_contract import (
@@ -82,6 +83,9 @@ def arguments(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         choices=BROWSER_MEMORY_CHOICES,
         default=DEFAULT_BROWSER_MEMORY_MIB,
+    )
+    parser.add_argument(
+        "--resource-profile", choices=("default", "aggregate1024"), default="default"
     )
     return parser.parse_args(argv)
 
@@ -180,33 +184,27 @@ def manifest_for(root: Path, plan: dict[str, Any], nonce: str) -> dict[str, Any]
     return manifest
 
 
-def run_browser(root: Path, manifest: dict[str, Any], names: dict[str, str]) -> None:
-    """Keep actual hardened browser lifecycle, adding only its numeric observer.
-    :param root: Owned runtime and output root.
-    :param manifest: Fixed immutable image and source identities.
-    :param names: Exact allocated Docker resources.
-    :return: None after real Chromium and actual bootstrap.verify_after pass.
-    :raises Exception: Guard, real browser or actual post-browser DB readback fails.
+def run_browser(
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    owner: aggregate.Owner | None = None,
+    result: dict[str, Any] | None = None,
+) -> None:
+    """Run the genuine browser and real database readback under the chosen profile.
+
+    :param root: Private source/output root.
+    :param manifest: Immutable source/image selectors.
+    :param names: Exact owned resources.
+    :param owner: Explicit parent or unchanged defaultNone.
+    :param result: Independent safe HOST receipt.
+    :return: None after actual browser and post-browser state checks.
+    :raises Exception: Actual browser or ownership/readback failure.
     """
-    require_ci_browser_reserve(remote._LIMITS["browser"][0])
-    command = observed_browser_arguments(root, manifest, names)
-    remote.docker(root, *command)
-    remote.docker(root, "network", "connect", names["egress"], names["browser"])
-    remote.docker(root, "start", names["browser"])
-    remote.write_isolation_receipt(root, manifest, names)
+    start_observed_browser(root, manifest, names, owner, result)
     if remote.docker(root, "wait", names["browser"], timeout=600).strip() != "0":
         raise RuntimeError("Actual benchmark browser failed.")
-    remote.docker(
-        root,
-        "exec",
-        names["web"],
-        "python",
-        "manage.py",
-        "shell",
-        "--no-imports",
-        "-c",
-        "from bootstrap import verify_after; verify_after()",
-    )
+    post_browser_readback(root, names, owner)
 
 
 def container_state(root: Path, name: str, role: str) -> dict[str, Any]:
@@ -284,16 +282,21 @@ def browser_text(record: dict[str, Any]) -> str:
 
 
 def workload(
-    root: Path, manifest: dict[str, Any], names: dict[str, str], result: dict[str, Any]
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    result: dict[str, Any],
+    owner: aggregate.Owner | None = None,
 ) -> None:
-    """Execute genuine owned lifecycle without image pulls or external DB inputs.
+    """Keep old initial guards and actual app/DB/browser work unchanged by default.
 
-    :param root: Verified private root.
-    :param manifest: Validated immutable candidate.
-    :param names: Fresh exact resource names.
-    :param result: Safe mutable phase/status receipt.
-    :return: None only after actual HTTPS/browser/DB and measurement checks.
-    :raises Exception: Any real lifecycle or measurement guard fails.
+    :param root: Verified private invocation.
+    :param manifest: Immutable candidate identity.
+    :param names: Exact resources.
+    :param result: Safe actual phase/measurement state.
+    :param owner: Explicit CI parent or unchanged defaultNone.
+    :return: None after genuine core and readback completion.
+    :raises Exception: Any actual capacity, source or workload guard fails.
     """
     result["phase"] = "capacity"
     measured = remote.reserve_capacity(
@@ -301,17 +304,10 @@ def workload(
     )
     require_ci_capacity(measured["available_memory_bytes"])
     remote.private_file(root / "output/capacity.json", json.dumps(measured, indent=2))
-    result["phase"] = "database"
-    remote.create_networks(root, manifest["nonce"], names)
-    password = remote.start_database(
-        root, manifest["nonce"], names, manifest["postgres_image"]
-    )
-    result["phase"] = "web"
-    remote.write_app_runtime(root, manifest, password)
-    remote.start_web(root, manifest, names)
-    remote.wait_web(root, manifest, names)
+    password = provision_database(root, manifest, names, owner, result)
+    provision_web(root, manifest, names, password, owner, result)
     result["phase"] = "browser_and_real_state_readback"
-    run_browser(root, manifest, names)
+    run_browser(root, manifest, names, owner, result)
     result["status"] = "CORE_WORKLOAD_PASSED_MEASUREMENT_PENDING"
 
 
@@ -326,7 +322,12 @@ def failure(error: Exception) -> str:
 
 
 def finish(
-    root: Path, nonce: str, names: dict[str, str], output: Path, result: dict[str, Any]
+    root: Path,
+    nonce: str,
+    names: dict[str, str],
+    output: Path,
+    result: dict[str, Any],
+    owner: aggregate.Owner | None = None,
 ) -> None:
     """Always clean exact labeled resources, then export checked public evidence.
 
@@ -339,6 +340,7 @@ def finish(
     """
     try:
         remote.cleanup(root, nonce, names)
+        cleanup_aggregate(owner, root, names)
         result["cleanup"] = "SUCCESS"
     except Exception as error:  # noqa: BLE001 - sanitize every owned boundary failure.
         result.update(
@@ -357,30 +359,83 @@ def execute(
     output: Path,
     result: dict[str, Any],
     browser_memory: int = 512,
+    resource_profile: str = "default",
 ) -> None:
-    """Prepare one experiment and keep owned cleanup on every actual failure path.
-    :param prepared: Actual reviewed controller preparation.
-    :param web_memory: Explicit384 default or256 experiment.
-    :param browser_memory: Explicit512 default or768 CI-only experiment.
-    :param output: Fresh absolute public destination.
-    :param result: Curated public result under construction.
-    :return: None when all actual checks and cleanup succeed.
+    """Prepare an explicit selected experiment without changing default resource policy.
+
+    :param prepared: Exact controller source preparation.
+    :param web_memory: Existing web memory choice.
+    :param output: Fresh public evidence directory.
+    :param result: Safe HOST receipt.
+    :param browser_memory: Existing closed browser memory choice.
+    :param resource_profile: Default or fixed aggregate1024 CI-only preset.
+    :return: None after real execution and cleanup.
     :raises Exception: Preparation fails before owned execution.
     """
     validate_host()
-    repository = Path(__file__).resolve().parents[2]
-    plan, source = validate_prepared(prepared, repository)
+    preparation = validate_prepared(prepared, Path(__file__).resolve().parents[2])
     nonce = uuid4().hex
     root = allocate_root(nonce)
+    choices = (web_memory, browser_memory, resource_profile)
+    execute_allocated(root, nonce, preparation, choices, output, result)
+
+
+def execute_allocated(
+    root: Path,
+    nonce: str,
+    preparation: tuple[dict[str, Any], dict[str, Any]],
+    choices: tuple[int, int, str],
+    output: Path,
+    result: dict[str, Any],
+) -> None:
+    """Retain positive owner state even if unit creation fails halfway through.
+    :param root: Private allocated root.
+    :param nonce: Fresh source owner.
+    :param preparation: Validated plan and actual source map.
+    :param choices: Explicit web/browser/profile selection.
+    :param output: Fresh public destination.
+    :param result: Independent safe HOST state.
+    :return: None after genuine workload and settlement.
+    """
+    owner = None
     names = remote.resource_names(nonce)
     try:
-        prepare_runtime(root, plan, source, nonce, web_memory, result, browser_memory)
-        run_owned_workload(root, names, result)
-    except Exception as error:  # noqa: BLE001 - sanitize every owned boundary failure.
-        result.update(status="FAILED", exception_class=failure(error))
-        remote.record_runtime_failure(root, error)
+        owner = initialize_runtime(root, preparation, choices, result)
+        if owner is not None:
+            result["aggregate_operation"] = "START_PARENT_AND_KEEPER"
+            aggregate.start(owner)
+        run_owned_workload(root, names, result, owner)
+    except Exception as error:  # noqa: BLE001 - retain safe failure class.
+        record_owned_failure(root, owner, error, result)
     finally:
-        measure_and_finish(root, nonce, names, output, result)
+        measure_and_finish(root, nonce, names, output, result, owner)
+
+
+def initialize_runtime(
+    root: Path,
+    preparation: tuple[dict[str, Any], dict[str, Any]],
+    choices: tuple[int, int, str],
+    result: dict[str, Any],
+) -> aggregate.Owner | None:
+    """Bind a planned aggregate owner before its first actual unit operation.
+
+    :param root: Exclusive private root.
+    :param preparation: Validated plan/source maps.
+    :param choices: Web/browser/profile choices.
+    :param result: Safe actual selection metadata.
+    :return: Explicit aggregate owner or None for unchanged defaults.
+    :raises Exception: Profile, cache or source binding fails.
+    """
+    web, browser, profile = choices
+    enabled = aggregate.validate_profile(profile, web, browser)
+    plan, source = preparation
+    prepare_runtime(
+        root, plan, source, root.name[len("mimir-experts-") :], web, result, browser
+    )
+    result["resource_profile"] = profile
+    if not enabled:
+        return None
+    return plan_aggregate(root, plan, result)
 
 
 def prepare_runtime(
@@ -526,7 +581,12 @@ def validate_measurements(result: dict[str, Any]) -> None:
 
 
 def measure_and_finish(
-    root: Path, nonce: str, names: dict[str, str], output: Path, result: dict[str, Any]
+    root: Path,
+    nonce: str,
+    names: dict[str, str],
+    output: Path,
+    result: dict[str, Any],
+    owner: aggregate.Owner | None = None,
 ) -> None:
     """Measure before cleanup even on failure, then settle exact owned resources.
 
@@ -538,7 +598,7 @@ def measure_and_finish(
     :return: None with actual metric, cleanup and export status.
     """
     try:
-        retain_measurements(root, nonce, names, result)
+        retain_measurements(root, nonce, names, result, owner)
     except Exception as error:  # noqa: BLE001 - fixed enum and class only.
         if result["status"] != "FAILED":
             result["phase"] = "measurement"
@@ -549,11 +609,15 @@ def measure_and_finish(
             measurement_reason=failure_reason(error),
         )
     finally:
-        finish(root, nonce, names, output, result)
+        finish(root, nonce, names, output, result, owner)
 
 
 def retain_measurements(
-    root: Path, nonce: str, names: dict[str, str], result: dict[str, Any]
+    root: Path,
+    nonce: str,
+    names: dict[str, str],
+    result: dict[str, Any],
+    owner: aggregate.Owner | None = None,
 ) -> None:
     """Put sanitized numeric observations in HOST result before any exporter check.
 
@@ -570,6 +634,7 @@ def retain_measurements(
     remote.private_file(
         root / "output/benchmark-memory.json", json.dumps(measured, indent=2)
     )
+    retain_aggregate_observation(owner, result)
     validate_measurements(measured)
     result["measurement"] = "SUCCESS"
     if result["status"] == "CORE_WORKLOAD_PASSED_MEASUREMENT_PENDING":
@@ -718,7 +783,10 @@ def record_envelope(
 
 
 def observed_browser_arguments(
-    root: Path, manifest: dict[str, Any], names: dict[str, str]
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    parent: str | None = None,
 ) -> list[str]:
     """Bind the same closed cap to actual Docker limits and observer verification.
 
@@ -730,7 +798,7 @@ def observed_browser_arguments(
     """
     memory = remote._LIMITS["browser"][0]
     browser_memory_bytes(memory)
-    command = remote.browser_arguments(root, manifest, names)
+    command = remote.browser_arguments(root, manifest, names, parent)
     if command[-1] != "/runtime/browser.py":
         raise ValueError("Actual browser command contract changed.")
     command[-1] = "/runtime/benchmark_observer.py"
@@ -776,7 +844,10 @@ def require_ci_browser_reserve(memory_mib: int) -> None:
 
 
 def run_owned_workload(
-    root: Path, names: dict[str, str], result: dict[str, Any]
+    root: Path,
+    names: dict[str, str],
+    result: dict[str, Any],
+    owner: aggregate.Owner | None = None,
 ) -> None:
     """Keep the unchanged bounded real lifecycle within its normal cleanup window.
 
@@ -788,7 +859,7 @@ def run_owned_workload(
     """
     manifest = read_json(root / "runtime/run.json")
     with remote.runtime_deadline():
-        workload(root, manifest, names, result)
+        workload(root, manifest, names, result, owner)
 
 
 def execute_cli(
@@ -808,6 +879,7 @@ def execute_cli(
         output,
         result,
         options.browser_memory_mib,
+        options.resource_profile,
     )
 
 
@@ -818,6 +890,264 @@ def ci_memory_requirement() -> int:
     """
     selected = sum(bounds[0] for bounds in remote._LIMITS.values())
     return max(contract.MIN_AVAILABLE_MEMORY, (selected + _HOST_RESERVE_MIB) * _MIB)
+
+
+def verify_aggregate_member(
+    owner: aggregate.Owner | None,
+    root: Path,
+    names: dict[str, str],
+    role: str,
+    result: dict[str, Any] | None,
+) -> None:
+    """Verify actual parent, labels, enforced limits and host PID after each start.
+
+    :param owner: Explicit owner or unchanged default.
+    :param root: Private Docker configuration.
+    :param names: Exact resources.
+    :param role: One fixed container role.
+    :param result: Safe independent HOST receipt.
+    :return: None after actual membership proof.
+    :raises Exception: Actual identity or enforced ancestry differs.
+    """
+    if owner is None:
+        return
+    remote.assert_resource(root, "container", names[role], owner.nonce)
+    row = aggregate_container_row(root, names[role])
+    aggregate.verify_member(owner, role, row)
+    if result is not None:
+        result.setdefault("aggregate_members", {})[role] = True
+
+
+def retain_aggregate_observation(
+    owner: aggregate.Owner | None, result: dict[str, Any]
+) -> None:
+    """Keep typed actual parent metrics in HOST state before acceptance/export.
+
+    :param owner: Explicit positively owned parent, or defaultNone.
+    :param result: Independent safe HOST result.
+    :return: None only after exact aggregate measurement and member proof pass.
+    :raises Exception: Any live identity, member, cap or headroom proof fails.
+    """
+    if owner is None:
+        return
+    result["aggregate"] = aggregate.observe(owner)
+    aggregate.require_headroom(result["aggregate"])
+    if not result["aggregate"]["keeper_verified"] or result.get(
+        "aggregate_members"
+    ) != {"db": True, "web": True, "browser": True}:
+        raise ValueError("Aggregate complete membership proof is missing.")
+
+
+def cleanup_aggregate(
+    owner: aggregate.Owner | None, root: Path, names: dict[str, str]
+) -> None:
+    """Confirm Docker absence before stopping either exact owned transient unit.
+
+    :param owner: Explicit parent owner or defaultNone.
+    :param root: Private Docker config.
+    :param names: Exact invocation names.
+    :return: None only after both owned units and kernel parent are gone.
+    :raises Exception: Inventory, ownership or parent cleanup fails.
+    """
+    if owner is None:
+        return
+    existing = remote.docker(
+        root, "container", "ls", "--all", "--format", "{{.Names}}", timeout=20
+    ).splitlines()
+    remaining = [
+        names[role] for role in ("db", "web", "browser") if names[role] in existing
+    ]
+    aggregate.cleanup(owner, remaining)
+
+
+def plan_aggregate(
+    root: Path, plan: dict[str, Any], result: dict[str, Any]
+) -> aggregate.Owner:
+    """Bind the actual supported driver and source before transient unit creation.
+
+    :param root: Exclusive private root.
+    :param plan: Validated control source identity.
+    :param result: Independent HOST receipt.
+    :return: Explicit private aggregate owner.
+    :raises ValueError: Actual Docker driver/version is unsupported.
+    """
+    result["aggregate_limit_bytes"] = aggregate.LIMIT_BYTES
+    row = json.loads(
+        remote.docker(
+            root,
+            "info",
+            "--format",
+            '{"driver":{{json .CgroupDriver}},"version":{{json .CgroupVersion}}}',
+        )
+    )
+    aggregate.require_driver(row)
+    return aggregate.plan(
+        root, root.name[len("mimir-experts-") :], plan["runner_revision"]
+    )
+
+
+def aggregate_container_row(root: Path, name: str) -> dict[str, Any]:
+    """Read only explicit non-secret Docker identity/limit fields.
+
+    :param root: Private Docker configuration.
+    :param name: Exact owned container name.
+    :return: Actual curated observation; never Config.Env or raw inspect.
+    """
+    fields = {
+        "id": ".Id",
+        "pid": ".State.Pid",
+        "running": ".State.Running",
+        "parent": ".HostConfig.CgroupParent",
+        "memory": ".HostConfig.Memory",
+        "swap": ".HostConfig.MemorySwap",
+        "owner": 'index .Config.Labels "io.featurefactory.experts.owner"',
+        "fixture": 'index .Config.Labels "io.featurefactory.experts.fixture"',
+        "readonly": ".HostConfig.ReadonlyRootfs",
+        "cap_drop": ".HostConfig.CapDrop",
+        "security": ".HostConfig.SecurityOpt",
+        "restarts": ".RestartCount",
+    }
+    template = (
+        "{"
+        + ",".join(f'"{key}":{{{{json ({value})}}}}' for key, value in fields.items())
+        + "}"
+    )
+    return json.loads(
+        remote.docker(root, "container", "inspect", "--format", template, name)
+    )
+
+
+def start_observed_browser(
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    owner: aggregate.Owner | None,
+    result: dict[str, Any] | None,
+) -> None:
+    """Start only the real hardened observer after the correct live budget guard.
+
+    :param root: Private runtime.
+    :param manifest: Fixed image/source identity.
+    :param names: Exact allocated resources.
+    :param owner: Explicit aggregate parent or defaultNone.
+    :param result: Independent HOST state.
+    :return: None after actual browser PID parent proof.
+    """
+    if owner is None:
+        require_ci_browser_reserve(remote._LIMITS["browser"][0])
+    else:
+        aggregate.guard(owner)
+    parent = aggregate.parent_name(owner.nonce) if owner is not None else None
+    remote.docker(root, *observed_browser_arguments(root, manifest, names, parent))
+    remote.docker(root, "network", "connect", names["egress"], names["browser"])
+    remote.docker(root, "start", names["browser"])
+    verify_aggregate_member(owner, root, names, "browser", result)
+    remote.write_isolation_receipt(root, manifest, names)
+
+
+def provision_database(
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    owner: aggregate.Owner | None,
+    result: dict[str, Any],
+) -> str:
+    """Preserve actual fresh PG initialization and prove its selected parent.
+
+    :param root: Private invocation.
+    :param manifest: Fixed PG image/source identity.
+    :param names: Exact resource names.
+    :param owner: Explicit aggregate parent or defaultNone.
+    :param result: Safe HOST state.
+    :return: Actual dedicated app password, never exported.
+    """
+    result["phase"] = "database"
+    remote.create_networks(root, manifest["nonce"], names)
+    parent = aggregate.parent_name(owner.nonce) if owner is not None else None
+    if owner is not None:
+        aggregate.guard(owner)
+    password = remote.start_database(
+        root, manifest["nonce"], names, manifest["postgres_image"], parent
+    )
+    verify_aggregate_member(owner, root, names, "db", result)
+    return password
+
+
+def provision_web(
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    password: str,
+    owner: aggregate.Owner | None,
+    result: dict[str, Any],
+) -> None:
+    """Preserve real TLS/source/bootstrap and positively prove actual web ancestry.
+
+    :param root: Private invocation.
+    :param manifest: Fixed candidate selectors.
+    :param names: Exact resources.
+    :param password: Private owned database password.
+    :param owner: Explicit aggregate parent or defaultNone.
+    :param result: Safe HOST state.
+    :return: None after genuine HTTPS health succeeds.
+    """
+    result["phase"] = "web"
+    remote.write_app_runtime(root, manifest, password)
+    parent = aggregate.parent_name(owner.nonce) if owner is not None else None
+    if owner is not None:
+        aggregate.guard(owner)
+    remote.start_web(root, manifest, names, parent)
+    verify_aggregate_member(owner, root, names, "web", result)
+    remote.wait_web(root, manifest, names)
+
+
+def post_browser_readback(
+    root: Path, names: dict[str, str], owner: aggregate.Owner | None
+) -> None:
+    """Run the unchanged real owned DB readback after browser completion.
+
+    :param root: Private runtime.
+    :param names: Exact known resources.
+    :param owner: Explicit aggregate or defaultNone.
+    :return: None only after actual bootstrap.verify_after succeeds.
+    :raises Exception: Reserve or real readback fails.
+    """
+    if owner is not None:
+        aggregate.guard(owner)
+    remote.docker(
+        root,
+        "exec",
+        names["web"],
+        "python",
+        "manage.py",
+        "shell",
+        "--no-imports",
+        "-c",
+        "from bootstrap import verify_after; verify_after()",
+    )
+
+
+def record_owned_failure(
+    root: Path, owner: aggregate.Owner | None, error: Exception, result: dict[str, Any]
+) -> None:
+    """Preserve original failed status even if private diagnostic validation fails.
+
+    :param root: Positively owned private root.
+    :param owner: Explicit aggregate or defaultNone.
+    :param error: Actual original failure; its message/args are never exported.
+    :param result: Independent safe HOST state.
+    :return: None after fixed failure classification is retained.
+    """
+    result.update(status="FAILED", exception_class=failure(error))
+    if owner is not None:
+        try:
+            result["aggregate_failure"] = aggregate.failure_receipt(owner)
+        except (ValueError, TypeError, OSError):
+            result["aggregate_failure"] = {
+                "operation": "PRIVATE_EVIDENCE_REJECTED",
+                "manager_error": "UNCLASSIFIED",
+            }
+    remote.record_runtime_failure(root, error)
 
 
 if __name__ == "__main__":

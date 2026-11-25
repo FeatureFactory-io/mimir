@@ -473,31 +473,36 @@ def create_networks(root: Path, nonce: str, names: dict[str, str]) -> None:
     docker(root, "network", "create", *labels(nonce), names["egress"])
 
 
-def start_database(root: Path, nonce: str, names: dict[str, str], image: str) -> str:
+def start_database(
+    root: Path, nonce: str, names: dict[str, str], image: str, parent: str | None = None
+) -> str:
     """Start only the fresh owned PostgreSQL container and dedicated app role.
 
     :param root: Private bind mounts and generated credentials.
     :param nonce: Exact owner identity.
     :param names: Exact allocated resource names.
     :param image: Immutable PostgreSQL16 repository digest.
+    :param parent: Explicit owned cgroup slice or unchanged defaultNone.
     :return: Dedicated app-role password, never logged/exported.
     :raises RuntimeError: Real database startup or role creation fails.
     """
     private_file(root / "pg-admin-password", os.urandom(32).hex(), 999)
-    docker(root, *database_arguments(root, nonce, names, image))
+    docker(root, *database_arguments(root, nonce, names, image, parent))
     wait_database(root, names["db"])
     return create_app_role(root, nonce, names["db"])
 
 
-def container_arguments(nonce: str, names: dict[str, str], kind: str) -> list[str]:
+def container_arguments(
+    nonce: str, names: dict[str, str], kind: str, parent: str | None = None
+) -> list[str]:
     """Compose common least-privilege and resource bounds for one owned container.
 
     :param nonce: Validated owner identity.
     :param names: Exact allocated resource names.
     :param kind: Fixed role: web, db or browser.
+    :param parent: Optional exact owned slice, never an ambient/default parent.
     :return: Explicit Docker arguments; no shell expansion or inherited environment.
     """
-    memory, cpu, pids, temporary = _LIMITS[kind]
     operation = ["create"] if kind == "browser" else ["run", "-d"]
     return [
         *operation,
@@ -506,17 +511,8 @@ def container_arguments(nonce: str, names: dict[str, str], kind: str) -> list[st
         *labels(nonce),
         "--network",
         names["internal"],
-        "--memory",
-        f"{memory}m",
-        "--memory-swap",
-        f"{memory}m",
-        "--cpus",
-        cpu,
-        "--pids-limit",
-        str(pids),
-        *_HARDENING,
-        "--tmpfs",
-        f"/tmp:rw,nosuid,size={temporary}m",
+        *owned_parent_arguments(nonce, parent),
+        *role_arguments(kind),
     ]
 
 
@@ -539,7 +535,7 @@ def mounts(root: Path, bindings: tuple[tuple[str, str, bool], ...]) -> list[str]
 
 
 def database_arguments(
-    root: Path, nonce: str, names: dict[str, str], image: str
+    root: Path, nonce: str, names: dict[str, str], image: str, parent: str | None = None
 ) -> list[str]:
     """Build the internal-only nonroot PostgreSQL container command.
 
@@ -547,10 +543,11 @@ def database_arguments(
     :param nonce: Owner identity.
     :param names: Exact allocated resources.
     :param image: Immutable PG16 digest.
+    :param parent: Explicit owned cgroup slice or unchanged defaultNone.
     :return: Docker argument vector with no shared DB URL.
     """
     return [
-        *container_arguments(nonce, names, "db"),
+        *container_arguments(nonce, names, "db", parent),
         "--network-alias",
         "cedar-db",
         "--user",
@@ -654,17 +651,23 @@ def web_mounts(root: Path) -> list[str]:
     return mounts(root, _WEB_BINDS)
 
 
-def start_web(root: Path, manifest: dict[str, Any], names: dict[str, str]) -> None:
+def start_web(
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    parent: str | None = None,
+) -> None:
     """Launch the bounded app with an explicit verify/guard/init/TLS entrypoint.
 
     :param root: Private runtime directory.
     :param manifest: Immutable source/image identity.
     :param names: Exact allocated resources.
+    :param parent: Explicit owned cgroup slice or unchanged defaultNone.
     :return: None after Docker starts the owned app.
     :raises RuntimeError: Container creation fails.
     """
     argv = [
-        *container_arguments(manifest["nonce"], names, "web"),
+        *container_arguments(manifest["nonce"], names, "web", parent),
         "--network-alias",
         "cedar-web",
         "--publish",
@@ -775,17 +778,21 @@ def require_browser_reserve() -> None:
 
 
 def browser_arguments(
-    root: Path, manifest: dict[str, Any], names: dict[str, str]
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    parent: str | None = None,
 ) -> list[str]:
     """Build the actual browser command without app/database/provider credentials.
 
     :param root: Owned source/output mounts.
     :param manifest: Immutable browser digest and owner identity.
     :param names: Exact allocated resources.
+    :param parent: Explicit owned cgroup slice or unchanged defaultNone.
     :return: Docker create arguments; code mounts are read-only.
     """
     return [
-        *container_arguments(manifest["nonce"], names, "browser"),
+        *container_arguments(manifest["nonce"], names, "browser", parent),
         "--shm-size",
         "128m",
         *mounts(root, _BROWSER_BINDS),
@@ -1124,6 +1131,45 @@ def finish_owned_run(
         cleanup(root, manifest["nonce"], names)
         verify_root(root, manifest["nonce"])
         shutil.rmtree(root)
+
+
+def owned_parent_arguments(nonce: str, parent: str | None) -> list[str]:
+    """Admit only this invocation's explicit slice; default vectors stay identical.
+
+    :param nonce: Positive32hex owner identity.
+    :param parent: Optional fixed derived unit name.
+    :return: Empty default or exact cgroup-parent option.
+    :raises ValueError: Foreign or malformed parent.
+    """
+    owner_record(nonce)
+    if parent is None:
+        return []
+    if parent != f"mimirexperts{nonce}.slice":
+        raise ValueError("Refusing a foreign cgroup parent.")
+    return ["--cgroup-parent", parent]
+
+
+def role_arguments(kind: str) -> list[str]:
+    """Keep every original per-role resource and hardening option unchanged.
+
+    :param kind: Existing web/db/browser role.
+    :return: Original bounded argument vector in its original order.
+    :raises KeyError: Unknown role.
+    """
+    memory, cpu, pids, temporary = _LIMITS[kind]
+    return [
+        "--memory",
+        f"{memory}m",
+        "--memory-swap",
+        f"{memory}m",
+        "--cpus",
+        cpu,
+        "--pids-limit",
+        str(pids),
+        *_HARDENING,
+        "--tmpfs",
+        f"/tmp:rw,nosuid,size={temporary}m",
+    ]
 
 
 if __name__ == "__main__":
