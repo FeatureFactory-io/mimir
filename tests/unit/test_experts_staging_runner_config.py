@@ -5,9 +5,11 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
+import shutil
 import signal
 import subprocess
 import sys
+import sysconfig
 import tarfile
 from pathlib import Path
 from types import ModuleType
@@ -318,6 +320,7 @@ def test_container_contract_with_actual_generated_vectors_has_no_ambient_runtime
     assert "ANTHROPIC_API_KEY" not in " ".join(
         browser
     ) and "AWS_ACCESS_KEY_ID" not in " ".join(browser)
+    assert "PYTHONPATH=/runtime:/app" not in browser
     assert "--entrypoint" in browser and browser[-2:] == [
         manifest["browser_image"],
         "/runtime/browser.py",
@@ -698,3 +701,170 @@ def test_image_cache_reserve_with_observed_idle_sizes_uses_digest_identity(
 # Actual read-only CI45526140670 metadata, source receipt SHA256
 # 13ba76346cb63685e40b67b32c092f163d27fdb8c061227fa6e152dfb6c0e1d8.
 _OBSERVED_IDLE_CACHE_JSON = '{"web":{"Id":"sha256:5d250803bac2ea5a1c545246d82b5a5eded74eec52451bf7eacef5738839ed61","RepoDigests":["411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:e7f6e2170fd6250a9b6c3f635ceb2b90d0dfbe81ed337c10180c0a903ca5e1ba"],"Os":"linux","Architecture":"amd64","Size":827361988},"browser":{"Id":"sha256:06420e0e4d82040e23ef50eec215ca9be5e1b66683ffc5df426268996ed013e4","RepoDigests":["411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:a74104c8fb4ff8a02dd053ee2584868d91dd4273f058b690faf0875684c5e368"],"Os":"linux","Architecture":"amd64","Size":1904824872},"postgres":{"Id":"sha256:a026aff735540e5492c2ac4a782edd7dffa9b3b816dbda710d63b7a84f2c9b82","RepoDigests":["postgres@sha256:07abc3f43c9395b0bdbbab36bc25ddb0e8d83cd4fcafb5fb7d6abe14ff156dd8"],"Os":"linux","Architecture":"amd64","Size":468060783}}'
+
+
+_IMPORT_PROBE = """import json, runpy, sys
+sys.path.extend(json.loads(sys.argv[2]))
+class MainReached(Exception):
+    pass
+def guard(event, args):
+    if event == "open" and args[0] == "/runtime/run.json":
+        raise MainReached()
+    if event in {"subprocess.Popen", "socket.connect", "socket.bind", "sqlite3.connect"}:
+        raise AssertionError("Forbidden import side effect")
+sys.addaudithook(guard)
+try:
+    runpy.run_path(sys.argv[1], run_name="__main__")
+except MainReached:
+    from django.conf import settings
+    from django.apps import apps
+    assert not settings.configured and not apps.ready
+    assert "pytest" not in sys.modules
+    print(json.dumps({"status": "MAIN_REACHED", "django_configured": False}))
+except ModuleNotFoundError as error:
+    print(json.dumps({"status": "IMPORT_FAILED", "module": error.name}))
+"""
+
+
+def _readonly_import_tree(tmp_path: Path) -> tuple[Path, Path]:
+    """Copy real import sources into read-only app/runtime roots.
+
+    :param tmp_path: Exclusive test directory.
+    :return: Runtime script directory and candidate application directory.
+    """
+    runtime, app = tmp_path / "runtime", tmp_path / "app"
+    runtime.mkdir()
+    for name in _load("controller")._RUNTIME_FILES:
+        shutil.copyfile(_RUNTIME / name, runtime / name)
+    shutil.copytree(
+        _ROOT / "tests/support",
+        app / "tests/support",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
+    shutil.copyfile(_ROOT / "tests/__init__.py", app / "tests/__init__.py")
+    (runtime / "import-probe.py").write_text(_IMPORT_PROBE)
+    for root in (runtime, app):
+        for path in root.rglob("*"):
+            path.chmod(0o555 if path.is_dir() else 0o444)
+        root.chmod(0o555)
+    return runtime, app
+
+
+def _browser_import_environment(
+    argv: list[str], runtime: Path, app: Path
+) -> dict[str, str]:
+    """Map only declared container import roots into the owned local snapshot.
+
+    :param argv: Actual browser Docker vector.
+    :param runtime: Owned read-only runtime directory.
+    :param app: Owned read-only application directory.
+    :return: Only explicit pure browser environment entries.
+    """
+    environment = {
+        argv[i + 1].split("=", 1)[0]: argv[i + 1].split("=", 1)[1]
+        for i, value in enumerate(argv)
+        if value == "-e"
+    }
+    if "PYTHONPATH" in environment:
+        environment["PYTHONPATH"] = (
+            environment["PYTHONPATH"]
+            .replace("/runtime", str(runtime))
+            .replace("/app", str(app))
+        )
+    return environment
+
+
+def _probe_browser_import(argv: list[str], runtime: Path, app: Path) -> dict:
+    """Execute the whole real script with only its declared pure environment.
+
+    :param argv: Actual Docker create vector from the runtime builder.
+    :param runtime: Read-only control scripts.
+    :param app: Read-only real candidate test helpers.
+    :return: Actual missing-module or first-main-read observation.
+    """
+    environment = _browser_import_environment(argv, runtime, app)
+    dependencies = list(
+        dict.fromkeys(sysconfig.get_paths()[key] for key in ("purelib", "platlib"))
+    )
+    command = [
+        sys.executable,
+        "-B",
+        "-S",
+        str(runtime / "import-probe.py"),
+        str(runtime / Path(argv[-1]).name),
+        json.dumps(dependencies),
+    ]
+    result = subprocess.run(
+        command,
+        cwd=app,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=30,
+    )
+    return json.loads(result.stdout)
+
+
+@pytest.mark.parametrize(
+    "phase,case,observed",
+    [("guest-public", "guest-public", False)]
+    + [
+        (phase, case, True)
+        for phase, case in (
+            ("core", "core"),
+            ("nomination", "nomination"),
+            ("guest-public", "guest-public"),
+            ("copy-maria", "copy-maria"),
+            ("copy-guest", "copy-guest"),
+            ("copy-self", "copy-self"),
+            ("authenticated-matrix", "authenticated-matrix"),
+            ("long-identity-and-prose", "long_identity_and_prose"),
+            ("missing-summary", "missing_summary"),
+            ("summary-acceptance", "summary-acceptance"),
+            ("final-confirmation", "nomination"),
+        )
+    ],
+)
+def test_browser_entrypoint_with_clean_process_imports_real_app_without_setup(
+    modules: dict[str, ModuleType],
+    tmp_path: Path,
+    phase: str,
+    case: str,
+    observed: bool,
+) -> None:
+    """Real script imports must work without pytest path/settings side effects."""
+    remote = modules["remote"]
+    manifest = _runtime_manifest()
+    manifest.update(suite_phase=phase, saga_case=case)
+    names = remote.resource_names(manifest["nonce"])
+    parent = (
+        remote.resource_runtime.aggregate.parent_name(manifest["nonce"])
+        if observed
+        else None
+    )
+    argv = remote.browser_arguments(tmp_path, manifest, names, parent)
+    runtime, app = _readonly_import_tree(tmp_path)
+    assert _probe_browser_import(argv, runtime, app) == {
+        "status": "MAIN_REACHED",
+        "django_configured": False,
+    }
+
+
+def test_browser_entrypoint_with_missing_app_path_exposes_real_import_fault(
+    modules: dict[str, ModuleType], tmp_path: Path
+) -> None:
+    """A real negative control prevents ambient pytest roots masking transport."""
+    remote = modules["remote"]
+    manifest = _runtime_manifest()
+    names = remote.resource_names(manifest["nonce"])
+    parent = remote.resource_runtime.aggregate.parent_name(manifest["nonce"])
+    argv = remote.browser_arguments(tmp_path, manifest, names, parent)
+    if "PYTHONPATH=/runtime:/app" in argv:
+        index = argv.index("PYTHONPATH=/runtime:/app")
+        del argv[index - 1 : index + 1]
+    runtime, app = _readonly_import_tree(tmp_path)
+    assert _probe_browser_import(argv, runtime, app) == {
+        "status": "IMPORT_FAILED",
+        "module": "tests",
+    }

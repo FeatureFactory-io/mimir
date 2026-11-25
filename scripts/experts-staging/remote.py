@@ -856,11 +856,26 @@ def browser_arguments(
         "PYTHONDONTWRITEBYTECODE=1",
         "-e",
         "AWS_EC2_METADATA_DISABLED=true",
+        *browser_import_environment(manifest, parent),
         "--entrypoint",
         "python",
         manifest["browser_image"],
         browser_entrypoint(manifest, parent),
     ]
+
+
+def browser_import_environment(
+    manifest: dict[str, Any], parent: str | None
+) -> list[str]:
+    """Expose real app test helpers only to dispatchers that import them.
+
+    :param manifest: Authenticated true suite case.
+    :param parent: Explicit verified parent or unchanged defaultNone.
+    :return: Pure fixed import paths; ordinary core arguments remain unchanged.
+    """
+    if browser_entrypoint(manifest, parent) == "/runtime/browser.py":
+        return []
+    return ["-e", "PYTHONPATH=/runtime:/app"]
 
 
 def browser_entrypoint(manifest: dict[str, Any], parent: str | None) -> str:
