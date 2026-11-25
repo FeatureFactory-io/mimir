@@ -15,6 +15,7 @@ import pytest
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "scripts/experts-staging"))
 import controller
+import suite_archive as archive_control
 import suite_contract as suite
 import suite_export as export
 from saga_trace import redact_trace
@@ -464,3 +465,30 @@ def test_verify_case_archive_with_received_effect_fact_mutation_rejects(
             archive.addfile(info, io.BytesIO(data))
     with pytest.raises(ValueError):
         verify_case_archive(target, manifest)
+
+
+@pytest.mark.parametrize("field", ["source_revision", "application_source_revision"])
+def test_received_browser_facts_with_contradictory_emitted_source_rejects(
+    field: str,
+) -> None:
+    manifest = _archive_manifest()
+    browser = {
+        "fixture_sha256": manifest["fixture_sha256"],
+        "viewport_count": 7,
+        "viewports": [
+            {"width": w, "height": h}
+            for w, h in (
+                (1280, 800),
+                (1920, 1080),
+                (1512, 982),
+                (768, 1024),
+                (1024, 768),
+                (390, 844),
+                (360, 800),
+            )
+        ],
+        "login_observation": None,
+        field: "0" * 40,
+    }
+    with pytest.raises(ValueError):
+        archive_control._browser_facts("authenticated-matrix", browser, {}, manifest)
