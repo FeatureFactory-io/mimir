@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import json
 import signal
 import subprocess
 import sys
@@ -32,6 +33,7 @@ _PUBLIC_RECEIPTS = (
     "browser-failure.json",
     "runtime-isolation.json",
     "capacity.json",
+    "runtime-failure.json",
 )
 
 
@@ -427,3 +429,189 @@ def test_database_arguments_with_readonly_root_support_entrypoint_socket(
     assert argv[argv.index("--memory") + 1] == "192m"
     assert argv[argv.index("--cpus") + 1] == "0.25"
     assert "--publish" not in argv and "--privileged" not in argv
+
+
+def _cache_metadata(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Construct pure input records matching the public Docker metadata schema.
+
+    :param manifest: Valid test contract; no image or cloud operation is invoked.
+    :return: Complete matching three-role Linux/amd64 metadata.
+    """
+    return {
+        role: {
+            "Id": "sha256:" + "a" * 64,
+            "Os": "linux",
+            "Architecture": "amd64",
+            "Size": size,
+            "RepoDigests": [manifest[f"{role}_image"]],
+        }
+        for role, size in manifest["image_sizes"].items()
+    }
+
+
+def test_image_cache_reserve_with_three_exact_records_excludes_resident_bytes(
+    modules: dict[str, ModuleType],
+) -> None:
+    """Recognize only a complete exact cache; keep the declared live disk floor.
+
+    :param modules: Actual pure staging contract functions.
+    :return: None once all three matching immutable records permit the live floor.
+    :raises AssertionError: Cache identity or reserve computation differs.
+    """
+    manifest = _runtime_manifest()
+    cache = _cache_metadata(manifest)
+    assert modules["contract"].image_cache_reserve(manifest, cache) == 1024**3
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("Os", "windows"),
+        ("Architecture", "arm64"),
+        ("Size", True),
+        ("Size", 1),
+        ("Id", "latest"),
+        ("Id", "sha256:" + "A" * 64),
+        ("RepoDigests", ["mimir:latest"]),
+        ("RepoDigests", "not-a-list"),
+        ("RepoDigests", []),
+    ],
+)
+def test_image_cache_reserve_with_wrong_metadata_keeps_cold_budget(
+    modules: dict[str, ModuleType], field: str, value: Any
+) -> None:
+    """Never lower storage reserve for mismatched local metadata.
+
+    :param modules: Actual contract module.
+    :param field: One public Docker metadata field to corrupt.
+    :param value: Explicit adverse value; no Docker dependency is mocked.
+    :return: None after the unchanged conservative cold budget is required.
+    :raises AssertionError: An incomplete identity permits the cached budget.
+    """
+    manifest = _runtime_manifest()
+    cache = _cache_metadata(manifest)
+    cache["web"][field] = value
+    assert modules["contract"].image_cache_reserve(manifest, cache) == (
+        modules["contract"].validate_runtime_manifest(manifest)
+    )
+
+
+@pytest.mark.parametrize("mode", ["missing", "extra", "empty", "invalid_row"])
+def test_image_cache_reserve_with_incomplete_roles_keeps_cold_budget(
+    modules: dict[str, ModuleType], mode: str
+) -> None:
+    """Require all and only the three role observations before using cache proof.
+
+    :param modules: Actual pure contract module.
+    :param mode: Missing, extra, empty or malformed role observation.
+    :return: None after the cold budget remains required.
+    :raises AssertionError: Partial proof changes the resource requirement.
+    """
+    manifest, cache = _runtime_manifest(), _cache_metadata(_runtime_manifest())
+    if mode == "missing":
+        del cache["postgres"]
+    if mode == "extra":
+        cache["foreign"] = cache["web"]
+    if mode == "empty":
+        cache = {}
+    if mode == "invalid_row":
+        cache["browser"] = None
+    assert modules["contract"].image_cache_reserve(manifest, cache) == (
+        modules["contract"].validate_runtime_manifest(manifest)
+    )
+
+
+@pytest.mark.parametrize("value", [True, None, -1, 0, 1024**3 - 1, 1024**3 + 1])
+def test_validate_pull_capacity_with_uncomputed_budget_rejects(
+    modules: dict[str, ModuleType], value: Any
+) -> None:
+    """Reject arbitrary budget values instead of admitting an unproven floor.
+
+    :param modules: Actual contract module.
+    :param value: Invalid or noncanonical reserve candidate.
+    :return: None after rejection.
+    :raises AssertionError: An arbitrary input lowers the guard.
+    """
+    with pytest.raises(ValueError):
+        modules["contract"].validate_pull_capacity(2 * 1024**3, 8 * 1024**3, value)
+
+
+def test_validate_pull_capacity_with_cached_disk_still_rejects_low_memory(
+    modules: dict[str, ModuleType],
+) -> None:
+    """Retain the measured memory hold even with exact cached image proof.
+
+    :param modules: Actual contract module.
+    :return: None after the real post-pull memory observation remains blocked.
+    :raises AssertionError: Disk accounting silently lowers the memory threshold.
+    """
+    with pytest.raises(ValueError):
+        modules["contract"].validate_pull_capacity(
+            1_357_348_864, 3_306_106_880, 1024**3
+        )
+    modules["contract"].validate_pull_capacity(
+        modules["contract"].MIN_AVAILABLE_MEMORY, 1024**3, 1024**3
+    )
+
+
+def test_runtime_failure_receipt_with_private_error_exports_only_classification(
+    modules: dict[str, ModuleType], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Retain useful safe failure metadata with original private text excluded.
+
+    :param modules: Real host control implementation.
+    :param tmp_path: Real owned filesystem destination.
+    :param capsys: Actual emitted safe decision output.
+    :return: None after byte-level receipt and stdout privacy assertions pass.
+    :raises AssertionError: Exception text leaks or export protection changes.
+    """
+    try:
+        raise RuntimeError("PRIVATE_PASSWORD_AND_PROPOSAL_SENTINEL")
+    except RuntimeError as error:
+        modules["remote"].record_runtime_failure(tmp_path, error)
+    target = tmp_path / "output/runtime-failure.json"
+    record = json.loads(target.read_text())
+    assert record["status"] == "FAILED" and record["exception_class"] == "RuntimeError"
+    assert "PRIVATE_PASSWORD" not in target.read_text() + capsys.readouterr().out
+    assert modules["remote"].evidence_files(tmp_path / "output") == [target]
+    with pytest.raises(FileExistsError):
+        modules["remote"].record_runtime_failure(tmp_path, RuntimeError("PRIVATE"))
+
+
+def test_runtime_failure_receipt_with_linked_destination_rejects(
+    modules: dict[str, ModuleType], tmp_path: Path
+) -> None:
+    """Do not follow a linked artifact directory while handling a failure.
+
+    :param modules: Actual host control module.
+    :param tmp_path: Real owned test directory.
+    :return: None when the original outside bytes remain untouched.
+    :raises AssertionError: Error recording writes through a link.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / "output").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError):
+        modules["remote"].record_runtime_failure(tmp_path, RuntimeError("PRIVATE"))
+    assert not list(outside.iterdir())
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "runtime-failure.json.env",
+        "private/runtime-failure.json",
+        "runtime-failure-secret.json",
+    ],
+)
+def test_allowed_evidence_name_with_private_failure_variant_rejects(
+    modules: dict[str, ModuleType], name: str
+) -> None:
+    """Admit only the fixed sanitized failure receipt, never private variants.
+
+    :param modules: Real host control import.
+    :param name: Unsafe failure-artifact spelling.
+    :return: None after rejection.
+    :raises AssertionError: The new artifact admission broadens unexpectedly.
+    """
+    assert modules["remote"].allowed_evidence_name(Path(name)) is False

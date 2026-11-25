@@ -35,6 +35,76 @@ _RUNTIME_KEYS = {
 }
 MIN_AVAILABLE_MEMORY = 1400 * 1024 * 1024
 MIN_AVAILABLE_DISK = 4 * 1024 * 1024 * 1024
+LIVE_DISK_RESERVE = 1024**3
+
+
+def image_cache_reserve(
+    manifest: Mapping[str, Any], observations: Mapping[str, Any]
+) -> int:
+    """Budget existing image bytes only after complete exact local-cache proof.
+
+    :param manifest: Validated candidate images and actual CI sizes.
+    :param observations: Whitelisted Docker metadata keyed by all three roles.
+    :return: OneGiB for a complete match, otherwise the unchanged cold budget.
+    :raises ValueError: The candidate manifest itself is invalid.
+    """
+    cold = validate_runtime_manifest(manifest)
+    if not isinstance(observations, Mapping) or set(observations) != {
+        "web",
+        "browser",
+        "postgres",
+    }:
+        return cold
+    matched = all(
+        cached_image_matches(manifest[f"{role}_image"], size, observations[role])
+        for role, size in manifest["image_sizes"].items()
+    )
+    return LIVE_DISK_RESERVE if matched else cold
+
+
+def cached_image_matches(reference: str, size: int, actual: Mapping[str, Any]) -> bool:
+    """Check one real immutable Linux/amd64 cache record without tag inference.
+
+    :param reference: Exact validated image digest reference.
+    :param size: Positive immutable image size from the candidate CI receipt.
+    :param actual: Whitelisted real Docker image metadata.
+    :return: Whether digest, architecture, identity and size all match.
+    """
+    if not isinstance(actual, Mapping) or not isinstance(reference, str):
+        return False
+    identity, digests = actual.get("Id"), actual.get("RepoDigests")
+    return (
+        type(size) is int
+        and size > 0
+        and type(actual.get("Size")) is int
+        and actual["Size"] == size
+        and actual.get("Os") == "linux"
+        and actual.get("Architecture") == "amd64"
+        and isinstance(identity, str)
+        and re.fullmatch(r"sha256:[a-f0-9]{64}", identity) is not None
+        and isinstance(digests, list)
+        and all(isinstance(item, str) for item in digests)
+        and reference in digests
+    )
+
+
+def validate_pull_capacity(memory: int, disk: int, reserve: int) -> None:
+    """Preserve memory protection and admit only computed cold or cached budgets.
+
+    :param memory: Actual current available memory bytes.
+    :param disk: Actual current free Docker-storage bytes.
+    :param reserve: Budget returned by image_cache_reserve, never a manifest flag.
+    :return: None after unchanged memory and actual storage reserve checks.
+    :raises ValueError: Any typed bound, budget or measured capacity is unsafe.
+    """
+    if any(type(value) is not int for value in (memory, disk, reserve)):
+        raise ValueError("Fresh integer capacity and computed reserve are required.")
+    if reserve != LIVE_DISK_RESERVE and reserve < MIN_AVAILABLE_DISK:
+        raise ValueError("Storage reserve is not a computed cold or cached budget.")
+    if memory < MIN_AVAILABLE_MEMORY or disk < reserve:
+        raise ValueError(
+            "Idle host cannot safely fit the unchanged memory/storage reserve."
+        )
 
 
 def validate_receipt(
@@ -185,12 +255,7 @@ def validate_capacity(memory: int, disk: int) -> None:
     :return: None when bounded web/PG/browser and reserve can fit.
     :raises ValueError: If fresh capacity is below either fixed threshold.
     """
-    if type(memory) is not int or type(disk) is not int:
-        raise ValueError("Fresh integer capacity readings are required.")
-    if memory < MIN_AVAILABLE_MEMORY or disk < MIN_AVAILABLE_DISK:
-        raise ValueError(
-            "Idle host cannot safely fit bounded web/PG/browser plus reserve."
-        )
+    validate_pull_capacity(memory, disk, MIN_AVAILABLE_DISK)
 
 
 def validate_runtime_manifest(manifest: Mapping[str, Any]) -> int:

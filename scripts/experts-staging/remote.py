@@ -12,6 +12,7 @@ import signal
 import subprocess
 import tarfile
 import time
+import traceback
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -19,7 +20,13 @@ from tempfile import TemporaryFile
 from types import FrameType
 from typing import Any
 
-from contract import owner_record, validate_capacity, validate_runtime_manifest
+from contract import (
+    LIVE_DISK_RESERVE,
+    image_cache_reserve,
+    owner_record,
+    validate_pull_capacity,
+    validate_runtime_manifest,
+)
 
 _HARDENING = (
     "--cap-drop",
@@ -86,6 +93,114 @@ _BROWSER_BINDS = (
     ("output", "/output", False),
     ("app-data", "/app/data", True),
 )
+_CACHE_FIELDS = ("Id", "RepoDigests", "Os", "Architecture", "Size")
+_CACHE_FORMAT = (
+    "{" + ",".join(f'"{field}":{{{{json .{field}}}}}' for field in _CACHE_FIELDS) + "}"
+)
+_FAILURE_PHASES = {
+    "capacity": "capacity",
+    "reserve_capacity": "capacity",
+    "inspect_cached_images": "image_cache",
+    "pull_images": "image_pull",
+    "bounded_pull": "image_pull",
+    "monitor_pull": "image_pull",
+    "start_database": "database_start",
+    "wait_database": "database_start",
+    "create_app_role": "database_role",
+    "write_app_runtime": "runtime_setup",
+    "start_web": "web_start",
+    "wait_web": "web_readiness",
+    "run_browser": "browser",
+    "require_browser_reserve": "browser_capacity",
+}
+_PUBLIC_EXCEPTION_CLASSES = {
+    "ValueError",
+    "RuntimeError",
+    "TimeoutError",
+    "OSError",
+    "FileNotFoundError",
+    "PermissionError",
+    "JSONDecodeError",
+    "CalledProcessError",
+    "TimeoutExpired",
+}
+
+
+def inspect_cached_images(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+    """Read only three exact local image identities without registry operations.
+
+    :param root: Invocation-private Docker configuration path.
+    :param manifest: Already validated immutable image references.
+    :return: Whitelisted actual records; partial/unreadable cache stays untrusted.
+    """
+    rows = {}
+    for role in ("web", "browser", "postgres"):
+        try:
+            row = json.loads(
+                docker(
+                    root,
+                    "image",
+                    "inspect",
+                    "--format",
+                    _CACHE_FORMAT,
+                    manifest[f"{role}_image"],
+                    timeout=20,
+                )
+            )
+        except (RuntimeError, json.JSONDecodeError):
+            continue
+        if isinstance(row, dict) and set(row) == set(_CACHE_FIELDS):
+            rows[role] = row
+    return rows
+
+
+def record_runtime_failure(root: Path, error: Exception) -> None:
+    """Retain only safe failure classification, excluding private command output.
+
+    :param root: Positively owned invocation directory.
+    :param error: Actual raised exception; its message is never exported.
+    :return: None after one exclusive public classification receipt is written.
+    :raises ValueError: The evidence destination is linked or unsafe.
+    :raises OSError: Existing receipt or filesystem failure prevents safe recording.
+    """
+    output = root / "output"
+    if root.resolve() != root or output.is_symlink():
+        raise ValueError("Runtime failure evidence requires an unlinked owned path.")
+    output.mkdir(mode=0o700, exist_ok=True)
+    frames = [
+        {"function": item.name, "line": item.lineno}
+        for item in traceback.extract_tb(error.__traceback__)
+        if Path(item.filename).name == "remote.py" and item.name in _FAILURE_PHASES
+    ]
+    kind = type(error).__name__
+    record = {
+        "status": "FAILED",
+        "phase": _FAILURE_PHASES[frames[-1]["function"]] if frames else "owned_runtime",
+        "exception_class": kind if kind in _PUBLIC_EXCEPTION_CLASSES else "Exception",
+        "source_frames": frames,
+        "private_output_exported": False,
+    }
+    with (output / "runtime-failure.json").open("x") as stream:
+        json.dump(record, stream, indent=2)
+    print(json.dumps({"stage": "owned_runtime_failure", **record}), flush=True)
+
+
+def reserve_capacity(
+    root: Path, manifest: dict[str, Any], cold_reserve: int
+) -> dict[str, Any]:
+    """Use actual exact image cache proof while retaining the memory hold.
+
+    :param root: Owned runtime and Docker configuration path.
+    :param manifest: Fully validated actual candidate runtime declarations.
+    :param cold_reserve: Unchanged original validated cold-image requirement.
+    :return: Safe measured capacity, selected reserve and whitelisted cache proof.
+    :raises ValueError: Capacity or budget identity is unsafe.
+    """
+    cache = inspect_cached_images(root, manifest)
+    reserve = image_cache_reserve(manifest, cache)
+    if reserve not in {cold_reserve, LIVE_DISK_RESERVE}:
+        raise ValueError("Actual image budget differs from the checked runtime.")
+    return {**capacity(reserve), "required_disk_bytes": reserve, "image_cache": cache}
 
 
 def command(argv: list[str], *, data: str | None = None, timeout: int = 120) -> str:
@@ -158,9 +273,7 @@ def capacity(required_disk: int) -> dict[str, int]:
         command(["docker", "info", "--format", "{{json .DockerRootDir}}"])
     )
     disk = shutil.disk_usage(docker_root).free
-    validate_capacity(memory, disk)
-    if disk < required_disk:
-        raise ValueError("Actual image-size reserve cannot fit on the idle host.")
+    validate_pull_capacity(memory, disk, required_disk)
     return {"available_memory_bytes": memory, "available_docker_disk_bytes": disk}
 
 
@@ -836,6 +949,7 @@ def allowed_evidence_name(path: Path) -> bool:
         "browser-failure.json",
         "runtime-isolation.json",
         "capacity.json",
+        "runtime-failure.json",
         "browser-trace.zip",
         "screenshots/guest-native-clipboard.png",
     }
@@ -939,7 +1053,7 @@ def provision(
     :param required_disk: Conservative actual image-size reserve.
     :return: None after genuine core readiness and real state readback.
     """
-    measured = capacity(required_disk)
+    measured = reserve_capacity(root, manifest, required_disk)
     create_directories(root)
     (root / "output/capacity.json").write_text(json.dumps(measured, indent=2))
     image = pull_images(root, manifest)
@@ -965,19 +1079,31 @@ def main() -> None:
     names = resource_names(nonce)
     with runtime_deadline():
         try:
-            print(
-                json.dumps(
-                    {
-                        "stage": "owned_companion_start",
-                        "source_revision": manifest["source_revision"],
-                        "nonce": nonce,
-                    }
-                ),
-                flush=True,
-            )
+            announce_start(manifest)
             provision(root, manifest, names, required_disk)
+        except Exception as error:
+            record_runtime_failure(root, error)
+            raise
         finally:
             finish_owned_run(root, manifest, names)
+
+
+def announce_start(manifest: dict[str, Any]) -> None:
+    """Emit only the original safe source/owner start declaration.
+
+    :param manifest: Previously validated public runtime identity.
+    :return: None after the actual start decision is observable.
+    """
+    print(
+        json.dumps(
+            {
+                "stage": "owned_companion_start",
+                "source_revision": manifest["source_revision"],
+                "nonce": manifest["nonce"],
+            }
+        ),
+        flush=True,
+    )
 
 
 def finish_owned_run(
