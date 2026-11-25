@@ -6,6 +6,8 @@ import argparse
 import hashlib
 import io
 import json
+import os
+import stat
 import subprocess
 import tarfile
 from pathlib import Path
@@ -122,6 +124,23 @@ def runtime_environment(actual: list[str]) -> list[str]:
     return result
 
 
+def runtime_user(runtime: Path) -> str:
+    """Use the private source directory's actual CI owner without DAC bypass.
+
+    :param runtime: Fresh unpacked source directory owned by this process.
+    :return: Verified numeric UID:GID for the import-only container.
+    :raises ValueError: The directory is linked or has another owner/group.
+    """
+    info = runtime.lstat()
+    if (
+        not stat.S_ISDIR(info.st_mode)
+        or info.st_uid != os.geteuid()
+        or info.st_gid != os.getegid()
+    ):
+        raise ValueError("Actual process-owned CI source directory required")
+    return f"{info.st_uid}:{info.st_gid}"
+
+
 def probe_arguments(
     runtime: Path, actual: list[str], identity: str | None = None
 ) -> list[str]:
@@ -132,11 +151,14 @@ def probe_arguments(
     :return: No-network probe argv; :raises ValueError: Unknown runtime scope.
     """
     environment = runtime_environment(actual)
+    user = runtime_user(runtime)
     identity = identity or uuid4().hex
     if len(identity) != 32 or any(c not in "0123456789abcdef" for c in identity):
         raise ValueError("Fresh closed probe identity required")
     return [
         *_FLAGS,
+        "--user",
+        user,
         "--name",
         "experts-ci-import-" + identity,
         "--label",
@@ -289,7 +311,10 @@ def cleanup_probe(identity: str) -> None:
     if not isinstance(labels, dict) or labels.get(_LABEL) != identity:
         raise ValueError("CI probe container ownership differs")
     result = subprocess.run(
-        ["docker", "rm", "--force", name], capture_output=True, timeout=15, check=False
+        ["docker", "rm", "--force", "--volumes", name],
+        capture_output=True,
+        timeout=15,
+        check=False,
     )
     if result.returncode != 0:
         raise ValueError("CI probe container cleanup unknown")

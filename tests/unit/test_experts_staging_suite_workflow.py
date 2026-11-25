@@ -283,7 +283,7 @@ def test_import_probe_with_timeout_only_cleans_exact_owned_container(
     command = calls[0][0]
     name = command[command.index("--name") + 1]
     assert name.startswith("experts-ci-import-")
-    assert calls[-1][0] == ["docker", "rm", "--force", name]
+    assert calls[-1][0] == ["docker", "rm", "--force", "--volumes", name]
     assert all(
         options["timeout"] <= 90 and options["capture_output"] for _, options in calls
     )
@@ -351,3 +351,30 @@ def test_cleanup_probe_with_wrong_owner_never_removes_container(
     with pytest.raises(ValueError):
         probe.cleanup_probe("c" * 32)
     assert len(calls) == 1 and calls[0][:3] == ["docker", "container", "inspect"]
+
+
+def test_import_probe_with_private_runtime_runs_as_verified_directory_owner(
+    probe: ModuleType, tmp_path: Path
+) -> None:
+    """Private shipped sources must be readable with every capability dropped."""
+    private = tmp_path / "private-runtime"
+    private.mkdir(mode=0o700)
+    actual = probe.remote.browser_arguments(
+        tmp_path,
+        {
+            "nonce": "c" * 32,
+            "browser_image": _BROWSER,
+            "suite_phase": "nomination",
+            "saga_case": "nomination",
+        },
+        probe.remote.resource_names("c" * 32),
+    )
+    command = probe.probe_arguments(private, actual)
+    assert private.stat().st_mode & 0o777 == 0o700
+    assert command[command.index("--user") + 1] == (
+        f"{private.stat().st_uid}:{private.stat().st_gid}"
+    )
+    alias = tmp_path / "linked-runtime"
+    alias.symlink_to(private, target_is_directory=True)
+    with pytest.raises(ValueError):
+        probe.probe_arguments(alias, actual)
