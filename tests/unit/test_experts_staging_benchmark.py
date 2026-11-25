@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -691,7 +692,13 @@ def test_finish_with_rejected_export_preserves_closed_reason_without_secret_name
         result
     ) and "SECRET_CONTENT" not in json.dumps(result)
     assert result["export_rejected_shapes"] == [
-        {"top_category": "root_file", "kind": "file", "depth": 1, "extension": "other"}
+        {
+            "top_category": "root_file",
+            "kind": "file",
+            "depth": 1,
+            "extension": "other",
+            "rejections": ["NAME_PATTERN_MISMATCH"],
+        }
     ]
     assert not list(public.iterdir())
 
@@ -813,6 +820,7 @@ def test_rejected_export_shapes_with_many_unknown_members_is_closed_and_bounded(
             "kind": "file",
             "depth": 1,
             "extension": "json",
+            "rejections": ["NAME_PATTERN_MISMATCH"],
         }
         for row in shapes
     )
@@ -1031,3 +1039,209 @@ def _invalid_diagnostic(metrics: ModuleType, mutation: str) -> dict[str, Any]:
     else:
         record["source_frames"][0]["line"] = True if mutation == "line_bool" else 1
     return record
+
+
+@pytest.mark.parametrize("mib", [512, 768])
+def test_browser_memory_bytes_with_closed_diagnostic_choice_returns_exact_cap(
+    metrics: ModuleType, mib: int
+) -> None:
+    assert metrics.browser_memory_bytes(mib) == mib * 1024 * 1024
+
+
+@pytest.mark.parametrize("value", [True, 0, 256, 1024, "768", 768.0])
+def test_browser_memory_bytes_with_unreviewed_or_wrongly_typed_choice_rejects(
+    metrics: ModuleType, value: Any
+) -> None:
+    with pytest.raises(ValueError):
+        metrics.browser_memory_bytes(value)
+
+
+@pytest.mark.parametrize("browser_memory", [512, 768])
+def test_select_envelope_with_browser_experiment_changes_only_local_browser_cap(
+    driver: ModuleType, browser_memory: int
+) -> None:
+    before = dict(driver.remote._LIMITS)
+    source = (_RUNTIME / "remote.py").read_bytes()
+    result = {}
+    driver.select_envelope(384, result, browser_memory=browser_memory)
+    assert driver.remote._LIMITS["browser"] == (browser_memory, *before["browser"][1:])
+    assert (
+        driver.remote._LIMITS["db"] == before["db"]
+        and driver.remote._LIMITS["web"] == before["web"]
+    )
+    assert (
+        result["browser_memory_mib"] == browser_memory
+        and result["host_reserve_mib"] == 256
+    )
+    assert result["idle_guard_mib"] == 1400 and result["scope"] == "DISPOSABLE_CI_ONLY"
+    assert (_RUNTIME / "remote.py").read_bytes() == source
+
+
+def test_observed_browser_arguments_with_768_experiment_binds_docker_and_observer_cap(
+    driver: ModuleType, tmp_path: Path
+) -> None:
+    driver.select_envelope(384, {}, browser_memory=768)
+    nonce = "a" * 32
+    command = driver.observed_browser_arguments(
+        tmp_path,
+        {"nonce": nonce, "browser_image": "fixed-image"},
+        driver.remote.resource_names(nonce),
+    )
+    assert command[command.index("--memory") + 1] == "768m"
+    assert command[command.index("--memory-swap") + 1] == "768m"
+    assert command[-3:] == [
+        "/runtime/benchmark_observer.py",
+        "--browser-memory-mib",
+        "768",
+    ]
+
+
+def test_export_rejection_with_real_regular_name_mismatch_and_hardlink_distinguishes_closed_kinds(
+    controls: ModuleType, tmp_path: Path
+) -> None:
+    video = tmp_path / "video"
+    video.mkdir()
+    unknown = video / "PRIVATE_NAME.webm"
+    unknown.write_text("PRIVATE_CONTENT")
+    assert controls.export_rejection_kinds(
+        unknown, Path("video/PRIVATE_NAME.webm")
+    ) == ["NAME_PATTERN_MISMATCH"]
+    known = video / ("a" * 32 + ".webm")
+    known.hardlink_to(unknown)
+    assert controls.export_rejection_kinds(known, Path("video") / known.name) == [
+        "HARDLINK_COUNT_NOT_ONE"
+    ]
+    rows = controls.rejected_export_shapes(tmp_path)
+    assert all("rejections" in row for row in rows)
+    assert "PRIVATE_NAME" not in json.dumps(
+        rows
+    ) and "PRIVATE_CONTENT" not in json.dumps(rows)
+
+
+def test_benchmark_arguments_with_default_and_explicit_browser_choice_are_closed(
+    driver: ModuleType, tmp_path: Path
+) -> None:
+    argv = [
+        "--prepared-output",
+        str(tmp_path),
+        "--web-memory-mib",
+        "384",
+        "--output",
+        str(tmp_path / "new"),
+    ]
+    assert driver.arguments(argv).browser_memory_mib == 512
+    assert (
+        driver.arguments([*argv, "--browser-memory-mib", "768"]).browser_memory_mib
+        == 768
+    )
+    with pytest.raises(SystemExit):
+        driver.arguments([*argv, "--browser-memory-mib", "1024"])
+
+
+@pytest.mark.parametrize("mib", [512, 768])
+def test_observer_memory_choice_with_explicit_closed_option_matches_enforced_cap(
+    metrics: ModuleType, mib: int
+) -> None:
+    assert metrics.observer_memory_choice(["--browser-memory-mib", str(mib)]) == mib
+    assert metrics.observer_memory_choice([]) == 512
+
+
+def test_observer_memory_choice_with_unreviewed_option_rejects(
+    metrics: ModuleType,
+) -> None:
+    with pytest.raises(SystemExit):
+        metrics.observer_memory_choice(["--browser-memory-mib", "1024"])
+
+
+@pytest.mark.parametrize(
+    "actual,selected", [(512, 512), (768, 768), (512, 768), (768, 512)]
+)
+def test_browser_counter_parsing_with_selected_enforced_cap_rejects_mismatch(
+    metrics: ModuleType, actual: int, selected: int
+) -> None:
+    text = _COUNTERS.replace("2048", str(actual * 1024 * 1024))
+    if actual != selected:
+        with pytest.raises(ValueError):
+            metrics.parse_memory(
+                text, "browser", metrics.browser_memory_bytes(selected)
+            )
+    else:
+        assert (
+            metrics.parse_memory(
+                text, "browser", metrics.browser_memory_bytes(selected)
+            )["limit_bytes"]
+            == actual * 1024 * 1024
+        )
+
+
+@pytest.mark.parametrize("browser_memory,required", [(512, 1400), (768, 1600)])
+def test_require_ci_capacity_with_larger_cap_preserves_full_256mib_reserve(
+    driver: ModuleType, browser_memory: int, required: int
+) -> None:
+    driver.select_envelope(384, {}, browser_memory=browser_memory)
+    driver.require_ci_capacity(required * 1024 * 1024)
+    with pytest.raises(ValueError):
+        driver.require_ci_capacity(required * 1024 * 1024 - 1)
+    with pytest.raises(ValueError):
+        driver.require_ci_capacity(True)
+
+
+def test_observer_source_with_dynamic_choice_checks_actual_cgroup_limit_and_no_ambient_env() -> (
+    None
+):
+    tree = ast.parse((_RUNTIME / "benchmark_observer.py").read_text())
+    functions = {
+        node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
+    }
+    main_calls = [
+        ast.unparse(node)
+        for node in ast.walk(functions["main"])
+        if isinstance(node, ast.Call)
+    ]
+    assert (
+        "observer_memory_choice()" in main_calls
+        and "observe(passed, memory_mib)" in main_calls
+    )
+    observed = [
+        ast.unparse(node)
+        for node in ast.walk(functions["observe"])
+        if isinstance(node, ast.Call)
+    ]
+    assert "browser_memory_bytes(memory_mib)" in observed
+    assert not [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Attribute) and node.attr in {"getenv", "environ"}
+    ]
+
+
+def test_export_rejection_kinds_with_symlink_fifo_directory_and_alias_preserves_closed_metadata(
+    controls: ModuleType, tmp_path: Path
+) -> None:
+    regular = tmp_path / ("a" * 32 + ".webm")
+    regular.write_text("PRIVATE_CONTENT")
+    linked = tmp_path / "PRIVATE_LINK.webm"
+    linked.symlink_to(regular)
+    assert controls.export_rejection_kinds(linked, Path("video/PRIVATE_LINK.webm")) == [
+        "SYMLINK"
+    ]
+    fifo = tmp_path / "PRIVATE_FIFO.webm"
+    os.mkfifo(fifo)
+    assert controls.export_rejection_kinds(fifo, Path("video/PRIVATE_FIFO.webm")) == [
+        "FILE_TYPE_NOT_REGULAR"
+    ]
+    directory = tmp_path / "PRIVATE_DIRECTORY"
+    directory.mkdir()
+    assert controls.export_rejection_kinds(directory, Path("PRIVATE_DIRECTORY")) == [
+        "DIRECTORY_NOT_ADMITTED"
+    ]
+    actual = tmp_path / "actual"
+    actual.mkdir()
+    target = actual / ("b" * 32 + ".webm")
+    target.write_text("PRIVATE_CONTENT")
+    alias = tmp_path / "alias"
+    alias.symlink_to(actual, target_is_directory=True)
+    assert controls.export_rejection_kinds(
+        alias / target.name, Path("video") / target.name
+    ) == ["PATH_ALIAS"]
+    assert controls.export_rejection_kinds(regular, Path("video") / regular.name) == []

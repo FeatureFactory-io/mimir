@@ -29,6 +29,9 @@ from benchmark_contract import (
     validated_diagnostic_bytes,
 )
 from benchmark_metrics import (
+    BROWSER_MEMORY_CHOICES,
+    DEFAULT_BROWSER_MEMORY_MIB,
+    browser_memory_bytes,
     failure_reason,
     host_observations,
     parse_browser_diagnostic,
@@ -37,6 +40,7 @@ from benchmark_metrics import (
 )
 
 _MIB = 1024 * 1024
+_HOST_RESERVE_MIB = 256
 _MEMORY_PROBE = "cat /sys/fs/cgroup/memory.peak /sys/fs/cgroup/memory.max /sys/fs/cgroup/memory.events"
 _STATE_FIELDS = {
     "oom_killed": ".State.OOMKilled",
@@ -63,16 +67,23 @@ _SAFE_EXCEPTIONS = {
 }
 
 
-def arguments() -> argparse.Namespace:
+def arguments(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse only explicit prepared inputs and the bounded experiment choice.
 
-    :return: Required absolute paths and web memory selection.
+    :param argv: Explicit tests or actual CLI arguments.
+    :return: Required paths and explicit diagnostic memory selections.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepared-output", type=Path, required=True)
     parser.add_argument("--web-memory-mib", type=int, choices=(384, 256), required=True)
     parser.add_argument("--output", type=Path, required=True)
-    return parser.parse_args()
+    parser.add_argument(
+        "--browser-memory-mib",
+        type=int,
+        choices=BROWSER_MEMORY_CHOICES,
+        default=DEFAULT_BROWSER_MEMORY_MIB,
+    )
+    return parser.parse_args(argv)
 
 
 def validate_host() -> None:
@@ -177,11 +188,8 @@ def run_browser(root: Path, manifest: dict[str, Any], names: dict[str, str]) -> 
     :return: None after real Chromium and actual bootstrap.verify_after pass.
     :raises Exception: Guard, real browser or actual post-browser DB readback fails.
     """
-    remote.require_browser_reserve()
-    command = remote.browser_arguments(root, manifest, names)
-    if command[-1] != "/runtime/browser.py":
-        raise ValueError("Actual browser command contract changed.")
-    command[-1] = "/runtime/benchmark_observer.py"
+    require_ci_browser_reserve(remote._LIMITS["browser"][0])
+    command = observed_browser_arguments(root, manifest, names)
     remote.docker(root, *command)
     remote.docker(root, "network", "connect", names["egress"], names["browser"])
     remote.docker(root, "start", names["browser"])
@@ -291,6 +299,7 @@ def workload(
     measured = remote.reserve_capacity(
         root, manifest, contract.validate_runtime_manifest(manifest)
     )
+    require_ci_capacity(measured["available_memory_bytes"])
     remote.private_file(root / "output/capacity.json", json.dumps(measured, indent=2))
     result["phase"] = "database"
     remote.create_networks(root, manifest["nonce"], names)
@@ -343,12 +352,16 @@ def finish(
 
 
 def execute(
-    prepared: Path, web_memory: int, output: Path, result: dict[str, Any]
+    prepared: Path,
+    web_memory: int,
+    output: Path,
+    result: dict[str, Any],
+    browser_memory: int = 512,
 ) -> None:
     """Prepare one experiment and keep owned cleanup on every actual failure path.
-
     :param prepared: Actual reviewed controller preparation.
     :param web_memory: Explicit384 default or256 experiment.
+    :param browser_memory: Explicit512 default or768 CI-only experiment.
     :param output: Fresh absolute public destination.
     :param result: Curated public result under construction.
     :return: None when all actual checks and cleanup succeed.
@@ -361,10 +374,8 @@ def execute(
     root = allocate_root(nonce)
     names = remote.resource_names(nonce)
     try:
-        prepare_runtime(root, plan, source, nonce, web_memory, result)
-        manifest = read_json(root / "runtime/run.json")
-        with remote.runtime_deadline():
-            workload(root, manifest, names, result)
+        prepare_runtime(root, plan, source, nonce, web_memory, result, browser_memory)
+        run_owned_workload(root, names, result)
     except Exception as error:  # noqa: BLE001 - sanitize every owned boundary failure.
         result.update(status="FAILED", exception_class=failure(error))
         remote.record_runtime_failure(root, error)
@@ -379,6 +390,7 @@ def prepare_runtime(
     nonce: str,
     web_memory: int,
     result: dict[str, Any],
+    browser_memory: int = 512,
 ) -> None:
     """Install only reviewed controls and explicit experimental memory selection.
 
@@ -388,10 +400,11 @@ def prepare_runtime(
     :param nonce: Fresh invocation identity.
     :param web_memory:384 default or256 explicit experiment.
     :param result: Safe public result.
+    :param browser_memory:512 default or768 CI-only experiment.
     :return: None after exact runtime setup and provenance are retained.
     :raises Exception: Runtime/cache/source guard fails.
     """
-    select_envelope(web_memory, result)
+    select_envelope(web_memory, result, browser_memory)
     remote.create_directories(root)
     os.environ["DOCKER_CONFIG"] = str(root / "docker-config")
     hashes = copy_runtime(root, source)
@@ -419,7 +432,7 @@ def main() -> None:
         "uat_accepted": False,
     }
     try:
-        execute(options.prepared_output, options.web_memory_mib, output, result)
+        execute_cli(options, output, result)
     except Exception as error:  # noqa: BLE001 - safe classification.
         result.update(status="FAILED", exception_class=failure(error))
     publish_result(output, result)
@@ -476,7 +489,11 @@ def capture_role(root: Path, nonce: str, name: str, role: str) -> dict[str, Any]
     try:
         if role == "browser":
             observed = read_json(root / "output/browser-memory.json")
-            result["memory"] = parse_memory(browser_text(observed), role, 512 * _MIB)
+            result["memory"] = parse_memory(
+                browser_text(observed),
+                role,
+                browser_memory_bytes(remote._LIMITS["browser"][0]),
+            )
             result["memory"]["driver_passed"] = observed["driver_passed"]
         else:
             text = remote.docker(
@@ -580,25 +597,23 @@ def read_browser_diagnostic(root: Path) -> dict[str, Any]:
         }
 
 
-def select_envelope(web_memory: int, result: dict[str, Any]) -> None:
-    """Change only this process's web cap, explicitly labeling the experiment.
+def select_envelope(
+    web_memory: int, result: dict[str, Any], browser_memory: int = 512
+) -> None:
+    """Change only local CI memory choices while preserving primary defaults.
 
-    :param web_memory:384 default or256 explicit experiment.
+    :param web_memory:384 default or256 explicit diagnostic experiment.
     :param result: Safe public result.
-    :return: None after unchanged CPU/pids/tmp and other role caps are preserved.
-    :raises ValueError: An unsupported experiment is requested.
+    :param browser_memory:512 default or768 explicit diagnostic experiment.
+    :return: None after all CPU/pid/tmp/DB limits and reserve stay preserved.
+    :raises ValueError: An unsupported or wrongly typed choice is requested.
     """
     if type(web_memory) is not int or web_memory not in {384, 256}:
         raise ValueError("Only explicit reviewed memory experiments are allowed.")
-    current = remote._LIMITS["web"]
-    remote._LIMITS["web"] = (web_memory, *current[1:])
-    result.update(
-        web_memory_mib=web_memory,
-        experiment="DEFAULT_384" if web_memory == 384 else "EXPERIMENT_256",
-        envelope_mib={role: bounds[0] for role, bounds in remote._LIMITS.items()},
-        host_reserve_mib=256,
-        idle_guard_mib=1400,
-    )
+    browser_memory_bytes(browser_memory)
+    for role, memory in (("web", web_memory), ("browser", browser_memory)):
+        remote._LIMITS[role] = (memory, *remote._LIMITS[role][1:])
+    record_envelope(web_memory, browser_memory, result)
 
 
 def write_provenance(
@@ -674,6 +689,135 @@ def export_public(root: Path, output: Path, result: dict[str, Any]) -> None:
             export_reason=failure_reason(error),
         )
         result["export_rejected_shapes"] = rejected_export_shapes(root / "output")
+
+
+def record_envelope(
+    web_memory: int, browser_memory: int, result: dict[str, Any]
+) -> None:
+    """Label the selected CI envelope explicitly, without adopting it for idle.
+
+    :param web_memory: Validated local web cap.
+    :param browser_memory: Validated local browser cap.
+    :param result: Safe HOST result.
+    :return: None after fixed experiment metadata and unchanged reserves are saved.
+    """
+    result.update(
+        web_memory_mib=web_memory,
+        browser_memory_mib=browser_memory,
+        experiment="DEFAULT_384" if web_memory == 384 else "EXPERIMENT_256",
+        browser_experiment=(
+            "DEFAULT_512" if browser_memory == 512 else "CI_EXPERIMENT_768"
+        ),
+        scope="DISPOSABLE_CI_ONLY",
+        envelope_mib={role: bounds[0] for role, bounds in remote._LIMITS.items()},
+        host_reserve_mib=_HOST_RESERVE_MIB,
+        idle_guard_mib=1400,
+        ci_initial_required_memory_mib=ci_memory_requirement() // _MIB,
+        ci_live_browser_reserve_mib=browser_memory + _HOST_RESERVE_MIB,
+    )
+
+
+def observed_browser_arguments(
+    root: Path, manifest: dict[str, Any], names: dict[str, str]
+) -> list[str]:
+    """Bind the same closed cap to actual Docker limits and observer verification.
+
+    :param root: Owned private runtime.
+    :param manifest: Fixed immutable image/source selectors.
+    :param names: Exact owned container/network identities.
+    :return: Original hardened command with only the observer entrypoint/choice.
+    :raises ValueError: Browser cap or actual command contract is unexpected.
+    """
+    memory = remote._LIMITS["browser"][0]
+    browser_memory_bytes(memory)
+    command = remote.browser_arguments(root, manifest, names)
+    if command[-1] != "/runtime/browser.py":
+        raise ValueError("Actual browser command contract changed.")
+    command[-1] = "/runtime/benchmark_observer.py"
+    return [*command, "--browser-memory-mib", str(memory)]
+
+
+def require_ci_capacity(available_bytes: int) -> None:
+    """Keep the original floor and add sufficient reserve for the larger CI choice.
+
+    :param available_bytes: Actual fresh capacity from the unchanged remote guard.
+    :return: None if selected caps plus256MiB and the original floor both fit.
+    :raises ValueError: Typed fresh capacity cannot safely fit the experiment.
+    """
+    required = ci_memory_requirement()
+    if type(available_bytes) is not int or available_bytes < required:
+        raise ValueError(
+            "Selected CI caps plus host reserve exceed fresh available memory."
+        )
+
+
+def require_ci_browser_reserve(memory_mib: int) -> None:
+    """Retain the old live guard and also reserve256MiB beyond the chosen browser.
+
+    :param memory_mib: Explicit512 or768 CI-only cap.
+    :return: None after both actual live capacity checks pass.
+    :raises ValueError: Fresh memory cannot safely fit browser plus reserve.
+    """
+    remote.require_browser_reserve()
+    available = (
+        int(
+            next(
+                line.split()[1]
+                for line in Path("/proc/meminfo").read_text().splitlines()
+                if line.startswith("MemAvailable:")
+            )
+        )
+        * 1024
+    )
+    if available < browser_memory_bytes(memory_mib) + _HOST_RESERVE_MIB * _MIB:
+        raise ValueError(
+            "Selected browser plus host reserve exceed fresh available memory."
+        )
+
+
+def run_owned_workload(
+    root: Path, names: dict[str, str], result: dict[str, Any]
+) -> None:
+    """Keep the unchanged bounded real lifecycle within its normal cleanup window.
+
+    :param root: Positive private runtime root.
+    :param names: Exact owned resource identities.
+    :param result: Safe phase/result receipt.
+    :return: None after actual workload completion.
+    :raises Exception: Real source, resource, browser or state verification fails.
+    """
+    manifest = read_json(root / "runtime/run.json")
+    with remote.runtime_deadline():
+        workload(root, manifest, names, result)
+
+
+def execute_cli(
+    options: argparse.Namespace, output: Path, result: dict[str, Any]
+) -> None:
+    """Forward only parsed closed CI choices to the actual owned experiment.
+
+    :param options: Actual validated argparse result.
+    :param output: Fresh public directory.
+    :param result: Safe HOST receipt.
+    :return: None after the actual selected experiment and settlement.
+    :raises Exception: The genuine execution fails.
+    """
+    execute(
+        options.prepared_output,
+        options.web_memory_mib,
+        output,
+        result,
+        options.browser_memory_mib,
+    )
+
+
+def ci_memory_requirement() -> int:
+    """Compute selected CI ceilings plus the preserved host reserve and floor.
+
+    :return: Exact initial required bytes, never below the primary1400MiB floor.
+    """
+    selected = sum(bounds[0] for bounds in remote._LIMITS.values())
+    return max(contract.MIN_AVAILABLE_MEMORY, (selected + _HOST_RESERVE_MIB) * _MIB)
 
 
 if __name__ == "__main__":

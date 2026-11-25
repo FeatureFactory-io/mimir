@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import ast
 import json
 import os
@@ -52,8 +53,13 @@ _BROWSER_FUNCTIONS = {
     "run_readiness",
     "perform_readiness",
 }
+DEFAULT_BROWSER_MEMORY_MIB = 512
+BROWSER_MEMORY_CHOICES = (512, 768)
 MAX_DIAGNOSTIC_BYTES = 16 * 1024
 _REASONS = {
+    "Unsupported diagnostic browser memory choice.": "BROWSER_MEMORY_CHOICE_REJECTED",
+    "Selected CI caps plus host reserve exceed fresh available memory.": "CI_ENVELOPE_RESERVE_REJECTED",
+    "Selected browser plus host reserve exceed fresh available memory.": "CI_BROWSER_RESERVE_REJECTED",
     "Browser diagnostic bytes are not canonical.": "BROWSER_DIAGNOSTIC_BYTES_REJECTED",
     "Browser diagnostic bytes exceed the fixed bound.": "BROWSER_DIAGNOSTIC_SIZE_REJECTED",
     "Unknown evidence directory.": "EXPORT_DIRECTORY_REJECTED",
@@ -429,3 +435,32 @@ def write_browser_diagnostic(path: Path, record: dict[str, Any]) -> None:
     )
     with os.fdopen(descriptor, "wb") as stream:
         stream.write(data)
+
+
+def browser_memory_bytes(memory_mib: int) -> int:
+    """Accept only default512 or explicit768 for the disposable CI experiment.
+
+    :param memory_mib: Typed explicit diagnostic choice, never idle policy.
+    :return: Exact enforced memory cap in bytes.
+    :raises ValueError: Wrong type or unsupported cap.
+    """
+    if type(memory_mib) is not int or memory_mib not in BROWSER_MEMORY_CHOICES:
+        raise ValueError("Unsupported diagnostic browser memory choice.")
+    return memory_mib * 1024 * 1024
+
+
+def observer_memory_choice(argv: list[str] | None = None) -> int:
+    """Parse the observer's explicit closed cap without reading ambient environment.
+
+    :param argv: Explicit unit arguments or actual observer process argv.
+    :return: Default512 or explicit768, checked against the enforced cgroup later.
+    :raises SystemExit: Unknown, missing or unsupported CLI arguments.
+    """
+    parser = argparse.ArgumentParser(description="Disposable CI browser observer")
+    parser.add_argument(
+        "--browser-memory-mib",
+        type=int,
+        choices=BROWSER_MEMORY_CHOICES,
+        default=DEFAULT_BROWSER_MEMORY_MIB,
+    )
+    return parser.parse_args(argv).browser_memory_mib

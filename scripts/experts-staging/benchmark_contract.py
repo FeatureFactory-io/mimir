@@ -333,6 +333,7 @@ def export_shape(path: Path, relative: Path) -> dict[str, Any]:
         "kind": kind,
         "depth": min(len(parts), 32),
         "extension": extension,
+        "rejections": export_rejection_kinds(path, relative),
     }
 
 
@@ -381,3 +382,31 @@ def validated_diagnostic_bytes(path: Path) -> bytes:
         data = stream.read(MAX_DIAGNOSTIC_BYTES + 1)
     parse_browser_diagnostic(data)
     return data
+
+
+def export_rejection_kinds(path: Path, relative: Path) -> list[str]:
+    """Classify actual failed admission predicates without publishing filenames.
+
+    :param path: Owned member, metadata read through lstat only.
+    :param relative: Member path used privately by the unchanged allowlist.
+    :return: Closed reason enums, never names, paths, contents or guessed cause.
+    """
+    metadata = path.lstat()
+    mode = metadata.st_mode
+    result = []
+    if stat.S_ISLNK(mode):
+        result.append("SYMLINK")
+    elif path.resolve() != path:
+        result.append("PATH_ALIAS")
+    if stat.S_ISDIR(mode):
+        if str(relative) not in {"screenshots", "video"}:
+            result.append("DIRECTORY_NOT_ADMITTED")
+    elif not stat.S_ISREG(mode):
+        if not stat.S_ISLNK(mode):
+            result.append("FILE_TYPE_NOT_REGULAR")
+    else:
+        if metadata.st_nlink != 1:
+            result.append("HARDLINK_COUNT_NOT_ONE")
+        if not public_name(relative):
+            result.append("NAME_PATTERN_MISMATCH")
+    return result

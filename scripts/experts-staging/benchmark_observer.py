@@ -9,12 +9,12 @@ from pathlib import Path
 import browser
 from benchmark_metrics import (
     browser_failure,
+    browser_memory_bytes,
+    observer_memory_choice,
     read_memory,
     require_headroom,
     write_browser_diagnostic,
 )
-
-_LIMIT_BYTES = 512 * 1024 * 1024
 
 
 def main() -> None:
@@ -23,6 +23,7 @@ def main() -> None:
     :return: None only when the genuine driver and measured headroom pass.
     :raises Exception: Original browser failure, or unavailable/unsafe counters.
     """
+    memory_mib = observer_memory_choice()
     passed = False
     try:
         browser.main()
@@ -31,17 +32,20 @@ def main() -> None:
         write_diagnostic(error)
         raise
     finally:
-        observe(passed)
+        observe(passed, memory_mib)
 
 
-def observe(driver_passed: bool) -> None:
+def observe(driver_passed: bool, memory_mib: int = 512) -> None:
     """Save only actual numeric kernel counters, without environment or diagnostics.
 
     :param driver_passed: Whether unchanged browser.main returned normally.
+    :param memory_mib: Exact explicit CI choice, also enforced by Docker.
     :return: None after measured positive headroom, preserving failed-driver status.
     :raises Exception: Missing metrics or actual memory exhaustion.
     """
-    record = read_memory(Path("/sys/fs/cgroup"), "browser", _LIMIT_BYTES)
+    record = read_memory(
+        Path("/sys/fs/cgroup"), "browser", browser_memory_bytes(memory_mib)
+    )
     record["driver_passed"] = driver_passed
     path = Path("/output/browser-memory.json")
     descriptor = os.open(
