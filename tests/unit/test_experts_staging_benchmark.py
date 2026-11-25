@@ -1245,3 +1245,68 @@ def test_export_rejection_kinds_with_symlink_fifo_directory_and_alias_preserves_
         alias / target.name, Path("video") / target.name
     ) == ["PATH_ALIAS"]
     assert controls.export_rejection_kinds(regular, Path("video") / regular.name) == []
+
+
+@pytest.mark.parametrize("prefix", ["", "page@"])
+def test_allowed_evidence_name_with_closed_native_video_forms_accepts_actual_source(
+    controls: ModuleType, prefix: str
+) -> None:
+    assert controls.remote.allowed_evidence_name(
+        Path("video") / (prefix + "a" * 32 + ".webm")
+    )
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "video/page@" + "a" * 31 + ".webm",
+        "video/page@" + "a" * 33 + ".webm",
+        "video/page@" + "A" * 32 + ".webm",
+        "video/page@@" + "a" * 32 + ".webm",
+        "video/other@" + "a" * 32 + ".webm",
+        "video/page%40" + "a" * 32 + ".webm",
+        "video/../page@" + "a" * 32 + ".webm",
+        "video/sub/page@" + "a" * 32 + ".webm",
+        "video/page@" + "a" * 32 + ".webm.tmp",
+        "video/page@" + "a" * 32 + ".mp4",
+        "/video/page@" + "a" * 32 + ".webm",
+        "video/page@" + "a" * 32 + ".webm\n",
+    ],
+)
+def test_allowed_evidence_name_with_prefixed_video_variants_rejects(
+    controls: ModuleType, name: str
+) -> None:
+    assert controls.remote.allowed_evidence_name(Path(name)) is False
+
+
+def test_safe_export_with_closed_page_prefixed_video_preserves_original_bytes(
+    controls: ModuleType, tmp_path: Path
+) -> None:
+    source, public = tmp_path / "source", tmp_path / "public"
+    (source / "video").mkdir(parents=True)
+    public.mkdir()
+    path = source / "video" / ("page@" + "a" * 32 + ".webm")
+    path.write_bytes(b"original owned video bytes")
+    (source / "health.json").write_text('{"status":"healthy"}')
+    records = controls.safe_export(source, public)
+    assert {row["path"] for row in records} == {"health.json", "video/" + path.name}
+    assert (public / "video" / path.name).read_bytes() == path.read_bytes()
+
+
+@pytest.mark.parametrize("hardlink", [False, True])
+def test_safe_export_with_page_prefixed_link_rejects_before_copy(
+    controls: ModuleType, tmp_path: Path, hardlink: bool
+) -> None:
+    source, public = tmp_path / "source", tmp_path / "public"
+    (source / "video").mkdir(parents=True)
+    public.mkdir()
+    private = tmp_path / "private"
+    private.write_text("PRIVATE_CONTENT")
+    path = source / "video" / ("page@" + "a" * 32 + ".webm")
+    if hardlink:
+        path.hardlink_to(private)
+    else:
+        path.symlink_to(private)
+    with pytest.raises(ValueError):
+        controls.safe_export(source, public)
+    assert not list(public.iterdir())

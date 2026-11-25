@@ -934,7 +934,6 @@ def evidence_files(output: Path) -> list[Path]:
 
 def allowed_evidence_name(path: Path) -> bool:
     """Allow only declared original acquisition and non-secret receipt filenames.
-
     :param path: Relative artifact path inside the public output directory.
     :return: Whether the concrete artifact is an expected safe output.
     """
@@ -961,7 +960,7 @@ def allowed_evidence_name(path: Path) -> bool:
             r"(?:screenshots/)?guest-(?:list|profile)-[0-9]{3,4}-[0-9]{3,4}-attempt-[12]\.(?:json|png)",
             name,
         )
-        or re.fullmatch(r"video/[a-f0-9]{32}\.webm", name)
+        or re.fullmatch(r"video/(?:page@)?[a-f0-9]{32}\.webm", name)
     )
 
 
