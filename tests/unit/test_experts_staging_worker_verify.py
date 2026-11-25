@@ -122,7 +122,8 @@ def test_request_verification_with_false_success_nonce_rejects(scope: Path) -> N
 
     def lie() -> None:
         with listener, listener.accept()[0] as client:
-            client.recv(1024)
+            client.settimeout(5)
+            assert worker.receive(client) == worker.packet({"nonce": _NONCE})
             client.sendall(b'{"status":"CASE_VERIFIED","nonce":"wrong"}')
 
     server = threading.Thread(target=lie, daemon=True)
