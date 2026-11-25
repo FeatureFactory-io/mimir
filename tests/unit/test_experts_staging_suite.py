@@ -155,3 +155,60 @@ def test_prepare_public_with_rejected_content_retains_raw_privately_and_exports_
 )
 def test_allowed_name_with_raw_or_undeclared_capture_rejects(name: str) -> None:
     assert export.allowed_name(Path(name)) is False
+
+
+def test_public_receipt_with_precise_native_login_retains_safe_protocol() -> None:
+    login = {
+        "actor": "esvensson",
+        "method": "POST",
+        "path": "/auth/user/login/",
+        "status": 302,
+        "started_at": "2026-11-25T00:00:00.000001+00:00",
+        "completed_at": "2026-11-25T00:00:00.000009+00:00",
+        "session_key_sha256": "a" * 64,
+    }
+    row = {
+        "case": "authenticated-matrix",
+        "status": "BROWSER_OBSERVED",
+        "login_observation": login,
+        "nonread_requests": [{"method": "POST", "path": "/auth/user/login/"}],
+    }
+    safe = export.public_receipt(
+        "suite-readonly-browser.json", row, json.dumps(row).encode()
+    )
+    assert (
+        safe["login_observation"] == login
+        and safe["nonread_requests"] == row["nonread_requests"]
+    )
+
+
+@pytest.mark.parametrize("tamper", ["actor", "path", "session_key_sha256", "extra"])
+def test_public_receipt_with_unreviewed_native_protocol_rejects(tamper: str) -> None:
+    login = {
+        "actor": "esvensson",
+        "method": "POST",
+        "path": "/auth/user/login/",
+        "status": 302,
+        "started_at": "2026-11-25T00:00:00.000001+00:00",
+        "completed_at": "2026-11-25T00:00:00.000009+00:00",
+        "session_key_sha256": "a" * 64,
+    }
+    login[tamper] = "PRIVATE_REJECTED_VALUE"
+    row = {
+        "case": "authenticated-matrix",
+        "status": "BROWSER_OBSERVED",
+        "login_observation": login,
+    }
+    with pytest.raises((AssertionError, ValueError)):
+        export.public_receipt(
+            "suite-readonly-browser.json", row, json.dumps(row).encode()
+        )
+
+
+def test_allowed_name_with_guest_trace_chunks_is_closed_by_actual_ia_sizes() -> None:
+    assert export.allowed_name(Path("traces/guest-public-1280-800.zip"))
+    assert export.allowed_name(Path("traces/guest-public-1280-800.provenance.json"))
+    assert not export.allowed_name(Path("traces/guest-public-999-999.zip"))
+    assert not export.allowed_name(
+        Path("private/guest-public-1280-800-trace-original.zip")
+    )

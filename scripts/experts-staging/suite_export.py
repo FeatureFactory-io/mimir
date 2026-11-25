@@ -17,6 +17,7 @@ from saga_trace import (
     write_redacted,
 )
 from suite_contract import FULL_CASES
+from suite_receipts import protocol_fields
 
 _STATUSES = {
     "FAILED",
@@ -213,6 +214,12 @@ def capture_names() -> set[str]:
                         }
                     )
     for width, height in _SIZES:
+        result.update(
+            {
+                f"traces/guest-public-{width}-{height}.zip",
+                f"traces/guest-public-{width}-{height}.provenance.json",
+            }
+        )
         for screen in ("list", "profile"):
             for attempt in (1, 2):
                 stem = f"guest-{screen}-{width}-{height}-attempt-{attempt}"
@@ -295,6 +302,7 @@ def public_receipt(
     _selected_identity(record, result)
     _selected_observations(record, result)
     _capture_fields(record, result)
+    protocol_fields(record, result)
     if name.endswith("effects.json"):
         _check_effects(record)
     if "failure" in name:
@@ -326,7 +334,16 @@ def _selected_identity(record: dict[str, Any], result: dict[str, Any]) -> None:
         allowed = (
             _STATUSES
             if key == "status"
-            else ({r.case for r in FULL_CASES} if key == "case" else _EXCEPTIONS)
+            else (
+                {r.case for r in FULL_CASES}
+                | {
+                    f"guest-{screen}-{w}-{h}"
+                    for w, h in _SIZES
+                    for screen in ("list", "profile")
+                }
+                if key == "case"
+                else _EXCEPTIONS
+            )
         )
         if type(record[key]) is not str or record[key] not in allowed:
             raise ValueError("Unreviewed receipt identity value.")
@@ -677,11 +694,40 @@ def _check_trace(root: Path, secrets: tuple[bytes, ...]) -> None:
     :return: None after every public ZIP member is checked.
     :raises ValueError: Missing provenance, private value or changed image.
     """
-    public = root / "output/saga-trace.zip"
-    if not public.exists():
-        return
-    original = root / "private-evidence/browser/saga-trace-original.zip"
-    record = json.loads((root / "output/saga-trace-provenance.json").read_text())
+    pairs = [
+        ("saga-trace.zip", "saga-trace-original.zip", "saga-trace-provenance.json")
+    ]
+    pairs.extend(
+        (
+            f"traces/guest-public-{w}-{h}.zip",
+            f"guest-public-{w}-{h}-trace-original.zip",
+            f"traces/guest-public-{w}-{h}.provenance.json",
+        )
+        for w, h in _SIZES
+    )
+    for public, original, provenance in pairs:
+        if (root / "output" / public).exists():
+            _trace_pair(
+                root / "output" / public,
+                root / "private-evidence/browser" / original,
+                root / "output" / provenance,
+                secrets,
+            )
+
+
+def _trace_pair(
+    public: Path, original: Path, provenance: Path, secrets: tuple[bytes, ...]
+) -> None:
+    """Validate one actual safe derivative against its untouched private original.
+
+    :param public: Actual safe derivative ZIP.
+    :param original: Untouched private browser chunk.
+    :param provenance: Actual matching JSON provenance.
+    :param secrets: Captured private values/encodings.
+    :return: None after hash, topology, all-member and binary image comparison.
+    :raises ValueError: Any claimed fact differs from original actual bytes.
+    """
+    record = json.loads(provenance.read_text())
     if (
         record.get("public_sha256") != hashlib.sha256(public.read_bytes()).hexdigest()
         or record.get("original_sha256")

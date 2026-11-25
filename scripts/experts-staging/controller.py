@@ -55,6 +55,8 @@ _RUNTIME_FILES = (
     "suite_browser.py",
     "suite_readonly.py",
     "suite_mail.py",
+    "suite_receipts.py",
+    "suite_guest_trace.py",
 )
 _SOURCE_PREFIXES = (
     "accounts/",
@@ -169,6 +171,8 @@ def source_manifest(repository: Path, revision: str) -> dict[str, Any]:
     :return: Source identity and complete selected file SHA map.
     :raises ValueError: Mandatory app/guard/fixture coverage is absent.
     """
+    if not isinstance(revision, str) or not re.fullmatch(r"[a-f0-9]{40}", revision):
+        raise ValueError("Full immutable candidate source revision required.")
     files = source_hashes(repository, revision)
     required = {
         "mimir/settings/base.py",
@@ -800,6 +804,11 @@ def committed_controls() -> tuple[dict[str, bytes], dict[str, Any]]:
     """
     root = Path(__file__).resolve().parents[2]
     revision = git_bytes(root, "rev-parse", "HEAD").decode().strip()
+    controller_source = git_bytes(
+        root, "show", f"{revision}:scripts/experts-staging/controller.py"
+    )
+    if Path(__file__).read_bytes() != controller_source:
+        raise ValueError("Controller itself must match committed reviewed source.")
     files: dict[str, bytes] = {}
     for name in _RUNTIME_FILES:
         path = Path(__file__).parent / name
@@ -813,6 +822,7 @@ def committed_controls() -> tuple[dict[str, bytes], dict[str, Any]]:
         files[name] = committed
     return files, {
         "control_revision": revision,
+        "controller_sha256": hashlib.sha256(controller_source).hexdigest(),
         "files": {name: hashlib.sha256(raw).hexdigest() for name, raw in files.items()},
     }
 

@@ -12,6 +12,8 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 
 from playwright.sync_api import Locator, Page, expect
+from tests.support.experts_guest_browser import tab_to_guest_control
+
 from saga_guest import (
     VIEWPORTS,
     GuestOracle,
@@ -23,8 +25,6 @@ from saga_guest import (
     validate_origin,
     validate_output,
 )
-
-from tests.support.experts_guest_browser import tab_to_guest_control
 
 logger = logging.getLogger(__name__)
 _DESIGN_PATH = "/experts/?category=design"
@@ -351,7 +351,8 @@ def _read_all_lines(summary: Locator) -> None:
     :raises AssertionError: A line is obscured, reflows or cannot be reached.
     """
     page = summary.page
-    page.keyboard.press("Home")
+    page.mouse.move(page.viewport_size["width"] / 2, page.viewport_size["height"] / 2)
+    page.mouse.wheel(0, -100000)
     page.wait_for_function("scrollY===0", timeout=_SETTLE_TIMEOUT_MS)
     expected = summary.evaluate(_LINE_STATE, _READING_FRACTION)["count"]
     assert expected > 0
@@ -408,7 +409,8 @@ def _capture(page: Page, output: Path, name: str, screen: str) -> dict[str, Any]
     target = output / (name + ".png")
     if target.exists() or target.is_symlink():
         raise ValueError("Original responsive acquisition cannot be overwritten.")
-    page.keyboard.press("Home")
+    page.mouse.move(page.viewport_size["width"] / 2, page.viewport_size["height"] / 2)
+    page.mouse.wheel(0, -100000)
     page.wait_for_function("scrollY===0", timeout=_SETTLE_TIMEOUT_MS)
     page.screenshot(path=str(target), full_page=True)
     return {

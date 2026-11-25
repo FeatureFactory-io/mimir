@@ -16,6 +16,7 @@ from saga_guest_responsive import run_elena_matrix
 from saga_summary_browser import run_summary_case
 from saga_visual_browser import run_visual_case
 from suite_contract import selected_case
+from suite_guest_trace import finish_guest, original_path
 
 _OUTPUT = Path("/output")
 _ORIGIN = "https://cedar-web:8443"
@@ -129,11 +130,18 @@ def _guest_matrix(page: Page, oracle: GuestOracle) -> list[dict[str, Any]]:
     :return: Seven actual native outcomes.
     """
     rows = []
-    for width, height in VIEWPORTS:
+    for index, (width, height) in enumerate(VIEWPORTS):
+        if index:
+            page.context.tracing.start_chunk()
         page.set_viewport_size({"width": width, "height": height})
         destination = _OUTPUT / "screenshots" / f"guest-{width}-{height}"
         destination.mkdir(mode=0o700)
-        rows.append(run_guest(page, _ORIGIN, destination, oracle))
+        try:
+            rows.append(run_guest(page, _ORIGIN, destination, oracle))
+        finally:
+            page.context.tracing.stop_chunk(
+                path=str(original_path(_OUTPUT, width, height))
+            )
     return rows
 
 
@@ -161,10 +169,16 @@ def run_readonly(browser: Browser, case: str) -> None:
         _observe_readonly(context, case)
         success = True
     finally:
-        context.tracing.stop(path=str(_OUTPUT / "private/saga-trace-original.zip"))
+        if case == "guest-public":
+            context.tracing.stop()
+        else:
+            context.tracing.stop(path=str(_OUTPUT / "private/saga-trace-original.zip"))
         context.close()
         try:
-            shared.finish_evidence(case, success)
+            if case == "guest-public":
+                finish_guest(_OUTPUT, success)
+            else:
+                shared.finish_evidence(case, success)
         finally:
             shared._PRIVATE_VALUES.reset(binding)
 
