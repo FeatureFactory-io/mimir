@@ -513,7 +513,7 @@ def _nomination_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
             "inspected_contact_destination"
         ]
     if "nomination_text" in record:
-        text = "I nominate Maria Rodriguez for a discussion about Noor's Cedar bank onboarding brief. Her Accessibility Audit Playbook v1.0 includes Trace Keyboard Focus, Review Form Feedback. These public examples address keyboard navigation, understandable form errors and recovery. Next step is to request a discussion. Availability is unconfirmed."
+        text = "I nominate Maria Rodriguez for a discussion about Noor's Cedar bank onboarding brief. Her Accessibility Audit Playbook v1.0 includes Trace Keyboard Focus, Review Form Feedback, Document Recovery Paths. These public examples address keyboard navigation, understandable form errors and recovery. Next step is to request a discussion. Availability is unconfirmed."
         if record["nomination_text"] != text:
             raise ValueError("Exact fictional observed nomination required.")
         result["nomination_text"] = text

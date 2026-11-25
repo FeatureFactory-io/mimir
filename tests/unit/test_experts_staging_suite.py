@@ -22,6 +22,7 @@ import suite_capture as capture_control
 import suite_contract as suite
 import suite_export as export
 import suite_pixels as pixels
+from saga_browser import _ACTIVITIES, nomination_record
 from saga_trace import redact_trace
 from suite_archive import verify_case_archive
 
@@ -657,3 +658,20 @@ def test_quarantine_blank_with_unreviewed_existing_receipt_rejects_before_move(
     with pytest.raises(ValueError):
         capture_control.quarantine_blank(output, original, "summary-acceptance")
     assert original.read_bytes() == raw and receipt.read_bytes() == before
+
+
+def test_public_receipt_with_actual_nomination_three_read_examples_accepts() -> None:
+    record = {
+        "case": "nomination",
+        "status": "BROWSER_OBSERVED",
+        **nomination_record(
+            "Maria Rodriguez", _ACTIVITIES, "mailto:maria.rodriguez@example.com", 12.5
+        ),
+    }
+    raw = json.dumps(record).encode()
+    result = export.public_receipt("saga-browser.json", record, raw)
+    assert result["nomination_text"] == record["nomination_text"]
+    assert "Document Recovery Paths" in result["nomination_text"]
+    record["nomination_text"] += " Unknown example."
+    with pytest.raises(ValueError):
+        export.public_receipt("saga-browser.json", record, json.dumps(record).encode())
