@@ -85,7 +85,7 @@ def arguments(argv: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_BROWSER_MEMORY_MIB,
     )
     parser.add_argument(
-        "--resource-profile", choices=("default", "aggregate1024"), default="default"
+        "--resource-profile", choices=("default", "aggregate960"), default="default"
     )
     return parser.parse_args(argv)
 
@@ -368,7 +368,7 @@ def execute(
     :param output: Fresh public evidence directory.
     :param result: Safe HOST receipt.
     :param browser_memory: Existing closed browser memory choice.
-    :param resource_profile: Default or fixed aggregate1024 CI-only preset.
+    :param resource_profile: Default or fixed aggregate960 CI-only preset.
     :return: None after real execution and cleanup.
     :raises Exception: Preparation fails before owned execution.
     """

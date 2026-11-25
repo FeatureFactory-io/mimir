@@ -20,7 +20,7 @@ on:
         type: choice
         required: true
         default: default
-        options: [default, aggregate1024]
+        options: [default, aggregate960]
 
 permissions:
   contents: read
@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   benchmark:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diagnostics/experts-linux-memory-benchmark-20261125'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diagnostics/experts-ci-aggregate960-20261125'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
@@ -83,8 +83,8 @@ jobs:
           set -euo pipefail
           case "$EXPERIMENT_WEB_MEMORY_MIB" in 384|256) ;; *) exit 2 ;; esac
           case "$EXPERIMENT_BROWSER_MEMORY_MIB" in 512|768) ;; *) exit 2 ;; esac
-          case "$EXPERIMENT_RESOURCE_PROFILE" in default|aggregate1024) ;; *) exit 2 ;; esac
-          if test "$EXPERIMENT_RESOURCE_PROFILE" = aggregate1024; then
+          case "$EXPERIMENT_RESOURCE_PROFILE" in default|aggregate960) ;; *) exit 2 ;; esac
+          if test "$EXPERIMENT_RESOURCE_PROFILE" = aggregate960; then
             test "$EXPERIMENT_WEB_MEMORY_MIB" = 384
             test "$EXPERIMENT_BROWSER_MEMORY_MIB" = 768
           fi

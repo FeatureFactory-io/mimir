@@ -43,21 +43,21 @@ def test_parent_name_with_foreign_or_unsafe_identity_rejects(
 
 
 @pytest.mark.parametrize(
-    "name,web,browser", [("aggregate1024", 384, 768), ("default", 384, 512)]
+    "name,web,browser", [("aggregate960", 384, 768), ("default", 384, 512)]
 )
 def test_validate_profile_with_closed_consistent_choice_preserves_default(
     module: ModuleType, name: str, web: int, browser: int
 ) -> None:
-    assert module.validate_profile(name, web, browser) is (name == "aggregate1024")
+    assert module.validate_profile(name, web, browser) is (name == "aggregate960")
 
 
 @pytest.mark.parametrize(
     "name,web,browser",
     [
         ("other", 384, 768),
-        ("aggregate1024", 256, 768),
-        ("aggregate1024", 384, 512),
-        ("aggregate1024", True, 768),
+        ("aggregate960", 256, 768),
+        ("aggregate960", 384, 512),
+        ("aggregate960", True, 768),
     ],
 )
 def test_validate_profile_with_unreviewed_or_inconsistent_choice_rejects(
@@ -80,11 +80,11 @@ def test_validate_remaining_with_owned_allocations_uses_remaining_not_full_brows
 @pytest.mark.parametrize(
     "available,current,maximum",
     [
-        (True, 1, 1073741824),
-        (2000000000, -1, 1073741824),
-        (2000000000, 1073741825, 1073741824),
+        (True, 1, 1006632960),
+        (2000000000, -1, 1006632960),
+        (2000000000, 1006632961, 1006632960),
         (2000000000, 1, 2147483648),
-        (2000000000, 0, 1073741824),
+        (2000000000, 0, 1006632960),
     ],
 )
 def test_validate_remaining_with_unverified_or_invalid_parent_rejects(
@@ -100,7 +100,7 @@ def test_read_group_with_actual_files_retains_peak_and_zero_swap(
     values = {
         "memory.current": "4096",
         "memory.peak": "8192",
-        "memory.max": "1073741824",
+        "memory.max": "1006632960",
         "memory.swap.current": "0",
         "memory.swap.max": "0",
         "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n",
@@ -707,3 +707,31 @@ def test_command_failure_with_loaded_lookup_preserves_lookup_not_stop_enum(
     row = module.checked_private(owner.root / "aggregate-command-failure.json")
     module.validate_failure_record(row)
     assert row["operation"] == "LOOKUP_PARENT"
+
+
+def test_aggregate960_with_fixed_parent_preserves_role_caps_and_host_reserve(
+    module: ModuleType,
+) -> None:
+    assert module.LIMIT_BYTES == 960 * 1024**2
+    assert module.RESERVE_BYTES == 256 * 1024**2
+    assert module.ROLE_MEMORY_MIB == {"web": 384, "db": 192, "browser": 768}
+    assert (module.LIMIT_BYTES + module.RESERVE_BYTES) // 1024**2 == 1216
+    assert module.validate_profile("default", 384, 512) is False
+
+
+def test_validate_profile_with_retired_1024_name_refuses_unmeasured_alias(
+    module: ModuleType,
+) -> None:
+    with pytest.raises(ValueError):
+        module.validate_profile("aggregate1024", 384, 768)
+
+
+def test_validate_remaining_with_actual_960_parent_uses_remaining_budget_boundary(
+    module: ModuleType,
+) -> None:
+    mib = 1024**2
+    module.validate_remaining((960 - 1 + 256) * mib, mib, 960 * mib)
+    with pytest.raises(ValueError):
+        module.validate_remaining((960 - 1 + 256) * mib - 1, mib, 960 * mib)
+    with pytest.raises(ValueError):
+        module.validate_remaining(2000 * mib, mib, 1024 * mib)

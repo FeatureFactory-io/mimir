@@ -158,16 +158,43 @@ def test_aggregate_profile_with_dispatch_requires_explicit_closed_coupled_choice
     workflow = _workflow()
     option = workflow["on"]["workflow_dispatch"]["inputs"]["resource_profile"]
     assert option["default"] == "default"
-    assert option["options"] == ["default", "aggregate1024"]
+    assert option["options"] == ["default", "aggregate960"]
     steps = workflow["jobs"]["benchmark"]["steps"]
     step = next(s for s in steps if s.get("name", "").startswith("Run the genuine"))
     assert (
         step["env"]["EXPERIMENT_RESOURCE_PROFILE"] == "${{ inputs.resource_profile }}"
     )
     command = step["run"]
-    assert 'case "$EXPERIMENT_RESOURCE_PROFILE" in default|aggregate1024)' in command
+    assert 'case "$EXPERIMENT_RESOURCE_PROFILE" in default|aggregate960)' in command
     assert 'test "$EXPERIMENT_WEB_MEMORY_MIB" = 384' in command
     assert 'test "$EXPERIMENT_BROWSER_MEMORY_MIB" = 768' in command
     assert '--resource-profile "$EXPERIMENT_RESOURCE_PROFILE"' in command
     gate = next(s["run"] for s in steps if s.get("name", "").startswith("Validate"))
     assert "test_experts_staging_aggregate.py" in gate
+
+
+def test_aggregate960_workflow_with_fixed_diagnostic_ref_has_only_manual_benchmark() -> (
+    None
+):
+    workflow = _workflow()
+    assert set(workflow["on"]) == {"workflow_dispatch"}
+    assert set(workflow["jobs"]) == {"benchmark"}
+    job = workflow["jobs"]["benchmark"]
+    assert (
+        job["if"]
+        == "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diagnostics/experts-ci-aggregate960-20261125'"
+    )
+    command = "\n".join(step.get("run", "") for step in job["steps"])
+    assert all(
+        word not in command
+        for word in (
+            "send-command",
+            "aws ssm",
+            "start-instances",
+            "update-environment",
+            "swap-environment-cnames",
+            "docker build",
+            "docker push",
+            "git push",
+        )
+    )

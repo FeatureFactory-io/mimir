@@ -596,7 +596,7 @@ def test_benchmark_workflow_with_manual_only_branch_has_no_deployment_or_ssm() -
     assert set(workflow["jobs"]) == {"benchmark"}
     job = workflow["jobs"]["benchmark"]
     assert "github.event_name == 'workflow_dispatch'" in job["if"]
-    assert "refs/heads/diagnostics/experts-linux-memory-benchmark-20261125" in job["if"]
+    assert "refs/heads/diagnostics/experts-ci-aggregate960-20261125" in job["if"]
     commands = "\n".join(step.get("run", "") for step in job["steps"])
     assert "sudo /usr/bin/env -i /usr/bin/python3" in commands
     assert not any(
@@ -1357,10 +1357,8 @@ def test_aggregate_profile_cli_is_closed_and_preserves_default_mode(
     ]
     assert driver.arguments(argv).resource_profile == "default"
     assert (
-        driver.arguments(
-            [*argv, "--resource-profile", "aggregate1024"]
-        ).resource_profile
-        == "aggregate1024"
+        driver.arguments([*argv, "--resource-profile", "aggregate960"]).resource_profile
+        == "aggregate960"
     )
     with pytest.raises(SystemExit):
         driver.arguments([*argv, "--resource-profile", "arbitrary-parent"])
