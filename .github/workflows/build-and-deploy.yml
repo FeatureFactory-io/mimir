@@ -535,6 +535,30 @@ jobs:
           assert result['Status'] == 'Success' and result['ResponseCode'] == 0
           print(result['StandardOutputContent'])
           PY_RESULT
+      - name: Classify previous owned companion failure without exporting private output
+        if: always()
+        run: |
+          python3 - <<'PY_OWNED_FAILURE'
+          import json, re, subprocess
+          from pathlib import Path
+          command_id = 'e383dc2a-cd0c-4874-ab0b-8ce5ff98adde'
+          instance_id = 'i-0f9603f1b45a08879'
+          args = ['aws', 'ssm', 'get-command-invocation', '--command-id',
+                  command_id, '--instance-id', instance_id, '--output', 'json']
+          actual = json.loads(subprocess.check_output(args, timeout=60))
+          assert actual['CommandId'] == command_id and actual['InstanceId'] == instance_id
+          private_error = actual.get('StandardErrorContent', '')
+          frames = re.findall(r'File "[^"\n]*/(remote|contract)\.py", line (\d+), in ([A-Za-z_][A-Za-z_0-9]*)', private_error)
+          classes = re.findall(r'^([A-Za-z_][A-Za-z_0-9.]*(?:Error|Exception|Expired)):', private_error, re.M)
+          operations = [name for name in ('get-login-password', 'bounded_pull', 'monitor_pull', 'start_database', 'start_web', 'run_browser') if name in private_error]
+          safe = {'command_id': actual['CommandId'], 'status': actual['Status'],
+                  'response_code': actual['ResponseCode'], 'exception_classes': classes,
+                  'source_frames': [{'module': module, 'line': int(line), 'function': function} for module, line, function in frames],
+                  'fixed_operation_markers': operations, 'raw_output_exported': False}
+          output = Path('preflight-receipts'); output.mkdir(exist_ok=True)
+          (output / 'previous-owned-failure.json').write_text(json.dumps(safe, indent=2) + '\n')
+          print(json.dumps(safe))
+          PY_OWNED_FAILURE
       - name: Preserve read-only preflight receipts
         if: always()
         uses: actions/upload-artifact@v4
