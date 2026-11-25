@@ -376,3 +376,28 @@ def test_explicit_deadline_signal_raises_into_cleanup_boundary(
     """The real handler raises instead of bypassing ordinary finally cleanup."""
     with pytest.raises(TimeoutError):
         modules["remote"].deadline_exceeded(signal.SIGALRM, None)
+
+
+def test_https_web_entry_with_four_threads_preserves_one_process_and_tls() -> None:
+    """Bound HTTPS connection concurrency without adding another app process.
+
+    :return: None when the measured local repair retains one worker and TLS.
+    :raises AssertionError: Worker count, thread count, TLS or deadline changes.
+    """
+    tree = ast.parse((_RUNTIME / "web_entry.py").read_text())
+    assignment = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "_GUNICORN"
+            for target in node.targets
+        )
+    )
+    argv = ast.literal_eval(assignment.value)
+    assert argv[:2] == ["gunicorn", "mimir.wsgi:application"]
+    assert argv[argv.index("--workers") + 1] == "1"
+    assert argv[argv.index("--threads") + 1] == "4"
+    assert argv[argv.index("--certfile") + 1] == "/tls/server.crt"
+    assert argv[argv.index("--keyfile") + 1] == "/tls/server.key"
+    assert argv[argv.index("--timeout") + 1] == "90"

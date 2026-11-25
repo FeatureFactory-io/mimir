@@ -12,7 +12,7 @@ _GUNICORN = [
     "--workers",
     "1",
     "--threads",
-    "2",
+    "4",
     "--bind",
     "0.0.0.0:8443",
     "--certfile",
