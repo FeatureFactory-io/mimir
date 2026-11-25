@@ -38,6 +38,40 @@ def test_suite_cases_with_full_has_eleven_distinct_phases_and_final_true_nominat
     assert suite.suite_cases("core") == (rows[0],)
 
 
+def test_suite_cases_with_copy_summary_retry_selects_only_two_original_cases() -> None:
+    full = suite.suite_cases("full")
+    assert suite.suite_cases("copy-summary-retry") == (full[5], full[9])
+    assert [row.phase for row in full] == [row.phase for row in suite.FULL_CASES]
+
+
+def test_retry_receipt_with_two_passes_keeps_full_saga_unaccepted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        controller,
+        "execute_lifecycle",
+        lambda session, destination, actual: seen.append(actual),
+    )
+    monkeypatch.setattr(
+        controller, "phase_directory", lambda output, phase, selector: output / phase
+    )
+    controller.execute_suite(
+        None, tmp_path, {"source_revision": "a" * 40}, "copy-summary-retry"
+    )
+    result = json.loads((tmp_path / "suite-result.json").read_text())
+    assert result["suite"] == "copy-summary-retry"
+    assert [row["phase"] for row in result["cases"]] == [
+        "copy-self",
+        "summary-acceptance",
+    ]
+    assert (
+        result["all_cases_verified"] is True and result["full_saga_accepted"] is False
+    )
+    assert len({row["nonce"] for row in seen}) == 2
+
+
 @pytest.mark.parametrize("value", [None, "FULL", "guest", "", 1])
 def test_suite_cases_with_unknown_selector_rejects(value: object) -> None:
     with pytest.raises(ValueError):

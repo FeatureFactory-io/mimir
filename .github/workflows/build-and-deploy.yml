@@ -24,11 +24,11 @@ on:
         required: true
         default: false
       experts_suite:
-        description: Explicit core readiness or full eleven-case Cedar verification
+        description: Core readiness, full eleven-case verification or closed two-case repair retry
         type: choice
         required: true
         default: core
-        options: [core, full]
+        options: [core, full, copy-summary-retry]
       experts_resource_profile:
         description: Default resources or explicit measured shared 960 MiB staging trial
         type: choice
@@ -587,7 +587,7 @@ jobs:
           test "$NORMAL_DEPLOY" = false
           test "$PREFLIGHT_ONLY" = false
           test "$WAKE_IDLE" = false
-          case "$EXPERTS_SUITE" in core|full) ;; *) exit 2 ;; esac
+          case "$EXPERTS_SUITE" in core|full|copy-summary-retry) ;; *) exit 2 ;; esac
           case "$RESOURCE_PROFILE" in default|aggregate960) ;; *) exit 2 ;; esac
           [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]]
@@ -662,7 +662,7 @@ jobs:
           Path('experts-readiness/image-runtime-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           PY
       - name: Verify immutable browser imports before any host execution
-        if: inputs.experts_suite == 'full' || inputs.experts_resource_profile == 'aggregate960'
+        if: inputs.experts_suite != 'core' || inputs.experts_resource_profile == 'aggregate960'
         run: |
           set -euo pipefail
           python scripts/experts-staging/probe_browser_imports.py \

@@ -385,7 +385,7 @@ def verify(output: Path, images: Path, suite: str) -> dict[str, Any]:
     manifest = controller.execution_manifest(output, images)
     measured = controller.resource_profile.selected(manifest)
     cases = suite_cases(suite)
-    if not measured and suite != "full":
+    if not measured and suite == "core":
         raise ValueError("Default core remains unchanged")
     case = cases[0] if measured else cases[1]
     manifest.update(suite_phase=case.phase, saga_case=case.case)
@@ -416,7 +416,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--images", type=Path, required=True)
-    parser.add_argument("--suite", choices=("core", "full"), required=True)
+    parser.add_argument(
+        "--suite", choices=("core", "full", "copy-summary-retry"), required=True
+    )
     args = parser.parse_args()
     passed = False
     try:

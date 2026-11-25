@@ -31,12 +31,18 @@ FULL_CASES = (
 def suite_cases(suite: str) -> tuple[SuiteCase, ...]:
     """Select the closed explicit suite.
 
-    :param suite: core or full.
+    :param suite: core, full or the explicit two-case copy-summary-retry.
     :return: Immutable phases, e.g. eleven for full.
     :raises ValueError: Unknown suite.
     """
-    if type(suite) is not str or suite not in {"core", "full"}:
-        raise ValueError("Explicit core or full suite required.")
+    if type(suite) is not str or suite not in {"core", "full", "copy-summary-retry"}:
+        raise ValueError("Explicit core, full or copy-summary-retry suite required.")
+    if suite == "copy-summary-retry":
+        return tuple(
+            row
+            for row in FULL_CASES
+            if row.phase in {"copy-self", "summary-acceptance"}
+        )
     return FULL_CASES if suite == "full" else FULL_CASES[:1]
 
 

@@ -923,7 +923,7 @@ def execute_suite(
     :param session: Existing authenticated account connection.
     :param output: Owned CI directory with exact prepared source declarations.
     :param manifest: Validated candidate/image declaration.
-    :param suite: Explicit core or full selector.
+    :param suite: Explicit core, full or closed copy-summary-retry selector.
     :return: None after all selected actual lifecycles and cleanup verify.
     :raises SuiteFailure: Actual failures remain failures after remaining lanes run.
     """
@@ -1126,7 +1126,9 @@ def main() -> None:
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--images", type=Path)
-    parser.add_argument("--suite", choices=("core", "full"), default="core")
+    parser.add_argument(
+        "--suite", choices=("core", "full", "copy-summary-retry"), default="core"
+    )
     parser.add_argument(
         "--resource-profile", choices=("default", "aggregate960"), default="default"
     )

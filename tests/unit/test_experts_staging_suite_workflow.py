@@ -36,10 +36,17 @@ def test_full_suite_with_dispatch_requires_explicit_closed_selector() -> None:
     """
     workflow = _workflow()
     option = workflow["on"]["workflow_dispatch"]["inputs"]["experts_suite"]
-    assert option["default"] == "core" and option["options"] == ["core", "full"]
+    assert option["default"] == "core" and option["options"] == [
+        "core",
+        "full",
+        "copy-summary-retry",
+    ]
     job = workflow["jobs"]["experts-staging"]
     assert job["env"]["EXPERTS_SUITE"] == "${{ inputs.experts_suite }}"
-    assert 'case "$EXPERTS_SUITE" in core|full)' in job["steps"][0]["run"]
+    assert (
+        'case "$EXPERTS_SUITE" in core|full|copy-summary-retry)'
+        in job["steps"][0]["run"]
+    )
     run = next(
         s["run"]
         for s in job["steps"]
@@ -100,7 +107,7 @@ def test_full_or_measured_with_browser_import_preflight_precedes_host_execution(
     step = next(step for step in job["steps"] if step.get("name") == name)
     assert (
         step["if"]
-        == "inputs.experts_suite == 'full' || inputs.experts_resource_profile == 'aggregate960'"
+        == "inputs.experts_suite != 'core' || inputs.experts_resource_profile == 'aggregate960'"
     )
     assert names.index(
         "Record actual immutable image sizes before any host pull"
