@@ -9992,7 +9992,7 @@ iteration_convergence_followups:
     - tests/unit/test_karma_sqlite_lifecycle.py
     preserves: Production behavior unchanged; restore the actual async worker wrapper and current schema leaves after owned test lifetimes.
   isolated_idle_runner:
-    status: measured960_full_suite_in_progress_staging_not_accepted
+    status: measured960_browser_startup_repair_staging_not_accepted
     footprint:
     - .github/workflows/build-and-deploy.yml
     - scripts/experts-staging/
@@ -10016,7 +10016,7 @@ iteration_convergence_followups:
     actual_full_staging_retry: 45554226298
     actual_full_staging_result: All eleven failed at initial memory guard; no browser work; complete owned runtime cleanup; product and visual acceptance not assessed.
     actual_measured960_full_run: 45557882849
-    actual_measured960_full_result: In progress after actual CI contract/source/proof/image gates passed; all normal jobs skipped; staging and UAT remain unaccepted.
+    actual_measured960_full_result: All eleven startup capacity/source/seed/health gates passed, then browser processes exited nonzero before captures; complete owned-private cleanup; all20UATsteps unstarted; source entrypoint repair in progress.
     resource_profile:
       explicit_trial: aggregate960
       default_initial_guard_mib: 1400

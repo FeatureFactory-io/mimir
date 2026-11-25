@@ -1722,3 +1722,43 @@ The final edit must use actual staged evidence and automated elapsed time,
 separately from editorial reading holds; no human usability-study claim follows.
 Native editable guest DO/SEE and shared-design source frames are readable and
 verified reference inputs only. They supply no staged product/visual verdict.
+
+
+### Actual960 staging failure and browser startup counterexample
+
+Actual45557882849/f879 completed with all eleven cases FAILED. In contrast to
+the earlier1280MiB failures, every current initial1216MiB guard passed. All405
+candidate source files,42member runtime/proof bundles, image identities, Cedar
+seed12users/2129awards/11profiles and healthy candidate04 receipts agree.
+All three owned container memberships are true. Parent peaks296,968,192–
+379,846,656bytes show zero max/OOM/kill events; web/PG measured counters have
+no exhaustion, and all Docker roles report zero restarts/OOMfalse. Browser
+memory is UNAVAILABLE, not zero. Every browser exits nonzero at run_browser789;
+no PNG/WebM exists, and all20UATsteps remain NOT_STARTED/productNOT_ASSESSED.
+Underlying original browser stderr is not available from the exported receipts;
+do not claim its exact cause was observed. All owned resources and private
+runtime directories were removed. Retained remote failure objects are not
+claimed deleted. Artifact14997651150 original ZIP SHA256:
+`6527492696e777bbe3a2f63dbb2ad4c562244fe3145b1ec1f7d160e3c5669883`.
+Independent actual-failure report SHA256:
+`109c652085dd95ff8bd97d12b09668cbfd730c62ec3f38d07d6558a70414cbc2`.
+
+A clean local whole-entrypoint counterexample reproduces ModuleNotFoundError
+for tests before main in suite_browser and resource_observer, despite cwd being
+the read-only candidate app snapshot. Pytest/Django setup and site/.pth injection
+are absent. Adding only explicit /runtime:/app import paths lets both unchanged
+entrypoints reach their first manifest-read barrier without browser, database,
+network or app mutation. This proves a source defect consistent with the actual
+exit; a fresh actual image/runtime check is required before inferring repair of
+that run. Minimal dispatcher-only browser environment repair and an immutable
+image pre-host import gate are under preparation; ordinary core argv and all
+source, ownership, resource, archive and acceptance guards remain unchanged.
+
+Storyboard/Page/localHTML/progress now match88. The corrected Scene22 Aiden
+voice is63.76seconds; U-A-T pronunciation uses a separately recorded input while
+canonical spoken content remains sequence87. The checked replacement source
+intro is392frames/16.333333seconds, SHA256:
+`0b12148695470203616965f0682b88d1717de59e5a77bb711e7994b6f70e0bca`.
+It preserves native Cursor/CLI source and the rear-facing comic, with no repeated
+narration. Source-only clip QA supplies no actual staged UAT verdict. Final film
+completion still requires genuine staged browser evidence and independent review.
