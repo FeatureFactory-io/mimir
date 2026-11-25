@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import tarfile
 from pathlib import Path
 from typing import Any
 
+import resource_profile
 from suite_contract import selected_case
 from suite_export import allowed_name, public_receipt
 from suite_pixels import png_bytes_nonuniform
@@ -39,14 +41,9 @@ def verify_case_archive(
             or sum(m.size for m in members) > 128 * 1024**2
         ):
             raise ValueError("Closed bounded archive required.")
-        _received_pixels(archive, members)
-        records = {
-            m.name: json.loads(archive.extractfile(m).read())
-            for m in members
-            if m.name.endswith(".json")
-        }
-        _typed_records(records)
+        records = read_archive_records(archive, members)
         _identity_record(records, manifest)
+        verify_resource_record(records, manifest, require_pass)
         if require_pass:
             _required_media(case, names)
             _required_records(case, records, manifest)
@@ -425,3 +422,66 @@ def _nomination_facts(browser: dict[str, Any]) -> None:
         != (browser["elapsed_monotonic_seconds"] <= 300)
     ):
         raise ValueError("Actual unsent timed nomination evidence required.")
+
+
+def verify_resource_record(
+    records: dict[str, Any], manifest: dict[str, Any], passing: bool
+) -> None:
+    """Independently bind downloaded canonical measured evidence to this exact case.
+
+    :param records: Actual bounded archive JSON derivatives.
+    :param manifest: Authenticated fresh source/case/nonce/profile.
+    :param passing: Require complete successful measurements for case acceptance.
+    :return: None only after source-bound safe numerical proof validates.
+    :raises ValueError: Missing, redirected, hidden or failed measurement differs.
+    """
+    if not resource_profile.selected(manifest):
+        if "resource-receipt.json" in records:
+            raise ValueError("Default profile cannot import aggregate acceptance.")
+        return
+    record = dict(records.get("resource-receipt.json", {}))
+    if record.pop("derivative", None) is not True:
+        raise ValueError("Actual measured resource derivative required.")
+    digest = record.pop("original_sha256", None)
+    raw = resource_profile.canonical(record)
+    if hashlib.sha256(raw).hexdigest() != digest:
+        raise ValueError("Actual canonical resource hash differs.")
+    resource_profile.checked_receipt(raw, manifest, passing)
+
+
+def _received_resource_bytes(
+    archive: tarfile.TarFile, members: list[tarfile.TarInfo]
+) -> None:
+    """Reject hidden/duplicate JSON data in the downloaded resource derivative.
+
+    :param archive: Actual bounded archive, never a caller-supplied projection.
+    :param members: Already admitted regular member table.
+    :return: None only for exact canonical bytes of the fixed resource member.
+    :raises ValueError: Duplicate keys, escape aliases or hidden bytes differ.
+    """
+    for member in members:
+        if member.name == "resource-receipt.json":
+            raw = archive.extractfile(member).read()
+            if resource_profile.canonical(json.loads(raw)) != raw:
+                raise ValueError("Downloaded resource bytes are not canonical.")
+
+
+def read_archive_records(
+    archive: tarfile.TarFile, members: list[tarfile.TarInfo]
+) -> dict[str, Any]:
+    """Read actual downloaded bytes only after pixel and canonical admission.
+
+    :param archive: Actual hash-verified bounded archive.
+    :param members: Already admitted regular closed member table.
+    :return: Actual typed safe JSON derivatives.
+    :raises ValueError: Pixels, exact bytes or typed derivatives differ.
+    """
+    _received_pixels(archive, members)
+    _received_resource_bytes(archive, members)
+    records = {
+        m.name: json.loads(archive.extractfile(m).read())
+        for m in members
+        if m.name.endswith(".json")
+    }
+    _typed_records(records)
+    return records

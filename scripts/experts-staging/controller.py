@@ -18,6 +18,7 @@ from uuid import uuid4
 
 import boto3
 
+import resource_profile
 from contract import (
     SOURCE_EXACT_FILES,
     select_idle,
@@ -65,6 +66,11 @@ _RUNTIME_FILES = (
     "suite_guest_capture.py",
     "suite_capture.py",
     "suite_pixels.py",
+    "aggregate.py",
+    "benchmark_metrics.py",
+    "resource_profile.py",
+    "resource_runtime.py",
+    "resource_observer.py",
 )
 _SOURCE_PREFIXES = (
     "accounts/",
@@ -240,6 +246,7 @@ def prepare(arguments: argparse.Namespace) -> None:
     output.mkdir(mode=0o700, parents=True, exist_ok=True)
     (output / "source.json").write_text(json.dumps(source, indent=2) + "\n")
     plan = prepared_plan(arguments, receipt, image, source)
+    prepare_resource(arguments, plan, output)
     (output / "prepared-plan.json").write_text(json.dumps(plan, indent=2) + "\n")
     write_workflow_outputs(plan)
     print(
@@ -281,6 +288,38 @@ def prepared_plan(
         "web_image": image,
         "fixture_sha256": source["files"]["test-data/experts/cedar-rfp-01.json"],
     }
+
+
+def prepare_resource(
+    arguments: argparse.Namespace, plan: dict[str, Any], output: Path
+) -> None:
+    """Copy only validated fixed proof when the measured profile is explicit.
+
+    :param arguments: Exact CLI proof paths and closed selector.
+    :param plan: Prepared actual source/build identity.
+    :param output: Owned prepared directory.
+    :return: None after immutable proof and profile are bound to the plan.
+    :raises ValueError: Missing proof or proof supplied for the default profile.
+    """
+    choice = getattr(arguments, "resource_profile", "default")
+    supplied = [
+        getattr(arguments, name, None)
+        for name in ("resource_proof_result", "resource_proof_source")
+    ]
+    plan["resource_profile"] = choice
+    if not resource_profile.selected(plan):
+        if any(path is not None for path in supplied):
+            raise ValueError("Default profile does not accept reduced-resource proof.")
+        return
+    if any(
+        path is None or path.is_symlink() or not path.is_file() for path in supplied
+    ):
+        raise ValueError("Both immutable resource proof files are required.")
+    raw = [path.read_bytes() for path in supplied]
+    identity = resource_profile.prepared_identity(plan)
+    resource_profile.validate_proof(*raw, identity)
+    for name, data in zip(resource_profile.PROOF_FILES, raw):
+        (output / name).write_bytes(data)
 
 
 def write_workflow_outputs(plan: dict[str, Any]) -> None:
@@ -375,6 +414,7 @@ def make_bundle(output: Path, manifest: dict[str, Any]) -> tuple[Path, str]:
     files["source.json"] = (output / "source.json").read_bytes()
     manifest["source_files"] = json.loads(files["source.json"])["files"]
     manifest["control_files"] = controls["files"]
+    files.update(resource_profile.bundle_proof(output, manifest))
     files["run.json"] = json.dumps(manifest).encode()
     if sum(len(data) for data in files.values()) > 2 * 1024 * 1024:
         raise ValueError("Runtime source package exceeds the fixed transport bound.")
@@ -385,6 +425,21 @@ def make_bundle(output: Path, manifest: dict[str, Any]) -> tuple[Path, str]:
             info.size, info.mode = len(data), 0o600
             package.addfile(info, io.BytesIO(data))
     return target, hashlib.sha256(target.read_bytes()).hexdigest()
+
+
+def bundle_members(manifest: dict[str, Any]) -> list[str]:
+    """Declare exactly the source/control members and optional immutable proof.
+
+    :param manifest: Authenticated explicit resource profile.
+    :return: Exact member table shared with the closed host launcher.
+    """
+    return [
+        *_RUNTIME_FILES,
+        "source.json",
+        "run.json",
+        "controls.json",
+        *(resource_profile.PROOF_FILES if resource_profile.selected(manifest) else ()),
+    ]
 
 
 def launcher(manifest: dict[str, Any], digest: str) -> str:
@@ -403,7 +458,7 @@ def launcher(manifest: dict[str, Any], digest: str) -> str:
             "nonce": manifest["nonce"],
             "bucket": manifest["bucket"],
             "sha256": digest,
-            "members": [*_RUNTIME_FILES, "source.json", "run.json", "controls.json"],
+            "members": bundle_members(manifest),
         }
     )
     return (
@@ -673,6 +728,10 @@ sys.path.insert(0,str(root/'runtime'))
 import remote
 remote.verify_root(root,record['nonce'])
 remote.cleanup(root,record['nonce'],remote.resource_names(record['nonce']))
+import resource_runtime
+manifest=json.loads((root/'runtime/run.json').read_text())
+assert manifest['nonce']==record['nonce']
+resource_runtime.cleanup(root,manifest,remote)
 remote.verify_root(root,record['nonce'])
 if record['verified_download']:shutil.rmtree(root)
 print(json.dumps({'nonce':record['nonce'],'resources_removed':True,'private_runtime_removed':not root.exists(),'root_was_absent':False}))
@@ -909,6 +968,9 @@ def phase_directory(output: Path, phase: str, suite: str) -> Path:
     if suite == "full":
         destination.mkdir(mode=0o700)
         (destination / "source.json").write_bytes((output / "source.json").read_bytes())
+        for name in resource_profile.PROOF_FILES:
+            if (output / name).is_file():
+                (destination / name).write_bytes((output / name).read_bytes())
     return destination
 
 
@@ -1046,6 +1108,11 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--images", type=Path)
     parser.add_argument("--suite", choices=("core", "full"), default="core")
+    parser.add_argument(
+        "--resource-profile", choices=("default", "aggregate1024"), default="default"
+    )
+    parser.add_argument("--resource-proof-result", type=Path)
+    parser.add_argument("--resource-proof-source", type=Path)
     arguments = parser.parse_args()
     required = _REQUIRED_ARGUMENTS[arguments.mode]
     if any(getattr(arguments, name) is None for name in required):

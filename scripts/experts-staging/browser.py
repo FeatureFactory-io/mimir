@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from time import monotonic
 from typing import Any
@@ -127,20 +129,23 @@ def capture_guest(context: BrowserContext) -> list[dict[str, Any]]:
     :return: Fourteen actual source/font/geometry observations.
     :raises AssertionError: A genuine public affordance or required capture fails.
     """
-    page, rows = context.new_page(), []
-    for width, height in _VIEWPORTS:
-        page.set_viewport_size({"width": width, "height": height})
-        rows.append(
-            capture(page, "/experts/?category=design", f"guest-list-{width}-{height}")
-        )
-        assert_design_names(page)
-        rows.append(
-            capture(page, "/experts/mrodriguez/", f"guest-profile-{width}-{height}")
-        )
-        expect(
-            page.get_by_role("heading", name="Maria Rodriguez", exact=True)
-        ).to_be_visible()
-        assert not page.locator('a[href^="mailto:"]').count()
+    rows = []
+    with owned_page(context) as page:
+        for width, height in _VIEWPORTS:
+            page.set_viewport_size({"width": width, "height": height})
+            rows.append(
+                capture(
+                    page, "/experts/?category=design", f"guest-list-{width}-{height}"
+                )
+            )
+            assert_design_names(page)
+            rows.append(
+                capture(page, "/experts/mrodriguez/", f"guest-profile-{width}-{height}")
+            )
+            expect(
+                page.get_by_role("heading", name="Maria Rodriguez", exact=True)
+            ).to_be_visible()
+            assert not page.locator('a[href^="mailto:"]').count()
     return rows
 
 
@@ -165,34 +170,34 @@ def assert_design_names(page: Page) -> None:
 
 def real_guest_clipboard(context: BrowserContext) -> dict[str, Any]:
     """Prove genuine secure-context clipboard completion with no guest receipt.
-
     :param context: Fresh anonymous context on the owned HTTPS origin.
     :return: Exact public prompt digest/length and real no-receipt observation.
     :raises AssertionError: Clipboard, HTTP, network or secure-context checks fail.
     """
     oracle = json.loads((_OUTPUT / "public-copy.json").read_text())
     context.grant_permissions(["clipboard-read", "clipboard-write"], origin=_ORIGIN)
-    page, receipts = context.new_page(), []
-    observe_receipts(page, receipts)
-    response = page.goto(_ORIGIN + oracle["path"])
-    assert response is not None and response.status == 200
-    prepare_real_clipboard(page)
-    page.get_by_test_id("activity-header-actions").get_by_test_id(
-        "copy-prompt-btn"
-    ).click()
-    expect(page.get_by_test_id("copy-prompt-toast")).to_be_visible()
-    copied = page.evaluate("navigator.clipboard.readText()")
-    assert hashlib.sha256(copied.encode()).hexdigest() == oracle["sha256"]
-    assert len(copied.encode()) == oracle["bytes"] and receipts == []
-    page.screenshot(
-        path=str(_OUTPUT / "screenshots/guest-native-clipboard.png"), full_page=True
-    )
-    return {
-        "secure_context": True,
-        "actual_clipboard_sha256": oracle["sha256"],
-        "bytes": oracle["bytes"],
-        "guest_receipt_requests": 0,
-    }
+    receipts = []
+    with owned_page(context) as page:
+        observe_receipts(page, receipts)
+        response = page.goto(_ORIGIN + oracle["path"])
+        assert response is not None and response.status == 200
+        prepare_real_clipboard(page)
+        page.get_by_test_id("activity-header-actions").get_by_test_id(
+            "copy-prompt-btn"
+        ).click()
+        expect(page.get_by_test_id("copy-prompt-toast")).to_be_visible()
+        copied = page.evaluate("navigator.clipboard.readText()")
+        assert hashlib.sha256(copied.encode()).hexdigest() == oracle["sha256"]
+        assert len(copied.encode()) == oracle["bytes"] and receipts == []
+        page.screenshot(
+            path=str(_OUTPUT / "screenshots/guest-native-clipboard.png"), full_page=True
+        )
+        return {
+            "secure_context": True,
+            "actual_clipboard_sha256": oracle["sha256"],
+            "bytes": oracle["bytes"],
+            "guest_receipt_requests": 0,
+        }
 
 
 def observe_receipts(page: Page, receipts: list[str]) -> None:
@@ -279,7 +284,7 @@ def run_readiness(browser: Browser) -> None:
     )
     blocked: list[str] = []
     context.route("**/*", lambda route: restrict_requests(route, blocked))
-    context.tracing.start(screenshots=True, snapshots=True, sources=True)
+    context.tracing.start(screenshots=False, snapshots=True, sources=True)
     try:
         perform_readiness(context, browser.version, blocked, monotonic())
     except Exception as error:
@@ -324,6 +329,22 @@ def perform_readiness(
         "undeclared_requests": blocked,
     }
     write_json("browser-readiness.json", result)
+
+
+@contextmanager
+def owned_page(context: BrowserContext) -> Iterator[Page]:
+    """Close one actual owned browser page after success or any failed acquisition.
+
+    :param context: Actual isolated browser context, never a mocked page source.
+    :return: One yielded page whose close completes before the next stage.
+    Resource ownership: https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager
+    :raises Exception: Acquisition or actual page-close failure propagates.
+    """
+    page = context.new_page()
+    try:
+        yield page
+    finally:
+        page.close()
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import tarfile
 import time
 import traceback
@@ -19,6 +20,7 @@ from tempfile import TemporaryFile
 from types import FrameType
 from typing import Any
 
+import resource_runtime
 from contract import (
     LIVE_DISK_RESERVE,
     image_cache_reserve,
@@ -26,6 +28,7 @@ from contract import (
     validate_pull_capacity,
     validate_runtime_manifest,
 )
+from resource_profile import selected as measured_profile
 from suite_contract import selected_case
 from suite_export import allowed_name, prepare_public
 
@@ -188,17 +191,23 @@ def record_runtime_failure(root: Path, error: Exception) -> None:
 
 
 def reserve_capacity(
-    root: Path, manifest: dict[str, Any], cold_reserve: int
+    root: Path,
+    manifest: dict[str, Any],
+    cold_reserve: int,
+    resource: resource_runtime.ResourceRun | None = None,
 ) -> dict[str, Any]:
     """Use actual exact image cache proof while retaining the memory hold.
 
     :param root: Owned runtime and Docker configuration path.
     :param manifest: Fully validated actual candidate runtime declarations.
     :param cold_reserve: Unchanged original validated cold-image requirement.
+    :param resource: Explicit verified owned parent/profile or unchanged defaultNone.
     :return: Safe measured capacity, selected reserve and whitelisted cache proof.
     :raises ValueError: Capacity or budget identity is unsafe.
     """
     cache = inspect_cached_images(root, manifest)
+    if resource is not None:
+        return resource_runtime.capacity(resource, cache)
     reserve = image_cache_reserve(manifest, cache)
     if reserve not in {cold_reserve, LIVE_DISK_RESERVE}:
         raise ValueError("Actual image budget differs from the checked runtime.")
@@ -405,6 +414,13 @@ def pull_images(root: Path, manifest: dict[str, Any]) -> str:
     :return: Immutable PostgreSQL16 repository digest.
     :raises RuntimeError: Authentication, pull or digest resolution fails.
     """
+    if measured_profile(manifest):
+        if (
+            image_cache_reserve(manifest, inspect_cached_images(root, manifest))
+            != LIVE_DISK_RESERVE
+        ):
+            raise ValueError("Measured profile cannot pull missing immutable images.")
+        return manifest["postgres_image"]
     registry = manifest["web_image"].split("/")[0]
     password = command(["aws", "ecr", "get-login-password", "--region", "us-east-1"])
     docker(
@@ -474,39 +490,63 @@ def create_networks(root: Path, nonce: str, names: dict[str, str]) -> None:
     docker(root, "network", "create", *labels(nonce), names["egress"])
 
 
-def start_database(root: Path, nonce: str, names: dict[str, str], image: str) -> str:
+def start_database(
+    root: Path, nonce: str, names: dict[str, str], image: str, parent: str | None = None
+) -> str:
     """Start only the fresh owned PostgreSQL container and dedicated app role.
 
     :param root: Private bind mounts and generated credentials.
     :param nonce: Exact owner identity.
     :param names: Exact allocated resource names.
     :param image: Immutable PostgreSQL16 repository digest.
+    :param parent: Explicit verified owned parent/profile or unchanged defaultNone.
     :return: Dedicated app-role password, never logged/exported.
     :raises RuntimeError: Real database startup or role creation fails.
     """
     private_file(root / "pg-admin-password", os.urandom(32).hex(), 999)
-    docker(root, *database_arguments(root, nonce, names, image))
+    docker(root, *database_arguments(root, nonce, names, image, parent))
     wait_database(root, names["db"])
     return create_app_role(root, nonce, names["db"])
 
 
-def container_arguments(nonce: str, names: dict[str, str], kind: str) -> list[str]:
+def container_arguments(
+    nonce: str, names: dict[str, str], kind: str, parent: str | None = None
+) -> list[str]:
     """Compose common least-privilege and resource bounds for one owned container.
 
     :param nonce: Validated owner identity.
     :param names: Exact allocated resource names.
     :param kind: Fixed role: web, db or browser.
+    :param parent: Explicit verified owned parent/profile or unchanged defaultNone.
     :return: Explicit Docker arguments; no shell expansion or inherited environment.
     """
     memory, cpu, pids, temporary = _LIMITS[kind]
+    extra = resource_runtime.parent_arguments(nonce, parent)
+    if parent is not None and kind == "browser":
+        memory = 768
     operation = ["create"] if kind == "browser" else ["run", "-d"]
     return [
         *operation,
         "--name",
         names[kind],
+        *extra,
         *labels(nonce),
         "--network",
         names["internal"],
+        *container_limits(memory, cpu, pids, temporary),
+    ]
+
+
+def container_limits(memory: int, cpu: str, pids: int, temporary: int) -> list[str]:
+    """Compose the unchanged per-role hardening and fixed resource flags.
+
+    :param memory: Fixed role ceiling inMiB.
+    :param cpu: Fixed role CPU fraction.
+    :param pids: Fixed role process ceiling.
+    :param temporary: Fixed owned tmpfs size inMiB.
+    :return: Exact original Docker resource/security vector.
+    """
+    return [
         "--memory",
         f"{memory}m",
         "--memory-swap",
@@ -540,7 +580,11 @@ def mounts(root: Path, bindings: tuple[tuple[str, str, bool], ...]) -> list[str]
 
 
 def database_arguments(
-    root: Path, nonce: str, names: dict[str, str], image: str
+    root: Path,
+    nonce: str,
+    names: dict[str, str],
+    image: str,
+    parent: str | None = None,
 ) -> list[str]:
     """Build the internal-only nonroot PostgreSQL container command.
 
@@ -548,10 +592,11 @@ def database_arguments(
     :param nonce: Owner identity.
     :param names: Exact allocated resources.
     :param image: Immutable PG16 digest.
+    :param parent: Explicit verified owned parent/profile or unchanged defaultNone.
     :return: Docker argument vector with no shared DB URL.
     """
     return [
-        *container_arguments(nonce, names, "db"),
+        *container_arguments(nonce, names, "db", parent),
         "--network-alias",
         "cedar-db",
         "--user",
@@ -656,17 +701,23 @@ def web_mounts(root: Path) -> list[str]:
     return mounts(root, _WEB_BINDS)
 
 
-def start_web(root: Path, manifest: dict[str, Any], names: dict[str, str]) -> None:
+def start_web(
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    parent: str | None = None,
+) -> None:
     """Launch the bounded app with an explicit verify/guard/init/TLS entrypoint.
 
     :param root: Private runtime directory.
     :param manifest: Immutable source/image identity.
     :param names: Exact allocated resources.
+    :param parent: Explicit verified owned parent/profile or unchanged defaultNone.
     :return: None after Docker starts the owned app.
     :raises RuntimeError: Container creation fails.
     """
     argv = [
-        *container_arguments(manifest["nonce"], names, "web"),
+        *container_arguments(manifest["nonce"], names, "web", parent),
         "--network-alias",
         "cedar-web",
         "--publish",
@@ -727,22 +778,47 @@ def read_health(root: Path, name: str) -> dict[str, Any]:
     return json.loads(docker(root, "exec", name, "python", "-c", probe, timeout=10))
 
 
-def run_browser(root: Path, manifest: dict[str, Any], names: dict[str, str]) -> None:
+def run_browser(
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    resource: resource_runtime.ResourceRun | None = None,
+) -> None:
     """Run separately bounded real Chromium, then recheck actual DB ownership/state.
 
     :param root: Owned runtime/output directories.
     :param manifest: Immutable browser image contract.
     :param names: Exact allocated Docker resources.
+    :param resource: Explicit verified owned parent/profile or unchanged defaultNone.
     :return: None after actual clipboard/readiness and domain readback pass.
     :raises RuntimeError: Browser or real database readback fails.
     """
-    require_browser_reserve()
-    docker(root, *browser_arguments(root, manifest, names))
+    if resource is None:
+        require_browser_reserve()
+    else:
+        resource.guard()
+    parent = resource_runtime.parent(resource)
+    docker(root, *browser_arguments(root, manifest, names, parent))
     docker(root, "network", "connect", names["egress"], names["browser"])
     docker(root, "start", names["browser"])
+    if resource is not None:
+        resource.member("browser", names)
     write_isolation_receipt(root, manifest, names)
     if docker(root, "wait", names["browser"], timeout=600).strip() != "0":
         raise RuntimeError("Actual on-idle browser readiness failed.")
+    if resource is not None:
+        resource.guard()
+    verify_case_effects(root, names)
+
+
+def verify_case_effects(root: Path, names: dict[str, str]) -> None:
+    """Run the real lane-specific Django database and mail oracle after browser work.
+
+    :param root: Owned private configuration.
+    :param names: Exact actual container names.
+    :return: None after the actual case oracle passes.
+    :raises RuntimeError: Original real domain readback fails.
+    """
     docker(
         root,
         "exec",
@@ -777,17 +853,21 @@ def require_browser_reserve() -> None:
 
 
 def browser_arguments(
-    root: Path, manifest: dict[str, Any], names: dict[str, str]
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    parent: str | None = None,
 ) -> list[str]:
     """Build the actual browser command without app/database/provider credentials.
 
     :param root: Owned source/output mounts.
     :param manifest: Immutable browser digest and owner identity.
     :param names: Exact allocated resources.
+    :param parent: Explicit verified owned parent/profile or unchanged defaultNone.
     :return: Docker create arguments; code mounts are read-only.
     """
     return [
-        *container_arguments(manifest["nonce"], names, "browser"),
+        *container_arguments(manifest["nonce"], names, "browser", parent),
         "--shm-size",
         "128m",
         *mounts(root, _BROWSER_BINDS),
@@ -798,12 +878,24 @@ def browser_arguments(
         "--entrypoint",
         "python",
         manifest["browser_image"],
-        (
-            "/runtime/browser.py"
-            if selected_case(manifest).case == "core"
-            else "/runtime/suite_browser.py"
-        ),
+        browser_entrypoint(manifest, parent),
     ]
+
+
+def browser_entrypoint(manifest: dict[str, Any], parent: str | None) -> str:
+    """Select the genuine case dispatcher with optional numeric observation only.
+
+    :param manifest: Authenticated true suite case.
+    :param parent: Explicit verified parent or unchanged defaultNone.
+    :return: Fixed owned runtime path, never caller-supplied code.
+    """
+    if parent is not None:
+        return "/runtime/resource_observer.py"
+    return (
+        "/runtime/browser.py"
+        if selected_case(manifest).case == "core"
+        else "/runtime/suite_browser.py"
+    )
 
 
 def write_isolation_receipt(
@@ -844,7 +936,7 @@ def isolation_row(
         else {names["internal"]}
     )
     limits = item["HostConfig"]
-    _check_container_limits(limits, kind)
+    _check_container_limits(limits, kind, measured_profile(manifest))
     return {
         "role": kind,
         "image": item["Config"]["Image"],
@@ -855,7 +947,9 @@ def isolation_row(
     }
 
 
-def _check_container_limits(limits: dict[str, Any], kind: str) -> None:
+def _check_container_limits(
+    limits: dict[str, Any], kind: str, measured: bool = False
+) -> None:
     """Verify actual memory/swap/CPU/process and security ceilings before browser proof.
 
     :param limits: Actual Docker HostConfig from the owned container inspection.
@@ -864,6 +958,8 @@ def _check_container_limits(limits: dict[str, Any], kind: str) -> None:
     :raises AssertionError: Any actual bound or security property differs.
     """
     memory, cpu, pids, _ = _LIMITS[kind]
+    if measured and kind == "browser":
+        memory = 768
     assert limits["Memory"] == limits["MemorySwap"] == memory * 1024**2
     assert limits["NanoCpus"] == int(float(cpu) * 10**9)
     assert limits["PidsLimit"] == pids
@@ -1049,7 +1145,11 @@ def deadline_exceeded(signum: int, frame: FrameType | None) -> None:
 
 
 def provision(
-    root: Path, manifest: dict[str, Any], names: dict[str, str], required_disk: int
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    required_disk: int,
+    resource: resource_runtime.ResourceRun | None = None,
 ) -> None:
     """Create only the owned bounded app/database/browser lifecycle.
 
@@ -1057,18 +1157,46 @@ def provision(
     :param manifest: Validated public runtime identity.
     :param names: Exact allocated resources.
     :param required_disk: Conservative actual image-size reserve.
+    :param resource: Explicit verified owned parent/profile or unchanged defaultNone.
     :return: None after genuine core readiness and real state readback.
     """
-    measured = reserve_capacity(root, manifest, required_disk)
+    measured = reserve_capacity(root, manifest, required_disk, resource)
     create_directories(root)
     (root / "output/capacity.json").write_text(json.dumps(measured, indent=2))
+    resource_runtime.start(resource)
     image = pull_images(root, manifest)
     create_networks(root, manifest["nonce"], names)
-    password = start_database(root, manifest["nonce"], names, image)
+    parent = resource_runtime.parent(resource)
+    password = start_database(root, manifest["nonce"], names, image, parent)
+    if resource is not None:
+        resource.member("db", names)
+        resource.guard()
+    provision_web(root, manifest, names, password, resource)
+    run_browser(root, manifest, names, resource)
+
+
+def provision_web(
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    password: str,
+    resource: resource_runtime.ResourceRun | None,
+) -> None:
+    """Start actual prepared web and prove its live parent after readiness.
+
+    :param root: Owned runtime.
+    :param manifest: Actual source/case identity.
+    :param names: Exact owned resource names.
+    :param password: Private database role credential, never exported.
+    :param resource: Optional explicit verified parent.
+    :return: None after actual web readiness and ancestry proof.
+    """
+    parent = resource_runtime.parent(resource)
     write_app_runtime(root, manifest, password)
-    start_web(root, manifest, names)
+    start_web(root, manifest, names, parent)
     wait_web(root, manifest, names)
-    run_browser(root, manifest, names)
+    if resource is not None:
+        resource.member("web", names)
 
 
 def main() -> None:
@@ -1084,15 +1212,16 @@ def main() -> None:
     nonce = manifest["nonce"]
     verify_root(root, nonce)
     names = resource_names(nonce)
+    resource = resource_runtime.create(root, manifest, sys.modules[__name__])
     with runtime_deadline():
         try:
             announce_start(manifest)
-            provision(root, manifest, names, required_disk)
+            provision(root, manifest, names, required_disk, resource)
         except Exception as error:
             record_runtime_failure(root, error)
             raise
         finally:
-            finish_owned_run(root, manifest, names)
+            finish_owned_run(root, manifest, names, resource)
 
 
 def announce_start(manifest: dict[str, Any]) -> None:
@@ -1114,21 +1243,30 @@ def announce_start(manifest: dict[str, Any]) -> None:
 
 
 def finish_owned_run(
-    root: Path, manifest: dict[str, Any], names: dict[str, str]
+    root: Path,
+    manifest: dict[str, Any],
+    names: dict[str, str],
+    resource: resource_runtime.ResourceRun | None = None,
 ) -> None:
     """Export real partial/success artifacts and always remove exact owned resources.
 
     :param root: Verified private invocation root.
     :param manifest: Exact source/owner/transport identities.
     :param names: Exact allocated resources.
+    :param resource: Explicit verified owned parent/profile or unchanged defaultNone.
     :return: None after actual artifact transfer and verified cleanup.
     :raises Exception: Export/cleanup failure remains an actual failed run.
     """
     try:
         if (root / "output").is_dir():
-            archive_evidence(root, manifest)
+            try:
+                if resource is not None:
+                    resource.retain(names)
+            finally:
+                archive_evidence(root, manifest)
     finally:
         cleanup(root, manifest["nonce"], names)
+        resource_runtime.cleanup(root, manifest, sys.modules[__name__])
         verify_root(root, manifest["nonce"])
         # Controller removes private originals only after verified archive download.
         (root / "runtime-complete.json").write_text(

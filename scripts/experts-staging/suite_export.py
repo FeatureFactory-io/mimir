@@ -12,6 +12,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+import resource_profile
 from saga_trace import (
     encode_private_values,
     trace_provenance,
@@ -101,6 +102,7 @@ _HASHES = {
     "fixture_control_sha256",
 }
 _CLOSED_REPORTS = {
+    "resource-receipt.json",
     "health.json",
     "public-copy.json",
     "seed-receipt.json",
@@ -787,7 +789,7 @@ def prepare_public(root: Path, manifest: dict[str, Any]) -> None:
         except (ValueError, UnicodeDecodeError):
             record = None
         derivative = _admit_receipt(name, record, raw, manifest)
-        path.write_text(json.dumps(derivative, indent=2) + "\n")
+        write_public_receipt(path, derivative)
     _scan_public(output, secrets)
 
 
@@ -818,6 +820,30 @@ def _admit_receipt(
 def _special_receipt(
     name: str, record: Any, raw: bytes, manifest: dict[str, Any]
 ) -> dict[str, Any]:
+    """Admit canonical measured resources or retain the existing receipt contracts.
+
+    :param name: Exact reviewed receipt filename.
+    :param record: Parsed original object.
+    :param raw: Exact original bytes before parsing.
+    :param manifest: Authenticated lifecycle identity.
+    :return: Closed source-bound safe derivative.
+    :raises ValueError: Exact byte/identity/resource admission differs.
+    """
+    if name == "resource-receipt.json":
+        checked = resource_profile.checked_receipt(
+            raw, manifest, passing=record.get("status") == "VERIFIED"
+        )
+        return {
+            **checked,
+            "derivative": True,
+            "original_sha256": hashlib.sha256(raw).hexdigest(),
+        }
+    return _ordinary_receipt(name, record, raw, manifest)
+
+
+def _ordinary_receipt(
+    name: str, record: Any, raw: bytes, manifest: dict[str, Any]
+) -> dict[str, Any]:
     """Bind source/control facts to authenticated declarations, not raw contents.
 
     :param name: Exact admitted original filename.
@@ -831,21 +857,7 @@ def _special_receipt(
         return _isolation_receipt(record, raw, manifest)
     result = public_receipt(name, record, raw)
     if name == "source-identity.json":
-        for key in (
-            "source_revision",
-            "build_run_id",
-            "web_image",
-            "browser_image",
-            "nonce",
-            "fixture_sha256",
-            "suite_phase",
-            "saga_case",
-            "control_revision",
-        ):
-            if key in manifest:
-                if record.get(key) != manifest[key]:
-                    raise ValueError("Actual source identity differs from invocation.")
-                result[key] = manifest[key]
+        bind_source_identity(record, result, manifest)
     if name in {"source-manifest.json", "control-identity.json"}:
         declaration = (
             "source.json" if name == "source-manifest.json" else "controls.json"
@@ -896,7 +908,7 @@ def _isolation_role(row: dict[str, Any], manifest: dict[str, Any]) -> dict[str, 
     limits = {
         "web": (384, 750000000),
         "db": (192, 250000000),
-        "browser": (512, 1000000000),
+        "browser": (768 if resource_profile.selected(manifest) else 512, 1000000000),
     }
     role = row["role"]
     image_key = "postgres_image" if role == "db" else role + "_image"
@@ -1067,3 +1079,44 @@ def _scan_public(output: Path, secrets: tuple[bytes, ...]) -> None:
             )
         if path.suffix == ".zip":
             verify_redacted(path, secrets)
+
+
+def write_public_receipt(path: Path, record: dict[str, Any]) -> None:
+    """Write the resource derivative with exact canonical byte admission downstream.
+
+    :param path: Already admitted positively owned output file.
+    :param record: Closed safe derivative.
+    :return: None after exact public bytes are written.
+    """
+    if path.name == "resource-receipt.json":
+        path.write_bytes(resource_profile.canonical(record))
+    else:
+        path.write_text(json.dumps(record, indent=2) + "\n")
+
+
+def bind_source_identity(
+    record: dict[str, Any], result: dict[str, Any], manifest: dict[str, Any]
+) -> None:
+    """Bind the safe source derivative to the authenticated original invocation.
+
+    :param record: Parsed original source receipt.
+    :param result: Safe derivative under construction.
+    :param manifest: Authenticated source/case/control declaration.
+    :return: None after all declared identities agree.
+    :raises ValueError: Original receipt cross-binds another invocation.
+    """
+    for key in (
+        "source_revision",
+        "build_run_id",
+        "web_image",
+        "browser_image",
+        "nonce",
+        "fixture_sha256",
+        "suite_phase",
+        "saga_case",
+        "control_revision",
+    ):
+        if key in manifest:
+            if record.get(key) != manifest[key]:
+                raise ValueError("Actual source identity differs from invocation.")
+            result[key] = manifest[key]
