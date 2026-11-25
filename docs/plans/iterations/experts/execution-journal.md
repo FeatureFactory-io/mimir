@@ -1498,3 +1498,56 @@ removal preserve explicit screenshots, videos, snapshots/sources and user action
 Actual local matrix/summary replays and fresh independent review remain active;
 no local proof is called staging. Canonical/local storyboard/progress match80.
 Full staged UAT and the completed20–30minute movie remain unfinished.
+
+### 2026-11-25 — actual shared-budget proof and corrected local capture preparation
+
+Actual disposable CI45546965249, exact source
+`bf245630222dad6ae89d67f143343eb9863df4aa`, completed the real core browser,
+native clipboard and DB readback under a kernel-enforced shared1GiB parent.
+Actual simultaneous parent peak861,097,984bytes; max/OOM/kill events zero.
+All three actual Docker/host PID parent memberships were verified. Individual
+browser/web/PG peaks588,320,768/316,407,808/87,531,520bytes had no limit/OOM/
+restart failures. Export and owned cleanupSUCCESS; private_root_removed:true.
+Original artifact14991594192 SHA256:
+`97a6d09254a75ef04ce9c92c87c932865e4116dfc3fa8217041d284c4d267ee7`.
+Its two exact JSON proof digests are pinned separately before staging transport.
+This is core-only CI measurement, not actual idle/full-suite acceptance.
+
+Independent source review rejected the earlier aggregate implementation for
+keeper membership and missing-unit loading semantics. Correctedbf24563 passes
+370checks in both environments and38independent host3.9 boundary controls.
+Review SHA256:
+`49d96f895114f806ed12e07243afbc2b15f21ba5e589a38e6bdb09fa22cf90e0`.
+Only then was the actual successful kernel experiment dispatched. The measured
+module is now being adopted into the full staging controller: explicit closed
+aggregate1024 profile, exact warm images only, fixed384/192/768 role limits,
+shared1024 limit plus unchanged256MiB host reserve and fresh1280MiB initial
+capacity check per lifecycle. Default1400MiB behavior stays unchanged. No resize,
+global pruning, normal EB deployment, shared RDS or production DB operation.
+
+Root workflow8893260 binds the trial to the original fixed CI artifact, validates
+its immutable ZIP and both member byte hashes, and passes proof arguments only
+for explicitaggregate1024. Eight new controls first fail, then pass; combined
+workflow controls pass11in both dependency environments. Actual original artifact
+extraction also passes under hostPython3.9. Changed archives, links, oversized
+inputs, altered proof members and existing destinations are rejected. This is
+preparation for a bounded trial, not permission to treat a local proof as stage.
+
+Full-suite local preparation is frozen at9acf7fc34918da549e19bd8c8698a431cce9c380:
+448pure/workflow checks,456broader checks and82standalone configuration checks.
+Six actual fresh PostgreSQL/HTTPS cases provide180nonuniform original PNGs and
+six native1280x800videos. Actual UI/effects and private archive readback pass;
+all six exact owned PG containers are independently absent and port8443released.
+The earlier seven blank summary frames and export failures remain preserved.
+Capture repairs acquire native task state before full-document scroll handling;
+quarantine checks reject actual linked receipt/folder boundary reproductions.
+Exact nomination note validation now includes the actual third public activity.
+Author report SHA256:
+`b1922c8542bc53df234ff121f6e6d2c6d37815ad795c5199a0c3d3d50974f4bc`.
+Fresh independent final capture review continues. These are localarm64 component
+proofs; full_saga_accepted:false. All405protected candidate files remain unchanged.
+
+Canonical storyboard and local HTML/progress match81; only two progress
+paragraphs changed. Scene instructions/narration and all599blocks are preserved.
+First21scene cut, Scene22source introduction, lesson insert and closing artwork
+remain ready. Actual full staged UAT and final Scenes22–26 remain unfinished.

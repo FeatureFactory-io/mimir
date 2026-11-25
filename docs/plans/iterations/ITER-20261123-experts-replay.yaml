@@ -9992,9 +9992,9 @@ iteration_convergence_followups:
     - tests/unit/test_karma_sqlite_lifecycle.py
     preserves: Production behavior unchanged; restore the actual async worker wrapper and current schema leaves after owned test lifetimes.
   isolated_idle_runner:
-    status: preparation_in_progress_no_cloud_dispatch
+    status: full_suite_resource_adoption_in_progress_staging_not_accepted
     footprint:
-    - .github/workflows/experts-staging-uat.yml
+    - .github/workflows/build-and-deploy.yml
     - scripts/experts-staging/
     - tests/unit/test_experts_staging_runner*
     authorization: Existing local GO and explicit user CI/CD staging instruction; prepare bounded owned resources without changing normal deployment or production infrastructure.
@@ -10006,10 +10006,28 @@ iteration_convergence_followups:
     - Source IAM has no StartSession; no IAM expansion. Prefer owned on-host browser via existing SendCommand and bounded artifact transport.
     - Exact image digest mapped by CI source receipt and actual source-file hash verification; no nonexistent embedded revision label claim.
     - Deployment held until complete gates and independent review; main merge, release and promotion retain human review.
+    local_full_suite_source: 9acf7fc34918da549e19bd8c8698a431cce9c380
+    local_capture_preparation: Six fresh local cases; 180 original PNGs and six native videos. Independent final capture review remains separate from staging acceptance.
+    resource_profile:
+      explicit_trial: aggregate1024
+      default_initial_guard_mib: 1400
+      trial_initial_guard_mib: 1280
+      shared_parent_limit_mib: 1024
+      host_reserve_mib: 256
+      warm_exact_images_required: true
+      measured_ci_run: 45546965249
+      measured_source: bf245630222dad6ae89d67f143343eb9863df4aa
+      measured_parent_peak_bytes: 861097984
+      measured_artifact_sha256: 97a6d09254a75ef04ce9c92c87c932865e4116dfc3fa8217041d284c4d267ee7
+      qualification: Actual core-only CI measurement; full eleven-case idle execution and independent visual verdict remain required. No production database access or normal deployment.
   ci_dependency_compatibility:
-    status: repair_in_progress
+    status: actual_candidate_build_passed
     observed_run: 45508236061
     observed_source: c45b036252db2456c1eea16fe9515f7a9b1f007a
+    successful_run: 45516980492
+    successful_candidate: 04c9432bce7eac5ec34a090bc5e8ec4fa06f409d
+    successful_test_count: 3340
+    established_skips: 3
     footprint:
     - tests/unit/test_contribution_summary_adapter.py
     - tests/support/provider_http_server.py
