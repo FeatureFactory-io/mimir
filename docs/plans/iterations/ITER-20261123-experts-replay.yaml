@@ -9992,7 +9992,7 @@ iteration_convergence_followups:
     - tests/unit/test_karma_sqlite_lifecycle.py
     preserves: Production behavior unchanged; restore the actual async worker wrapper and current schema leaves after owned test lifetimes.
   isolated_idle_runner:
-    status: nine_full_run_cases_verified_two_affected_retries_running_staging_not_accepted
+    status: experts_uat_composite_independently_accepted_film_final_export_pending
     footprint:
     - .github/workflows/build-and-deploy.yml
     - scripts/experts-staging/
@@ -10010,7 +10010,7 @@ iteration_convergence_followups:
     local_capture_preparation: Six fresh local cases; 180 original PNGs and six native videos. Independent final capture review remains separate from staging acceptance.
     reviewed_controller: 55d9dcb7d0b73323faac407f2766c5e180f0c027
     historical_1280_controller_checks_each_environment: 593
-    current_controller_actual_linux_checks: 617
+    current_controller_actual_linux_checks: 664
     original_full_staging_run: 45550540519
     original_full_staging_result: All eleven failed before browser; owned runtime resources removed and private failure records retained.
     original_startup_readonly_run: 45552826357
@@ -10026,7 +10026,24 @@ iteration_convergence_followups:
     actual_repair_retry_result: Nine CASE_VERIFIED including resource-clean guest; copy-self lacks safe archive after receipt-admission failure, summary browser TimeoutError before final oracle. Independent14of20literalsteps certified;6unproven. All11resourcesremoved/private10removed-copyselfretained. Actual650Linux/import pass; full acceptance pending.
     affected_cases_retry_run: 45580634460
     affected_cases_retry_selector: copy-summary-retry
-    affected_cases_retry_result: Exact55d9dcb passed CI gates and entered owned execution for only copy-self and summary-acceptance with fresh nonces/DBs. Local664pass both environments; independent131focused each plus50source/filesystem/privacy controls. No full-eleven-run success claim; composite acceptance requires same405app/image/fixture plus unchanged retained-case actions/oracles/guards and complete newcase evidence/cleanup.
+    affected_cases_retry_result: Both original affected cases independently accepted on exact55d9dcb, same405app/image/fixture/oracles and unchanged resource limits. Actual664Linux checks and image imports pass. Artifact15006403069 SHA256 0d550f616b299241bfc6fd591e425d0e568cc00b6ff62576f1cbc990e0d74551. Both owned resources and private runtime directories removed; no evidence of cleanup of the older failed copy-self private root.
+    composite_uat:
+      status: EXPERTS_UAT_COMPOSITE_PASS
+      logical_cases: 11
+      literal_steps: 20
+      selected_full_run_cases: 9
+      selected_affected_retry_cases: 2
+      single_green_full_eleven_run: false
+      all_producer_full_saga_flags_false: true
+      report: planning/experts-uat-composite-45572474749-45580634460/Experts-UAT-Review.md
+      report_sha256: 634821fde623692f59c219644cf6a37b374fb45d49138f91dba86f279af37f17
+      verification_sha256: 1efc62ea6666a7619549a176d51a410ebc2b960452adddb54e8d5fee4ac19241
+      selected_case_parent_peak_bytes: 985460736
+      selected_case_all_resource_events_zero: true
+      historical_private_evidence_retention: open
+      global_lint_and_Analytics: open_unwaived
+      project_wide_DoD_or_release_approval: false
+      qualification: Scripted browser execution plus independent agent visual review, using nine passing cases from45572474749 and two fresh passing cases from45580634460. Original failed runs and producer flags remain unchanged. No human usability study, production database access, normal deployment, main merge, release or promotion.
     resource_profile:
       explicit_trial: aggregate960
       default_initial_guard_mib: 1400

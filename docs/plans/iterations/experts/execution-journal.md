@@ -1923,3 +1923,38 @@ facing external note and three comparisons retain exact provenance. A new90s
 Scene22 adds the certified fresh guest evidence with original1x excerpts and
 explicit reading holds. Scene23/completed film remain pending actual verdict.
 Storyboard/Page/localHTML/progress92 agree; all existing findings remain open.
+
+### Experts UAT composite accepted; final movie export rejected
+
+The affected retry45580634460/job139089494318 passed both copy-self and
+summary-acceptance on exact55d9dcb, with664 actual Linux checks and exact-image
+imports passing. Artifact15006403069 is34600352bytes, SHA256
+`0d550f616b299241bfc6fd591e425d0e568cc00b6ff62576f1cbc990e0d74551`.
+Both selected cases have zero measured parent/role memory.max, OOM, kill and
+restart events, unchanged app/images/fixture/oracles, and complete owned-private
+cleanup. Their parent peaks are934662144 and985460736bytes. Summary acceptance
+shows the explicit review/admin decision and8200→8700 projection, exactly one
+award/activity/version/local-file mail and two finite scripted model calls.
+Passing the retry does not establish the cause of the original timeout.
+
+Independent review now certifies all20 literal DO/SEE steps across11 logical
+Experts cases: nine passing acquisitions from45572474749 plus two from45580634460.
+The composite report SHA256 is
+`634821fde623692f59c219644cf6a37b374fb45d49138f91dba86f279af37f17`;
+verification SHA256 is
+`1efc62ea6666a7619549a176d51a410ebc2b960452adddb54e8d5fee4ac19241`.
+It is not one green full-eleven Actions run; all original failed reports and
+producer full_saga_accepted:false flags remain intact. This is scripted browser
+execution plus independent agent visual review. The older failed copy-self
+private evidence root,893 global lint diagnostics and Analytics finding remain
+open and unwaived. No project-wide DoD, main merge, release or production approval.
+
+Storyboard/Page/local HTML/progress94 reflect the composite and corrected G02
+contact proof. All six final film source components and14 editable native
+chapters pass independent source-selection checks. The first final movie join
+SHA256 `0b7e246fd8f012c091ab3d3d42fa5f37e975363e59087ee9dc104b3b820b4d8f`
+is rejected: actual duration370.375seconds/8889frames, versus the selected
+source total1319.576seconds. The original failed export and its timestamp
+warnings are preserved. The final movie remains unfinished until a corrected
+export passes actual duration, full decode, continuity and visual/audio checks.
+No new cloud execution or production database access was performed for film QA.
