@@ -725,7 +725,7 @@ def validate_publication(
             decision["started_at"],
             decision["completed_at"],
         )
-    validate_activity(change, decision)
+    validate_activity(change, decision, reviewed["rows"]["methodology.activity"])
     validate_receipt(change, decision)
     assert utc_timestamp(reviewed["observed_at"]) <= utc_timestamp(
         decision["started_at"]
@@ -755,16 +755,31 @@ def validate_award(change: PipChange) -> None:
     assert award.entity_type_snapshot is None and award.entity_id_snapshot is None
 
 
-def validate_activity(change: PipChange, decision: dict[str, Any]) -> None:
+def validate_activity(
+    change: PipChange, decision: dict[str, Any], originals: dict[str, Any]
+) -> None:
     """Check sole appended public Activity fields and exact native decision times.
 
     :param change: Accepted actual ADD.
     :param decision: Actual staff POST response envelope.
+    :param originals: Exact original predecision activity rows.
     :return: None after all new activity values agree.
     """
     activity = Activity.objects.get(
         workflow_id=change.parent_workflow_id, name=change.name, guidance=change.content
     )
+    expected_order = (
+        max(
+            (
+                row["fields"]["order"]
+                for row in originals.values()
+                if row["fields"]["workflow"] == change.parent_workflow_id
+            ),
+            default=0,
+        )
+        + 1
+    )
+    assert activity.order == expected_order
     assert activity.phase_id is None and activity.agent_id is None
     assert (
         activity.predecessor_id is None

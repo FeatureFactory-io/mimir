@@ -248,3 +248,69 @@ def test_no_predecision_mail_with_actual_file_backend_rejects_decision_artifact(
         )
     with pytest.raises(AssertionError):
         fixture.validate_no_mail(tmp_path)
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("wrong_order", [False, True])
+def test_decision_oracle_with_native_acceptance_checks_exact_append_order(
+    cedar_dataset: CedarDataset,
+    wrong_order: bool,
+) -> None:
+    """Native acceptance has one precise appended Activity and one500 award.
+
+    :param cedar_dataset: Real fixture in a runner-owned database.
+    :param wrong_order: Whether to corrupt only the actual newly appended order.
+    :return: None after clean publication or required order rejection.
+    """
+    baseline, reviewed, client = reviewed_native_case(cedar_dataset)
+    client.get("/auth/user/logout/")
+    native_login(client, "mchen")
+    start = fixture.now()
+    response = client.post(
+        f"/pips/{baseline['pip_id']}/admin-review/",
+        {"action": "finalize", f"decision_{baseline['change_id']}": "ACCEPT"},
+    )
+    observed = {"finalization": {"started_at": start, "completed_at": fixture.now()}}
+    assert response.status_code == 302
+    current = domain_rows()
+    fixture.domain_delta(baseline, reviewed["rows"], current, True)
+    fixture.validate_decision_values(baseline, reviewed, current, observed)
+    if wrong_order:
+        model = User._meta.apps.get_model("methodology", "Activity")
+        activity = model.objects.get(name="Screen Reader Error Recovery")
+        model.objects.filter(pk=activity.pk).update(order=activity.order + 1)
+        with pytest.raises(AssertionError):
+            fixture.validate_decision_values(
+                baseline, reviewed, domain_rows(), observed
+            )
+
+
+def reviewed_native_case(
+    cedar: CedarDataset,
+) -> tuple[dict[str, Any], dict[str, Any], Client]:
+    """Reach real Reviewed through ordinary HTTP and the finite provider-only port.
+
+    :param cedar: Real owned baseline.
+    :return: Precise private preparation, Reviewed observation and original client.
+    """
+    pip = prepare_summary_submission(cedar)
+    change = pip.changes.get()
+    baseline = {
+        "pip_id": pip.pk,
+        "change_id": change.pk,
+        "rows": domain_rows(),
+        "projections": projections(),
+        "prepared_at": fixture.now(),
+    }
+    client = Client()
+    native_login(client, "mrodriguez")
+    responses = load_summary_script(
+        SUMMARY_SCRIPTS / "PRF-EXPERTS-01/happy.json", change.pk
+    )
+    with summary_processing_scope(responses) as llm:
+        assert client.post(f"/pips/{pip.pk}/submit/").status_code == 302
+        assert len(llm.calls) == 2
+    reviewed = {"rows": domain_rows(), "observed_at": fixture.now()}
+    fixture.domain_delta(baseline, baseline["rows"], reviewed["rows"], False)
+    fixture.validate_reviewed_values(baseline, reviewed)
+    return baseline, reviewed, client
