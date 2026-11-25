@@ -1867,3 +1867,59 @@ immutable image imports, live idle guards, owned synthetic DB and final evidence
 checks. Source video/CLI artifacts and all prior failures remain preserved.
 Storyboard/Page/localHTML/progress91 agree. No prod DB access/copy, normal
 deployment, main merge, release or promotion; global893/Analytics remain open.
+
+### Full45572474749 actual result and affected-case retry
+
+Actual650Linux gates11.04seconds and exact-image imports PASS onb574. Original
+artifact15005181191,262817608bytes, ZIP SHA
+`2e4f30117cdf5e6ada84c23380c6a8a47c078bb6f77a729c61cc70090ab25ee1`.
+Nine strict cases verify, now including guest-public. Its parent968028160bytes
+under960MiB and all measured role/parent max/OOM/kill/restarts0 establish this
+case's actual fit. Independent G01–G04 scopedPASS preserves1024initial local
+table scrolling as explicitly allowed by IA1210/S12N5/S24; no simultaneous-all-
+numbers or new horizontal-gesture claim. Full independent review certifies14of20
+literal steps; six remain unproven. All11owned resources removed;10private
+runtime directories removed, copy-self's private originals remain retained.
+Independent report SHA
+`ca9928da46d9607181b7c51719e283e37ae6557e55df3313ca8dcf5bff3970f2`.
+
+Copy-self has no safe archive/current download: original SSMd36eb1e6-ea70-4395-
+8bff-9a9f22e4a456 fails at prepare_public789 receipt admission. Exact bound
+read-only API diagnostic45578594819/ac3e6e0 performs only two original
+GetCommandInvocation reads, no host commands; artifact15003864903 SHA
+`18f776c6c9d0e95979b675ece74a32d22b8d9910d5e1e7f36f3b6192e85c7576`.
+The rejected exact filename remains unknown from that typed readback. Separately,
+real producer/export reproduction proves inspect_copy_totals always emits
+Maria-after, omitted by copy-self's closed filename list.075fcb8 admits only
+that existing literal step, preserving all privacy and other-name rejection.
+Summary has browserTimeoutError, zero media and driverfalse before final oracle;
+its published complete counters have no exhaustion. No same-worker-memory-
+savings success is inferred. d460263 adds only13closed safe summary source
+locations for future failure diagnosis; its actual timeout cause remains unknown.
+
+Rootbb368c9 adds closed copy-summary-retry selection for these two original
+cases, leaving core/full unchanged and full_saga_accepted:false even if bothpass.
+Independent review rejects missing retry phase directories; successor55d9dcb
+validates phase membership and creates exclusive noncore directories/source/
+proof copies before lifecycle work. Real filesystem RED6/GREEN6 guards and all
+original failures are preserved. Full664tests pass both environments; independent
+131focused each plus50source/equivalence/real-filesystem/privacy controls pass.
+Independent preparation report SHA
+`8e4f6deff27cdb4bccd5572b20dec0851021ab43288d790da2b69af34082617a`.
+
+Actual affected-case retry45580634460/job139089494318 runs exact55d9dcb7d0b73323
+faac407f2766c5e180f0c027, same app04/build45516980492/images/405source/fixture,
+limits/reserve/oracles. CI contract/image/import steps pass, normalfive SKIP,
+owned execution in progress. Future composite admission must map all11phases/
+20steps to their actual acquisition run/control/nonce/hash and unchanged retained
+case behavior. It will never relabel this failed full run as successful. Old
+copy-self private retention remains a separate finding until audited recovery or
+explicit retention disposition; newcase cleanup cannot prove historical cleanup.
+No productionDB access/copy, normal deployment, main merge, release or promotion.
+
+Film: first21checked18:21 remains unchanged. Ending22/24/25/26 normalizedv3 has
+full AV/audio/23decoded-frame QA and108hash source-index readback; actual user-
+facing external note and three comparisons retain exact provenance. A new90s
+Scene22 adds the certified fresh guest evidence with original1x excerpts and
+explicit reading holds. Scene23/completed film remain pending actual verdict.
+Storyboard/Page/localHTML/progress92 agree; all existing findings remain open.

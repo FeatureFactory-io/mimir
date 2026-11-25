@@ -9992,7 +9992,7 @@ iteration_convergence_followups:
     - tests/unit/test_karma_sqlite_lifecycle.py
     preserves: Production behavior unchanged; restore the actual async worker wrapper and current schema leaves after owned test lifetimes.
   isolated_idle_runner:
-    status: full11_repair_retry_running_after_eight_verified_three_failed_staging_not_accepted
+    status: nine_full_run_cases_verified_two_affected_retries_running_staging_not_accepted
     footprint:
     - .github/workflows/build-and-deploy.yml
     - scripts/experts-staging/
@@ -10008,7 +10008,7 @@ iteration_convergence_followups:
     - Deployment held until complete gates and independent review; main merge, release and promotion retain human review.
     local_full_suite_source: 9acf7fc34918da549e19bd8c8698a431cce9c380
     local_capture_preparation: Six fresh local cases; 180 original PNGs and six native videos. Independent final capture review remains separate from staging acceptance.
-    reviewed_controller: b574dbbc94a19f003583ef51d189fdf13825314d
+    reviewed_controller: 55d9dcb7d0b73323faac407f2766c5e180f0c027
     historical_1280_controller_checks_each_environment: 593
     current_controller_actual_linux_checks: 617
     original_full_staging_run: 45550540519
@@ -10023,7 +10023,10 @@ iteration_convergence_followups:
     actual_entrypoint_full_run: 45564582929
     actual_entrypoint_full_result: Eight CASE_VERIFIED; guest-public and summary-acceptance recorded memory-limit events; copy-self browser failed before captures. All11 owned/private cleanup successful;617Linux checks/import pass; normal5skip; fullUAT and independent visual acceptance pending.
     actual_repair_retry_run: 45572474749
-    actual_repair_retry_result: Starting actual650Linux checks and exact-image import before full11 execution. Guest pages close between complete viewport journeys; original summary oracle runs in its loaded worker; copy-self safe source diagnostics added. All405 app files, images, limits, reserve and zero-exhaustion acceptance unchanged; actual fit and full UAT acceptance pending.
+    actual_repair_retry_result: Nine CASE_VERIFIED including resource-clean guest; copy-self lacks safe archive after receipt-admission failure, summary browser TimeoutError before final oracle. Independent14of20literalsteps certified;6unproven. All11resourcesremoved/private10removed-copyselfretained. Actual650Linux/import pass; full acceptance pending.
+    affected_cases_retry_run: 45580634460
+    affected_cases_retry_selector: copy-summary-retry
+    affected_cases_retry_result: Exact55d9dcb passed CI gates and entered owned execution for only copy-self and summary-acceptance with fresh nonces/DBs. Local664pass both environments; independent131focused each plus50source/filesystem/privacy controls. No full-eleven-run success claim; composite acceptance requires same405app/image/fixture plus unchanged retained-case actions/oracles/guards and complete newcase evidence/cleanup.
     resource_profile:
       explicit_trial: aggregate960
       default_initial_guard_mib: 1400
