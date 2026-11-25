@@ -77,6 +77,9 @@ _BOOLS = {
     "original_native_video",
     "private_output_exported",
     "domain_unchanged",
+    "trace_screenshots",
+    "trace_snapshots",
+    "trace_sources",
 }
 _HASHES = {
     "sha256",
@@ -190,7 +193,7 @@ def allowed_name(path: Path) -> bool:
         "screenshots/guest-native-clipboard.png",
     }:
         return True
-    if re.fullmatch(r"video/[a-f0-9]{32}\.webm", name):
+    if re.fullmatch(r"video/(?:page@)?[a-f0-9]{32}\.webm", name):
         return True
     return name in capture_names()
 
@@ -302,6 +305,7 @@ def public_receipt(
     _selected_identity(record, result)
     _selected_observations(record, result)
     _capture_fields(record, result)
+    _step_fields(record, result)
     protocol_fields(record, result)
     if name.endswith("effects.json"):
         _check_effects(record)
@@ -417,6 +421,29 @@ def _capture_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
         if type(record["modal_viewport_acquired"]) is not bool:
             raise ValueError("Actual modal acquisition boolean required.")
         result["modal_viewport_acquired"] = record["modal_viewport_acquired"]
+
+
+def _step_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
+    """Retain only the literal completed UAT step sequence produced by this lane.
+
+    :param record: Actual browser observation.
+    :param result: Public derivative.
+    :return: None after the exact literal step declaration validates.
+    :raises ValueError: A caller invents or relabels completed steps.
+    """
+    if "completed_steps" not in record:
+        return
+    expected = {
+        "guest-public": ["G01", "G02", "G03", "G04"],
+        "authenticated-matrix": [],
+        "summary-acceptance": ["C01", "C02", "C03", "C04", "C05"],
+    }
+    if (
+        record.get("case") not in expected
+        or record["completed_steps"] != expected[record["case"]]
+    ):
+        raise ValueError("Exact literal completed UAT step sequence required.")
+    result["completed_steps"] = record["completed_steps"]
 
 
 def _check_effects(record: dict[str, Any]) -> None:

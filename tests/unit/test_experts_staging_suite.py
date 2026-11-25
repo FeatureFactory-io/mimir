@@ -212,3 +212,18 @@ def test_allowed_name_with_guest_trace_chunks_is_closed_by_actual_ia_sizes() -> 
     assert not export.allowed_name(
         Path("private/guest-public-1280-800-trace-original.zip")
     )
+
+
+@pytest.mark.parametrize(
+    "name,allowed",
+    [
+        ("video/page@" + "a" * 32 + ".webm", True),
+        ("video/" + "a" * 32 + ".webm", True),
+        ("video/page@PRIVATE.webm", False),
+        ("video/anything.webm", False),
+    ],
+)
+def test_allowed_name_with_actual_native_video_spelling_is_closed(
+    name: str, allowed: bool
+) -> None:
+    assert export.allowed_name(Path(name)) is allowed

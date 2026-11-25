@@ -46,7 +46,43 @@ def verify_case_archive(
         _typed_records(records)
         _identity_record(records, manifest)
         if require_pass:
+            _required_media(case, names)
             _required_records(case, records, manifest)
+
+
+def _required_media(case: str, names: list[str]) -> None:
+    """Require actual native media and all seven guest trace chunks on success.
+
+    :param case: Closed true case.
+    :param names: Exact downloaded file names.
+    :return: None when required real media exists.
+    :raises ValueError: A passing lane lacks original video/screenshots or traces.
+    """
+    if not any(
+        re.fullmatch(r"video/(?:page@)?[a-f0-9]{32}\.webm", name) for name in names
+    ) or not any(
+        name.startswith("screenshots/") and name.endswith(".png") for name in names
+    ):
+        raise ValueError("Original native video and screenshots are required.")
+    if case == "guest-public":
+        sizes = (
+            (1280, 800),
+            (1920, 1080),
+            (1512, 982),
+            (768, 1024),
+            (1024, 768),
+            (390, 844),
+            (360, 800),
+        )
+        required = {
+            f"traces/guest-public-{w}-{h}{suffix}"
+            for w, h in sizes
+            for suffix in (".zip", ".provenance.json")
+        }
+        if not required <= set(names):
+            raise ValueError("All seven actual guest viewport trace chunks required.")
+    elif case != "core" and "saga-trace.zip" not in names:
+        raise ValueError("Actual safe derivative trace required for every case.")
 
 
 def _typed_records(records: dict[str, Any]) -> None:

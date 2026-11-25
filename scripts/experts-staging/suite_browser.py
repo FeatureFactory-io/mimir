@@ -115,6 +115,9 @@ def _observe_readonly(context: BrowserContext, case: str) -> None:
             "case": case,
             "status": "BROWSER_OBSERVED",
             "viewport_count": 7,
+            "completed_steps": (
+                ["G01", "G02", "G03", "G04"] if case == "guest-public" else []
+            ),
             "login_observation": login,
             "observations": result,
             "full_saga_accepted": False,
@@ -164,7 +167,9 @@ def run_readonly(browser: Browser, case: str) -> None:
     )
     binding = shared.start_private_capture()
     success = False
-    context.tracing.start(screenshots=True, snapshots=True, sources=True)
+    context.tracing.start(
+        screenshots=case != "guest-public", snapshots=True, sources=True
+    )
     try:
         _observe_readonly(context, case)
         success = True

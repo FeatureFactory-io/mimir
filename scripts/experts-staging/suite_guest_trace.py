@@ -61,10 +61,14 @@ def _publish_chunk(output: Path, width: int, height: int, values: set[str]) -> N
     """
     stem = f"guest-public-{width}-{height}"
     original = original_path(output, width, height)
+    os.chmod(original, 0o600)
     result = redact_trace(original, output / "traces" / (stem + ".zip"), values)
     result.update(
         original_retention="private_until_verified_owned_cleanup",
         viewport={"width": width, "height": height},
+        trace_screenshots=False,
+        trace_snapshots=True,
+        trace_sources=True,
     )
     target = output / "traces" / (stem + ".provenance.json")
     with target.open("x") as stream:
