@@ -5,6 +5,8 @@ from __future__ import annotations
 import ast
 import copy
 import hashlib
+import os
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +35,23 @@ _ORDERS = {
     "Design": ["sreed", "mrodriguez", "pnair", "dortiz", "hkim"],
     "Development": ["mchen", "jlee"],
 }
+
+
+def validate_output(output: Path) -> Path:
+    """Require the caller's existing private acquisition root without ORM imports.
+
+    :param output: Absolute freshly owned mode0700 evidence directory.
+    :return: Unchanged validated path.
+    :raises ValueError: A linked, foreign, public or nonexistent path is supplied.
+    """
+    if not isinstance(output, Path) or not output.is_absolute():
+        raise ValueError("An absolute private acquisition directory is required.")
+    if not output.is_dir() or output.resolve() != output or output.is_symlink():
+        raise ValueError("Existing acquisition directory cannot contain links.")
+    info = output.stat()
+    if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+        raise ValueError("Owned mode0700 acquisition directory required.")
+    return output
 
 
 def source_constants(path: Path) -> dict[str, Any]:

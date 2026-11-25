@@ -15,6 +15,32 @@ sys.path.insert(0, str(_REPO / "scripts/experts-staging"))
 import saga_visual_contract as contract
 
 
+def test_validate_output_with_private_owned_directory_accepts(tmp_path: Path) -> None:
+    """Original acquisitions use an explicit owned private root."""
+    tmp_path.chmod(0o700)
+    assert contract.validate_output(tmp_path) == tmp_path
+
+
+@pytest.mark.parametrize("variant", ["public", "linked", "absent", "relative"])
+def test_validate_output_with_unsafe_directory_rejects(
+    tmp_path: Path, variant: str
+) -> None:
+    """Public, redirected, missing or relative roots cannot acquire evidence."""
+    tmp_path.chmod(0o700)
+    if variant == "public":
+        tmp_path.chmod(0o755)
+        path = tmp_path
+    elif variant == "linked":
+        path = tmp_path / "linked"
+        path.symlink_to(tmp_path, target_is_directory=True)
+    elif variant == "relative":
+        path = Path("relative")
+    else:
+        path = tmp_path / "absent"
+    with pytest.raises(ValueError):
+        contract.validate_output(path)
+
+
 @pytest.mark.parametrize("case", [None, "", "normal", "guest", 1, "../missing_summary"])
 def test_validate_case_with_other_lane_rejects(case: object) -> None:
     """Normal and guest modules cannot stand in for these two explicit variants."""

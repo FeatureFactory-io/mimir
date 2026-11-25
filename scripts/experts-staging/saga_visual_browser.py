@@ -20,6 +20,7 @@ from saga_visual_contract import (
     expected_contributors,
     source_constants,
     validate_case,
+    validate_output,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ def check_oracle(output: Path, case: str) -> dict[str, Any]:
     :raises AssertionError: Source, fixture, ranking or declared preparation differs.
     """
     validate_case(case)
+    validate_output(output)
     constants = source_constants(_SOURCE)
     assert hashlib.sha256(_FIXTURE.read_bytes()).hexdigest() == FIXTURE_SHA256
     document = json.loads(_FIXTURE.read_text())
@@ -98,6 +100,9 @@ def observe_viewport(
     _check_native_list(page, output, oracle, people, path, size)
     shared.capture_private_values(page)
     expect(page.get_by_test_id("user-display")).to_have_text("esvensson")
+    page.mouse.wheel(0, -page.evaluate("document.documentElement.scrollHeight"))
+    cards._wait_for_scroll_to_settle(page)
+    assert page.evaluate("scrollY") == 0
     fonts = loaded_fonts(page)
     name = f"visual-{oracle['case']}-{size[0]}-{size[1]}.png"
     target = output / "screenshots" / name
