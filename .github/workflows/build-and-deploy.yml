@@ -30,11 +30,11 @@ on:
         default: core
         options: [core, full]
       experts_resource_profile:
-        description: Default resources or explicit measured shared 1 GiB staging trial
+        description: Default resources or explicit measured shared 960 MiB staging trial
         type: choice
         required: true
         default: default
-        options: [default, aggregate1024]
+        options: [default, aggregate960]
       experts_candidate_run_id:
         description: Successful build-only Actions run with exact candidate image receipt
         type: string
@@ -588,7 +588,7 @@ jobs:
           test "$PREFLIGHT_ONLY" = false
           test "$WAKE_IDLE" = false
           case "$EXPERTS_SUITE" in core|full) ;; *) exit 2 ;; esac
-          case "$RESOURCE_PROFILE" in default|aggregate1024) ;; *) exit 2 ;; esac
+          case "$RESOURCE_PROFILE" in default|aggregate960) ;; *) exit 2 ;; esac
           [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$AWS_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]
@@ -612,10 +612,10 @@ jobs:
           github-token: ${{ github.token }}
           path: candidate-receipt
       - name: Verify immutable measured resource proof
-        if: inputs.experts_resource_profile == 'aggregate1024'
+        if: inputs.experts_resource_profile == 'aggregate960'
         run: |
           set -euo pipefail
-          gh api --method GET repos/FeatureFactory-io/mimir/actions/artifacts/14991594192/zip > measured-resource-proof.zip
+          gh api --method GET repos/FeatureFactory-io/mimir/actions/artifacts/14995828139/zip > measured-resource-proof.zip
           python scripts/experts-staging/download_resource_proof.py \
             --archive measured-resource-proof.zip --output measured-resource-proof
       - name: Verify actual successful build-only run and prepare source proof
@@ -623,7 +623,7 @@ jobs:
         run: |
           set -euo pipefail
           RESOURCE_PROOF_ARGS=()
-          if [[ "$RESOURCE_PROFILE" = aggregate1024 ]]; then
+          if [[ "$RESOURCE_PROFILE" = aggregate960 ]]; then
             RESOURCE_PROOF_ARGS=(
               --resource-proof-result measured-resource-proof/benchmark-result.json
               --resource-proof-source measured-resource-proof/benchmark-source.json

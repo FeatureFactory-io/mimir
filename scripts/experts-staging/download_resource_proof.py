@@ -1,6 +1,6 @@
 """Admit only the two byte-bound proofs from the reviewed core-only CI artifact.
 
-The workflow downloads fixed artifact14991594192 through GitHub's authenticated
+The workflow downloads fixed artifact14995828139 through GitHub's authenticated
 API. This module performs no network requests and never extracts other media.
 Successful proof admission authorizes an explicit bounded trial, not staging UAT.
 """
@@ -18,15 +18,15 @@ from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
 MAX_ARCHIVE_BYTES = 20 * 1024 * 1024
-ARCHIVE_SHA256 = "97a6d09254a75ef04ce9c92c87c932865e4116dfc3fa8217041d284c4d267ee7"
+ARCHIVE_SHA256 = "ddd99b7ae73c9a6241fa72f433aac1283457c6b8f7433c5dfa074ae2ac7c9ac7"
 PROOF_MEMBERS = {
     "benchmark-result.json": (
-        10909,
-        "5a01022824151a166000a32b0ad28bba1395b704e4244de3d639248a6b2b7556",
+        10908,
+        "13d50049c9361802038992873da696ad058fa9e04d4d2cf2077ebd8cd7defb4d",
     ),
     "benchmark-source.json": (
         1815,
-        "2334ed1c714de49f4808651e4b0b69e7a44335c493906a5ca930def2cc5a7766",
+        "9543610b70d5e80a261866beda67a86a3b6f8547954026334ea286dcaf8750e9",
     ),
 }
 

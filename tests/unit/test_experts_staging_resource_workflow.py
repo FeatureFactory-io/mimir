@@ -136,20 +136,18 @@ def test_resource_dispatch_with_reduced_budget_requires_exact_closed_proof_chain
     )
     option = workflow["on"]["workflow_dispatch"]["inputs"]["experts_resource_profile"]
     assert option["default"] == "default"
-    assert option["options"] == ["default", "aggregate1024"]
+    assert option["options"] == ["default", "aggregate960"]
     job = workflow["jobs"]["experts-staging"]
     assert job["env"]["RESOURCE_PROFILE"] == "${{ inputs.experts_resource_profile }}"
-    assert (
-        'case "$RESOURCE_PROFILE" in default|aggregate1024)' in job["steps"][0]["run"]
-    )
+    assert 'case "$RESOURCE_PROFILE" in default|aggregate960)' in job["steps"][0]["run"]
     proof = next(
         step
         for step in job["steps"]
         if step.get("name") == "Verify immutable measured resource proof"
     )
-    assert proof["if"] == "inputs.experts_resource_profile == 'aggregate1024'"
+    assert proof["if"] == "inputs.experts_resource_profile == 'aggregate960'"
     assert (
-        "repos/FeatureFactory-io/mimir/actions/artifacts/14991594192/zip"
+        "repos/FeatureFactory-io/mimir/actions/artifacts/14995828139/zip"
         in proof["run"]
     )
     assert "download_resource_proof.py" in proof["run"]
@@ -158,7 +156,7 @@ def test_resource_dispatch_with_reduced_budget_requires_exact_closed_proof_chain
         step["run"] for step in job["steps"] if step.get("id") == "experts-source"
     )
     assert '--resource-profile "$RESOURCE_PROFILE"' in prepare
-    assert 'if [[ "$RESOURCE_PROFILE" = aggregate1024 ]]' in prepare
+    assert 'if [[ "$RESOURCE_PROFILE" = aggregate960 ]]' in prepare
     assert (
         "--resource-proof-result measured-resource-proof/benchmark-result.json"
         in prepare
@@ -168,3 +166,24 @@ def test_resource_dispatch_with_reduced_budget_requires_exact_closed_proof_chain
         in prepare
     )
     assert '"${RESOURCE_PROOF_ARGS[@]}"' in prepare
+
+
+def test_resource_proof_with_measured_960_artifact_requires_exact_immutable_bytes():
+    """Admit only the independently measured smaller-parent artifact.
+
+    :return: None when ZIP and both proof pins match actual CI bytes.
+    """
+    module = _module()
+    assert module.ARCHIVE_SHA256 == (
+        "ddd99b7ae73c9a6241fa72f433aac1283457c6b8f7433c5dfa074ae2ac7c9ac7"
+    )
+    assert module.PROOF_MEMBERS == {
+        "benchmark-result.json": (
+            10908,
+            "13d50049c9361802038992873da696ad058fa9e04d4d2cf2077ebd8cd7defb4d",
+        ),
+        "benchmark-source.json": (
+            1815,
+            "9543610b70d5e80a261866beda67a86a3b6f8547954026334ea286dcaf8750e9",
+        ),
+    }
