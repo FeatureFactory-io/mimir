@@ -279,7 +279,7 @@ def run_readiness(browser: Browser) -> None:
     )
     blocked: list[str] = []
     context.route("**/*", lambda route: restrict_requests(route, blocked))
-    context.tracing.start(screenshots=True, snapshots=True, sources=True)
+    context.tracing.start(screenshots=False, snapshots=True, sources=True)
     try:
         perform_readiness(context, browser.version, blocked, monotonic())
     except Exception as error:
