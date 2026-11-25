@@ -10,24 +10,30 @@ import hashlib
 import json
 import logging
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.sessions.models import Session
 from django.core import serializers
+from django.core.serializers.json import DjangoJSONEncoder
 from django.urls import reverse
 from methodology.models import Activity, ExpertProfile, KarmaAward, Workflow
 from methodology.services.copy_prompt_service import CopyPromptService
 from methodology.services.experts_service import ExpertsService
-from rest_framework.authtoken.models import Token
 
 from bootstrap import scope, state, write_private
 from saga_contract import (
     ACTORS,
+    NORMAL_LOGIN_EXPIRY_SECONDS,
+    LoginInterval,
     assert_row_delta,
     validate_case,
     validate_copy_attempts,
+    validate_login_observation,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,26 +41,47 @@ _ROOT = Path("/experts-scope")
 _OUTPUT = Path("/output")
 _FIXTURE = Path("/app/test-data/experts/cedar-rfp-01.json")
 _MAIL = Path("/experts-mail")
+_SESSION_FIELDS = frozenset(
+    {"_auth_user_id", "_auth_user_backend", "_auth_user_hash", "_session_expiry"}
+)
+
+
+class SnapshotJSONEncoder(DjangoJSONEncoder):
+    """Preserve actual datetime microseconds in private evidence, never product JSON."""
+
+    def default(self: SnapshotJSONEncoder, value: Any) -> Any:
+        """Encode exact datetime values without Django's millisecond truncation.
+
+        :param value: Actual field value from the real model serializer.
+        :return: Full ISO microseconds or the unchanged standard Django encoding.
+        :raises TypeError: A field type cannot be serialized normally.
+        """
+        if isinstance(value, datetime):
+            return value.isoformat(timespec="microseconds")
+        return super().default(value)
 
 
 def domain_rows() -> dict[str, dict[str, Any]]:
-    """Read complete application rows plus stable account state privately.
+    """Read every installed concrete model and M2M row at full private precision.
 
     :return: Model/PK/value map, never printed or exported as public evidence.
     :raises DatabaseError: The actual owned connection cannot read a model.
     """
     models = sorted(
-        apps.get_app_config("methodology").get_models(), key=lambda m: m._meta.label
+        (
+            model
+            for model in apps.get_models(include_auto_created=True)
+            if not model._meta.proxy
+        ),
+        key=lambda model: model._meta.label,
     )
     result = {}
-    for model in [*models, User, Token]:
+    for model in models:
         fields = [
-            field.name
-            for field in (*model._meta.fields, *model._meta.many_to_many)
-            if field.name != "last_login"
+            field.name for field in (*model._meta.fields, *model._meta.many_to_many)
         ]
         encoded = serializers.serialize(
-            "json", model.objects.order_by("pk"), fields=fields
+            "json", model.objects.order_by("pk"), fields=fields, cls=SnapshotJSONEncoder
         )
         rows = json.loads(encoded)
         result[model._meta.label_lower] = {str(row["pk"]): row for row in rows}
@@ -104,7 +131,12 @@ def prepare_case(case: str) -> None:
     """
     validate_case(case)
     assert_pristine()
-    baseline = {"case": case, "rows": domain_rows(), "projections": projections()}
+    baseline = {
+        "case": case,
+        "rows": domain_rows(),
+        "projections": projections(),
+        "prepared_at": datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+    }
     write_private(_ROOT / "saga-baseline.json", baseline)
     oracle = public_oracle(case)
     write_private(_OUTPUT / "saga-oracle.json", oracle)
@@ -170,13 +202,7 @@ def verify_case(case: str) -> None:
     scope()
     baseline = json.loads((_ROOT / "saga-baseline.json").read_text())
     observed = json.loads((_OUTPUT / "saga-browser.json").read_text())
-    assert baseline["case"] == observed["case"] == case
-    assert observed["status"] == "BROWSER_OBSERVED"
-    additions = assert_row_delta(case, baseline["rows"], domain_rows())
-    expected = expected_projections(case, baseline["projections"])
-    assert projections() == expected, "Whole-user projections differ."
-    verify_awards(case, observed, additions)
-    assert not list(_MAIL.iterdir()), "A read or copy emitted decision mail."
+    additions = verify_case_state(case, baseline, observed)
     result = {
         "case": case,
         "status": "CASE_VERIFIED",
@@ -187,6 +213,62 @@ def verify_case(case: str) -> None:
     write_private(_OUTPUT / "saga-effects.json", result)
     logger.info(
         "Saga fixture verified | case=%s | added_awards=%s", case, len(additions)
+    )
+
+
+def verify_case_state(
+    case: str, baseline: dict[str, Any], observed: dict[str, Any]
+) -> list[str]:
+    """Reconcile full private state with the exact already observed native event.
+
+    :param case: Explicit actual case.
+    :param baseline: Private complete original state and preparation time.
+    :param observed: Safe actual browser observations, including its precise login.
+    :return: Actual allowed award IDs; raises AssertionError for any other effect.
+    """
+    assert baseline["case"] == observed["case"] == case
+    assert observed["status"] == "BROWSER_OBSERVED"
+    login = validate_login_observation(
+        case,
+        observed.get("login_observation"),
+        baseline["prepared_at"],
+        datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+    )
+    additions = assert_row_delta(case, baseline["rows"], domain_rows(), login)
+    verify_actual_session(login)
+    expected = expected_projections(case, baseline["projections"])
+    assert projections() == expected, "Whole-user projections differ."
+    verify_awards(case, observed, additions)
+    assert not list(_MAIL.iterdir()), "A read or copy emitted decision mail."
+    return additions
+
+
+def verify_actual_session(login: LoginInterval | None) -> None:
+    """Check private decoded state of the exact new observed browser session.
+
+    :param login: Actual native login metadata; None for anonymous reading.
+    :return: None after actor/backend/auth-hash/normal expiry agree privately.
+    :raises AssertionError: The exact observed session or decoded state differs.
+    """
+    if login is None:
+        return
+    matches = [
+        row
+        for row in Session.objects.all()
+        if hashlib.sha256(row.session_key.encode()).hexdigest()
+        == login.session_key_sha256
+    ]
+    assert len(matches) == 1
+    user = User.objects.get(username=login.actor)
+    actual = matches[0].get_decoded()
+    assert actual.keys() == _SESSION_FIELDS
+    assert actual["_auth_user_id"] == str(user.pk)
+    assert len(settings.AUTHENTICATION_BACKENDS) == 1
+    assert actual["_auth_user_backend"] == settings.AUTHENTICATION_BACKENDS[0]
+    assert actual["_auth_user_hash"] == user.get_session_auth_hash()
+    assert (
+        type(actual["_session_expiry"]) is int
+        and actual["_session_expiry"] == NORMAL_LOGIN_EXPIRY_SECONDS
     )
 
 

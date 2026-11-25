@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 from contextvars import ContextVar, Token
+from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from time import monotonic
@@ -198,22 +199,70 @@ def write_result(name: str, record: dict[str, Any]) -> None:
         stream.write("\n")
 
 
-def sign_in(page: Page, username: str) -> None:
+def sign_in(page: Page, username: str) -> dict[str, Any]:
     """Use the ordinary rendered form, genuine CSRF and actual session lifecycle.
 
     :param page: Fresh real browser page on the owned origin.
     :param username: Explicit fictional Cedar actor, e.g. esvensson.
-    :return: None after the normal signed-in actor is visible.
+    :return: Safe actual POST/302 UTC bounds and a session-cookie digest.
     :raises AssertionError: Form response or resulting actor is incorrect.
     """
     document(page, "/auth/user/login/")
+    assert not any(
+        cookie["name"] == "sessionid" for cookie in page.context.cookies([_ORIGIN])
+    )
     expect(page.locator('input[name="password"]')).to_have_attribute("type", "password")
     page.locator('input[name="username"]').fill(username)
     page.locator('input[name="password"]').fill(_PASSWORD)
-    page.locator('button[type="submit"]').click()
+    observed: dict[str, Any] = {"actor": username}
+    with page.expect_response(partial(observe_login_response, observed)) as response:
+        observed["started_at"] = datetime.now(timezone.utc).isoformat(
+            timespec="microseconds"
+        )
+        page.locator('button[type="submit"]').click()
+    assert response.value.status == 302
     expect(page).not_to_have_url(_ORIGIN + "/auth/user/login/")
     expect(page.get_by_test_id("user-display")).to_have_text(username)
     settle(page)
+    observed["session_key_sha256"] = actual_session_digest(page)
+    return observed
+
+
+def observe_login_response(observed: dict[str, Any], response: Response) -> bool:
+    """Record the actual response event time without changing its native delivery.
+
+    :param observed: Safe mutable metadata for this exact actual login action.
+    :param response: Actual unmodified HTTP response event.
+    :return: Whether this is the same-origin normal login POST response.
+    """
+    if (
+        response.url != _ORIGIN + "/auth/user/login/"
+        or response.request.method != "POST"
+    ):
+        return False
+    observed.update(
+        completed_at=datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+        method="POST",
+        path="/auth/user/login/",
+        status=response.status,
+    )
+    return True
+
+
+def actual_session_digest(page: Page) -> str:
+    """Hash the actual normal login cookie without exporting its private value.
+
+    :param page: Actual signed-in browser after native POST/302 completion.
+    :return: SHA256 of the one origin-scoped session cookie.
+    :raises AssertionError: The ordinary session cookie is absent or ambiguous.
+    """
+    cookies = [
+        cookie
+        for cookie in page.context.cookies([_ORIGIN])
+        if cookie["name"] == "sessionid"
+    ]
+    assert len(cookies) == 1 and cookies[0]["secure"] is True
+    return hashlib.sha256(cookies[0]["value"].encode()).hexdigest()
 
 
 def assert_design(page: Page) -> None:
@@ -1008,13 +1057,13 @@ def perform_case(
     writes: list[dict[str, str]] = []
     observe_requests(page, receipts, writes)
     actor = ACTORS[case]
-    if actor is not None:
-        sign_in(page, actor)
+    login = sign_in(page, actor) if actor is not None else None
     observed = (
         perform_nomination(page, oracle)
         if case == "nomination"
         else perform_copy(page, case, oracle)
     )
+    observed["login_observation"] = login
     assert not blocked and context.pages == [page]
     finalize_observation(page, case, oracle, observed, receipts, writes)
 
