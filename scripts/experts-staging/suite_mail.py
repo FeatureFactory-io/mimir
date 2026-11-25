@@ -12,6 +12,9 @@ from typing import Any
 from bootstrap import write_private
 from saga_summary_fixture import prepared_change, read_baseline, validate_mail
 
+_OUTPUT = Path("/output")
+_MAIL = Path("/experts-mail")
+
 
 def preview_record(raw: bytes, recipient: str, name: str) -> dict[str, Any]:
     """Extract only the exact accepted fixture mail facts.
@@ -54,14 +57,14 @@ def mail_preview() -> None:
     :return: None after the exact verified derivative is retained.
     :raises AssertionError: Effects or actual file-mail identity differs.
     """
-    effects = json.loads(Path("/output/saga-summary-effects.json").read_text())
+    effects = json.loads((_OUTPUT / "saga-summary-effects.json").read_text())
     assert effects["status"] == "CASE_VERIFIED" and effects["decision_mail_files"] == 1
     baseline = read_baseline()
     validate_mail(baseline)
     change = prepared_change(baseline)
-    files = list(Path("/experts-mail").iterdir())
+    files = list(_MAIL.iterdir())
     assert len(files) == 1 and not files[0].is_symlink()
     record = preview_record(
         files[0].read_bytes(), change.pip.created_by.email, change.name
     )
-    write_private(Path("/output/saga-summary-mail-preview.json"), record)
+    write_private(_OUTPUT / "saga-summary-mail-preview.json", record)

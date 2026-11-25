@@ -51,6 +51,7 @@ def _load(name: str) -> ModuleType:
 @pytest.fixture
 def modules(monkeypatch: pytest.MonkeyPatch) -> dict[str, ModuleType]:
     """Scope module import wiring to this test; no AWS/Docker dependency is replaced."""
+    monkeypatch.syspath_prepend(str(_RUNTIME))
     contract = _load("contract")
     monkeypatch.setitem(sys.modules, "contract", contract)
     return {
