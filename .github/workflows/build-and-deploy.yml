@@ -601,7 +601,7 @@ jobs:
         with:
           python-version: '3.14'
       - name: Install only control-plane validation dependencies
-        run: python -m pip install boto3 pytest pyyaml 'playwright>=1.40.0'
+        run: python -m pip install boto3 pytest pyyaml 'playwright>=1.40.0' 'django>=5.0'
       - name: Verify fail-closed runner contracts
         run: python -m pytest -p no:cacheprovider -c /dev/null --confcutdir=tests/unit tests/unit/test_experts_staging_runner_contract.py tests/unit/test_experts_staging_runner_config.py tests/unit/test_experts_staging_suite.py tests/unit/test_experts_staging_suite_workflow.py tests/unit/test_experts_staging_resource_workflow.py tests/unit/test_experts_staging_resource_profile.py tests/unit/test_experts_staging_aggregate.py tests/unit/test_experts_staging_capture_contract.py tests/unit/test_experts_staging_saga_contract.py tests/unit/test_experts_staging_saga_trace.py tests/unit/test_experts_staging_saga_guest.py tests/unit/test_experts_staging_saga_visual.py tests/unit/test_experts_staging_saga_summary_contract.py -q
       - name: Download exact candidate build receipt
