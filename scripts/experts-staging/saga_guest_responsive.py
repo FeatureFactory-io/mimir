@@ -374,6 +374,8 @@ def _capture(page: Page, output: Path, name: str, screen: str) -> dict[str, Any]
     target = output / (name + ".png")
     if target.exists() or target.is_symlink():
         raise ValueError("Original responsive acquisition cannot be overwritten.")
+    page.keyboard.press("Home")
+    page.wait_for_function("scrollY===0", timeout=_SETTLE_TIMEOUT_MS)
     page.screenshot(path=str(target), full_page=True)
     return {
         "screen_id": screen,
