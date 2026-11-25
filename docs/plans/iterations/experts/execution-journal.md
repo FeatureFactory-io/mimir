@@ -1812,3 +1812,29 @@ All20UAT observations and independent visual/product acceptance remain pending.
 No production database read/copy, normal deployment, main merge, release or
 promotion occurs. Global893lintFAIL and recorded Analytics reload finding remain
 unwaived. Storyboard/Page/localHTML/progress89 agree; final film remains pending.
+
+### Actual full staging 45564582929 — eight verified, three failed
+
+Exact control source7f21c1af9fcdef0edb1322ff04c76b393593107e and unchanged
+candidate04c9432/build45516980492:617Linux contracts and immutable browser
+import pass, all five normal jobs skip. Actual artifact15001990187 is288737156
+bytes with ZIP SHA256
+`4948ef9f933235da8643e00456339e6903dffddd787ce3c1b48f91a571d369d4`.
+Root verifies the original ZIP hash and each declared phase archive before
+extracting its closed regular members. Core, nomination, copy-maria,
+copy-guest, authenticated-matrix, long-identity-and-prose, missing-summary and
+final-confirmation are CASE_VERIFIED. Guest-public completes its browser actions
+but records336parent memory.max events; summary-acceptance records191parent
+memory.max events. Neither is accepted. Copy-self exits its browser nonzero
+without PNG/WebM, with zero parent exhaustion; its actual error cause remains
+unknown from the exported receipt. All11 owned resources and private runtime
+directories are successfully removed. Original receipts/captures remain intact.
+
+Necessary control repairs continue under existing authority without increasing
+limits, lowering reserve or weakening acceptance. Independent20DO/SEE and actual
+native visual review is underway; eight producer verifications do not establish
+whole staged UAT acceptance. Verified nomination, copy-award, matrix and final
+note media are available for closing-scene preparation. Storyboard/Page/local
+HTML/progress90 record this partial result. No production DB access/copy, normal
+deployment, merge, release or promotion. Global893lintFAIL/Analytics finding
+remain unwaived; final film incomplete.

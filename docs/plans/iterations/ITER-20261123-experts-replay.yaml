@@ -9992,7 +9992,7 @@ iteration_convergence_followups:
     - tests/unit/test_karma_sqlite_lifecycle.py
     preserves: Production behavior unchanged; restore the actual async worker wrapper and current schema leaves after owned test lifetimes.
   isolated_idle_runner:
-    status: full11_actual_execution_after_verified_core_staging_not_accepted
+    status: full11_eight_verified_three_failed_staging_not_accepted
     footprint:
     - .github/workflows/build-and-deploy.yml
     - scripts/experts-staging/
@@ -10021,7 +10021,7 @@ iteration_convergence_followups:
     actual_entrypoint_core_run: 45563734980
     actual_entrypoint_core_result: CASE_VERIFIED with actual617Linux checks and immutable-image imports;15PNG/2nativevideos; domain unchanged; complete owned cleanup; core only, fullUAT pending.
     actual_entrypoint_full_run: 45564582929
-    actual_entrypoint_full_result: In progress under exact7f after fresh CI/import checks; all normal jobs skipped; fullUAT and visual acceptance pending.
+    actual_entrypoint_full_result: Eight CASE_VERIFIED; guest-public and summary-acceptance recorded memory-limit events; copy-self browser failed before captures. All11 owned/private cleanup successful;617Linux checks/import pass; normal5skip; fullUAT and independent visual acceptance pending.
     resource_profile:
       explicit_trial: aggregate960
       default_initial_guard_mib: 1400
