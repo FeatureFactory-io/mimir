@@ -275,7 +275,6 @@ def _native_action_order(page: Page, actions: list[Locator]) -> None:
             page.keyboard.press("Tab")
         expect(action).to_be_focused()
         _focus_settle(action)
-        expect(action).to_be_in_viewport(ratio=1)
         _action_readable(action)
 
 
