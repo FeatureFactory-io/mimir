@@ -1279,3 +1279,42 @@ resource/cache follow-up must account for actual exact cached images and retain
 safe measured reserve, with no ambient image pruning or host-resource changes.
 Do not attribute this database-startup failure to the separately reproduced
 local two-thread HTTPS issue. All production-data and promotion exclusions remain.
+
+### 2026-11-25 — startup repair reviewed and actual UAT source captured
+
+Exact187c492 has fresh independent NODE_PASS for the bounded core repair.
+The new local Linux Docker control reproduces the original socket mismatch and
+verifies the corrected socket, actual restricted application role, TCP password
+login and owned database comment. It retains192MiB PG, all hardening and the
+1400MiB host memory floor.113guard cases pass in each dependency environment;
+2,022source blobs are unchanged, zero overlays. Probe storage/architecture differ
+from idle and do not certify its bind mounts or staged application. All eight
+owned probe resources were cleaned. Independent verification SHA256:
+`1d4f5cf46ccddddac33e1e7ef97dade43f2ce3ad4a99099d92e1e9da66a53b15`.
+
+Read-only CI45526140670 positively identifies all three cached immutable images
+on actual idle, with Linux/amd64 identities. Their Docker storage sizes differ
+from CI despite matching digests, so final cache accounting checks exact content
+identity and bounded actual host size rather than cross-engine size equality.
+Its available memory1,343,123,456bytes remains below the unchanged floor. No idle
+retry is authorized by this local result. A separate diagnostic branch prepares
+a disposable Linux CI memory benchmark with no deployment or SSM job; experimental
+limits are not adopted by that preparation.
+
+The repaired four-case Saga account oracle at9bcde8c has author preparation proof:
+four real local browser/effect cases,18rejected real-PG account/session faults,
+272checks per dependency environment, and verified trace privacy. Fresh
+independent review is active. UAT-18-03 proposal/summary/acceptance remains pending;
+these four cases do not stand in for it.
+
+After Denis unlocked the Mac, genuine native Cursor screenshots captured the
+actual candidate tests/uat/e2e-uat-flow.feature. Source SHA256:
+`80697c8913db5981b606b12d98343ea2f5d3f16cb14a1548444fea9b82b11135`.
+The source-only Scene22 deck has five individually inspected frames and passes
+package/layout/reference-font/first-party import checks. Original screenshot
+bytes were JPEG despite initial.png filenames; originals are preserved, with
+byte-identical.jpg copies and decoder-measured dimensions in corrected manifestv2.
+Deck SHA256: `ac4f58c03e44c898ce7187b705bd796902460cac02260a997c08ef0241407af0`.
+Canonical storyboard and local HTML/progress now match sequence76. Actual staged
+UAT, remaining film scenes and final movie remain unfinished. No production DB
+read/copy, main merge, release or promotion occurred.
