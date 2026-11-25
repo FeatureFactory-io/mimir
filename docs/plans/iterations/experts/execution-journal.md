@@ -1645,3 +1645,42 @@ Scene25native comic frames use exact dialogue and the original brief excerpt,
 preserve rear-facing work and await genuinely verified staging evidence before
 their empty working monitor can enter a final frame. No generated application
 screen, sent contact, main merge, app release or production promotion is added.
+
+
+### Measured smaller parent and staging retry preparation — 25 November 2026
+
+Full retry45554226298 completed with all eleven cases FAILED before browser
+work. The source-preserving safe download now succeeds, exposing the actual
+capacity observations:1,330,200,576–1,340,416,000bytes of available memory, below
+the fixed1,342,177,280byte requirement. Disk capacity and exact cached-image
+checks pass in all eleven. No parent or role container started. Each independent
+cleanup reports resources_removed:true and private_runtime_removed:true; this
+does not assert removal of retained remote failure objects. Artifact14995580872
+ZIP SHA256 is886a53e5d97e68e929fa532f4fbb6ec510287e795c788e4b8836d96bd80b85eb.
+All20UAT steps remain NOT_STARTED and product experience is NOT_ASSESSED.
+Independent actual-failure review SHA256:
+`1dae8ee633abf3cd93866a6b48b4d1f07fa719df52ba81effdd48be3fb01dab8`.
+
+Disposable-only CI45556227636 on reviewedf8b25d4 passed the genuine core browser
+workload under an enforced960MiB shared parent, retaining the exact role limits,
+zero swap and256MiB reserve. Actual peak822,898,688bytes; no parent/role max, OOM
+or restart events; all three memberships verified. Measurement, export, owned
+cleanup and private-root removal succeeded. Artifact14995828139 ZIP SHA256:
+`ddd99b7ae73c9a6241fa72f433aac1283457c6b8f7433c5dfa074ae2ac7c9ac7`.
+The44reported original artifact members match their exact lengths/hashes.
+This is a core-only disposable CI measurement, never full staging/UAT acceptance.
+
+Root transport7e967da updates only the explicit selector and immutable new proof
+pins. GenuineRED2failures/7passes precedes12focusedpasses in both environments.
+HostPython3.9 admits the actual ZIP and writes only the two byte-identical proof
+files. Independent12test/36mode/6negative checks pass without parser changes.
+Transport report SHA256:
+`f1fb05a476f32a4d1e0290a311cfcbae342ea0e6eb81ef2982487b27bce2b545`.
+Runtime adoption remains under preparation/fresh review before any new host run.
+The ordinary1400MiB guard,256MiB host reserve, fixed image identities, full
+suite/source/DB/media/effect/ownership checks and staging-only boundary remain.
+
+Canonical storyboard/localHTML/progress now match85 with599blocks preserved.
+The first21scenes and conditional ending assets retain their previous verified
+status. Full actual staged UAT and finalfilm remain unfinished; no production
+DB access/copy, normal EB deployment, main merge, release or promotion occurs.
