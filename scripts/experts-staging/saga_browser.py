@@ -203,6 +203,7 @@ def prepare_capture(page: Page) -> None:
     )
     page.mouse.move(page.viewport_size["width"] / 2, page.viewport_size["height"] / 2)
     page.mouse.wheel(0, -100000)
+    page.evaluate("window.scrollTo({top:0,left:0,behavior:'instant'})")
     page.wait_for_function("scrollY===0")
 
 
