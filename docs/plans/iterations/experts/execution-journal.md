@@ -1388,3 +1388,52 @@ are not application defects. The parent full-suite handoff preserves all five
 journeys/four UAT, long/missing variants and a fresh final confirmation.
 Canonical storyboard/local HTML/progress match78; progress is now three readable
 paragraphs, with scene/narration requirements unchanged. Full film is unfinished.
+
+### 2026-11-25 — actual browser exhaustion and accepted UAT preparation
+
+Canonical diagnostic admission6f5fecd passed independent review, including the
+rejected-byte counterexample. Actual disposable CI45535375717 then measured
+browser512MiB exhaustion (OOM17/kill2), web199,467,008bytes and PG87,105,536bytes.
+The subsequent sourceb9e190d trial45537228195 disabled only duplicate automatic
+trace preview images, retaining every explicit PNG/video/assertion. Its driver
+returned normally, but the actual browser container still recorded OOM1/kill1
+and exited1. Its web/PG peaks were199,397,376/87,142,400bytes. The original ZIP
+SHA256 is `efe3e6547f349b808e3147d40c8cbf2975b3761506487e83d54092511a9520de`.
+Video export also rejected two members; their actual rejection cause remains
+unresolved. Cleanup succeeded; private_root_removed:false is retained honestly.
+These are disposable CI measurements, not staged UAT. No idle/default resource
+limit,1400MiB safeguard, host configuration or application byte has changed.
+
+An explicit diagnostic-only512/768MiB browser experiment is prepared at803d287,
+with unchanged defaults, enforced Docker/cgroup cap identity and256MiB host
+reserve.270checks pass, with two normal-workflow shape tests excluded solely on
+the diagnostic branch. Root workflow guards first failed2then passed5. Fresh
+independent review precedes any dispatch. This is no evidence of successful768
+execution and authorizes no idle guard reduction.
+
+Fresh independent summary preparation07b8182 passed30tests, three actual owned
+PG/privateHTTPS controls and11rejected real-state mutations. Verification SHA256:
+`07999b2efb275359d35f5a29b8dbe017711abeec4a806ae1356c0cc028629766`.
+Fresh independent visual preparation8dc4570 passed both seven-size variants,
+24PG negative controls,8preparation guards and original media/privacy checks.
+Verification SHA256:
+`fcef3ea89811544773670b4b2809bc00a65fc3b7db6daaa97dad708f428c59c8`.
+Transient modal/hover captures are acquisition qualifications: settled native
+viewport checks were readable, with no corresponding application defect proved.
+
+Full eleven-case runtime integrationd6886f9 and explicit workflow98bbd63 are
+committed locally. The root workflow uses the actual measured immutable browser
+and PG digests, preserving default core selection and requiring explicit full
+selection. Full mode has a180-minute job bound for eleven independently bounded
+720-second lifecycles plus transport/cleanup. New workflow guards failed3then
+passed3; the combined current pure gate passes407. A standalone old test-loader
+import issue and actual oversized guest trace are being repaired in preparation;
+no staging acceptance is claimed from these checks.
+
+Scene22 source-introduction video is checked at16.416667seconds/1920x1080/24fps,
+using actual native Cursor/source frames and approved Aiden interval0–16.416667.
+SHA256: `6bf78507cd0dc123c0dca68eb5aef4ee3bad6dd747605207b2ceaf2c5be3cbb4`.
+Full decode and decoded-audio finite/unclipped checks pass; all three decoded
+shots are individually inspected. This interval must replace its matching whole
+Scene22 interval, not repeat it. Actual staged actions/verdict and full film
+remain unfinished. Canonical storyboard/local HTML/progress now match79.
