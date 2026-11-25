@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -284,11 +285,17 @@ def capacity(run: ResourceRun, cache: dict[str, Any]) -> dict[str, Any]:
         run.remote.command(["docker", "info", "--format", "{{json .DockerRootDir}}"])
     )
     disk = run.remote.shutil.disk_usage(docker_root).free
-    profile.require_capacity(memory, disk, import_guard)
+    try:
+        profile.require_capacity(memory, disk, import_guard)
+    except ValueError:
+        retain_capacity_failure(run, memory, disk, import_guard)
+        raise
     return {
         "available_memory_bytes": memory,
         "available_docker_disk_bytes": disk,
+        "required_memory_bytes": 1280 * profile.MIB,
         "required_disk_bytes": 1024**3,
+        "image_cache_verified": import_guard,
         "image_cache": cache,
     }
 
@@ -416,3 +423,45 @@ def capture_memory(
         return role_memory(run, names[role], role), member
     except Exception:  # noqa: BLE001 - fixed unavailable observation, no raw errors.
         return {"status": "UNAVAILABLE"}, member
+
+
+def retain_capacity_failure(
+    run: ResourceRun, memory: int, disk: int, cached: bool
+) -> None:
+    """Record actual numeric observations before rejecting an unsafe initial guard.
+
+    :param run: Positively owned invocation; no container has been created.
+    :param memory: Actual fresh available memory bytes.
+    :param disk: Actual fresh Docker-storage bytes.
+    :param cached: Actual complete fixed image-cache validation result.
+    :return: None after one private-mode, closed numeric receipt is retained.
+    :raises ValueError: Invalid types/ownership cannot create a public observation.
+    """
+    row = profile.capacity_observation(memory, disk, cached)
+    output = owned_capacity_output(run.root)
+    descriptor = os.open(
+        output / "capacity.json",
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+        0o600,
+    )
+    with os.fdopen(descriptor, "wb") as stream:
+        stream.write(profile.canonical(row))
+
+
+def owned_capacity_output(root: Path) -> Path:
+    """Create only the positive invocation's unaliased private-mode output directory.
+
+    :param root: Already verified own runtime root.
+    :return: Actual own output directory for finite diagnostic fields only.
+    :raises ValueError: Any alias, foreign UID or permission drift is unsafe.
+    """
+    output = root / "output"
+    output.mkdir(mode=0o700, exist_ok=True)
+    if (
+        output.is_symlink()
+        or output.resolve() != output
+        or output.stat().st_uid != os.getuid()
+        or output.stat().st_mode & 0o777 != 0o700
+    ):
+        raise ValueError("Positively owned capacity output required.")
+    return output

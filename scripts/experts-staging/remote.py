@@ -12,7 +12,6 @@ import subprocess
 import sys
 import tarfile
 import time
-import traceback
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -28,6 +27,8 @@ from contract import (
     validate_pull_capacity,
     validate_runtime_manifest,
 )
+from resource_profile import FAILURE_PHASES as _FAILURE_PHASES
+from resource_profile import failure_frames
 from resource_profile import selected as measured_profile
 from suite_contract import selected_case
 from suite_export import allowed_name, prepare_public
@@ -102,22 +103,6 @@ _CACHE_FIELDS = ("Id", "RepoDigests", "Os", "Architecture", "Size")
 _CACHE_FORMAT = (
     "{" + ",".join(f'"{field}":{{{{json .{field}}}}}' for field in _CACHE_FIELDS) + "}"
 )
-_FAILURE_PHASES = {
-    "capacity": "capacity",
-    "reserve_capacity": "capacity",
-    "inspect_cached_images": "image_cache",
-    "pull_images": "image_pull",
-    "bounded_pull": "image_pull",
-    "monitor_pull": "image_pull",
-    "start_database": "database_start",
-    "wait_database": "database_start",
-    "create_app_role": "database_role",
-    "write_app_runtime": "runtime_setup",
-    "start_web": "web_start",
-    "wait_web": "web_readiness",
-    "run_browser": "browser",
-    "require_browser_reserve": "browser_capacity",
-}
 _PUBLIC_EXCEPTION_CLASSES = {
     "ValueError",
     "RuntimeError",
@@ -172,11 +157,7 @@ def record_runtime_failure(root: Path, error: Exception) -> None:
     if root.resolve() != root or output.is_symlink():
         raise ValueError("Runtime failure evidence requires an unlinked owned path.")
     output.mkdir(mode=0o700, exist_ok=True)
-    frames = [
-        {"function": item.name, "line": item.lineno}
-        for item in traceback.extract_tb(error.__traceback__)
-        if Path(item.filename).name == "remote.py" and item.name in _FAILURE_PHASES
-    ]
+    frames = failure_frames(error)
     kind = type(error).__name__
     record = {
         "status": "FAILED",
@@ -988,7 +969,7 @@ def archive_evidence(root: Path, manifest: dict[str, Any]) -> None:
             "fixture_sha256",
         )
     }
-    (output / "source-identity.json").write_text(json.dumps(identity, indent=2))
+    retain_source_declaration(root)
     for key in ("suite_phase", "saga_case", "control_revision"):
         if key in manifest:
             identity[key] = manifest[key]
@@ -1272,6 +1253,30 @@ def finish_owned_run(
         (root / "runtime-complete.json").write_text(
             json.dumps({"nonce": manifest["nonce"], "resources_removed": True})
         )
+
+
+def retain_source_declaration(root: Path) -> None:
+    """Retain the authenticated declaration even before actual app startup.
+
+    :param root: Verified positive invocation root.
+    :return: None after the exact original exists without overwriting prior evidence.
+    :raises ValueError: Existing original differs, is linked or aliased.
+    :raises OSError: Exclusive source retention fails.
+    """
+    expected = (root / "runtime/source.json").read_bytes()
+    target = root / "output/source-manifest.json"
+    if target.exists() or target.is_symlink():
+        if (
+            target.is_symlink()
+            or target.stat().st_nlink != 1
+            or target.read_bytes() != expected
+        ):
+            raise ValueError(
+                "Existing source declaration differs from original bundle."
+            )
+        return
+    with target.open("xb") as stream:
+        stream.write(expected)
 
 
 if __name__ == "__main__":

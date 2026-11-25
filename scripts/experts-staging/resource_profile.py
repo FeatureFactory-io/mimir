@@ -5,11 +5,38 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import traceback
 from pathlib import Path
 from typing import Any
 
 from benchmark_metrics import parse_events, require_headroom
 from suite_contract import selected_case
+
+FAILURE_PHASES = {
+    "capacity": "capacity",
+    "reserve_capacity": "capacity",
+    "inspect_cached_images": "image_cache",
+    "pull_images": "image_pull",
+    "bounded_pull": "image_pull",
+    "monitor_pull": "image_pull",
+    "start_database": "database_start",
+    "wait_database": "database_start",
+    "create_app_role": "database_role",
+    "write_app_runtime": "runtime_setup",
+    "start_web": "web_start",
+    "wait_web": "web_readiness",
+    "run_browser": "browser",
+    "require_browser_reserve": "browser_capacity",
+    "resource_runtime.capacity": "capacity",
+    "resource_profile.require_capacity": "capacity",
+    "resource_runtime.start": "aggregate_start",
+    "resource_runtime.guard": "aggregate_live_capacity",
+    "resource_runtime.member": "aggregate_membership",
+    "aggregate.start": "aggregate_start",
+    "aggregate.guard": "aggregate_live_capacity",
+    "aggregate.validate_remaining": "aggregate_live_capacity",
+    "aggregate.verify_member": "aggregate_membership",
+}
 
 MIB = 1024**2
 PROOF_FILES = {
@@ -423,3 +450,83 @@ def bundle_proof(directory: Path, manifest: dict[str, Any]) -> dict[str, bytes]:
         return {}
     validate_files(directory, manifest)
     return {name: (directory / name).read_bytes() for name in PROOF_FILES}
+
+
+def failure_frames(error: Exception) -> list[dict[str, Any]]:
+    """Retain only fixed control function names and bounded numeric source lines.
+
+    :param error: Actual exception, never its message/args/locals.
+    :return: At most16 source-bound closed function/line observations.
+    """
+    result = []
+    for frame in traceback.extract_tb(error.__traceback__):
+        filename = Path(frame.filename).name
+        name = (
+            frame.name
+            if filename == "remote.py"
+            else Path(filename).stem + "." + frame.name
+        )
+        if (
+            filename
+            in {
+                "remote.py",
+                "resource_runtime.py",
+                "resource_profile.py",
+                "aggregate.py",
+            }
+            and name in FAILURE_PHASES
+        ):
+            result.append({"function": name, "line": frame.lineno})
+    return result[-16:]
+
+
+def checked_failure(record: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    """Admit only finite failure phases and known control-source frame projections.
+
+    :param record: Original generated safe runtime classification.
+    :return: Closed phase and actual bounded source-frame list.
+    :raises ValueError: Unknown strings, raw paths, types or phase inference differ.
+    """
+    frames = record.get("source_frames")
+    phase = record.get("phase")
+    if not isinstance(frames, list) or len(frames) > 16 or not isinstance(phase, str):
+        raise ValueError("Bounded actual failure classification required.")
+    for frame in frames:
+        if (
+            not isinstance(frame, dict)
+            or set(frame) != {"function", "line"}
+            or not isinstance(frame["function"], str)
+            or frame["function"] not in FAILURE_PHASES
+            or type(frame["line"]) is not int
+            or not 1 <= frame["line"] <= 4096
+        ):
+            raise ValueError("Only fixed actual control frames may be published.")
+    expected = FAILURE_PHASES[frames[-1]["function"]] if frames else "owned_runtime"
+    if phase != expected or record.get("private_output_exported") is not False:
+        raise ValueError("Failure phase must match its fixed source classification.")
+    return phase, frames
+
+
+def capacity_observation(memory: int, disk: int, cached: bool) -> dict[str, Any]:
+    """Project only finite actual counters and the fixed measured-profile budgets.
+
+    :param memory: Actual fresh available memory bytes.
+    :param disk: Actual fresh free Docker-storage bytes.
+    :param cached: Actual exact-image metadata verification result.
+    :return: Closed safe diagnostic values, not an acceptance verdict.
+    :raises ValueError: Unknown types or unbounded counters cannot be emitted.
+    """
+    if (
+        any(
+            type(value) is not int or not 0 <= value < 2**64 for value in (memory, disk)
+        )
+        or type(cached) is not bool
+    ):
+        raise ValueError("Finite actual capacity counters required.")
+    return {
+        "available_memory_bytes": memory,
+        "available_docker_disk_bytes": disk,
+        "required_memory_bytes": 1280 * MIB,
+        "required_disk_bytes": 1024**3,
+        "image_cache_verified": cached,
+    }

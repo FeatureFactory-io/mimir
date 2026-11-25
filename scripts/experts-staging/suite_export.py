@@ -66,10 +66,13 @@ _INTS = {
     "document_width",
     "rejected_captures",
     "available_memory_bytes",
+    "required_memory_bytes",
+    "required_disk_bytes",
     "available_docker_disk_bytes",
     "full_uat_contracts_passed",
 }
 _BOOLS = {
+    "image_cache_verified",
     "scope_rechecked",
     "full_saga_accepted",
     "galdr_eager",
@@ -829,6 +832,11 @@ def _special_receipt(
     :return: Closed source-bound safe derivative.
     :raises ValueError: Exact byte/identity/resource admission differs.
     """
+    if name == "runtime-failure.json":
+        phase, frames = resource_profile.checked_failure(record)
+        result = public_receipt(name, record, raw)
+        result.update(phase=phase, source_frames=frames)
+        return result
     if name == "resource-receipt.json":
         checked = resource_profile.checked_receipt(
             raw, manifest, passing=record.get("status") == "VERIFIED"

@@ -496,3 +496,159 @@ def test_verified_receipt_with_unavailable_memory_never_passes_partial_transport
     record["status"] = "VERIFIED"
     with pytest.raises(ValueError):
         module.checked_receipt(module.canonical(record), manifest, False)
+
+
+def test_archive_evidence_with_early_runtime_failure_exports_both_exact_declarations(
+    manifest: dict, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Actual producer/export/tar/readback with real files; no upload or runtime."""
+    output = tmp_path / "output"
+    output.mkdir()
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    actual = {
+        **manifest,
+        "resource_profile": "default",
+        "source_files": {"unit-model.py": "a" * 64},
+        "control_files": {"remote.py": "b" * 64},
+    }
+    source = {
+        "source_revision": actual["source_revision"],
+        "files": actual["source_files"],
+    }
+    controls = {
+        "control_revision": actual["control_revision"],
+        "files": actual["control_files"],
+    }
+    (runtime / "source.json").write_bytes(json.dumps(source).encode())
+    (runtime / "controls.json").write_bytes(json.dumps(controls).encode())
+    (output / "runtime-failure.json").write_text(
+        json.dumps(
+            {
+                "status": "FAILED",
+                "exception_class": "ValueError",
+                "private_output_exported": False,
+            }
+        )
+    )
+    monkeypatch.setattr(suite_export, "__file__", str(runtime / "suite_export.py"))
+    uploaded = []
+    monkeypatch.setattr(
+        remote, "upload_evidence", lambda path, record: uploaded.append(path)
+    )
+    remote.archive_evidence(tmp_path, actual)
+    assert len(uploaded) == 1
+    suite_archive.verify_case_archive(uploaded[0], actual, require_pass=False)
+    with tarfile.open(uploaded[0]) as archive:
+        assert {"source-manifest.json", "control-identity.json"} <= set(
+            archive.getnames()
+        )
+        observed = json.loads(archive.extractfile("source-manifest.json").read())
+        assert observed["declaration"] == source
+    with pytest.raises(ValueError):
+        suite_archive.verify_case_archive(uploaded[0], actual, require_pass=True)
+
+
+def test_capacity_with_real_low_memory_fixture_retains_numeric_observation_before_reject(
+    module: ModuleType, manifest: dict, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real fixture-file OS boundary model; no actual host or Docker query."""
+    memory = tmp_path / "model-meminfo"
+    memory.write_text(f"MemAvailable: {1280*1024-1} kB\n")
+    real_path = Path
+    monkeypatch.setattr(
+        resource_runtime,
+        "Path",
+        lambda value: memory if value == "/proc/meminfo" else real_path(value),
+    )
+
+    class Adapter:
+        image_cache_reserve = staticmethod(lambda record, cache: 1024**3)
+        command = staticmethod(lambda argv: json.dumps("/owned-engine-model"))
+
+        class shutil:
+            @staticmethod
+            def disk_usage(value: str) -> object:
+                return type("DiskFixture", (), {"free": 2 * 1024**3})()
+
+    run = resource_runtime.ResourceRun(tmp_path, manifest, Adapter)
+    with pytest.raises(ValueError):
+        resource_runtime.capacity(run, {})
+    row = json.loads((tmp_path / "output/capacity.json").read_text())
+    assert row["available_memory_bytes"] == 1280 * module.MIB - 1024
+    assert row["required_memory_bytes"] == 1280 * module.MIB
+    assert row["image_cache_verified"] is True
+    assert not (tmp_path / "aggregate-owner.json").exists()
+
+
+def test_runtime_failure_with_actual_capacity_guard_preserves_only_finite_phase(
+    module: ModuleType, tmp_path: Path
+) -> None:
+    try:
+        module.require_capacity(1, 1024**3, True)
+    except ValueError as error:
+        remote.record_runtime_failure(tmp_path, error)
+    raw = (tmp_path / "output/runtime-failure.json").read_bytes()
+    row = json.loads(raw)
+    exported = suite_export._special_receipt("runtime-failure.json", row, raw, {})
+    assert exported["phase"] == "capacity"
+    assert exported["source_frames"] and all(
+        type(frame["line"]) is int for frame in exported["source_frames"]
+    )
+    assert all(
+        set(frame) == {"function", "line"} for frame in exported["source_frames"]
+    )
+    assert b"PRIVATE_SENTINEL" not in module.canonical(exported)
+
+
+@pytest.mark.parametrize("change", ["phase", "function", "line_bool", "line_bound"])
+def test_runtime_failure_with_unknown_diagnostic_data_rejects_private_projection(
+    tmp_path: Path, change: str
+) -> None:
+    record = {
+        "status": "FAILED",
+        "exception_class": "ValueError",
+        "private_output_exported": False,
+        "phase": "capacity",
+        "source_frames": [{"function": "capacity", "line": 1}],
+    }
+    if change == "phase":
+        record["phase"] = "PRIVATE_SENTINEL"
+    elif change == "function":
+        record["source_frames"][0]["function"] = "PRIVATE_SENTINEL"
+    elif change == "line_bool":
+        record["source_frames"][0]["line"] = True
+    else:
+        record["source_frames"][0]["line"] = 4097
+    raw = json.dumps(record).encode()
+    safe = suite_export._admit_receipt("runtime-failure.json", record, raw, {})
+    assert safe["status"] == "FAILED" and safe["receipt_content_rejected"] is True
+    assert b"PRIVATE_SENTINEL" not in json.dumps(safe).encode()
+
+
+def test_source_declaration_with_conflicting_existing_original_refuses_overwrite(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runtime").mkdir()
+    (tmp_path / "output").mkdir()
+    original = b'{"PRIVATE_SENTINEL":"original evidence"}'
+    (tmp_path / "runtime/source.json").write_bytes(b'{"files":{}}')
+    target = tmp_path / "output/source-manifest.json"
+    target.write_bytes(original)
+    with pytest.raises(ValueError):
+        remote.retain_source_declaration(tmp_path)
+    assert target.read_bytes() == original
+
+
+def test_capacity_failure_with_linked_output_never_writes_foreign_directory(
+    manifest: dict, tmp_path: Path
+) -> None:
+    own = tmp_path / "own"
+    own.mkdir()
+    foreign = tmp_path / "foreign"
+    foreign.mkdir()
+    (own / "output").symlink_to(foreign, target_is_directory=True)
+    run = resource_runtime.ResourceRun(own, manifest, None)
+    with pytest.raises(ValueError):
+        resource_runtime.retain_capacity_failure(run, 1, 1024**3, True)
+    assert not list(foreign.iterdir())
