@@ -1052,7 +1052,7 @@ def capture_case(context: BrowserContext, case: str, oracle: dict[str, Any]) -> 
     :param oracle: Actual positively owned public baseline metadata.
     :return: None after browser observations; raises the original acquisition error.
     """
-    context.tracing.start(screenshots=True, snapshots=True, sources=True)
+    context.tracing.start(screenshots=False, snapshots=True, sources=True)
     blocked: list[str] = []
     context.route("**/*", lambda route: restrict_case(route, case, blocked))
     try:

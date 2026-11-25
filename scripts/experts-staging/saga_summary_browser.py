@@ -370,7 +370,7 @@ def capture(context: BrowserContext, oracle: dict[str, Any]) -> None:
     :param oracle: Safe preparation record.
     :return: None after every action and closed-network check.
     """
-    context.tracing.start(screenshots=True, snapshots=True, sources=True)
+    context.tracing.start(screenshots=False, snapshots=True, sources=True)
     blocked: list[str] = []
     context.route("**/*", lambda route: restrict(route, oracle, blocked))
     try:

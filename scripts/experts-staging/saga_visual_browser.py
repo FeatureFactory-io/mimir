@@ -258,7 +258,7 @@ def run_visual_case(browser: Browser, case: str, output: Path) -> dict[str, Any]
     (output / "screenshots").mkdir()
     binding = shared.start_private_capture()
     context = _new_context(browser, output)
-    context.tracing.start(screenshots=True, snapshots=True, sources=True)
+    context.tracing.start(screenshots=False, snapshots=True, sources=True)
     successful = False
     try:
         record = capture_context(context, output, case, oracle)

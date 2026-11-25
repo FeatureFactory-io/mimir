@@ -61,7 +61,6 @@ _INTS = {
     "proposed_target_seconds",
     "blocked_requests",
     "copy_receipt_requests",
-    "capture_scroll_y",
     "document_width",
     "available_memory_bytes",
     "available_docker_disk_bytes",
@@ -397,6 +396,7 @@ def public_receipt(
     result = _typed_fields(record)
     _selected_identity(record, result)
     _selected_observations(record, result)
+    _matrix_fields(record, result)
     _capture_fields(record, result)
     _step_fields(record, result)
     _geometry_fields(record, result)
@@ -472,6 +472,8 @@ def _selected_observations(record: dict[str, Any], result: dict[str, Any]) -> No
     :return: None after selected observation types validate.
     :raises ValueError: Invalid timing, viewport or nomination text.
     """
+    if "secure_context" in record and record["secure_context"] is not True:
+        raise ValueError("Actual secure browser context required.")
     if "viewport" in record:
         viewport = record["viewport"]
         if (
@@ -487,11 +489,54 @@ def _selected_observations(record: dict[str, Any], result: dict[str, Any]) -> No
             if type(value) not in (int, float) or not 0 <= value <= 720:
                 raise ValueError("Actual bounded monotonic time required.")
             result[key] = value
+    _nomination_fields(record, result)
+
+
+def _nomination_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
+    """Retain only the exact observed fictional nomination and unsent destination.
+
+    :param record: Original actual task observation.
+    :param result: Typed public derivative.
+    :return: None after exact public fixture text validation.
+    :raises ValueError: Unknown nomination prose or contact destination differs.
+    """
+    if "inspected_contact_destination" in record:
+        if (
+            record["inspected_contact_destination"]
+            != "mailto:maria.rodriguez@example.com"
+        ):
+            raise ValueError("Exact inspected fictional contact destination required.")
+        result["inspected_contact_destination"] = record[
+            "inspected_contact_destination"
+        ]
     if "nomination_text" in record:
         text = "I nominate Maria Rodriguez for a discussion about Noor's Cedar bank onboarding brief. Her Accessibility Audit Playbook v1.0 includes Trace Keyboard Focus, Review Form Feedback. These public examples address keyboard navigation, understandable form errors and recovery. Next step is to request a discussion. Availability is unconfirmed."
         if record["nomination_text"] != text:
             raise ValueError("Exact fictional observed nomination required.")
         result["nomination_text"] = text
+
+
+def _matrix_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
+    """Retain exact measured seven-size matrix observations without nested bodies.
+
+    :param record: Actual browser metadata.
+    :param result: Public derivative.
+    :return: None after actual measured sizes/count agree with the declared IA.
+    :raises ValueError: Missing, repeated, untyped or relabelled dimensions.
+    """
+    expected = [{"width": w, "height": h} for w, h in _SIZES]
+    if "screens" in record:
+        screens = record["screens"]
+        if not isinstance(screens, list) or len(screens) != 7:
+            raise ValueError("Exact seven measured screens required.")
+        measured = [row["viewport"] for row in screens]
+        if measured != expected:
+            raise ValueError("Exact measured IA size sequence required.")
+        result.update(viewport_count=7, viewports=measured)
+    if "viewports" in record:
+        if record["viewports"] != expected or record.get("viewport_count") != 7:
+            raise ValueError("Exact measured IA size sequence/count required.")
+        result["viewports"] = record["viewports"]
 
 
 def _capture_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
@@ -528,6 +573,11 @@ def _geometry_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
     :return: None after exact shape/type/bounds checks.
     :raises ValueError: Untrusted metadata attempts to export strings or extra fields.
     """
+    if "capture_scroll_y" in record:
+        value = record["capture_scroll_y"]
+        if type(value) not in (int, float) or not 0 <= value <= 100000:
+            raise ValueError("Actual numeric viewport scroll coordinate required.")
+        result["capture_scroll_y"] = value
     for key in ("navbar_geometry", "tooltip_geometry"):
         if key not in record:
             continue
@@ -577,11 +627,10 @@ def _check_effects(record: dict[str, Any]) -> None:
     :return: None after mandatory guard/counts agree.
     :raises ValueError: Success claim or effect count differs.
     """
-    expected = (
-        2
-        if record.get("case") == "copy-maria"
-        else (1 if record.get("case") == "summary-acceptance" else 0)
-    )
+    case = record.get("case")
+    if case not in {row.case for row in FULL_CASES if row.case != "core"}:
+        raise ValueError("True implemented effect case required.")
+    expected = 2 if case == "copy-maria" else (1 if case == "summary-acceptance" else 0)
     if (
         record.get("status") != "CASE_VERIFIED"
         or record.get("scope_rechecked") is not True
@@ -590,6 +639,43 @@ def _check_effects(record: dict[str, Any]) -> None:
         or record.get("full_saga_accepted") is not False
     ):
         raise ValueError("Exact verified per-case effects required.")
+    _case_effect_facts(record, case)
+
+
+def _case_effect_facts(record: dict[str, Any], case: str) -> None:
+    """Require exact real summary additions and unchanged readonly model/mail counts.
+
+    :param record: Received or freshly produced actual effects.
+    :param case: Validated true case.
+    :return: None after mandatory exact numeric and boolean lane facts agree.
+    :raises ValueError: A claimed effect count, scheduler or coverage differs.
+    """
+    facts: dict[str, Any] = {}
+    if case == "summary-acceptance":
+        facts = {
+            "new_activities": 1,
+            "new_versions": 1,
+            "decision_mail_files": 1,
+            "provider_calls": 2,
+            "galdr_eager": False,
+            "all_installed_rows_protected": True,
+        }
+    elif case in {
+        "guest-public",
+        "authenticated-matrix",
+        "long_identity_and_prose",
+        "missing_summary",
+    }:
+        facts = {"model_count": 39, "decision_mail_files": 0}
+    elif "decision_mail_files" in record:
+        facts["decision_mail_files"] = 0
+    if "model_count" in record:
+        facts["model_count"] = 39
+    if any(
+        type(record.get(key)) is not type(value) or record.get(key) != value
+        for key, value in facts.items()
+    ):
+        raise ValueError("Exact mandatory lane effect facts required.")
 
 
 def _failure_fields(record: dict[str, Any], result: dict[str, Any]) -> None:

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from suite_contract import selected_case
-from suite_export import allowed_name
+from suite_export import allowed_name, public_receipt
 
 
 def verify_case_archive(
@@ -126,7 +126,7 @@ def _required_records(
         ):
             raise ValueError("Actual core browser and effect proof required.")
         return
-    _lane_records(case, records)
+    _lane_records(case, records, manifest)
 
 
 def _identity_record(records: dict[str, Any], manifest: dict[str, Any]) -> None:
@@ -208,11 +208,12 @@ def _readiness_records(records: dict[str, Any], manifest: dict[str, Any]) -> Non
         raise ValueError("Downloaded actual health identity differs from invocation.")
 
 
-def _lane_records(case: str, records: dict[str, Any]) -> None:
+def _lane_records(case: str, records: dict[str, Any], manifest: dict[str, Any]) -> None:
     """Check the actual lane-specific public browser and complete-effects receipts.
 
     :param case: Closed true lane ID.
     :param records: Actual parsed archive reports.
+    :param manifest: Exact current fixture/source identity.
     :return: None after exact browser/effects and summary mail agree.
     :raises ValueError: The lane is incomplete or not verified.
     """
@@ -235,9 +236,153 @@ def _lane_records(case: str, records: dict[str, Any]) -> None:
         raise ValueError(
             "Actual lane-specific browser and whole-state effect proof required."
         )
+    _received_semantics(prefix, effects, browser)
+    _browser_facts(case, browser, records, manifest)
     if (
         case == "summary-acceptance"
         and records.get("saga-summary-mail-preview.json", {}).get("evidence_kind")
         != "actual_file_mail_preview"
     ):
         raise ValueError("Actual verified file-mail preview required.")
+
+
+def _received_semantics(
+    prefix: str, effects: dict[str, Any], browser: dict[str, Any]
+) -> None:
+    """Revalidate actual downloaded content, never rely on upstream pass labels.
+
+    :param prefix: Closed lane receipt family.
+    :param effects: Actual received numeric/domain verification.
+    :param browser: Actual received native observations.
+    :return: None only after exact effects, flags, protocol and metadata validation.
+    :raises ValueError: Any received typed semantic fact differs.
+    """
+    try:
+        public_receipt(prefix + "-effects.json", effects, json.dumps(effects).encode())
+        public_receipt(prefix + "-browser.json", browser, json.dumps(browser).encode())
+    except (AssertionError, KeyError, TypeError) as error:
+        raise ValueError("Received lane semantic proof differs.") from error
+
+
+def _browser_facts(
+    case: str,
+    browser: dict[str, Any],
+    records: dict[str, Any],
+    manifest: dict[str, Any],
+) -> None:
+    """Require complete source-bound actual native evidence for each true case.
+
+    :param case: Closed true lane.
+    :param browser: Actual received browser proof.
+    :param records: Actual downloaded public reports.
+    :param manifest: Authenticated expected fixture identity.
+    :return: None after mandatory native actor/steps/sizes/outcomes agree.
+    :raises ValueError: Missing, invented or cross-bound browser evidence.
+    """
+    if browser.get("fixture_sha256") != manifest.get("fixture_sha256"):
+        raise ValueError("Actual browser fixture proof differs.")
+    if case == "summary-acceptance":
+        if (
+            browser.get("completed_steps") != ["C01", "C02", "C03", "C04", "C05"]
+            or len(browser.get("login_observations", [])) != 3
+        ):
+            raise ValueError(
+                "Actual complete summary steps and native logins required."
+            )
+    elif case in {
+        "guest-public",
+        "authenticated-matrix",
+        "long_identity_and_prose",
+        "missing_summary",
+    }:
+        _matrix_browser_facts(case, browser)
+    else:
+        _legacy_browser_facts(case, browser, records)
+
+
+def _matrix_browser_facts(case: str, browser: dict[str, Any]) -> None:
+    """Require actual seven-size and actor evidence, preserving preparation status.
+
+    :param case: Closed true readonly or visual case.
+    :param browser: Received typed browser record.
+    :return: None after exact actual IA count/sequence and actor metadata exist.
+    :raises ValueError: Any complete matrix evidence is missing.
+    """
+    sizes = (
+        (1280, 800),
+        (1920, 1080),
+        (1512, 982),
+        (768, 1024),
+        (1024, 768),
+        (390, 844),
+        (360, 800),
+    )
+    if (
+        browser.get("viewport_count") != 7
+        or browser.get("viewports") != [{"width": w, "height": h} for w, h in sizes]
+        or "login_observation" not in browser
+    ):
+        raise ValueError("Actual complete source-bound seven-size matrix required.")
+    if case == "guest-public" and browser.get("completed_steps") != [
+        "G01",
+        "G02",
+        "G03",
+        "G04",
+    ]:
+        raise ValueError("Actual complete guest UAT steps required.")
+
+
+def _legacy_browser_facts(
+    case: str, browser: dict[str, Any], records: dict[str, Any]
+) -> None:
+    """Require actual nomination or native clipboard evidence and exact actor traffic.
+
+    :param case: Closed nomination/copy case.
+    :param browser: Received native observation.
+    :param records: Actual public prompt digest oracle and other reports.
+    :return: None after mandatory actual task outcome and no external send agree.
+    :raises ValueError: Missing or mismatched native evidence.
+    """
+    if not {
+        "login_observation",
+        "receipt_attempts",
+        "nonread_requests",
+    } <= browser.keys() or browser.get("viewport") != {"width": 1280, "height": 800}:
+        raise ValueError("Actual actor-bound native observations required.")
+    if case == "nomination":
+        _nomination_facts(browser)
+    else:
+        prompt = records.get("public-copy.json", {})
+        if (
+            browser.get("actual_clipboard_sha256") != prompt.get("sha256")
+            or browser.get("actual_clipboard_bytes") != prompt.get("bytes")
+            or type(prompt.get("bytes")) is not int
+            or prompt["bytes"] <= 0
+            or "receipt_response" not in browser
+        ):
+            raise ValueError("Actual native clipboard bytes/receipt outcome required.")
+
+
+def _nomination_facts(browser: dict[str, Any]) -> None:
+    """Require the actual timed fictional nomination and unsent destination.
+
+    :param browser: Actual received native nomination metadata.
+    :return: None after complete timing/task/no-send facts agree.
+    :raises ValueError: Any required actual nomination evidence is missing.
+    """
+    required = {
+        "nomination_text",
+        "elapsed_monotonic_seconds",
+        "proposed_target_seconds",
+        "automated_path_within_proposed_target",
+        "inspected_contact_destination",
+    }
+    if (
+        not required <= browser.keys()
+        or browser.get("contact_activated") is not False
+        or browser.get("email_sent") is not False
+        or browser.get("proposed_target_seconds") != 300
+        or browser["automated_path_within_proposed_target"]
+        != (browser["elapsed_monotonic_seconds"] <= 300)
+    ):
+        raise ValueError("Actual unsent timed nomination evidence required.")

@@ -167,11 +167,7 @@ def verify_readonly_case(case: str) -> None:
     scope()
     baseline = json.loads((_ROOT / "suite-readonly-baseline.json").read_text())
     observed = json.loads((_OUTPUT / "suite-readonly-browser.json").read_text())
-    assert baseline["case"] == observed["case"] == case
-    assert observed["status"] == "BROWSER_OBSERVED" and observed["viewport_count"] == 7
-    login = assert_readonly_rows(
-        case, baseline, domain_rows(), observed["login_observation"], now()
-    )
+    login = _readonly_observation(case, baseline, observed)
     verify_actual_session(login)
     assert projections() == baseline["projections"] and not list(_MAIL.iterdir())
     write_private(
@@ -187,3 +183,31 @@ def verify_readonly_case(case: str) -> None:
         },
     )
     logger.info("Readonly case verified | case=%s | models=39", case)
+
+
+def _readonly_observation(
+    case: str, baseline: dict[str, Any], observed: dict[str, Any]
+) -> Any:
+    """Bind actual source-sized browser completion to complete private model state.
+
+    :param case: Closed true readonly case.
+    :param baseline: Complete private independently prepared baseline.
+    :param observed: Actual seven-size native browser metadata.
+    :return: Exact observed login interval or None for the guest.
+    :raises AssertionError: Case, measured sizes or any39model effect differs.
+    """
+    assert baseline["case"] == observed["case"] == case
+    assert observed["status"] == "BROWSER_OBSERVED" and observed["viewport_count"] == 7
+    sizes = (
+        (1280, 800),
+        (1920, 1080),
+        (1512, 982),
+        (768, 1024),
+        (1024, 768),
+        (390, 844),
+        (360, 800),
+    )
+    assert observed["viewports"] == [{"width": w, "height": h} for w, h in sizes]
+    return assert_readonly_rows(
+        case, baseline, domain_rows(), observed["login_observation"], now()
+    )

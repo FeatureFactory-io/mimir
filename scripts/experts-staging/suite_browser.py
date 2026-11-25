@@ -110,19 +110,37 @@ def _observe_readonly(context: BrowserContext, case: str) -> None:
     assert not blocked and context.pages == [page]
     shared.capture_private_values(page)
     shared.write_result(
-        "suite-readonly-browser.json",
-        {
-            "case": case,
-            "status": "BROWSER_OBSERVED",
-            "viewport_count": 7,
-            "completed_steps": (
-                ["G01", "G02", "G03", "G04"] if case == "guest-public" else []
-            ),
-            "login_observation": login,
-            "observations": result,
-            "full_saga_accepted": False,
-        },
+        "suite-readonly-browser.json", _readonly_record(case, record, result, login)
     )
+
+
+def _readonly_record(
+    case: str, oracle: dict[str, Any], observed: Any, login: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Retain actual seven-size observations and exact source/fixture/actor evidence.
+
+    :param case: True readonly case.
+    :param oracle: Exact prepared source/fixture identity.
+    :param observed: Actual completed guest results or authenticated screen pairs.
+    :param login: Actual native safe login envelope or None.
+    :return: Safe actual browser observation awaiting39model verification.
+    """
+    rows = observed if case == "guest-public" else observed["screen_pairs"]
+    viewports = [row["viewport"] for row in rows]
+    return {
+        "case": case,
+        "status": "BROWSER_OBSERVED",
+        "viewport_count": len(viewports),
+        "viewports": viewports,
+        "completed_steps": (
+            ["G01", "G02", "G03", "G04"] if case == "guest-public" else []
+        ),
+        "login_observation": login,
+        "fixture_sha256": oracle["fixture_sha256"],
+        "source_revision": oracle["source_revision"],
+        "observations": observed,
+        "full_saga_accepted": False,
+    }
 
 
 def _guest_matrix(page: Page, oracle: GuestOracle) -> list[dict[str, Any]]:
@@ -171,9 +189,7 @@ def run_readonly(browser: Browser, case: str) -> None:
     )
     binding = shared.start_private_capture()
     success = False
-    context.tracing.start(
-        screenshots=case != "guest-public", snapshots=True, sources=True
-    )
+    context.tracing.start(screenshots=False, snapshots=True, sources=True)
     try:
         _observe_readonly(context, case)
         success = True

@@ -421,3 +421,46 @@ def test_prepare_public_with_linked_core_trace_rejects_before_touching_original(
         export.prepare_public(root, {})
     assert outside.read_bytes() == original
     assert target.is_symlink() if kind == "symlink" else target.stat().st_nlink == 2
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("new_awards", 999), ("scope_rechecked", False), ("full_saga_accepted", True)],
+)
+def test_verify_case_archive_with_received_effect_fact_mutation_rejects(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    manifest = _archive_manifest()
+    manifest.update(suite_phase="nomination", saga_case="nomination")
+    target = tmp_path / "effects-control.tar.gz"
+    effects = {
+        "case": "nomination",
+        "status": "CASE_VERIFIED",
+        "scope_rechecked": True,
+        "new_awards": 0,
+        "full_saga_accepted": False,
+    }
+    effects[field] = value
+    records = {
+        "source-identity.json": manifest,
+        "saga-browser.json": {"case": "nomination", "status": "BROWSER_OBSERVED"},
+        "saga-effects.json": effects,
+    }
+    with tarfile.open(target, "w:gz") as archive:
+        for name, record in records.items():
+            record = {**record, "derivative": True, "original_sha256": "9" * 64}
+            data = json.dumps(record).encode()
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+        for name in (
+            "video/" + "a" * 32 + ".webm",
+            "screenshots/guest-native-clipboard.png",
+            "saga-trace.zip",
+        ):
+            data = b"synthetic-validator-control"
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+    with pytest.raises(ValueError):
+        verify_case_archive(target, manifest)
