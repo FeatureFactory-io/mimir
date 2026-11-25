@@ -789,17 +789,23 @@ def run_browser(
         raise RuntimeError("Actual on-idle browser readiness failed.")
     if resource is not None:
         resource.guard()
-    verify_case_effects(root, names)
+    verify_case_effects(root, names, manifest)
 
 
-def verify_case_effects(root: Path, names: dict[str, str]) -> None:
+def verify_case_effects(
+    root: Path, names: dict[str, str], manifest: dict[str, Any]
+) -> None:
     """Run the real lane-specific Django database and mail oracle after browser work.
 
     :param root: Owned private configuration.
     :param names: Exact actual container names.
+    :param manifest: Validated phase/case declaration; summary uses its loaded worker.
     :return: None after the actual case oracle passes.
     :raises RuntimeError: Original real domain readback fails.
     """
+    if selected_case(manifest).case == "summary-acceptance":
+        docker(root, "exec", names["web"], "python", "/runtime/suite_worker_verify.py")
+        return
     docker(
         root,
         "exec",

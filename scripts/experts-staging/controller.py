@@ -62,6 +62,7 @@ _RUNTIME_FILES = (
     "suite_contract.py",
     "suite_export.py",
     "suite_runtime.py",
+    "suite_worker_verify.py",
     "suite_browser.py",
     "suite_readonly.py",
     "suite_mail.py",
