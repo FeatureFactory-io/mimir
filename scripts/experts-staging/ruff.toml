@@ -1,0 +1,4 @@
+# SSM invokes the AL2023 host's system Python, outside the Python3.14 app image.
+# Preserve portable exception syntax while inheriting every repository lint rule.
+extend = "../../pyproject.toml"
+target-version = "py39"

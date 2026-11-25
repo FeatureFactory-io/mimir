@@ -1,0 +1,5 @@
+ARG CANDIDATE_IMAGE
+FROM ${CANDIDATE_IMAGE}
+# Reuse immutable candidate layers. This derivative runs only the browser driver.
+RUN python -m playwright install --with-deps chromium
+ENTRYPOINT ["python"]

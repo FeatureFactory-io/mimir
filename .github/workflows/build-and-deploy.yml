@@ -18,6 +18,21 @@ on:
         type: boolean
         required: true
         default: true
+      experts_staging_only:
+        description: Run the isolated Cedar companion on existing idle; no normal EB deployment
+        type: boolean
+        required: true
+        default: false
+      experts_candidate_run_id:
+        description: Successful build-only Actions run with exact candidate image receipt
+        type: string
+        required: false
+        default: ''
+      experts_candidate_sha:
+        description: Exact forty-character source SHA from that build-only run
+        type: string
+        required: false
+        default: ''
       preflight_only:
         description: Inspect idle host identity and capacity without deployment or database access
         type: boolean
@@ -37,7 +52,7 @@ jobs:
   # ── 1. Tests ──────────────────────────────────────────────────────────────
   test:
     name: Run Tests
-    if: ${{ !inputs.preflight_only }}
+    if: ${{ !inputs.preflight_only && !inputs.experts_staging_only }}
     runs-on: ubuntu-latest
     env:
       MIMIR_ENV: test
@@ -129,7 +144,7 @@ jobs:
     name: Build and Push Docker Images
     needs: test
     runs-on: ubuntu-latest
-    if: always() && !inputs.preflight_only && needs.test.result == 'success'
+    if: always() && !inputs.preflight_only && !inputs.experts_staging_only && needs.test.result == 'success'
 
     outputs:
       image_suffix: ${{ steps.tag.outputs.suffix }}
@@ -258,7 +273,7 @@ jobs:
     runs-on: ubuntu-latest
     # Only on published release or manual dispatch — not on every push to main.
     if: >
-      vars.AWS_ACCOUNT_ID != '' && !inputs.preflight_only && (
+      vars.AWS_ACCOUNT_ID != '' && !inputs.preflight_only && !inputs.experts_staging_only && (
         github.event_name == 'release' ||
         (github.event_name == 'workflow_dispatch' && inputs.deploy_to_idle)
       )
@@ -351,7 +366,7 @@ jobs:
 
   wake_idle:
     name: Bring existing idle environment online
-    if: github.event_name == 'workflow_dispatch' && inputs.wake_idle
+    if: github.event_name == 'workflow_dispatch' && inputs.wake_idle && !inputs.experts_staging_only
     runs-on: ubuntu-latest
     timeout-minutes: 25
     concurrency:
@@ -388,7 +403,7 @@ jobs:
     name: Read-only staging identity and capacity
     needs: wake_idle
     if: >-
-      always() && github.event_name == 'workflow_dispatch' && inputs.preflight_only &&
+      always() && github.event_name == 'workflow_dispatch' && inputs.preflight_only && !inputs.experts_staging_only &&
       (needs.wake_idle.result == 'success' || needs.wake_idle.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -528,3 +543,115 @@ jobs:
           path: preflight-receipts/
           if-no-files-found: warn
           retention-days: 7
+
+  experts-staging:
+    name: Owned Cedar companion readiness on existing idle
+    if: github.event_name == 'workflow_dispatch' && inputs.experts_staging_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: mimir-idle-power
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    env:
+      CANDIDATE_RUN_ID: ${{ inputs.experts_candidate_run_id }}
+      CANDIDATE_SHA: ${{ inputs.experts_candidate_sha }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require isolated-only mode and validated candidate selectors
+        env:
+          NORMAL_DEPLOY: ${{ inputs.deploy_to_idle }}
+          PREFLIGHT_ONLY: ${{ inputs.preflight_only }}
+          WAKE_IDLE: ${{ inputs.wake_idle }}
+        run: |
+          set -euo pipefail
+          test "$NORMAL_DEPLOY" = false
+          test "$PREFLIGHT_ONLY" = false
+          test "$WAKE_IDLE" = false
+          [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$AWS_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]
+      - name: Checkout reviewed runner and candidate Git objects
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up runner Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Install only control-plane validation dependencies
+        run: python -m pip install boto3 pytest pyyaml
+      - name: Verify fail-closed runner contracts
+        run: python -m pytest -p no:cacheprovider -c /dev/null --confcutdir=tests/unit tests/unit/test_experts_staging_runner_contract.py tests/unit/test_experts_staging_runner_config.py -q
+      - name: Download exact candidate build receipt
+        uses: actions/download-artifact@v4
+        with:
+          name: candidate-image-identities-${{ inputs.experts_candidate_run_id }}
+          run-id: ${{ inputs.experts_candidate_run_id }}
+          github-token: ${{ github.token }}
+          path: candidate-receipt
+      - name: Verify actual successful build-only run and prepare source proof
+        id: experts-source
+        run: |
+          set -euo pipefail
+          python scripts/experts-staging/controller.py prepare \
+            --receipt candidate-receipt/candidate-image-identities.json \
+            --revision "$CANDIDATE_SHA" --run-id "$CANDIDATE_RUN_ID" \
+            --account "$AWS_ACCOUNT_ID" --output experts-readiness
+      - name: Configure existing deployment connection
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Log in to existing ECR repository
+        id: experts-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Set up isolated browser build
+        uses: docker/setup-buildx-action@v3
+      - name: Build browser derivative from exact candidate digest
+        id: experts-browser
+        uses: docker/build-push-action@v5
+        with:
+          context: scripts/experts-staging
+          file: scripts/experts-staging/Dockerfile.browser
+          build-args: CANDIDATE_IMAGE=${{ steps.experts-source.outputs.web_image }}
+          push: true
+          tags: ${{ steps.experts-ecr.outputs.registry }}/mimir:experts-browser-${{ github.run_id }}-${{ steps.experts-source.outputs.nonce }}
+          platforms: linux/amd64
+          cache-from: type=gha,scope=experts-browser
+          cache-to: type=gha,scope=experts-browser,mode=max
+      - name: Record actual immutable image sizes before any host pull
+        env:
+          WEB_IMAGE: ${{ steps.experts-source.outputs.web_image }}
+          BROWSER_IMAGE: ${{ steps.experts-ecr.outputs.registry }}/mimir@${{ steps.experts-browser.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker pull "$WEB_IMAGE" >/dev/null
+          docker pull "$BROWSER_IMAGE" >/dev/null
+          docker pull postgres:16 >/dev/null
+          python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          images = {name: json.loads(subprocess.check_output(['docker', 'image', 'inspect', image]))[0]
+                    for name, image in {'web': os.environ['WEB_IMAGE'], 'browser': os.environ['BROWSER_IMAGE'], 'postgres': 'postgres:16'}.items()}
+          postgres = next(value for value in images['postgres']['RepoDigests'] if value.startswith('postgres@sha256:'))
+          receipt = {'browser_image': os.environ['BROWSER_IMAGE'], 'postgres_image': postgres,
+                     'image_sizes': {name: value['Size'] for name, value in images.items()}}
+          Path('experts-readiness/image-runtime-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
+      - name: Execute only owned companion and export actual browser artifacts
+        run: |
+          set -euo pipefail
+          python scripts/experts-staging/controller.py execute \
+            --output experts-readiness --images experts-readiness/image-runtime-receipt.json
+      - name: Retain owned readiness evidence and actual open conditions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: experts-idle-readiness-${{ github.run_id }}
+          path: experts-readiness/
+          if-no-files-found: warn
