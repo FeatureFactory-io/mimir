@@ -815,14 +815,17 @@ def test_guest_matrix_with_acquisition_error_closes_page_and_preserves_failure(
     assert len(context.created) == failure + 1
 
 
-def _saga_source_method(name: str) -> tuple[Path, ast.FunctionDef]:
+def _saga_source_method(
+    name: str, module: str = "saga_browser"
+) -> tuple[Path, ast.FunctionDef]:
     """Read the exact trusted source function without running its environment.
 
     :param name: Literal reviewed helper selected by this control.
+    :param module: Literal source-controlled browser module.
     :return: Original absolute filename and unmodified function AST.
     :raises StopIteration: The required production function is missing.
     """
-    source = _ROOT / "scripts/experts-staging/saga_browser.py"
+    source = _ROOT / "scripts/experts-staging" / (module + ".py")
     method = next(
         n
         for n in ast.parse(source.read_text()).body
@@ -990,3 +993,50 @@ def test_copy_self_with_producer_maria_snapshot_has_exact_export_admission(
 )
 def test_copy_self_with_unreviewed_snapshot_variant_remains_rejected(name: str) -> None:
     assert not export.allowed_name(Path(name))
+
+
+def test_summary_capture_with_actual_error_exports_safe_summary_location(
+    tmp_path: Path,
+) -> None:
+    """The genuine summary handler must preserve failure location before cleanup."""
+    space, context, error, rows = _capture_failure_probe(tmp_path)
+    source, method = _saga_source_method("capture", "saga_summary_browser")
+    space.update(
+        CASE="summary-acceptance",
+        perform=space["perform_case"],
+        shared=SimpleNamespace(write_result=space["write_result"]),
+    )
+    exec(  # noqa: S102 - fixed actual reviewed summary failure-handler AST.
+        compile(ast.Module(body=[method], type_ignores=[]), str(source), "exec"), space
+    )
+    with pytest.raises(TimeoutError) as caught:
+        space["capture"](context, {})
+    assert caught.value is error and rows[-1][0] == "saga-summary-failure.json"
+    record = rows[-1][1]
+    assert any(
+        row["function"] == "saga_summary_browser.capture"
+        for row in record["browser_source_frames"]
+    )
+    public = export.public_receipt(rows[-1][0], record, json.dumps(record).encode())
+    assert public["status"] == "FAILED" and public["exception_class"] == "TimeoutError"
+    assert "PRIVATE_EXCEPTION" not in json.dumps(public)
+
+
+def test_summary_failure_with_real_sign_out_source_projects_only_closed_location() -> (
+    None
+):
+    """A native-action failure's source frame is retained without its raw message."""
+    source, method = _saga_source_method("sign_out", "saga_summary_browser")
+
+    def timeout(*args: object) -> None:
+        raise TimeoutError("PRIVATE_SUMMARY_EXCEPTION_SENTINEL")
+
+    space = {"Page": object}
+    exec(  # noqa: S102 - fixed actual reviewed native sign-out source AST.
+        compile(ast.Module(body=[method], type_ignores=[]), str(source), "exec"), space
+    )
+    with pytest.raises(TimeoutError) as caught:
+        space["sign_out"](SimpleNamespace(get_by_test_id=timeout))
+    frames = export.resource_profile.browser_failure_frames(caught.value)
+    assert len(frames) == 1 and frames[0]["function"] == "saga_summary_browser.sign_out"
+    assert "PRIVATE_SUMMARY" not in json.dumps(frames)

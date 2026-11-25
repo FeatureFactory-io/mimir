@@ -20,6 +20,7 @@ from playwright.sync_api import (
 )
 
 import saga_browser as shared
+from resource_profile import browser_failure_frames
 from saga_summary_contract import CASE, allow_summary_request
 
 _ORIGIN = "https://cedar-web:8443"
@@ -384,6 +385,7 @@ def capture(context: BrowserContext, oracle: dict[str, Any]) -> None:
                 "case": CASE,
                 "status": "FAILED",
                 "exception_class": type(error).__name__,
+                "browser_source_frames": browser_failure_frames(error),
                 "undeclared_requests": blocked,
             },
         )

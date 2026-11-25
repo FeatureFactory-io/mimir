@@ -67,6 +67,23 @@ _BROWSER_FRAME_FUNCTIONS = {
             "capture_private_values",
         }
     ),
+    "saga_summary_browser": frozenset(
+        {
+            "own_profile",
+            "categories",
+            "observe_post",
+            "submit",
+            "sign_out",
+            "finalize",
+            "confirm",
+            "revisit",
+            "perform",
+            "record_observation",
+            "restrict",
+            "run_summary_case",
+            "capture",
+        }
+    ),
     "suite_browser": frozenset(
         {
             "main",
