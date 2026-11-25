@@ -33,6 +33,10 @@ _REQUIRED_ARGUMENTS = {
     "execute": ("images",),
 }
 _REPO = "FeatureFactory-io/mimir"
+_REMOTE_DISPATCH = "subprocess.run(['python3',str(runtime/'remote.py')],check=True)"
+_AGGREGATE_REMOTE_DISPATCH = (
+    "import sys\nos.execv(sys.executable,[sys.executable,str(runtime/'remote.py')])"
+)
 _RUNTIME_FILES = (
     "remote.py",
     "contract.py",
@@ -442,6 +446,20 @@ def bundle_members(manifest: dict[str, Any]) -> list[str]:
     ]
 
 
+def launcher_template(manifest: dict[str, Any]) -> str:
+    """Replace only the measured profile's redundant waiting interpreter.
+
+    :param manifest: Authenticated closed resource selector.
+    :return: Original default template or exact aggregate-only terminal exec.
+    :raises ValueError: Unknown selector or changed terminal boundary is unsafe.
+    """
+    if not resource_profile.selected(manifest):
+        return _LAUNCHER
+    if _LAUNCHER.count(_REMOTE_DISPATCH) != 1:
+        raise ValueError("Exact original remote dispatch boundary required.")
+    return _LAUNCHER.replace(_REMOTE_DISPATCH, _AGGREGATE_REMOTE_DISPATCH)
+
+
 def launcher(manifest: dict[str, Any], digest: str) -> str:
     """Create a small fixed SSM program; no bearer URL/credential is transmitted.
 
@@ -463,7 +481,7 @@ def launcher(manifest: dict[str, Any], digest: str) -> str:
     )
     return (
         "python3 - <<'CEDAR_OWNED_LAUNCHER'\n"
-        + _LAUNCHER.replace("__PUBLIC_PAYLOAD__", repr(payload))
+        + launcher_template(manifest).replace("__PUBLIC_PAYLOAD__", repr(payload))
         + "\nCEDAR_OWNED_LAUNCHER"
     )
 

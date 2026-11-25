@@ -1,4 +1,4 @@
-"""Pure measured-proof and real-file admission controls; no host/cloud operations."""
+"""Pure/file/local-process controls; no host services or cloud resources are used."""
 
 from __future__ import annotations
 
@@ -7,8 +7,12 @@ import hashlib
 import importlib
 import io
 import json
+import os
+import signal
+import subprocess
 import sys
 import tarfile
+import time
 from pathlib import Path
 from types import ModuleType
 
@@ -652,3 +656,201 @@ def test_capacity_failure_with_linked_output_never_writes_foreign_directory(
     with pytest.raises(ValueError):
         resource_runtime.retain_capacity_failure(run, 1, 1024**3, True)
     assert not list(foreign.iterdir())
+
+
+def _launcher_ast(manifest: dict) -> ast.Module:
+    """Read actual generated code without executing any transport/host command."""
+    program = (
+        controller.launcher(manifest, "a" * 64).split("\n", 1)[1].rsplit("\n", 1)[0]
+    )
+    return ast.parse(program)
+
+
+def test_aggregate_launcher_with_verified_profile_replaces_waiting_python_process(
+    manifest: dict,
+) -> None:
+    tree = _launcher_ast(manifest)
+    final = tree.body[-1]
+    assert isinstance(final, ast.Expr) and isinstance(final.value, ast.Call)
+    assert ast.unparse(final.value.func) == "os.execv"
+    assert ast.unparse(final.value.args[0]) == "sys.executable"
+    assert (
+        ast.unparse(final.value.args[1])
+        == "[sys.executable, str(runtime / 'remote.py')]"
+    )
+
+
+def test_default_launcher_with_old_profile_keeps_original_subprocess_vector(
+    manifest: dict,
+) -> None:
+    tree = _launcher_ast({**manifest, "resource_profile": "default"})
+    final = tree.body[-1]
+    assert ast.unparse(final.value.func) == "subprocess.run"
+    assert ast.unparse(final.value.args[0]) == "['python3', str(runtime / 'remote.py')]"
+    assert [(kw.arg, ast.literal_eval(kw.value)) for kw in final.value.keywords] == [
+        ("check", True)
+    ]
+
+
+_LOCAL_EXEC_IDENTITY = """import hashlib,json,os,signal,sys,time
+from pathlib import Path
+root=Path(__file__).resolve().parent
+def snapshot(name):
+    owner=root/'controller-owner.json'
+    info=owner.stat()
+    row={'pid':os.getpid(),'ppid':os.getppid(),'uid':os.getuid(),'gid':os.getgid(),
+         'groups':sorted(os.getgroups()),'cwd':os.getcwd(),'executable':sys.executable,
+         'sentinel':os.environ.get('EXPERTS_LOCAL_EXEC_VALUE'),
+         'owner_sha256':hashlib.sha256(owner.read_bytes()).hexdigest(),
+         'owner_inode':info.st_ino,'owner_uid':info.st_uid,'owner_gid':info.st_gid,
+         'owner_mode':info.st_mode&0o777}
+    (root/name).write_text(json.dumps(row))
+"""
+_LOCAL_EXEC_TARGET = """
+mode=os.environ['EXPERTS_LOCAL_EXEC_MODE']
+if mode=='signal':
+    signal.signal(signal.SIGTERM,lambda number,frame:sys.exit(74))
+snapshot('after.json')
+if mode=='signal':
+    time.sleep(10)
+else:
+    sys.exit(int(mode))
+"""
+
+
+def _write_exec_fixture(manifest: dict, tmp_path: Path) -> tuple[Path, Path]:
+    """Execute only the reviewed final two launcher nodes in an owned local fixture."""
+    tree = _launcher_ast(manifest)
+    nodes = tree.body[-2:]
+    assert isinstance(nodes[0], ast.Import) and [n.name for n in nodes[0].names] == [
+        "sys"
+    ]
+    assert (
+        isinstance(nodes[1], ast.Expr)
+        and ast.unparse(nodes[1].value.func) == "os.execv"
+    )
+    terminal = ast.unparse(ast.Module(body=nodes, type_ignores=[]))
+    own = tmp_path / "local-exec-only"
+    own.mkdir(mode=0o700)
+    owner = own / "controller-owner.json"
+    owner.write_text("LOCAL_TEST_OWNER_ONLY")
+    owner.chmod(0o600)
+    wrapper = own / "launcher.py"
+    wrapper.write_text(
+        _LOCAL_EXEC_IDENTITY
+        + "\nruntime=root\nsnapshot('before.json')\n"
+        + terminal
+        + "\n"
+    )
+    (own / "remote.py").write_text(_LOCAL_EXEC_IDENTITY + _LOCAL_EXEC_TARGET)
+    cwd = own / "retained-working-directory"
+    cwd.mkdir(mode=0o700)
+    return wrapper, cwd
+
+
+def _assert_exec_identity(before: dict, after: dict, pid: int) -> None:
+    """Compare actual local kernel/process state, not an asserted PID model."""
+    assert before["pid"] == after["pid"] == pid
+    assert before["uid"] == after["uid"] == os.getuid()
+    assert before["gid"] == after["gid"] == os.getgid()
+    for key in (
+        "ppid",
+        "groups",
+        "cwd",
+        "executable",
+        "sentinel",
+        "owner_sha256",
+        "owner_inode",
+        "owner_uid",
+        "owner_gid",
+        "owner_mode",
+    ):
+        assert before[key] == after[key], key
+    assert (
+        after["sentinel"] == "fixed-public-local-probe" and after["owner_mode"] == 0o600
+    )
+
+
+@pytest.mark.parametrize("exit_code", [0, 23])
+def test_aggregate_exec_with_real_local_process_retains_pid_identity_and_exit_status(
+    manifest: dict, tmp_path: Path, exit_code: int
+) -> None:
+    wrapper, cwd = _write_exec_fixture(manifest, tmp_path)
+    env = {
+        **os.environ,
+        "EXPERTS_LOCAL_EXEC_VALUE": "fixed-public-local-probe",
+        "EXPERTS_LOCAL_EXEC_MODE": str(exit_code),
+    }
+    process = subprocess.Popen(
+        [sys.executable, str(wrapper)],
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, stderr = process.communicate(timeout=5)
+    assert process.returncode == exit_code and stdout == stderr == b""
+    before = json.loads((wrapper.parent / "before.json").read_text())
+    after = json.loads((wrapper.parent / "after.json").read_text())
+    _assert_exec_identity(before, after, process.pid)
+    assert after["cwd"] == str(cwd)
+
+
+def _ready_exec_snapshot(path: Path) -> dict:
+    """Read a completed real snapshot before delivering the bounded test signal."""
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            return json.loads(path.read_text())
+        except (FileNotFoundError, json.JSONDecodeError):
+            time.sleep(0.01)
+    raise AssertionError("Actual local exec target did not become ready.")
+
+
+def test_aggregate_exec_with_real_local_sigterm_reaches_same_supervised_pid(
+    manifest: dict, tmp_path: Path
+) -> None:
+    wrapper, cwd = _write_exec_fixture(manifest, tmp_path)
+    env = {
+        **os.environ,
+        "EXPERTS_LOCAL_EXEC_VALUE": "fixed-public-local-probe",
+        "EXPERTS_LOCAL_EXEC_MODE": "signal",
+    }
+    process = subprocess.Popen(
+        [sys.executable, str(wrapper)],
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        after = _ready_exec_snapshot(wrapper.parent / "after.json")
+        process.send_signal(signal.SIGTERM)
+        stdout, stderr = process.communicate(timeout=5)
+        assert process.returncode == 74 and stdout == stderr == b""
+        before = json.loads((wrapper.parent / "before.json").read_text())
+        _assert_exec_identity(before, after, process.pid)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+
+
+@pytest.mark.parametrize("choice", [None, True, "aggregate512", {"floor": 1}])
+def test_launcher_template_with_unknown_resource_selector_rejects(
+    choice: object,
+) -> None:
+    with pytest.raises(ValueError):
+        controller.launcher_template({"resource_profile": choice})
+
+
+def test_launcher_template_with_changed_terminal_boundary_refuses_broad_replacement(
+    manifest: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        controller,
+        "_LAUNCHER",
+        controller._LAUNCHER + "\n" + controller._REMOTE_DISPATCH,
+    )
+    with pytest.raises(ValueError):
+        controller.launcher_template(manifest)
