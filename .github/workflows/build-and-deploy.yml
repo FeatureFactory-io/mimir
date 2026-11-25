@@ -23,6 +23,12 @@ on:
         type: boolean
         required: true
         default: false
+      experts_suite:
+        description: Explicit core readiness or full eleven-case Cedar verification
+        type: choice
+        required: true
+        default: core
+        options: [core, full]
       experts_candidate_run_id:
         description: Successful build-only Actions run with exact candidate image receipt
         type: string
@@ -548,7 +554,7 @@ jobs:
     name: Owned Cedar companion readiness on existing idle
     if: github.event_name == 'workflow_dispatch' && inputs.experts_staging_only
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: ${{ inputs.experts_suite == 'full' && 180 || 45 }}
     concurrency:
       group: mimir-idle-power
       cancel-in-progress: false
@@ -560,6 +566,9 @@ jobs:
       CANDIDATE_SHA: ${{ inputs.experts_candidate_sha }}
       AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
       GH_TOKEN: ${{ github.token }}
+      EXPERTS_SUITE: ${{ inputs.experts_suite }}
+      BROWSER_IMAGE: 411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:a74104c8fb4ff8a02dd053ee2584868d91dd4273f058b690faf0875684c5e368
+      POSTGRES_IMAGE: postgres@sha256:07abc3f43c9395b0bdbbab36bc25ddb0e8d83cd4fcafb5fb7d6abe14ff156dd8
     steps:
       - name: Require isolated-only mode and validated candidate selectors
         env:
@@ -571,6 +580,7 @@ jobs:
           test "$NORMAL_DEPLOY" = false
           test "$PREFLIGHT_ONLY" = false
           test "$WAKE_IDLE" = false
+          case "$EXPERTS_SUITE" in core|full) ;; *) exit 2 ;; esac
           [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$AWS_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]
@@ -585,7 +595,7 @@ jobs:
       - name: Install only control-plane validation dependencies
         run: python -m pip install boto3 pytest pyyaml
       - name: Verify fail-closed runner contracts
-        run: python -m pytest -p no:cacheprovider -c /dev/null --confcutdir=tests/unit tests/unit/test_experts_staging_runner_contract.py tests/unit/test_experts_staging_runner_config.py -q
+        run: python -m pytest -p no:cacheprovider -c /dev/null --confcutdir=tests/unit tests/unit/test_experts_staging_runner_contract.py tests/unit/test_experts_staging_runner_config.py tests/unit/test_experts_staging_suite.py tests/unit/test_experts_staging_suite_workflow.py tests/unit/test_experts_staging_saga_contract.py tests/unit/test_experts_staging_saga_trace.py tests/unit/test_experts_staging_saga_guest.py tests/unit/test_experts_staging_saga_visual.py tests/unit/test_experts_staging_saga_summary_contract.py -q
       - name: Download exact candidate build receipt
         uses: actions/download-artifact@v4
         with:
@@ -610,34 +620,19 @@ jobs:
       - name: Log in to existing ECR repository
         id: experts-ecr
         uses: aws-actions/amazon-ecr-login@v2
-      - name: Set up isolated browser build
-        uses: docker/setup-buildx-action@v3
-      - name: Build browser derivative from exact candidate digest
-        id: experts-browser
-        uses: docker/build-push-action@v5
-        with:
-          context: scripts/experts-staging
-          file: scripts/experts-staging/Dockerfile.browser
-          build-args: CANDIDATE_IMAGE=${{ steps.experts-source.outputs.web_image }}
-          push: true
-          tags: ${{ steps.experts-ecr.outputs.registry }}/mimir:experts-browser-${{ github.run_id }}-${{ steps.experts-source.outputs.nonce }}
-          platforms: linux/amd64
-          cache-from: type=gha,scope=experts-browser
-          cache-to: type=gha,scope=experts-browser,mode=max
       - name: Record actual immutable image sizes before any host pull
         env:
           WEB_IMAGE: ${{ steps.experts-source.outputs.web_image }}
-          BROWSER_IMAGE: ${{ steps.experts-ecr.outputs.registry }}/mimir@${{ steps.experts-browser.outputs.digest }}
         run: |
           set -euo pipefail
           docker pull "$WEB_IMAGE" >/dev/null
           docker pull "$BROWSER_IMAGE" >/dev/null
-          docker pull postgres:16 >/dev/null
+          docker pull "$POSTGRES_IMAGE" >/dev/null
           python - <<'PY'
           import json, os, subprocess
           from pathlib import Path
           images = {name: json.loads(subprocess.check_output(['docker', 'image', 'inspect', image]))[0]
-                    for name, image in {'web': os.environ['WEB_IMAGE'], 'browser': os.environ['BROWSER_IMAGE'], 'postgres': 'postgres:16'}.items()}
+                    for name, image in {'web': os.environ['WEB_IMAGE'], 'browser': os.environ['BROWSER_IMAGE'], 'postgres': os.environ['POSTGRES_IMAGE']}.items()}
           postgres = next(value for value in images['postgres']['RepoDigests'] if value.startswith('postgres@sha256:'))
           receipt = {'browser_image': os.environ['BROWSER_IMAGE'], 'postgres_image': postgres,
                      'image_sizes': {name: value['Size'] for name, value in images.items()}}
@@ -647,7 +642,8 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/experts-staging/controller.py execute \
-            --output experts-readiness --images experts-readiness/image-runtime-receipt.json
+            --output experts-readiness --images experts-readiness/image-runtime-receipt.json \
+            --suite "$EXPERTS_SUITE"
       - name: Retain owned readiness evidence and actual open conditions
         if: always()
         uses: actions/upload-artifact@v4
