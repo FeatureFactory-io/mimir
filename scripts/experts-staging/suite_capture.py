@@ -23,6 +23,9 @@ def wait_for_paint(page: Page) -> None:
     :return: None after actual viewport/scroll/body geometry and fonts settle.
     :raises AssertionError: The browser does not reach stable paint readiness.
     """
+    page.wait_for_function(
+        "!document.getAnimations().some(a=>a.playState==='running' && a.effect?.getTiming().iterations!==Infinity)"
+    )
     stable = page.evaluate("""async () => {
         await document.fonts.ready;
         let previous='', stable=0;

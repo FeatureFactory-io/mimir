@@ -143,6 +143,9 @@ def snapshot(page: Page, case: str, step: str, public: bool = True) -> None:
     """
     if public:
         assert_public_body(page)
+    navbar = page.get_by_test_id("realm-navbar").bounding_box()
+    assert navbar is not None
+    page.mouse.move(page.viewport_size["width"] - 2, navbar["y"] + navbar["height"] + 2)
     for attempt in (1, 2):
         fonts = loaded_fonts(page)
         actual = snapshot_actual(page, case, f"{step}-attempt-{attempt}", fonts)
