@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import socket
@@ -107,11 +108,16 @@ def test_server_with_untrusted_packet_rejects_without_oracle(
         client.settimeout(5)
         client.connect(str(scope / "verify.sock"))
         client.sendall(payload)
-        client.shutdown(socket.SHUT_WR)
+        try:
+            client.shutdown(socket.SHUT_WR)
+        except OSError as error:
+            if len(payload) <= 1024 or error.errno != errno.ENOTCONN:
+                raise
         result = client.recv(1024)
     server.join(timeout=5)
     assert result == b'{"status":"FAILED"}' and not calls
     assert not server.is_alive()
+    assert not (scope / "verify.sock").exists()
 
 
 def test_request_verification_with_false_success_nonce_rejects(scope: Path) -> None:
