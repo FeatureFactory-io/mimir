@@ -68,6 +68,19 @@ _DB_BINDS = (
     ("pgdata", "/var/lib/postgresql/data", False),
     ("pg-admin-password", "/run/secrets/pg-password", True),
 )
+# The image clears PGHOST for its setup client, which uses this default socket.
+_POSTGRES_SOCKET_TMPFS = (
+    "/var/run/postgresql:rw,nosuid,size=1m,uid=999,gid=999,mode=3775"
+)
+_POSTGRES_SERVER = (
+    "postgres",
+    "-c",
+    "unix_socket_directories=/var/run/postgresql",
+    "-c",
+    "shared_buffers=32MB",
+    "-c",
+    "max_connections=20",
+)
 _BROWSER_BINDS = (
     ("runtime", "/runtime", True),
     ("output", "/output", False),
@@ -422,26 +435,19 @@ def database_arguments(
     :param image: Immutable PG16 digest.
     :return: Docker argument vector with no shared DB URL.
     """
-    server = [
-        "postgres",
-        "-c",
-        "unix_socket_directories=/tmp",
-        "-c",
-        "shared_buffers=32MB",
-        "-c",
-        "max_connections=20",
-    ]
     return [
         *container_arguments(nonce, names, "db"),
         "--network-alias",
         "cedar-db",
         "--user",
         "999:999",
+        "--tmpfs",
+        _POSTGRES_SOCKET_TMPFS,
         *mounts(root, _DB_BINDS),
         "-e",
         "POSTGRES_PASSWORD_FILE=/run/secrets/pg-password",
         image,
-        *server,
+        *_POSTGRES_SERVER,
     ]
 
 

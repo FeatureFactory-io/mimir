@@ -401,3 +401,29 @@ def test_https_web_entry_with_four_threads_preserves_one_process_and_tls() -> No
     assert argv[argv.index("--certfile") + 1] == "/tls/server.crt"
     assert argv[argv.index("--keyfile") + 1] == "/tls/server.key"
     assert argv[argv.index("--timeout") + 1] == "90"
+
+
+def test_database_arguments_with_readonly_root_support_entrypoint_socket(
+    modules: dict[str, ModuleType], tmp_path: Path
+) -> None:
+    """Keep the real image's initialization client and server on one socket.
+
+    :param modules: Actual pure staging-control imports.
+    :param tmp_path: Owned command-contract path; no Docker calls occur.
+    :return: None when only the bounded nonroot socket mount is writable.
+    :raises AssertionError: The entrypoint cannot reach its temporary server.
+    """
+    remote, manifest = modules["remote"], _runtime_manifest()
+    argv = remote.database_arguments(
+        tmp_path,
+        manifest["nonce"],
+        remote.resource_names(manifest["nonce"]),
+        manifest["postgres_image"],
+    )
+    assert "unix_socket_directories=/var/run/postgresql" in argv
+    assert "/var/run/postgresql:rw,nosuid,size=1m,uid=999,gid=999,mode=3775" in argv
+    assert "unix_socket_directories=/tmp" not in argv and "--read-only" in argv
+    assert argv[argv.index("--user") + 1] == "999:999"
+    assert argv[argv.index("--memory") + 1] == "192m"
+    assert argv[argv.index("--cpus") + 1] == "0.25"
+    assert "--publish" not in argv and "--privileged" not in argv
