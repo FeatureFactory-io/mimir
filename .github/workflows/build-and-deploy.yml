@@ -521,7 +521,7 @@ jobs:
           python3 - <<'PY_CAPACITY'
           import json, shlex
           from pathlib import Path
-          commands = ['set -eu', 'uname -m', 'getconf _NPROCESSORS_ONLN', 'free -b', 'df -Pk /', 'docker info --format "{{.ServerVersion}} {{.Architecture}} {{.MemTotal}} {{.NCPU}}"', 'docker ps --format "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"']
+          commands = ['set -eu', 'uname -m', 'getconf _NPROCESSORS_ONLN', 'free -b', 'df -Pk /', 'docker info --format "{{.ServerVersion}} {{.Architecture}} {{.MemTotal}} {{.NCPU}} {{.CgroupDriver}} {{.CgroupVersion}}"', 'docker ps --format "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"']
           images = {'web': '411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:e7f6e2170fd6250a9b6c3f635ceb2b90d0dfbe81ed337c10180c0a903ca5e1ba',
                     'browser': '411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:a74104c8fb4ff8a02dd053ee2584868d91dd4273f058b690faf0875684c5e368',
                     'postgres': 'postgres@sha256:07abc3f43c9395b0bdbbab36bc25ddb0e8d83cd4fcafb5fb7d6abe14ff156dd8'}
