@@ -10,6 +10,7 @@ import json
 import os
 import threading
 from collections.abc import Callable, Iterable
+from pathlib import Path
 from typing import Any
 
 from django.core.wsgi import get_wsgi_application
@@ -24,6 +25,8 @@ from tests.support.scripted_llm import ScriptedLLM
 
 import saga_summary_fixture as fixture
 from saga_summary_fixture import capture_reviewed, prepared_change, read_baseline
+from suite_runtime import verify
+from suite_worker_verify import start_server
 
 
 def configure_provider() -> tuple[ScriptedLLM, dict[str, Any]]:
@@ -138,3 +141,20 @@ def application(
         if hasattr(response, "close"):
             response.close()
         observe(environ, previous)
+
+
+def verify_loaded_worker() -> None:
+    """Run the unchanged complete ORM/mail oracle without duplicate Django memory.
+
+    :return: None only after the existing original effects and mail checks pass.
+    :raises Exception: Any exact scope, browser, data, session or mail check fails.
+    """
+    with _lock:
+        verify()
+
+
+_verification_worker = start_server(
+    fixture._ROOT,
+    json.loads(Path("/runtime/run.json").read_text())["nonce"],
+    verify_loaded_worker,
+)

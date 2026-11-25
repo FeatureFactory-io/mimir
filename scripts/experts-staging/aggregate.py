@@ -14,7 +14,7 @@ from typing import Any
 
 from benchmark_metrics import parse_events
 
-LIMIT_BYTES = 1024 * 1024 * 1024
+LIMIT_BYTES = 960 * 1024 * 1024
 RESERVE_BYTES = 256 * 1024 * 1024
 ROLE_MEMORY_MIB = {"web": 384, "db": 192, "browser": 768}
 _FIELDS = (
@@ -83,16 +83,16 @@ def validate_profile(name: str, web: int, browser: int) -> bool:
     :param name: Closed resource profile.
     :param web: Explicit web memory cap.
     :param browser: Explicit browser memory cap.
-    :return: Whether aggregate1024 is selected.
+    :return: Whether aggregate960 is selected.
     :raises ValueError: Unknown profile or contradictory caps.
     """
-    if type(name) is not str or name not in {"default", "aggregate1024"}:
+    if type(name) is not str or name not in {"default", "aggregate960"}:
         raise ValueError("Unknown resource profile.")
-    if name == "aggregate1024" and (
+    if name == "aggregate960" and (
         type(web) is not int or type(browser) is not int or web != 384 or browser != 768
     ):
         raise ValueError("Aggregate profile requires web384 PG192 browser768.")
-    return name == "aggregate1024"
+    return name == "aggregate960"
 
 
 def validate_remaining(available: int, current: int, maximum: int) -> None:

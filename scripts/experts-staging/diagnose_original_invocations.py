@@ -1,4 +1,4 @@
-"""Read the eleven fixed original SSM invocations; never issue host commands."""
+"""Read the two fixed original SSM invocations; never issue host commands."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from typing import Any
 import boto3
 
 ROOT = Path(__file__).resolve().parent
-FIXED = json.loads((ROOT / "original-invocations-45550540519.json").read_text())
+FIXED = json.loads((ROOT / "original-invocations-45572474749.json").read_text())
 KNOWN = {
     "ValueError",
     "RuntimeError",
@@ -246,7 +246,7 @@ def main() -> dict[str, Any]:
     """
     if (
         os.environ.get("GITHUB_REF")
-        != "refs/heads/diagnostics/experts-full-stage-45550540519"
+        != "refs/heads/diagnostics/experts-full-stage-45572474749"
     ):
         raise ValueError("Fixed diagnostic ref required")
     index = sources()
@@ -274,7 +274,7 @@ def publish(result: dict[str, Any]) -> None:
     :return: None after exclusive write; existing/linked files are never admitted.
     :raises OSError: Output already exists or cannot be exclusively written.
     """
-    with Path("diagnostic-45550540519.json").open("x") as output:
+    with Path("diagnostic-45572474749.json").open("x") as output:
         json.dump(result, output, sort_keys=True)
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as marker:
         marker.write("safe_json=true\n")

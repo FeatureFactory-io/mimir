@@ -5,19 +5,96 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import traceback
 from pathlib import Path
 from typing import Any
 
 from benchmark_metrics import parse_events, require_headroom
 from suite_contract import selected_case
 
+FAILURE_PHASES = {
+    "capacity": "capacity",
+    "reserve_capacity": "capacity",
+    "inspect_cached_images": "image_cache",
+    "pull_images": "image_pull",
+    "bounded_pull": "image_pull",
+    "monitor_pull": "image_pull",
+    "start_database": "database_start",
+    "wait_database": "database_start",
+    "create_app_role": "database_role",
+    "write_app_runtime": "runtime_setup",
+    "start_web": "web_start",
+    "wait_web": "web_readiness",
+    "run_browser": "browser",
+    "require_browser_reserve": "browser_capacity",
+    "resource_runtime.capacity": "capacity",
+    "resource_profile.require_capacity": "capacity",
+    "resource_runtime.start": "aggregate_start",
+    "resource_runtime.guard": "aggregate_live_capacity",
+    "resource_runtime.member": "aggregate_membership",
+    "aggregate.start": "aggregate_start",
+    "aggregate.guard": "aggregate_live_capacity",
+    "aggregate.validate_remaining": "aggregate_live_capacity",
+    "aggregate.verify_member": "aggregate_membership",
+}
+
+
+_BROWSER_FRAME_FUNCTIONS = {
+    "saga_browser": frozenset(
+        {
+            "run_case",
+            "run_context",
+            "capture_case",
+            "perform_case",
+            "perform_copy",
+            "perform_nomination",
+            "document",
+            "settle",
+            "follow",
+            "sign_in",
+            "snapshot",
+            "own_summary",
+            "own_sources",
+            "account_controls",
+            "own_keyboard",
+            "own_preview",
+            "click_copy",
+            "assert_copy_surface",
+            "assert_clipboard",
+            "inspect_copy_totals",
+            "maria_breakdown",
+            "finalize_observation",
+            "capture_private_values",
+        }
+    ),
+    "suite_browser": frozenset(
+        {
+            "main",
+            "dispatch",
+            "run_readonly",
+            "_observe_readonly",
+            "_guest_matrix",
+            "_guest_viewport",
+        }
+    ),
+    "suite_capture": frozenset(
+        {"wait_for_paint", "acquire_pair", "_acquire_frame", "_record"}
+    ),
+    "suite_guest_capture": frozenset({"capture_viewport", "_geometry"}),
+}
+_BROWSER_FRAME_NAMES = frozenset(
+    module + "." + function
+    for module, functions in _BROWSER_FRAME_FUNCTIONS.items()
+    for function in functions
+)
+
 MIB = 1024**2
 PROOF_FILES = {
-    "resource-proof-result.json": "5a01022824151a166000a32b0ad28bba1395b704e4244de3d639248a6b2b7556",
-    "resource-proof-source.json": "2334ed1c714de49f4808651e4b0b69e7a44335c493906a5ca930def2cc5a7766",
+    "resource-proof-result.json": "13d50049c9361802038992873da696ad058fa9e04d4d2cf2077ebd8cd7defb4d",
+    "resource-proof-source.json": "9543610b70d5e80a261866beda67a86a3b6f8547954026334ea286dcaf8750e9",
 }
 SOURCE = "04c9432bce7eac5ec34a090bc5e8ec4fa06f409d"
-RUNNER = "bf245630222dad6ae89d67f143343eb9863df4aa"
+RUNNER = "f8b25d4f5485364fbe02faa2041a5d25c8c87538"
 IMAGES = {
     "web": "411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:e7f6e2170fd6250a9b6c3f635ceb2b90d0dfbe81ed337c10180c0a903ca5e1ba",
     "browser": "411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:a74104c8fb4ff8a02dd053ee2584868d91dd4273f058b690faf0875684c5e368",
@@ -38,13 +115,13 @@ def selected(manifest: dict[str, Any]) -> bool:
     """Select only the explicit measured profile.
 
     :param manifest: Authenticated invocation.
-    :return: True only for aggregate1024, False for the unchanged default.
+    :return: True only for aggregate960, False for the unchanged default.
     :raises ValueError: Selector is unknown.
     """
     value = manifest.get("resource_profile", "default")
-    if not isinstance(value, str) or value not in {"default", "aggregate1024"}:
+    if not isinstance(value, str) or value not in {"default", "aggregate960"}:
         raise ValueError("Unknown staged resource profile.")
-    return value == "aggregate1024"
+    return value == "aggregate960"
 
 
 def validate_proof(result: bytes, source: bytes, manifest: dict[str, Any]) -> None:
@@ -70,14 +147,14 @@ def require_capacity(memory: int, disk: int, cached: bool) -> None:
     :param memory: Fresh available memory bytes.
     :param disk: Fresh free Docker-storage bytes.
     :param cached: Complete actual exact-image metadata proof.
-    :return: None at1280MiB memory/1GiB storage with positive warm proof.
+    :return: None at1216MiB memory/1GiB storage with positive warm proof.
     :raises ValueError: Any typed input, cache identity or reserve differs.
     """
     if (
         type(memory) is not int
         or type(disk) is not int
         or cached is not True
-        or memory < 1280 * MIB
+        or memory < 1216 * MIB
         or disk < 1024 * MIB
     ):
         raise ValueError(
@@ -178,7 +255,7 @@ def receipt_payload(
     """
     return {
         "format": "mimir-measured-resources-v1",
-        "resource_profile": "aggregate1024",
+        "resource_profile": "aggregate960",
         "source_revision": manifest["source_revision"],
         "control_revision": manifest["control_revision"],
         "nonce": manifest["nonce"],
@@ -302,7 +379,7 @@ def parent_shape(row: dict[str, Any]) -> None:
     ):
         raise ValueError("Finite actual parent counters required.")
     if (
-        row["limit_bytes"] != 1024 * MIB
+        row["limit_bytes"] != 960 * MIB
         or row["swap_current_bytes"] != 0
         or row["swap_limit_bytes"] != 0
         or not 0 <= row["current_bytes"] <= row["peak_bytes"]
@@ -356,7 +433,7 @@ def proof_semantics(measured: dict[str, Any], identity: dict[str, Any]) -> None:
         or measured["cleanup"] != "SUCCESS"
         or measured["export"] != "SUCCESS"
         or measured["private_root_removed"] is not True
-        or measured["resource_profile"] != "aggregate1024"
+        or measured["resource_profile"] != "aggregate960"
         or measured["aggregate_members"] != {role: True for role in CAPS}
     ):
         raise ValueError("Successful source-bound aggregate measurement required.")
@@ -423,3 +500,123 @@ def bundle_proof(directory: Path, manifest: dict[str, Any]) -> dict[str, bytes]:
         return {}
     validate_files(directory, manifest)
     return {name: (directory / name).read_bytes() for name in PROOF_FILES}
+
+
+def failure_frames(error: Exception) -> list[dict[str, Any]]:
+    """Retain only fixed control function names and bounded numeric source lines.
+
+    :param error: Actual exception, never its message/args/locals.
+    :return: At most16 source-bound closed function/line observations.
+    """
+    result = []
+    for frame in traceback.extract_tb(error.__traceback__):
+        filename = Path(frame.filename).name
+        name = (
+            frame.name
+            if filename == "remote.py"
+            else Path(filename).stem + "." + frame.name
+        )
+        if (
+            filename
+            in {
+                "remote.py",
+                "resource_runtime.py",
+                "resource_profile.py",
+                "aggregate.py",
+            }
+            and name in FAILURE_PHASES
+        ):
+            result.append({"function": name, "line": frame.lineno})
+    return result[-16:]
+
+
+def checked_failure(record: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    """Admit only finite failure phases and known control-source frame projections.
+
+    :param record: Original generated safe runtime classification.
+    :return: Closed phase and actual bounded source-frame list.
+    :raises ValueError: Unknown strings, raw paths, types or phase inference differ.
+    """
+    frames = record.get("source_frames")
+    phase = record.get("phase")
+    if not isinstance(frames, list) or len(frames) > 16 or not isinstance(phase, str):
+        raise ValueError("Bounded actual failure classification required.")
+    for frame in frames:
+        if (
+            not isinstance(frame, dict)
+            or set(frame) != {"function", "line"}
+            or not isinstance(frame["function"], str)
+            or frame["function"] not in FAILURE_PHASES
+            or type(frame["line"]) is not int
+            or not 1 <= frame["line"] <= 4096
+        ):
+            raise ValueError("Only fixed actual control frames may be published.")
+    expected = FAILURE_PHASES[frames[-1]["function"]] if frames else "owned_runtime"
+    if phase != expected or record.get("private_output_exported") is not False:
+        raise ValueError("Failure phase must match its fixed source classification.")
+    return phase, frames
+
+
+def capacity_observation(memory: int, disk: int, cached: bool) -> dict[str, Any]:
+    """Project only finite actual counters and the fixed measured-profile budgets.
+
+    :param memory: Actual fresh available memory bytes.
+    :param disk: Actual fresh free Docker-storage bytes.
+    :param cached: Actual exact-image metadata verification result.
+    :return: Closed safe diagnostic values, not an acceptance verdict.
+    :raises ValueError: Unknown types or unbounded counters cannot be emitted.
+    """
+    if (
+        any(
+            type(value) is not int or not 0 <= value < 2**64 for value in (memory, disk)
+        )
+        or type(cached) is not bool
+    ):
+        raise ValueError("Finite actual capacity counters required.")
+    return {
+        "available_memory_bytes": memory,
+        "available_docker_disk_bytes": disk,
+        "required_memory_bytes": 1216 * MIB,
+        "required_disk_bytes": 1024**3,
+        "image_cache_verified": cached,
+    }
+
+
+def browser_failure_frames(error: Exception) -> list[dict[str, Any]]:
+    """Project only closed browser-source locations, never error text or locals.
+
+    :param error: Actual propagated browser exception.
+    :return: At most16 finite source function/line records.
+    """
+    result = []
+    for frame in traceback.extract_tb(error.__traceback__):
+        module = Path(frame.filename).stem
+        if module not in _BROWSER_FRAME_FUNCTIONS:
+            continue
+        if Path(frame.filename) != Path(__file__).with_name(module + ".py"):
+            continue
+        if frame.name in _BROWSER_FRAME_FUNCTIONS[module]:
+            result.append({"function": module + "." + frame.name, "line": frame.lineno})
+    return checked_browser_frames(result[-16:])
+
+
+def checked_browser_frames(frames: object) -> list[dict[str, Any]]:
+    """Validate the finite browser-source projection before derivative export.
+
+    :param frames: Actual generated browser failure locations.
+    :return: Independent closed records with no arbitrary strings or paths.
+    :raises ValueError: Unknown function, extra key or unbounded/type-invalid line.
+    """
+    if not isinstance(frames, list) or len(frames) > 16:
+        raise ValueError("Bounded browser source locations required.")
+    for row in frames:
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"function", "line"}
+            or not isinstance(row["function"], str)
+            or row["function"] not in _BROWSER_FRAME_NAMES
+            or type(row["line"]) is not int
+            or not 1 <= row["line"] <= 4096
+        ):
+            raise ValueError("Only fixed browser source locations may be published.")
+    return [dict(row) for row in frames]

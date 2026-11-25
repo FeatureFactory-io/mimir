@@ -1,0 +1,61 @@
+{
+  "source_revision": "b574dbbc94a19f003583ef51d189fdf13825314d",
+  "candidate": "04c9432bce7eac5ec34a090bc5e8ec4fa06f409d",
+  "artifact_id": 15005181191,
+  "artifact_sha256": "2e4f30117cdf5e6ada84c23380c6a8a47c078bb6f77a729c61cc70090ab25ee1",
+  "instance": "i-0f9603f1b45a08879",
+  "invocations": [
+    {
+      "phase": "copy-self",
+      "nonce": "a01d31c84c1a497cbafa8404c7c2565d",
+      "command": "d36eb1e6-ea70-4395-8bff-9a9f22e4a456",
+      "receipt_sha256": "69a943b1bbfdcc99f1905a28f3eddbf6a131b005342a05cb70bc7aa0c510a8c5"
+    },
+    {
+      "phase": "summary-acceptance",
+      "nonce": "ecc08bfd8d744739921083f2fa130419",
+      "command": "dbbf73ff-5ea0-4e47-91dd-d56635f5e776",
+      "receipt_sha256": "53f7d3487e70838f87abc02ed066c6fbb52c971f833e0077a0d3649e8a6d5be8"
+    }
+  ],
+  "sources": {
+    "remote.py": "a5316f308535bada7e344a16ef2c448c6c0d61f07efc22288410d465b3153132",
+    "contract.py": "dc87111ffa20c7491a8c113e7edc5c78cf0c3ca7d8f2b16461b7bdc331431e63",
+    "bootstrap.py": "61259536306c61eb14591d82c5fee07792a6a32039f43611f52b6d32fdc5ed25",
+    "browser.py": "5c321038d12b18e06301a77c6451c5f11312ac6b5de41959a1f39b924715df15",
+    "experts_staging_settings.py": "35e6b9ac46cbe64607373e334ef903fc39f5044d26582d54fbdc92aeb12251b9",
+    "verify_image.py": "2923c9e4f85dca21ae904f620f9a9f355e8d00a63e622c3bb95ef0f8bbf1d8fa",
+    "web_entry.py": "5d99bf3d06697a620db2e60fd268f18e45f8f769d36c07ade0f58024a72dd485",
+    "saga_browser.py": "aff883c100923af4033d48cc5472b4d1274073e3c1b9a875c88a0724214ce792",
+    "saga_contract.py": "185e7d1d36d5eedf44c802afe022e57ac9e67b74866e241248eb8eb2f1302da9",
+    "saga_fixture.py": "418c7aef8ee9dec877808dbbc5c159677094b77a46fb7c248ad54e9803a53d8a",
+    "saga_trace.py": "2859120a1e4fc5614b3290beb212218beac458ccf15ee732896e2822909a70f0",
+    "saga_guest.py": "2db368a0f063a0ad9473ee28cb1f422b0c76355bcd2c81dab18d13a194a1707c",
+    "saga_guest_responsive.py": "366aadcd1fc13a369f83cac7229146d29b2564955bb94769ef0805bb5cb7f6c1",
+    "saga_summary_browser.py": "f77dff1c589287b46cbdc6e65b922000453f0275360348a318b7c6f54ad01853",
+    "saga_summary_contract.py": "3280876ec1d399a70c20df44dfc32f9f089f21144a31d419149bb33a4f255f2c",
+    "saga_summary_fixture.py": "5b49987ba5b7f9eb8ea0b06900736ba37c796bdb64bf524abd0cd54f9f5873fd",
+    "companion_wsgi.py": "851cb6a771a3be8a61c472bc1a7d40e23229c3785c970090b91209f8ff0f4344",
+    "saga_visual_browser.py": "123cf0127b74fbb8efd189bf8fc6ffdb2183b3aceb302de7371261c19893828e",
+    "saga_visual_cards.py": "2fcd6923f0cc07729ca59f3fdd6284023f04f747ec2388ead37b6605484fb650",
+    "saga_visual_contract.py": "6e85630f629e4bbe3c0bb4cd4b733af1937615e1e385ee04c1dd9d498f04b147",
+    "saga_visual_fixture.py": "71dd5891d6ef13b8479f54f46cc72ff73b4309361b6fd7f5f1edca765d46c7d0",
+    "suite_contract.py": "72ec2d908d5dfd463bbcb51e321b6d6a0c97be8fcdb658b648ff4051ff89e1b0",
+    "suite_export.py": "03078e075cc00b6641cc564d578c4afcf108d3d2bf31b761351a112b63ce0f8a",
+    "suite_runtime.py": "17fd89c3d3900fa5598d610dc111147d37f72beb59ae29bad412731375c2fdf5",
+    "suite_worker_verify.py": "f33005c7c0ae3e19adff70bc020e850ef44603dba50248d6ddf3ba1a243b7bb5",
+    "suite_browser.py": "993a244de3f24662508ebf2bd43ef5f2ccc5898ba6d2e59578de4bb2bc42f1c4",
+    "suite_readonly.py": "b282220b2c9cb684d9eda36da2d095a5e992ce8b946439a51aa3e284b0fdce69",
+    "suite_mail.py": "cb4b78c4e6b3bd3d4e60e6b71170b8f0710b62bc72212e36671142b65cc039d9",
+    "suite_receipts.py": "63a18dbf9ca58a07fb8268730ec56ec4863bab3306f8d365e2bdd5883f859235",
+    "suite_guest_trace.py": "3134a98c554ec1b5f857ff6b3e8d8b4117f3edcc410686b0d9ffa55168039247",
+    "suite_guest_capture.py": "ad9005c647676b28e53ef71902e39adf0ed634b3a5ee0732b693ba011777ca05",
+    "suite_capture.py": "40fb8be16bdd00adfb0c1c4766c39fe587b2c59a102c279b190048ed2595430d",
+    "suite_pixels.py": "824e6cb891bf820f5e7a7e9cc2e783d19a97f0bdf25ed6a602374a4b09d0de52",
+    "aggregate.py": "1c8c9dde1efd553a9bcce92cd186db44ecb42ba6061b8adbb747165b53cc72b1",
+    "benchmark_metrics.py": "eb1964e0f40f32e1885c9b4a3e3baf90ad905a18973c29848f04eed8dc721776",
+    "resource_profile.py": "1842666879507fb13c30adf1fd2efb1e30f8896759bea0eaf451d9d709729c73",
+    "resource_runtime.py": "b37fd661aa5bbef6bd156e778005d11a13205b972afa7edce3037657b87c00e5",
+    "resource_observer.py": "fe19e06180e8c20a3bd515c1e680e4d72b3899f7b2fc9db72675c59ea137cdca"
+  }
+}

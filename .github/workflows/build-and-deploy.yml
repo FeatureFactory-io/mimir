@@ -5,7 +5,7 @@ permissions:
   contents: read
 jobs:
   read-original-invocations:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diagnostics/experts-full-stage-45550540519'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diagnostics/experts-full-stage-45572474749'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -24,13 +24,13 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-      - name: Read eleven exact original SSM invocations
+      - name: Read two exact original SSM invocations
         id: read
         run: python scripts/experts-staging/diagnose_original_invocations.py
       - name: Retain only positively published typed diagnostic facts
         if: always() && steps.read.outputs.safe_json == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: diagnostic-45550540519
-          path: diagnostic-45550540519.json
+          name: diagnostic-45572474749
+          path: diagnostic-45572474749.json
           if-no-files-found: error

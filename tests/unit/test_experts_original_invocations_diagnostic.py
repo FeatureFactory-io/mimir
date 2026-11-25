@@ -24,9 +24,9 @@ def protocol():
     """Use real ZIP-derived protocol identity; stdout/trace are synthetic controls."""
     index = diag.sources()
     row = diag.FIXED["invocations"][0]
-    scopes = [n for n in index["remote.py"][1] if n.lineno <= 230 <= n.end_lineno]
+    scopes = [n for n in index["remote.py"][1] if n.lineno <= 211 <= n.end_lineno]
     function = min(scopes, key=lambda n: n.end_lineno - n.lineno).name
-    trace = f'  File "/var/tmp/mimir-experts-{row["nonce"]}/runtime/remote.py", line 230, in {function}\n'
+    trace = f'  File "/var/tmp/mimir-experts-{row["nonce"]}/runtime/remote.py", line 211, in {function}\n'
     response = {
         "CommandId": row["command"],
         "InstanceId": diag.FIXED["instance"],
@@ -52,9 +52,9 @@ def test_summarize_with_actual_protocol_identity_and_source_bound_synthetic_trac
     row, index, response, _ = protocol
     result = diag.summarize(response, row, index)
     assert result["read_status"] == "verified"
-    assert result["classification"] == "known_remote_py_230_RuntimeError"
+    assert result["classification"] == "known_remote_py_211_RuntimeError"
     assert result["frames"][0]["file"] == "remote.py"
-    assert len(diag.FIXED["invocations"]) == 11
+    assert len(diag.FIXED["invocations"]) == 2
 
 
 @pytest.mark.parametrize(
@@ -116,7 +116,7 @@ def test_summarize_with_unreviewed_trace_frame_omits_all_untrusted_text(
     elif mutation == "unknown-function":
         old = old.replace("in command", "in PRIVATE_CANARY")
     else:
-        old = old.replace("line 230", "line 999999")
+        old = old.replace("line 211", "line 999999")
     response["StandardErrorContent"] = old
     result = diag.summarize(response, row, index)
     assert result["classification"] == "unknown" and result["frames"] == []
@@ -137,7 +137,7 @@ def test_summarize_with_later_unknown_exception_never_relabels_earlier_known_rai
     assert result["traceback_segments"][0]["kind"] == "earlier_exception_context"
     assert (
         result["traceback_segments"][0]["classification"]
-        == "known_remote_py_230_RuntimeError"
+        == "known_remote_py_211_RuntimeError"
     )
     assert result["traceback_segments"][-1]["kind"] == "terminal_exception"
     assert "PRIVATE" not in json.dumps(result)
@@ -153,7 +153,7 @@ def test_publish_with_existing_or_aliased_output_never_admits_original(
     monkeypatch.setenv("GITHUB_OUTPUT", str(marker))
     outside = tmp_path / "outside.json"
     outside.write_bytes(b"PRIVATE_OUTSIDE_CANARY")
-    output = tmp_path / "diagnostic-45550540519.json"
+    output = tmp_path / "diagnostic-45572474749.json"
     if alias == "symlink":
         output.symlink_to(outside)
     elif alias == "hardlink":
@@ -198,7 +198,7 @@ def test_workflow_with_manual_fixed_ref_contains_only_read_job():
     job = workflow["jobs"]["read-original-invocations"]
     assert (
         job["if"]
-        == "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diagnostics/experts-full-stage-45550540519'"
+        == "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diagnostics/experts-full-stage-45572474749'"
     )
     upload = next(
         step
@@ -206,7 +206,7 @@ def test_workflow_with_manual_fixed_ref_contains_only_read_job():
         if step.get("uses") == "actions/upload-artifact@v4"
     )
     assert upload["if"] == "always() && steps.read.outputs.safe_json == 'true'"
-    assert upload["with"]["path"] == "diagnostic-45550540519.json"
+    assert upload["with"]["path"] == "diagnostic-45572474749.json"
     assert (
         "send_command"
         not in (

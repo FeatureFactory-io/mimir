@@ -107,8 +107,12 @@ def _observe_readonly(context: BrowserContext, case: str) -> None:
         result = run_elena_matrix(page, _ORIGIN, _OUTPUT / "screenshots", oracle)
     else:
         result = _guest_matrix(page, oracle)
-    assert not blocked and context.pages == [page]
-    shared.capture_private_values(page)
+    assert not blocked
+    if case == "authenticated-matrix":
+        assert context.pages == [page]
+        shared.capture_private_values(page)
+    else:
+        assert not context.pages
     shared.write_result(
         "suite-readonly-browser.json", _readonly_record(case, record, result, login)
     )
@@ -150,24 +154,43 @@ def _guest_matrix(page: Page, oracle: GuestOracle) -> list[dict[str, Any]]:
     :param oracle: Actual pristine public expectations.
     :return: Seven actual native outcomes.
     """
-    rows = []
+    rows, context = [], page.context
     for index, (width, height) in enumerate(VIEWPORTS):
         if index:
-            page.context.tracing.start_chunk()
-        page.set_viewport_size({"width": width, "height": height})
-        destination = _OUTPUT / "screenshots" / f"guest-{width}-{height}"
-        destination.mkdir(mode=0o700)
+            assert not context.pages
+            context.tracing.start_chunk()
+            page = context.new_page()
+        assert context.pages == [page]
         try:
-            rows.append(
-                run_guest(
-                    page, _ORIGIN, destination, oracle, native_viewport_captures=True
-                )
-            )
+            rows.append(_guest_viewport(page, oracle, width, height))
         finally:
-            page.context.tracing.stop_chunk(
-                path=str(original_path(_OUTPUT, width, height))
-            )
+            try:
+                context.tracing.stop_chunk(
+                    path=str(original_path(_OUTPUT, width, height))
+                )
+            finally:
+                page.close()
     return rows
+
+
+def _guest_viewport(
+    page: Page, oracle: GuestOracle, width: int, height: int
+) -> dict[str, Any]:
+    """Acquire the complete independent journey before releasing its renderer.
+
+    :param page: Sole actual anonymous page in the unchanged recording context.
+    :param oracle: Original pristine public expectations.
+    :param width: Exact reviewed IA width.
+    :param height: Exact reviewed IA height.
+    :return: Actual unchanged G01–G04 outcome and all native acquisitions.
+    :raises Exception: Every original browser/action/capture assertion propagates.
+    """
+    page.set_viewport_size({"width": width, "height": height})
+    destination = _OUTPUT / "screenshots" / f"guest-{width}-{height}"
+    destination.mkdir(mode=0o700)
+    row = run_guest(page, _ORIGIN, destination, oracle, native_viewport_captures=True)
+    shared.capture_private_values(page)
+    return row
 
 
 def run_readonly(browser: Browser, case: str) -> None:
