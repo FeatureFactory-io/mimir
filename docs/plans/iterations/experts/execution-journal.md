@@ -1762,3 +1762,53 @@ intro is392frames/16.333333seconds, SHA256:
 It preserves native Cursor/CLI source and the rear-facing comic, with no repeated
 narration. Source-only clip QA supplies no actual staged UAT verdict. Final film
 completion still requires genuine staged browser evidence and independent review.
+
+
+### Actual browser startup repair and core verified — 25 November 2026
+
+Runtime6538fd4 adds only explicit /runtime:/app imports for suite/observer
+browser dispatchers, leaving ordinary core argv unchanged. A source-controlled
+fresh subprocess reproduces missing tests from the originalf879bundle and reaches
+main after the sole environment correction, without Django/pytest setup or
+browser/DB/network work. Test-only435a135 names a15second bounded wait for
+local process-invariant fixtures; all identity/exit/signal assertions and actual
+production deadlines are unchanged. Shared mutable-tree full local repeats are
+explicitly NON_AUTHORITATIVE_FOR_435, preserving both a local exec timeout and
+concurrent peer RED skeleton results. No full local green is inferred.
+Author report99a38d21bd09f9077f172ae8f72f084272abbdb0f1ad9fc256666430034fb15c;
+independent runtime review30347a1c8af5da202d513d691bf2e9005ac7a79e611c10ba7145f8dc9dcb3763.
+
+CI-only70f2d8e adds an immutable-image import barrier using the genuine shipped
+bundle before any host execution. Review rejected its private0700 mount/UID
+precondition and incomplete anonymous-volume cleanup; NODE_FAIL retained.
+Successor7f21c1a uses the verified directory owner UID:GID while preserving
+private modes, dropped capabilities and read-only source; label-checked cleanup
+removes only its own container and anonymous volumes. Fourteen focused checks
+pass in each dependency environment, plus53independent boundary checks.
+Independent exact7freviewe27821cf1652584bd17c84cea3cb7e3e14e8a1475c4de040ae8af4ea0e312e70.
+No actual import or staged success was inferred from preparation.
+
+Actual coreCI45563734980, exact7f21c1af9fcdef0edb1322ff04c76b393593107e,
+passes617Linux contracts in10.34seconds, actual immutable-image import and
+CASE_VERIFIED core execution. All normal five jobs SKIPPED. Original artifact
+14999570611 ZIP SHA256:
+`c861a170402d055dce50f7da7765166a6956395f9689e5d2a259ef0b1cd1fffb`.
+Strict actual browser archive readback passes, SHA256:
+`49743033a91508f39716170c915fc7b800847146951b9b63918e32fb615e742c`.
+All405candidate files/37controls, exact42member bundle/proofs, current SSM/object/
+download identity, seed and unchanged domain checks agree. Fourteen responsive
+captures plus native clipboard produce15originalPNGs and two VP9 recordings.
+All three memberships verify; parent/browser/web/PG max/OOM/kill/restarts are
+zero and parent swap0. Actual parent peak988,291,072bytes(942.51MiB) under960
+leaves17.49MiB headroom: this is core evidence, never proof of full workload fit.
+Owned runtime resources/private directories are removed. Independent core report
+`bef2e7ef3c0ada9a9e31dffd4c36f617a826bf4d4bc6fcd0016141ca65e86e2f`.
+
+Following strict local readback and actual desktop/phone capture inspection,
+root dispatched full eleven-case CI45564582929/job139036184041 on the SAME7f
+source and fixedcandidate04/build45516980492. Its Linux/source/proof/image/import
+gates pass, normal five jobs SKIP, and owned host execution is in progress.
+All20UAT observations and independent visual/product acceptance remain pending.
+No production database read/copy, normal deployment, main merge, release or
+promotion occurs. Global893lintFAIL and recorded Analytics reload finding remain
+unwaived. Storyboard/Page/localHTML/progress89 agree; final film remains pending.
