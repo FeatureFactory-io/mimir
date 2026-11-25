@@ -20,6 +20,7 @@ from saga_trace import (
     write_redacted,
 )
 from suite_contract import FULL_CASES
+from suite_pixels import png_nonuniform
 from suite_receipts import protocol_fields
 
 _STATUSES = {
@@ -62,6 +63,7 @@ _INTS = {
     "blocked_requests",
     "copy_receipt_requests",
     "document_width",
+    "rejected_captures",
     "available_memory_bytes",
     "available_docker_disk_bytes",
     "full_uat_contracts_passed",
@@ -81,6 +83,8 @@ _BOOLS = {
     "original_native_video",
     "private_output_exported",
     "domain_unchanged",
+    "pixels_nonuniform",
+    "blank_originals_private",
     "trace_screenshots",
     "trace_snapshots",
     "trace_sources",
@@ -129,6 +133,7 @@ _CLOSED_REPORTS = {
     "suite-readonly-effects.json",
     "control-identity.json",
     "owned-cleanup.json",
+    "capture-rejections.json",
     "browser-trace-provenance.json",
 }
 _STEPS = {
@@ -152,6 +157,7 @@ _STEPS = {
     "summary-acceptance": (
         "C01-own-8200",
         "C02-keyboard-preview",
+        "C02-keyboard-expanded",
         "C03-reviewed",
         "C03-refreshed-8200",
         "C04-confirm",
@@ -221,13 +227,9 @@ def _step_capture_names() -> set[str]:
             for attempt in (1, 2):
                 stem = f"saga-{case}-{step}-attempt-{attempt}"
                 result.update({stem + ".json", "screenshots/" + stem + ".png"})
-                if step == "C04-confirm":
-                    result.update(
-                        {
-                            stem + "-viewport.json",
-                            "screenshots/" + stem + "-viewport.png",
-                        }
-                    )
+                result.update(
+                    {stem + "-viewport.json", "screenshots/" + stem + "-viewport.png"}
+                )
     return result
 
 
@@ -400,6 +402,7 @@ def public_receipt(
     _capture_fields(record, result)
     _step_fields(record, result)
     _geometry_fields(record, result)
+    _rejection_fields(record, result)
     protocol_fields(record, result)
     if name.endswith("effects.json"):
         _check_effects(record)
@@ -555,6 +558,8 @@ def _capture_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
         ):
             raise ValueError("Closed actual font family list required.")
         result["fonts"] = fonts
+    if "pixels_nonuniform" in record and record["pixels_nonuniform"] is not True:
+        raise ValueError("Actual public frame must contain visible pixel variation.")
     if "capture_kind" in record:
         if record["capture_kind"] not in {"full_document", "native_viewport"}:
             raise ValueError("Closed native capture label required.")
@@ -595,6 +600,31 @@ def _geometry_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
         ):
             raise ValueError("Closed actual numeric native geometry required.")
         result[key] = box
+
+
+def _rejection_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
+    """Retain only the closed count/hash proof of privately quarantined blanks.
+
+    :param record: Actual rejection metadata.
+    :param result: Safe derivative.
+    :return: None after exact bounded hash list validation.
+    :raises ValueError: Unknown private bytes or inconsistent counts.
+    """
+    if "rejected_capture_sha256" not in record:
+        return
+    hashes = record["rejected_capture_sha256"]
+    if (
+        not isinstance(hashes, list)
+        or not 0 < len(hashes) <= 128
+        or record.get("rejected_captures") != len(hashes)
+        or record.get("blank_originals_private") is not True
+        or any(
+            not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value)
+            for value in hashes
+        )
+    ):
+        raise ValueError("Bounded actual blank-original hash proof required.")
+    result["rejected_capture_sha256"] = hashes
 
 
 def _step_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
@@ -1031,5 +1061,9 @@ def _scan_public(output: Path, secrets: tuple[bytes, ...]) -> None:
             for value in secrets
         ):
             raise ValueError("Private value in public member.")
+        if path.suffix == ".png" and not png_nonuniform(path):
+            raise ValueError(
+                "Uniform actual PNG cannot certify visible application content."
+            )
         if path.suffix == ".zip":
             verify_redacted(path, secrets)

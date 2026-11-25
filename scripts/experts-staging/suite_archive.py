@@ -10,6 +10,7 @@ from typing import Any
 
 from suite_contract import selected_case
 from suite_export import allowed_name, public_receipt
+from suite_pixels import png_bytes_nonuniform
 
 
 def verify_case_archive(
@@ -38,6 +39,7 @@ def verify_case_archive(
             or sum(m.size for m in members) > 128 * 1024**2
         ):
             raise ValueError("Closed bounded archive required.")
+        _received_pixels(archive, members)
         records = {
             m.name: json.loads(archive.extractfile(m).read())
             for m in members
@@ -48,6 +50,24 @@ def verify_case_archive(
         if require_pass:
             _required_media(case, names)
             _required_records(case, records, manifest)
+
+
+def _received_pixels(archive: tarfile.TarFile, members: list[tarfile.TarInfo]) -> None:
+    """Reject actual blank/corrupt downloaded PNGs before a case verdict.
+
+    :param archive: Actual already-bounded downloaded artifact.
+    :param members: Checked closed regular archive directory.
+    :return: None only when every actual original PNG has visible pixel variation.
+    :raises ValueError: A PNG is oversized, malformed or uniformly blank.
+    """
+    for member in members:
+        if member.name.endswith(".png"):
+            if member.size > 8 * 1024**2:
+                raise ValueError("Actual PNG exceeds its finite byte budget.")
+            if not png_bytes_nonuniform(archive.extractfile(member).read()):
+                raise ValueError(
+                    "Blank downloaded PNG cannot certify actual UI evidence."
+                )
 
 
 def _required_media(case: str, names: list[str]) -> None:

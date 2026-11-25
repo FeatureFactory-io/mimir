@@ -36,6 +36,7 @@ from saga_contract import (
     validate_copy_attempts,
 )
 from saga_trace import redact_trace
+from suite_capture import acquire_pair, wait_for_paint
 
 _ORIGIN = "https://cedar-web:8443"
 _OUTPUT = Path("/output")
@@ -144,91 +145,35 @@ def snapshot(page: Page, case: str, step: str, public: bool = True) -> None:
         assert_public_body(page)
     for attempt in (1, 2):
         fonts = loaded_fonts(page)
-        snapshot_actual(page, case, f"{step}-attempt-{attempt}", fonts)
-        if "Montserrat" in fonts and "Font Awesome 6 Pro" in fonts:
+        actual = snapshot_actual(page, case, f"{step}-attempt-{attempt}", fonts)
+        if actual and "Montserrat" in fonts and "Font Awesome 6 Pro" in fonts:
             return
+        if not actual:
+            wait_for_paint(page)
+            continue
         if attempt == 1:
             page.reload(wait_until="networkidle")
             settle(page)
     raise AssertionError(
-        "Actual external fonts did not load; original acquisitions retained."
+        "Actual pixel/font capture admission failed; original acquisitions retained privately."
     )
 
 
-def snapshot_actual(page: Page, case: str, step: str, fonts: list[str]) -> None:
+def snapshot_actual(page: Page, case: str, step: str, fonts: list[str]) -> bool:
     """Retain original screenshot bytes before deciding whether fonts passed.
 
     :param page: Actual current page.
     :param case: Implemented lane.
     :param step: Exact source-controlled step and actual acquisition number.
     :param fonts: Actual loaded font families from this acquisition.
-    :return: None after original image and safe measurements exist.
+    :return: True only for genuine nonuniform document and native viewport frames.
     :raises AssertionError: Actual document overflows the current viewport.
     """
     width = page.viewport_size["width"]
     assert page.evaluate("document.documentElement.scrollWidth") == width
-    name = f"saga-{case}-{step}"
-    prepare_capture(page)
-    page.screenshot(
-        path=str(_OUTPUT / "screenshots" / f"{name}.png"),
-        full_page=True,
-        mask=[page.get_by_test_id("profile-token-field")],
-    )
-    if step.startswith("C04-confirm"):
-        snapshot_modal_viewport(page, case, name)
-    write_result(
-        f"{name}.json",
-        {
-            "case": case,
-            "step": step,
-            "path": urlsplit(page.url).path,
-            "viewport": page.viewport_size,
-            "fonts": fonts,
-            "secure_context": True,
-            "capture_kind": "full_document",
-            "modal_viewport_acquired": step.startswith("C04-confirm"),
-        },
-    )
-
-
-def prepare_capture(page: Page) -> None:
-    """Wait for actual finite animations and position the native document capture.
-
-    :param page: Real rendered current state; no DOM or style mutation.
-    :return: None after animations settle and native scroll reaches top.
-    :raises TimeoutError: The genuine rendered state does not settle.
-    """
-    page.wait_for_function(
-        "!document.getAnimations().some(a => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity)"
-    )
-    page.mouse.move(page.viewport_size["width"] / 2, page.viewport_size["height"] / 2)
-    page.mouse.wheel(0, -100000)
-    page.evaluate("window.scrollTo({top:0,left:0,behavior:'instant'})")
-    page.wait_for_function("scrollY===0")
-
-
-def snapshot_modal_viewport(page: Page, case: str, name: str) -> None:
-    """Acquire the actual settled modal viewport alongside its document capture.
-
-    :param page: Actual open native modal, without scroll or style replacement.
-    :param case: True summary case.
-    :param name: Fixed source-owned screenshot stem.
-    :return: None after original viewport PNG and explicit geometry metadata.
-    """
-    page.screenshot(
-        path=str(_OUTPUT / "screenshots" / f"{name}-viewport.png"),
-        full_page=False,
-        mask=[page.get_by_test_id("profile-token-field")],
-    )
-    write_result(
-        f"{name}-viewport.json",
-        {
-            "case": case,
-            "viewport": page.viewport_size,
-            "capture_kind": "native_viewport",
-            "secure_context": True,
-            "modal_viewport_acquired": True,
-        },
+    wait_for_paint(page)
+    return acquire_pair(
+        page, _OUTPUT, case, step, fonts, [page.get_by_test_id("profile-token-field")]
     )
 
 
@@ -716,11 +661,12 @@ def account_controls(profile: Locator) -> None:
         expect(profile.get_by_test_id(name)).to_be_visible()
 
 
-def own_keyboard(page: Page, profile: Locator) -> None:
+def own_keyboard(page: Page, profile: Locator, case: str | None = None) -> None:
     """Use native Tab, Enter and Space through the real summary expansion control.
 
     :param page: Actual Maria browser at her own profile.
     :param profile: Existing own-profile region.
+    :param case: Optional exact summary lane for the literal expanded-state capture.
     :return: None after full expansion and restored four-line preview.
     :raises AssertionError: Native focus order, accessible state or clipping differs.
     """
@@ -738,6 +684,10 @@ def own_keyboard(page: Page, profile: Locator) -> None:
     expect(toggle).to_be_focused()
     page.keyboard.press("Enter")
     own_preview(summary, toggle, True)
+    summary.scroll_into_view_if_needed()
+    if case is not None:
+        assert case == "summary-acceptance"
+        snapshot(page, case, "C02-keyboard-expanded", public=False)
     expect(toggle).to_be_focused()
     page.keyboard.press("Space")
     own_preview(summary, toggle, False)

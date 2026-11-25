@@ -67,6 +67,7 @@ def own_profile(
         paragraph
     )
     shared.account_controls(profile)
+    profile.get_by_test_id("profile-karma-card").scroll_into_view_if_needed()
     return profile
 
 
@@ -260,7 +261,7 @@ def perform(context: BrowserContext, oracle: dict[str, Any]) -> None:
     logins = [shared.sign_in(page, "mrodriguez")]
     profile = own_profile(page, 1600, 7200, oracle["initial_summary"])
     shared.snapshot(page, CASE, "C01-own-8200", public=False)
-    shared.own_keyboard(page, profile)
+    shared.own_keyboard(page, profile, case=CASE)
     shared.snapshot(page, CASE, "C02-keyboard-preview", public=False)
     submission = submit(page, oracle)
     sign_out(page)

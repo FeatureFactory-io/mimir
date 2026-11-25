@@ -63,6 +63,8 @@ _RUNTIME_FILES = (
     "suite_receipts.py",
     "suite_guest_trace.py",
     "suite_guest_capture.py",
+    "suite_capture.py",
+    "suite_pixels.py",
 )
 _SOURCE_PREFIXES = (
     "accounts/",

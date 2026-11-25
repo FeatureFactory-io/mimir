@@ -5,9 +5,11 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import struct
 import sys
 import tarfile
 import zipfile
+import zlib
 from pathlib import Path
 
 import pytest
@@ -16,8 +18,10 @@ _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "scripts/experts-staging"))
 import controller
 import suite_archive as archive_control
+import suite_capture as capture_control
 import suite_contract as suite
 import suite_export as export
+import suite_pixels as pixels
 from saga_trace import redact_trace
 from suite_archive import verify_case_archive
 
@@ -281,7 +285,11 @@ def _write_core_archive(
             "video/" + "a" * 32 + ".webm",
             "screenshots/guest-native-clipboard.png",
         ):
-            data = b"synthetic-validator-only-control"
+            data = (
+                _png_control(bytes((245, 247, 250)), bytes((0, 0, 0)))
+                if name.endswith(".png")
+                else b"synthetic-validator-only-control"
+            )
             info = tarfile.TarInfo(name)
             info.size = len(data)
             archive.addfile(info, io.BytesIO(data))
@@ -459,7 +467,11 @@ def test_verify_case_archive_with_received_effect_fact_mutation_rejects(
             "screenshots/guest-native-clipboard.png",
             "saga-trace.zip",
         ):
-            data = b"synthetic-validator-control"
+            data = (
+                _png_control(bytes((245, 247, 250)), bytes((0, 0, 0)))
+                if name.endswith(".png")
+                else b"synthetic-validator-control"
+            )
             info = tarfile.TarInfo(name)
             info.size = len(data)
             archive.addfile(info, io.BytesIO(data))
@@ -492,3 +504,88 @@ def test_received_browser_facts_with_contradictory_emitted_source_rejects(
     }
     with pytest.raises(ValueError):
         archive_control._browser_facts("authenticated-matrix", browser, {}, manifest)
+
+
+def _png_control(color: bytes, second: bytes | None = None) -> bytes:
+    """Create tiny synthetic PNG pixel controls, never product screenshots.
+
+    :param color: Exact first RGB pixel.
+    :param second: Optional different second pixel.
+    :return: Valid actual PNG fixture bytes with CRCs and lossless IDAT.
+    """
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + kind
+            + data
+            + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+        )
+
+    ihdr = struct.pack(">IIBBBBB", 2, 1, 8, 2, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", ihdr)
+        + chunk(
+            b"IDAT",
+            zlib.compress(b"\x00" + color + (color if second is None else second)),
+        )
+        + chunk(b"IEND", b"")
+    )
+
+
+@pytest.mark.parametrize("different", [False, True])
+def test_png_nonuniform_with_actual_lossless_pixel_control_detects_blank(
+    tmp_path: Path, different: bool
+) -> None:
+    target = tmp_path / "control.png"
+    target.write_bytes(
+        _png_control(bytes((245, 247, 250)), bytes((0, 0, 0)) if different else None)
+    )
+    assert pixels.png_nonuniform(target) is different
+
+
+@pytest.mark.parametrize("raw", [b"", b"not-a-PNG", b"\x89PNG\r\n\x1a\n"])
+def test_png_nonuniform_with_invalid_original_rejects(
+    tmp_path: Path, raw: bytes
+) -> None:
+    target = tmp_path / "invalid.png"
+    target.write_bytes(raw)
+    with pytest.raises(ValueError):
+        pixels.png_nonuniform(target)
+
+
+def test_quarantine_blank_with_actual_original_retains_bytes_and_hash(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "output"
+    (output / "private").mkdir(mode=0o700, parents=True)
+    (output / "screenshots").mkdir()
+    source = output / "screenshots/saga-summary-acceptance-C01-own-8200-attempt-1.png"
+    raw = _png_control(bytes((245, 247, 250)))
+    source.write_bytes(raw)
+    capture_control.quarantine_blank(output, source, "summary-acceptance")
+    private = output / "private/rejected-captures" / source.name
+    assert not source.exists() and private.read_bytes() == raw
+    receipt = json.loads((output / "capture-rejections.json").read_text())
+    assert receipt["rejected_captures"] == 1 and receipt["rejected_capture_sha256"] == [
+        hashlib.sha256(raw).hexdigest()
+    ]
+    assert (
+        export.public_receipt(
+            "capture-rejections.json", receipt, json.dumps(receipt).encode()
+        )["blank_originals_private"]
+        is True
+    )
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "saga-summary-acceptance-C02-keyboard-expanded-attempt-1-viewport.json",
+        "screenshots/saga-copy-maria-own-summary-8200-attempt-1-viewport.png",
+        "screenshots/saga-nomination-E03-sofia-attempt-1-viewport.png",
+    ],
+)
+def test_allowed_name_with_required_actual_native_uat_pair_is_closed(name: str) -> None:
+    assert export.allowed_name(Path(name)) is True
