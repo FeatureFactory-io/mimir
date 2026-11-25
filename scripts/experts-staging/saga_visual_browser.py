@@ -99,8 +99,9 @@ def observe_viewport(
     path = "/experts/?category=" + oracle["category"].lower()
     _check_native_list(page, output, oracle, people, path, size)
     shared.capture_private_values(page)
+    _assert_public_page(page)
     expect(page.get_by_test_id("user-display")).to_have_text("esvensson")
-    _scroll_to_capture_start(page, size)
+    _scroll_to_capture_start(page)
     fonts = loaded_fonts(page)
     name = f"visual-{oracle['case']}-{size[0]}-{size[1]}.png"
     target = output / "screenshots" / name
@@ -120,17 +121,34 @@ def observe_viewport(
     return row
 
 
-def _scroll_to_capture_start(page: Page, size: list[int]) -> None:
-    """Use actual pointer/wheel input after responsive resizing before acquisition.
+def _assert_public_page(page: Page) -> None:
+    """Reject real fixture-private evidence and account token controls in the DOM.
+
+    :param page: Actual rendered public list after normal Elena authentication.
+    :return: None after exact source fixture sentinels and account hooks are absent.
+    :raises AssertionError: Any private account or authored evidence is disclosed.
+    """
+    document = page.content()
+    fixture = json.loads(_FIXTURE.read_text())
+    for person in fixture["people"]:
+        values = list(person.get("private_playbooks", []))
+        values.extend(
+            person[key] for key in ("private_token", "private_pip") if person.get(key)
+        )
+        assert not any(value in document for value in values)
+    hooks = "[data-testid^='profile-token-'], #profile-api-token, [data-testid='profile-api-token']"
+    expect(page.locator(hooks)).to_have_count(0)
+
+
+def _scroll_to_capture_start(page: Page) -> None:
+    """Position the browser viewport after real keyboard checks before acquisition.
 
     :param page: Real native page after the complete keyboard sequence.
-    :param size: Actual current CSS viewport dimensions.
     :return: None once native document scrolling reaches and settles at the top.
     :raises AssertionError: Actual scrolling does not settle.
-    :raises TimeoutError: Native wheel input fails to reach the capture position.
+    :raises TimeoutError: The browser viewport fails to reach the capture position.
     """
-    page.mouse.move(size[0] / 2, size[1] / 2)
-    page.mouse.wheel(0, -page.evaluate("document.documentElement.scrollHeight"))
+    page.evaluate("window.scrollTo({top:0,left:0,behavior:'instant'})")
     page.wait_for_function("scrollY === 0", timeout=5000)
     cards._wait_for_scroll_to_settle(page)
 
