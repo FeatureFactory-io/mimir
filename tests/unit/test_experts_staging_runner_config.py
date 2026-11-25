@@ -210,6 +210,7 @@ def test_launcher_with_real_package_has_no_credentials_urls_or_unsafe_extraction
             *modules["controller"]._RUNTIME_FILES,
             "source.json",
             "run.json",
+            "controls.json",
         }
         assert all(
             b"DO_NOT_EXPORT_PRIVATE_SENTINEL" not in package.extractfile(item).read()

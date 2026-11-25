@@ -348,6 +348,7 @@ def run_summary_case(browser: Browser) -> None:
         service_workers="block",
         viewport={"width": 1280, "height": 800},
         record_video_dir=str(_OUTPUT / "video"),
+        record_video_size={"width": 1280, "height": 800},
     )
     binding = shared.start_private_capture()
     success = False

@@ -168,11 +168,14 @@ def snapshot_actual(page: Page, case: str, step: str, fonts: list[str]) -> None:
     width = page.viewport_size["width"]
     assert page.evaluate("document.documentElement.scrollWidth") == width
     name = f"saga-{case}-{step}"
+    prepare_capture(page)
     page.screenshot(
         path=str(_OUTPUT / "screenshots" / f"{name}.png"),
         full_page=True,
         mask=[page.get_by_test_id("profile-token-field")],
     )
+    if step.startswith("C04-confirm"):
+        snapshot_modal_viewport(page, case, name)
     write_result(
         f"{name}.json",
         {
@@ -182,6 +185,48 @@ def snapshot_actual(page: Page, case: str, step: str, fonts: list[str]) -> None:
             "viewport": page.viewport_size,
             "fonts": fonts,
             "secure_context": True,
+            "capture_kind": "full_document",
+            "modal_viewport_acquired": step.startswith("C04-confirm"),
+        },
+    )
+
+
+def prepare_capture(page: Page) -> None:
+    """Wait for actual finite animations and position the native document capture.
+
+    :param page: Real rendered current state; no DOM or style mutation.
+    :return: None after animations settle and native scroll reaches top.
+    :raises TimeoutError: The genuine rendered state does not settle.
+    """
+    page.wait_for_function(
+        "!document.getAnimations().some(a => a.playState === 'running' && a.effect?.getTiming().iterations !== Infinity)"
+    )
+    page.mouse.move(page.viewport_size["width"] / 2, page.viewport_size["height"] / 2)
+    page.mouse.wheel(0, -100000)
+    page.wait_for_function("scrollY===0")
+
+
+def snapshot_modal_viewport(page: Page, case: str, name: str) -> None:
+    """Acquire the actual settled modal viewport alongside its document capture.
+
+    :param page: Actual open native modal, without scroll or style replacement.
+    :param case: True summary case.
+    :param name: Fixed source-owned screenshot stem.
+    :return: None after original viewport PNG and explicit geometry metadata.
+    """
+    page.screenshot(
+        path=str(_OUTPUT / "screenshots" / f"{name}-viewport.png"),
+        full_page=False,
+        mask=[page.get_by_test_id("profile-token-field")],
+    )
+    write_result(
+        f"{name}-viewport.json",
+        {
+            "case": case,
+            "viewport": page.viewport_size,
+            "capture_kind": "native_viewport",
+            "secure_context": True,
+            "modal_viewport_acquired": True,
         },
     )
 
@@ -891,6 +936,7 @@ def run_case(browser: Browser, case: str) -> None:
         service_workers="block",
         viewport={"width": 1280, "height": 800},
         record_video_dir=str(_OUTPUT / "video"),
+        record_video_size={"width": 1280, "height": 800},
     )
     run_context(context, case, oracle)
 
@@ -966,6 +1012,10 @@ def finish_evidence(case: str, successful: bool) -> None:
     :return: None after safe publication or private failure quarantine.
     :raises ValueError: Trace sanitization cannot prove safe public bytes.
     """
+    write_result(
+        "private/captured-secrets.json",
+        {"values": sorted(_PRIVATE_VALUES.get() or set())},
+    )
     if not successful:
         quarantine_media()
         return

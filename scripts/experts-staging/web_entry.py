@@ -38,12 +38,15 @@ def main() -> None:
             "shell",
             "--no-imports",
             "-c",
-            "from bootstrap import initialize; initialize()",
+            "from bootstrap import initialize; initialize(); from suite_runtime import prepare; prepare()",
         ],
         check=True,
     )
 
-    os.execvp(_GUNICORN[0], _GUNICORN)
+    argv = list(_GUNICORN)
+    if os.environ.get("EXPERTS_SAGA_CASE") == "summary-acceptance":
+        argv[1] = "companion_wsgi:application"
+    os.execvp(argv[0], argv)
 
 
 if __name__ == "__main__":

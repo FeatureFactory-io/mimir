@@ -195,6 +195,8 @@ def test_validate_source_files_with_real_tree_detects_changed_or_symlinked_sourc
         "methodology/models/karma_award.py": b"MODEL=True\n",
         "tests/support/experts_data.py": b"GUARD=True\n",
         "test-data/experts/cedar-rfp-01.json": b"{}\n",
+        "tests/uat/e2e-uat-flow.feature": b"Feature: UAT\n",
+        "tests/e2e/test_expert_cards.py": b"VIEWPORTS=()\n",
     }
     hashes = {}
     for name, data in files.items():

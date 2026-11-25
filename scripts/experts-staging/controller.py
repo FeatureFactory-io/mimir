@@ -19,6 +19,8 @@ from uuid import uuid4
 import boto3
 
 from contract import select_idle, validate_receipt, validate_runtime_manifest
+from suite_archive import verify_case_archive
+from suite_contract import selected_case, suite_cases
 
 _REQUIRED_ARGUMENTS = {
     "prepare": ("receipt", "revision", "run_id", "account"),
@@ -33,6 +35,26 @@ _RUNTIME_FILES = (
     "experts_staging_settings.py",
     "verify_image.py",
     "web_entry.py",
+    "saga_browser.py",
+    "saga_contract.py",
+    "saga_fixture.py",
+    "saga_trace.py",
+    "saga_guest.py",
+    "saga_guest_responsive.py",
+    "saga_summary_browser.py",
+    "saga_summary_contract.py",
+    "saga_summary_fixture.py",
+    "companion_wsgi.py",
+    "saga_visual_browser.py",
+    "saga_visual_cards.py",
+    "saga_visual_contract.py",
+    "saga_visual_fixture.py",
+    "suite_contract.py",
+    "suite_export.py",
+    "suite_runtime.py",
+    "suite_browser.py",
+    "suite_readonly.py",
+    "suite_mail.py",
 )
 _SOURCE_PREFIXES = (
     "accounts/",
@@ -153,6 +175,8 @@ def source_manifest(repository: Path, revision: str) -> dict[str, Any]:
         "methodology/models/karma_award.py",
         "tests/support/experts_data.py",
         "test-data/experts/cedar-rfp-01.json",
+        "tests/uat/e2e-uat-flow.feature",
+        "tests/e2e/test_expert_cards.py",
     }
     if not required <= files.keys():
         raise ValueError("Candidate source is incomplete.")
@@ -175,8 +199,11 @@ def source_hashes(repository: Path, revision: str) -> dict[str, str]:
     selected = [
         name
         for name in names
-        if name.startswith(_SOURCE_PREFIXES)
-        and Path(name).suffix in {".py", ".html", ".css", ".js", ".json"}
+        if (
+            name.startswith(_SOURCE_PREFIXES)
+            and Path(name).suffix in {".py", ".html", ".css", ".js", ".json"}
+        )
+        or name in {"tests/uat/e2e-uat-flow.feature", "tests/e2e/test_expert_cards.py"}
     ]
     return {
         name: hashlib.sha256(
@@ -332,9 +359,9 @@ def make_bundle(output: Path, manifest: dict[str, Any]) -> tuple[Path, str]:
     :return: New tarball path and exact SHA-256.
     :raises ValueError: Runtime package exceeds its conservative transport bound.
     """
-    files = {
-        name: (Path(__file__).parent / name).read_bytes() for name in _RUNTIME_FILES
-    }
+    files, controls = committed_controls()
+    manifest["control_revision"] = controls["control_revision"]
+    files["controls.json"] = json.dumps(controls).encode()
     files["source.json"] = (output / "source.json").read_bytes()
     files["run.json"] = json.dumps(manifest).encode()
     if sum(len(data) for data in files.values()) > 2 * 1024 * 1024:
@@ -364,7 +391,7 @@ def launcher(manifest: dict[str, Any], digest: str) -> str:
             "nonce": manifest["nonce"],
             "bucket": manifest["bucket"],
             "sha256": digest,
-            "members": [*_RUNTIME_FILES, "source.json", "run.json"],
+            "members": [*_RUNTIME_FILES, "source.json", "run.json", "controls.json"],
         }
     )
     return (
@@ -443,7 +470,13 @@ def download_evidence(
             row = json.loads(line)
             if row.get("evidence_key") == expected_key:
                 receipts.append(row)
-    if len(receipts) != 1 or not 0 < receipts[0]["bytes"] <= 128 * 1024 * 1024:
+    if (
+        len(receipts) != 1
+        or set(receipts[0]) != {"evidence_key", "bytes", "sha256"}
+        or type(receipts[0]["bytes"]) is not int
+        or not 0 < receipts[0]["bytes"] <= 128 * 1024 * 1024
+        or not re.fullmatch(r"[a-f0-9]{64}", str(receipts[0]["sha256"]))
+    ):
         raise ValueError("Owned evidence export has no unique bounded receipt.")
     target = output / "idle-browser-evidence.tar.gz"
     s3.download_file(manifest["bucket"], expected_key, str(target))
@@ -472,11 +505,7 @@ def execute(arguments: argparse.Namespace) -> None:
         raise ValueError(
             "AWS account differs from candidate registry/transport identity."
         )
-    idle, instance_id = resolve_host(session)
-    try:
-        run_and_retrieve(session, output, manifest, idle, instance_id)
-    finally:
-        cleanup_after(session, output, manifest, instance_id)
+    execute_suite(session, output, manifest, getattr(arguments, "suite", "core"))
 
 
 def run_and_retrieve(
@@ -497,6 +526,7 @@ def run_and_retrieve(
     :raises ValueError: Runtime or transport observations fail.
     """
     bundle, digest = make_bundle(output, manifest)
+    (output / "execution-plan.json").write_text(json.dumps(manifest, indent=2))
     result = dispatch_companion(session, manifest, idle, instance_id, bundle, digest)
     safe = {
         "CommandId": result["CommandId"],
@@ -521,8 +551,19 @@ def cleanup_after(
     :return: None after actual bounded cleanup succeeds or finds no owned root.
     :raises ValueError: Actual cleanup fails; never conceal retained resources.
     """
+    _, current_instance = resolve_host(session)
+    if current_instance != instance_id:
+        raise ValueError("Idle ownership changed before independent cleanup.")
     ssm = session.client("ssm")
-    parameters = {"commands": [cleanup_launcher(manifest)], "executionTimeout": ["360"]}
+    parameters = {
+        "commands": [
+            cleanup_launcher(
+                manifest,
+                verified_download=(output / "verified-safe-download.json").is_file(),
+            )
+        ],
+        "executionTimeout": ["360"],
+    }
     response = ssm.send_command(
         InstanceIds=[instance_id],
         DocumentName="AWS-RunShellScript",
@@ -531,6 +572,8 @@ def cleanup_after(
     )
     result = wait_command(ssm, response["Command"]["CommandId"], instance_id)
     safe = {key: result[key] for key in ("CommandId", "Status", "ResponseCode")}
+    if result["Status"] == "Success" and result["ResponseCode"] == 0:
+        safe["actual_cleanup"] = cleanup_receipt(result, manifest["nonce"])
     (output / "final-owned-cleanup.json").write_text(json.dumps(safe, indent=2))
     if result["Status"] != "Success" or result["ResponseCode"] != 0:
         raise ValueError(
@@ -538,19 +581,62 @@ def cleanup_after(
         )
 
 
-def cleanup_launcher(manifest: dict[str, Any]) -> str:
+def cleanup_receipt(result: dict[str, Any], nonce: str) -> dict[str, Any]:
+    """Validate actual remote cleanup facts without trusting arbitrary stdout text.
+
+    :param result: Actual terminal SSM response.
+    :param nonce: Exact invocation owner.
+    :return: Typed actual resource/private-root cleanup receipt.
+    :raises ValueError: Missing, ambiguous or malformed cleanup observation.
+    """
+    rows = [
+        json.loads(line)
+        for line in result.get("StandardOutputContent", "").splitlines()
+        if line.startswith("{")
+    ]
+    matches = [
+        row for row in rows if isinstance(row, dict) and row.get("nonce") == nonce
+    ]
+    if (
+        len(matches) != 1
+        or set(matches[0])
+        != {"nonce", "resources_removed", "private_runtime_removed", "root_was_absent"}
+        or matches[0]["resources_removed"] is not True
+        or any(
+            type(matches[0][key]) is not bool
+            for key in (
+                "resources_removed",
+                "private_runtime_removed",
+                "root_was_absent",
+            )
+        )
+    ):
+        raise ValueError("Actual exact-owner typed cleanup observation required.")
+    return matches[0]
+
+
+def cleanup_launcher(
+    manifest: dict[str, Any], *, verified_download: bool = False
+) -> str:
     """Build exact-owner cleanup, authenticating local helper bytes before import.
 
     :param manifest: Validated public owner/source contract.
+    :param verified_download: True only after actual hash/content verified public download.
     :return: Safe literal SSM cleanup program; never a wildcard/global prune.
     :raises ValueError: The run identity is invalid.
     """
     validate_runtime_manifest(manifest)
     files = {
         name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest()
-        for name in ("remote.py", "contract.py")
+        for name in _RUNTIME_FILES
     }
-    payload = json.dumps({"nonce": manifest["nonce"], "files": files})
+    payload = json.dumps(
+        {
+            "nonce": manifest["nonce"],
+            "files": files,
+            "verified_download": verified_download,
+        }
+    )
     return (
         "python3 - <<'CEDAR_OWNED_CLEANUP'\n"
         + _CLEANUP.replace("__PUBLIC_PAYLOAD__", repr(payload))
@@ -562,7 +648,8 @@ _CLEANUP = """import hashlib,json,os,shutil,sys
 from pathlib import Path
 record=json.loads(__PUBLIC_PAYLOAD__)
 root=Path('/var/tmp')/('mimir-experts-'+record['nonce'])
-if not root.exists():sys.exit(0)
+if not root.exists():
+    print(json.dumps({'nonce':record['nonce'],'resources_removed':True,'private_runtime_removed':True,'root_was_absent':True}));sys.exit(0)
 assert root.resolve()==root and root.stat().st_uid==os.getuid() and root.stat().st_mode&0o777==0o700
 marker=root/'controller-owner.json'
 assert not marker.is_symlink() and json.loads(marker.read_text())['nonce']==record['nonce']
@@ -574,7 +661,8 @@ import remote
 remote.verify_root(root,record['nonce'])
 remote.cleanup(root,record['nonce'],remote.resource_names(record['nonce']))
 remote.verify_root(root,record['nonce'])
-shutil.rmtree(root)
+if record['verified_download']:shutil.rmtree(root)
+print(json.dumps({'nonce':record['nonce'],'resources_removed':True,'private_runtime_removed':not root.exists(),'root_was_absent':False}))
 """
 
 
@@ -676,6 +764,21 @@ def finalize_transport(
     """
     s3 = session.client("s3")
     download_evidence(s3, output, manifest, result)
+    verify_case_archive(
+        output / "idle-browser-evidence.tar.gz", manifest, require_pass=False
+    )
+    (output / "verified-safe-download.json").write_text(
+        json.dumps(
+            {
+                "nonce": manifest["nonce"],
+                "sha256": hashlib.sha256(
+                    (output / "idle-browser-evidence.tar.gz").read_bytes()
+                ).hexdigest(),
+                "safe_archive_verified": True,
+            }
+        )
+    )
+    verify_case_archive(output / "idle-browser-evidence.tar.gz", manifest)
     if result["Status"] != "Success" or result["ResponseCode"] != 0:
         raise ValueError(
             "Owned readiness failed; retained artifacts cannot certify staging."
@@ -687,6 +790,126 @@ def finalize_transport(
         s3.delete_object(
             Bucket=manifest["bucket"], Key=f"experts-uat/{manifest['nonce']}/{name}"
         )
+
+
+def committed_controls() -> tuple[dict[str, bytes], dict[str, Any]]:
+    """Bundle only exact committed control bytes with a separate immutable identity.
+
+    :return: Closed runtime files and exact HEAD/hash declaration.
+    :raises ValueError: Any runtime file is uncommitted, missing or linked.
+    """
+    root = Path(__file__).resolve().parents[2]
+    revision = git_bytes(root, "rev-parse", "HEAD").decode().strip()
+    files: dict[str, bytes] = {}
+    for name in _RUNTIME_FILES:
+        path = Path(__file__).parent / name
+        committed = git_bytes(
+            root, "show", f"{revision}:scripts/experts-staging/{name}"
+        )
+        if path.is_symlink() or path.read_bytes() != committed:
+            raise ValueError(
+                "Runtime bundle requires exact reviewed committed controls."
+            )
+        files[name] = committed
+    return files, {
+        "control_revision": revision,
+        "files": {name: hashlib.sha256(raw).hexdigest() for name, raw in files.items()},
+    }
+
+
+def execute_suite(
+    session: boto3.Session, output: Path, manifest: dict[str, Any], suite: str
+) -> None:
+    """Run every closed lifecycle even after a failed lane; never fabricate full Saga.
+
+    :param session: Existing authenticated account connection.
+    :param output: Owned CI directory with exact prepared source declarations.
+    :param manifest: Validated candidate/image declaration.
+    :param suite: Explicit core or full selector.
+    :return: None after all selected actual lifecycles and cleanup verify.
+    :raises SuiteFailure: Actual failures remain failures after remaining lanes run.
+    """
+    rows, errors = [], []
+    for phase in suite_cases(suite):
+        destination = phase_directory(output, phase.phase, suite)
+        actual = {
+            **manifest,
+            "nonce": uuid4().hex,
+            "suite_phase": phase.phase,
+            "saga_case": phase.case,
+        }
+        row = {"phase": phase.phase, "case": phase.case, "nonce": actual["nonce"]}
+        try:
+            execute_lifecycle(session, destination, actual)
+            row["status"] = "CASE_VERIFIED"
+        except Exception as error:  # noqa: BLE001
+            # Every required lane still runs; retain the original exception privately.
+            errors.append(error)
+            row.update(status="FAILED", exception_class="Exception")
+        rows.append(row)
+    receipt = {
+        "suite": suite,
+        "cases": rows,
+        "all_cases_verified": not errors,
+        "full_saga_accepted": False,
+        "independent_visual_review": "REQUIRED",
+        "operator": "scripted_browser_actions",
+    }
+    (output / "suite-result.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    if errors:
+        raise SuiteFailure(tuple(errors)) from errors[0]
+
+
+class SuiteFailure(RuntimeError):
+    """Keep every original lifecycle exception privately without exporting messages."""
+
+    def __init__(self, failures: tuple[Exception, ...]) -> None:
+        """Preserve actual exceptions after all selected lifecycles have run.
+
+        :param failures: Nonempty original failure tuple.
+        :return: None after retaining complete actual failures.
+        :raises ValueError: Empty failure group.
+        """
+        if not failures:
+            raise ValueError("Actual lifecycle failures required.")
+        self.failures = failures
+        super().__init__("Owned suite retains actual lifecycle failures.")
+
+
+def phase_directory(output: Path, phase: str, suite: str) -> Path:
+    """Create an exclusive per-phase output directory with exact candidate source.
+
+    :param output: Owned prepared CI directory.
+    :param phase: Closed suite phase.
+    :param suite: Explicit selected suite.
+    :return: Existing core destination or fresh per-phase directory.
+    :raises FileExistsError: A full-suite phase would reuse previous output.
+    """
+    destination = output if suite == "core" else output / phase
+    if suite == "full":
+        destination.mkdir(mode=0o700)
+        (destination / "source.json").write_bytes((output / "source.json").read_bytes())
+    return destination
+
+
+def execute_lifecycle(
+    session: boto3.Session, output: Path, manifest: dict[str, Any]
+) -> None:
+    """Rediscover idle and run one newly owned case with independent final cleanup.
+
+    :param session: Existing CI deployment connection.
+    :param output: Exclusive per-phase output directory.
+    :param manifest: Fresh nonce and true closed case declaration.
+    :return: None after actual source/browser/effects/archive/cleanup proof.
+    :raises Exception: Actual failure is preserved, including independent cleanup.
+    """
+    selected_case(manifest)
+    (output / "execution-plan.json").write_text(json.dumps(manifest, indent=2))
+    idle, instance_id = resolve_host(session)
+    try:
+        run_and_retrieve(session, output, manifest, idle, instance_id)
+    finally:
+        cleanup_after(session, output, manifest, instance_id)
 
 
 def main() -> None:
@@ -704,6 +927,7 @@ def main() -> None:
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--images", type=Path)
+    parser.add_argument("--suite", choices=("core", "full"), default="core")
     arguments = parser.parse_args()
     required = _REQUIRED_ARGUMENTS[arguments.mode]
     if any(getattr(arguments, name) is None for name in required):

@@ -6,7 +6,6 @@ import base64
 import hashlib
 import json
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -27,6 +26,8 @@ from contract import (
     validate_pull_capacity,
     validate_runtime_manifest,
 )
+from suite_contract import selected_case
+from suite_export import allowed_name, prepare_public
 
 _HARDENING = (
     "--cap-drop",
@@ -634,6 +635,7 @@ def write_app_runtime(root: Path, manifest: dict[str, Any], password: str) -> No
         "MIMIR_GIT_REVISION": manifest["source_revision"],
         "COOKIE_SECURE": "true",
         "PYTHONDONTWRITEBYTECODE": "1",
+        "EXPERTS_SAGA_CASE": selected_case(manifest).case,
     }
     private_file(
         root / "app.env", "".join(f"{key}={value}\n" for key, value in values.items())
@@ -750,7 +752,7 @@ def run_browser(root: Path, manifest: dict[str, Any], names: dict[str, str]) -> 
         "shell",
         "--no-imports",
         "-c",
-        "from bootstrap import verify_after; verify_after()",
+        "from suite_runtime import verify; verify()",
     )
 
 
@@ -796,7 +798,11 @@ def browser_arguments(
         "--entrypoint",
         "python",
         manifest["browser_image"],
-        "/runtime/browser.py",
+        (
+            "/runtime/browser.py"
+            if selected_case(manifest).case == "core"
+            else "/runtime/suite_browser.py"
+        ),
     ]
 
 
@@ -872,6 +878,14 @@ def archive_evidence(root: Path, manifest: dict[str, Any]) -> None:
         )
     }
     (output / "source-identity.json").write_text(json.dumps(identity, indent=2))
+    for key in ("suite_phase", "saga_case", "control_revision"):
+        if key in manifest:
+            identity[key] = manifest[key]
+    (output / "source-identity.json").write_text(json.dumps(identity, indent=2))
+    (output / "control-identity.json").write_bytes(
+        (root / "runtime/controls.json").read_bytes()
+    )
+    prepare_public(root, manifest)
     archive = package_evidence(root, evidence_files(output))
     upload_evidence(archive, manifest)
 
@@ -938,31 +952,7 @@ def allowed_evidence_name(path: Path) -> bool:
     :param path: Relative artifact path inside the public output directory.
     :return: Whether the concrete artifact is an expected safe output.
     """
-    fixed = {
-        "health.json",
-        "public-copy.json",
-        "seed-receipt.json",
-        "post-browser-state.json",
-        "source-identity.json",
-        "image-source-verification.json",
-        "source-manifest.json",
-        "browser-readiness.json",
-        "browser-failure.json",
-        "runtime-isolation.json",
-        "capacity.json",
-        "runtime-failure.json",
-        "browser-trace.zip",
-        "screenshots/guest-native-clipboard.png",
-    }
-    name = path.as_posix()
-    return bool(
-        name in fixed
-        or re.fullmatch(
-            r"(?:screenshots/)?guest-(?:list|profile)-[0-9]{3,4}-[0-9]{3,4}-attempt-[12]\.(?:json|png)",
-            name,
-        )
-        or re.fullmatch(r"video/[a-f0-9]{32}\.webm", name)
-    )
+    return allowed_name(path)
 
 
 def package_evidence(root: Path, files: list[Path]) -> Path:
@@ -1075,6 +1065,7 @@ def main() -> None:
     root = Path(__file__).resolve().parent.parent
     manifest = json.loads((root / "runtime/run.json").read_text())
     required_disk = validate_runtime_manifest(manifest)
+    selected_case(manifest)
     nonce = manifest["nonce"]
     verify_root(root, nonce)
     names = resource_names(nonce)
@@ -1124,7 +1115,10 @@ def finish_owned_run(
     finally:
         cleanup(root, manifest["nonce"], names)
         verify_root(root, manifest["nonce"])
-        shutil.rmtree(root)
+        # Controller removes private originals only after verified archive download.
+        (root / "runtime-complete.json").write_text(
+            json.dumps({"nonce": manifest["nonce"], "resources_removed": True})
+        )
 
 
 if __name__ == "__main__":

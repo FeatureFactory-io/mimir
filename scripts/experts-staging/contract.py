@@ -19,6 +19,8 @@ _SOURCE_PREFIXES = (
     "static/",
     "tests/support/",
     "test-data/experts/",
+    "tests/uat/e2e-uat-flow.feature",
+    "tests/e2e/test_expert_cards.py",
 )
 _RUNTIME_KEYS = {
     "nonce",
@@ -204,6 +206,8 @@ def validate_source_files(root: Path, files: Mapping[str, str]) -> None:
         "methodology/models/karma_award.py",
         "tests/support/experts_data.py",
         "test-data/experts/cedar-rfp-01.json",
+        "tests/uat/e2e-uat-flow.feature",
+        "tests/e2e/test_expert_cards.py",
     }
     if not required <= files.keys():
         raise ValueError(
@@ -230,7 +234,7 @@ def validate_source_file(root: Path, name: str, expected: str) -> None:
         path.is_absolute()
         or ".." in path.parts
         or "\\" in name
-        or not name.startswith(_SOURCE_PREFIXES)
+        or not (name in _SOURCE_PREFIXES[-2:] or name.startswith(_SOURCE_PREFIXES[:-2]))
         or not re.fullmatch(r"[a-f0-9]{64}", expected)
     ):
         raise ValueError("Unsafe source identity path/digest.")
