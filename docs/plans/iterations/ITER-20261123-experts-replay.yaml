@@ -60,7 +60,7 @@ iteration:
       source_validation: Existing CI wake and read-only capacity preflight passed; app test/build/deploy jobs skipped. No candidate deployed.
     ambient_database_identity: SAO declares shared huginn-db/logical mimir for both physical environments. Ambient secret URLs were not read; no default migration or Cedar seed is authorized by staging preparation.
     staging_arrangement: Exact candidate image in an owned isolated companion/database, with no ambient migrations or fixture seed.
-    candidate_deployment_status: Isolated core readiness CI45521369866 dispatched on reviewed runner1acf85d using successful candidate04c9432/build45516980492. Normal deployment, wake and preflight disabled. Actual Linux/idle readiness and full staged Saga remain unverified until observed receipts exist.
+    candidate_deployment_status: Isolated core readiness CI45521369866 failed during owned PostgreSQL startup; separate exact-owned cleanup succeeded. Read-only diagnostic CI45522662958 confirms start_database/wait_database failure, not browser acceptance. Startup cause and measured post-pull capacity require bounded repair/review before retry. No staging or full Saga pass is claimed.
     owned_postgres_scope_followup:
       owner_scenario: S45
       status: real_postgres_verified

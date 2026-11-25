@@ -1248,3 +1248,34 @@ The actual isolated dispatch is CI45521369866 on reviewed runner1acf85d, with
 candidate04c9432/build45516980492. All ordinary test/build/deployment/wake/preflight
 jobs skip in this mode. It currently prepares its browser derivative from the
 exact candidate image; that state is not yet an observed host/browser pass.
+
+### 2026-11-25 — first owned Linux readiness failure and read-only diagnosis
+
+CI45521369866 failed. Its actual SSM invocation
+`e383dc2a-cd0c-4874-ab0b-8ce5ff98adde` returned Failed/code1; the independent
+exact-owned cleanup invocation returned Success/code0. The hash-verified597-byte
+evidence archive contains capacity.json and source-identity.json only, not browser
+or image-source verification. Archive SHA-256:
+`fadf5acdb1d34a5f97fe7979cb46bd0f6be53fea70d8e676e62e7bced5c78fbf`.
+This is not a successful staging/UAT result.
+
+An isolated diagnostics branch based on1acf85d changes only the existing
+read-only preflight job. Exact13aca3d received independent safety review:
+one-step removal restores the prior workflow byte-for-byte; it reads the fixed
+failed command through GetCommandInvocation and exports only exception classes,
+fixed source frames and operation markers. Raw output remains private. Review
+receipt SHA-256:
+`85f73eb7bc8db3d036dc81251dbe8aa5364a33b920661644ae2e1cdcfbda6ddf`.
+Read-only CI45522662958 passed with normal test/build/deploy/wake/companion jobs
+skipped. Its sanitized trace locates the failure at start_database/wait_database,
+with RuntimeError and CalledProcessError. It does not establish the underlying
+PostgreSQL startup cause. The socket-directory/entrypoint interaction is only a
+source hypothesis pending an exact owned-Docker reproducer.
+
+Actual post-pull capacity is1,357,348,864available memory bytes and3,228,620KiB
+free disk; no running containers appear in that read-only listing. The cold-start
+1400MiB/4GiB guard would prevent another attempt at those readings. A bounded
+resource/cache follow-up must account for actual exact cached images and retain
+safe measured reserve, with no ambient image pruning or host-resource changes.
+Do not attribute this database-startup failure to the separately reproduced
+local two-thread HTTPS issue. All production-data and promotion exclusions remain.
