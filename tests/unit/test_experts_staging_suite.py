@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import io
 import json
@@ -11,6 +12,7 @@ import tarfile
 import zipfile
 import zlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -675,3 +677,273 @@ def test_public_receipt_with_actual_nomination_three_read_examples_accepts() -> 
     record["nomination_text"] += " Unknown example."
     with pytest.raises(ValueError):
         export.public_receipt("saga-browser.json", record, json.dumps(record).encode())
+
+
+_GUEST_LIFECYCLE_VIEWPORTS = (
+    (1280, 800),
+    (1920, 1080),
+    (1512, 982),
+    (768, 1024),
+    (1024, 768),
+    (390, 844),
+    (360, 800),
+)
+
+
+def _guest_namespace(tmp_path: Path, acquire: object, private: list) -> dict:
+    """Bind reviewed source to an explicit pure ownership protocol.
+
+    :param tmp_path: Owned acquisition root.
+    :param acquire: Probe callback recording only calls, never application claims.
+    :param private: Collected page ownership observations.
+    :return: Compiled genuine dispatcher/helper functions.
+    """
+    import_source = _ROOT / "scripts/experts-staging/suite_browser.py"
+    tree = ast.parse(import_source.read_text())
+    methods = [
+        n
+        for n in tree.body
+        if isinstance(n, ast.FunctionDef)
+        and n.name in {"_guest_matrix", "_guest_viewport"}
+    ]
+    space = {
+        "Page": object,
+        "GuestOracle": object,
+        "Any": object,
+        "Path": Path,
+        "_OUTPUT": tmp_path,
+        "_ORIGIN": "https://cedar-web:8443",
+        "VIEWPORTS": _GUEST_LIFECYCLE_VIEWPORTS,
+        "run_guest": acquire,
+        "shared": SimpleNamespace(capture_private_values=private.append),
+        "original_path": lambda output, width, height: output / f"{width}-{height}.zip",
+    }
+    exec(  # noqa: S102 - execute only fixed reviewed repository function AST.
+        compile(ast.Module(body=methods, type_ignores=[]), str(import_source), "exec"),
+        space,
+    )
+    return space
+
+
+class _GuestPageProbe:
+    """Pure ownership state probe, not an application/browser substitute."""
+
+    def __init__(self, context: _GuestContextProbe) -> None:
+        self.context = context
+        self.viewport_size = {}
+        self.closed = False
+
+    def set_viewport_size(self, viewport: dict) -> None:
+        self.viewport_size = viewport
+
+    def close(self) -> None:
+        assert self.context.pages == [self] and not self.closed
+        self.closed = True
+        self.context.pages.remove(self)
+
+
+class _GuestContextProbe:
+    """Reject concurrent page ownership and retain actual dispatcher call order."""
+
+    def __init__(self) -> None:
+        self.pages = []
+        self.created = []
+        self.chunks = []
+        self.tracing = SimpleNamespace(
+            start_chunk=lambda: self.chunks.append("start"),
+            stop_chunk=lambda **kwargs: self.chunks.append(kwargs["path"]),
+        )
+
+    def new_page(self) -> _GuestPageProbe:
+        assert not self.pages, "Previous independent renderer was retained."
+        page = _GuestPageProbe(self)
+        self.pages.append(page)
+        self.created.append(page)
+        return page
+
+
+def _guest_dispatch_probe(tmp_path: Path, failure: int | None) -> tuple:
+    """Execute actual dispatcher AST against a pure page ownership protocol.
+
+    :param tmp_path: Owned acquisition destination.
+    :param failure: Optional real callback exception index.
+    :return: Namespace, page/context, calls and private-value observation list.
+    """
+    context, calls, private = _GuestContextProbe(), [], []
+
+    def acquire(
+        page: _GuestPageProbe,
+        origin: str,
+        output: Path,
+        oracle: object,
+        **kwargs: object,
+    ) -> dict:
+        assert origin == "https://cedar-web:8443" and kwargs == {
+            "native_viewport_captures": True
+        }
+        assert page.context.pages == [page] and output.is_dir()
+        calls.append(dict(page.viewport_size))
+        if len(calls) - 1 == failure:
+            raise RuntimeError("CONTROL_ACQUISITION_FAILURE")
+        return {"viewport": dict(page.viewport_size)}
+
+    space = _guest_namespace(tmp_path, acquire, private)
+    (tmp_path / "screenshots").mkdir()
+    return space, context.new_page(), context, calls, private
+
+
+def test_guest_matrix_with_seven_independent_journeys_releases_each_page(
+    tmp_path: Path,
+) -> None:
+    space, page, context, calls, private = _guest_dispatch_probe(tmp_path, None)
+    rows = space["_guest_matrix"](page, object())
+    assert len(rows) == len(calls) == len(context.created) == len(private) == 7
+    assert calls == [{"width": w, "height": h} for w, h in space["VIEWPORTS"]]
+    assert not context.pages and all(page.closed for page in context.created)
+    assert context.chunks.count("start") == 6 and len(context.chunks) == 13
+
+
+@pytest.mark.parametrize("failure", [0, 3])
+def test_guest_matrix_with_acquisition_error_closes_page_and_preserves_failure(
+    tmp_path: Path, failure: int
+) -> None:
+    space, page, context, calls, private = _guest_dispatch_probe(tmp_path, failure)
+    with pytest.raises(RuntimeError, match="CONTROL_ACQUISITION_FAILURE"):
+        space["_guest_matrix"](page, object())
+    assert len(calls) == failure + 1 and len(private) == failure
+    assert not context.pages and all(page.closed for page in context.created)
+    assert len(context.created) == failure + 1
+
+
+def _saga_source_method(name: str) -> tuple[Path, ast.FunctionDef]:
+    """Read the exact trusted source function without running its environment.
+
+    :param name: Literal reviewed helper selected by this control.
+    :return: Original absolute filename and unmodified function AST.
+    :raises StopIteration: The required production function is missing.
+    """
+    source = _ROOT / "scripts/experts-staging/saga_browser.py"
+    method = next(
+        n
+        for n in ast.parse(source.read_text()).body
+        if isinstance(n, ast.FunctionDef) and n.name == name
+    )
+    return source, method
+
+
+def _actual_copy_failure() -> Exception:
+    """Raise through a real unchanged source function with private callback text.
+
+    :return: Actual exception whose known source frame can safely be retained.
+    """
+    source, function = _saga_source_method("inspect_copy_totals")
+
+    def timeout(*args: object) -> None:
+        raise TimeoutError("PRIVATE_EXCEPTION_MESSAGE_SENTINEL")
+
+    space = {"Page": object, "_MARIA": "/experts/mrodriguez/", "document": timeout}
+    exec(  # noqa: S102 - execute only fixed reviewed repository function AST.
+        compile(ast.Module(body=[function], type_ignores=[]), str(source), "exec"),
+        space,
+    )
+    try:
+        space["inspect_copy_totals"](object(), "copy-self")
+    except TimeoutError as error:
+        return error
+    raise AssertionError("Actual source failure control did not raise.")
+
+
+def test_browser_failure_with_real_known_frame_exports_location_without_private_text() -> (
+    None
+):
+    error = _actual_copy_failure()
+    frames = export.resource_profile.browser_failure_frames(error)
+    assert (
+        len(frames) == 1 and frames[0]["function"] == "saga_browser.inspect_copy_totals"
+    )
+    record = {
+        "case": "copy-self",
+        "status": "FAILED",
+        "exception_class": "TimeoutError",
+        "undeclared_requests": [],
+        "browser_source_frames": frames,
+        "message": str(error),
+        "locals": {"SECRET": "PRIVATE_LOCALS_SENTINEL"},
+    }
+    raw = json.dumps(record).encode()
+    result = export.public_receipt("saga-failure.json", record, raw)
+    assert result["browser_source_frames"] == frames
+    assert result["status"] == "FAILED" and result["exception_class"] == "TimeoutError"
+    assert "PRIVATE_" not in json.dumps(result)
+
+
+@pytest.mark.parametrize(
+    "frames",
+    [
+        [{"function": "PRIVATE_FUNCTION_SENTINEL", "line": 1}],
+        [{"function": "saga_browser.document", "line": True}],
+        [{"function": "saga_browser.document", "line": 4097}],
+        [{"function": "saga_browser.document", "line": 1, "locals": "PRIVATE"}],
+        [{"function": "saga_browser.document", "line": 1}] * 17,
+    ],
+)
+def test_browser_failure_with_unknown_or_private_frame_shape_rejects(
+    frames: object,
+) -> None:
+    record = {
+        "status": "FAILED",
+        "exception_class": "TimeoutError",
+        "browser_source_frames": frames,
+    }
+    with pytest.raises(ValueError):
+        export.public_receipt("saga-failure.json", record, json.dumps(record).encode())
+
+
+def _capture_failure_probe(tmp_path: Path) -> tuple:
+    """Bind genuine acquisition failure handling to pure trace cleanup probes.
+
+    :param tmp_path: Exclusive owned acquisition root.
+    :return: Actual function namespace, context, original exception and receipts.
+    """
+    source, method = _saga_source_method("capture_case")
+    (tmp_path / "private").mkdir()
+    error, rows = _actual_copy_failure(), []
+
+    def perform(*args: object) -> None:
+        raise error
+
+    def stop(**kwargs: str) -> None:
+        Path(kwargs["path"]).write_bytes(b"PRIVATE_TRACE_CONTROL")
+
+    context = SimpleNamespace(
+        tracing=SimpleNamespace(start=lambda **kw: None, stop=stop),
+        route=lambda *args: None,
+    )
+    space = {
+        "BrowserContext": object,
+        "Any": object,
+        "Path": Path,
+        "_OUTPUT": tmp_path,
+        "os": __import__("os"),
+        "perform_case": perform,
+        "browser_failure_frames": export.resource_profile.browser_failure_frames,
+        "write_result": lambda name, record: rows.append((name, record)),
+    }
+    exec(  # noqa: S102 - execute only fixed reviewed repository function AST.
+        compile(ast.Module(body=[method], type_ignores=[]), str(source), "exec"), space
+    )
+    return space, context, error, rows
+
+
+def test_capture_case_with_actual_error_retains_frames_and_original_exception(
+    tmp_path: Path,
+) -> None:
+    space, context, error, rows = _capture_failure_probe(tmp_path)
+    with pytest.raises(TimeoutError) as caught:
+        space["capture_case"](context, "copy-self", {})
+    assert caught.value is error and rows[0][0] == "saga-failure.json"
+    assert (
+        rows[0][1]["browser_source_frames"][-1]["function"]
+        == "saga_browser.inspect_copy_totals"
+    )
+    assert "PRIVATE_EXCEPTION" not in json.dumps(rows)

@@ -730,6 +730,10 @@ def _failure_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
     if not isinstance(requests, list) or len(requests) > 10000:
         raise ValueError("Bounded denied-request list required.")
     result["undeclared_request_count"] = len(requests)
+    if "browser_source_frames" in record:
+        result["browser_source_frames"] = resource_profile.checked_browser_frames(
+            record["browser_source_frames"]
+        )
 
 
 def _mail_fields(record: dict[str, Any], result: dict[str, Any]) -> None:

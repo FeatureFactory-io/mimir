@@ -29,6 +29,7 @@ from playwright.sync_api import (
 )
 
 from browser import assert_public_body, loaded_fonts
+from resource_profile import browser_failure_frames
 from saga_contract import (
     ACTORS,
     allow_saga_request,
@@ -1018,6 +1019,7 @@ def capture_case(context: BrowserContext, case: str, oracle: dict[str, Any]) -> 
                 "case": case,
                 "status": "FAILED",
                 "exception_class": type(error).__name__,
+                "browser_source_frames": browser_failure_frames(error),
                 "undeclared_requests": blocked,
             },
         )

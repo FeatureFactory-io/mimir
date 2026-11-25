@@ -38,6 +38,56 @@ FAILURE_PHASES = {
     "aggregate.verify_member": "aggregate_membership",
 }
 
+
+_BROWSER_FRAME_FUNCTIONS = {
+    "saga_browser": frozenset(
+        {
+            "run_case",
+            "run_context",
+            "capture_case",
+            "perform_case",
+            "perform_copy",
+            "perform_nomination",
+            "document",
+            "settle",
+            "follow",
+            "sign_in",
+            "snapshot",
+            "own_summary",
+            "own_sources",
+            "account_controls",
+            "own_keyboard",
+            "own_preview",
+            "click_copy",
+            "assert_copy_surface",
+            "assert_clipboard",
+            "inspect_copy_totals",
+            "maria_breakdown",
+            "finalize_observation",
+            "capture_private_values",
+        }
+    ),
+    "suite_browser": frozenset(
+        {
+            "main",
+            "dispatch",
+            "run_readonly",
+            "_observe_readonly",
+            "_guest_matrix",
+            "_guest_viewport",
+        }
+    ),
+    "suite_capture": frozenset(
+        {"wait_for_paint", "acquire_pair", "_acquire_frame", "_record"}
+    ),
+    "suite_guest_capture": frozenset({"capture_viewport", "_geometry"}),
+}
+_BROWSER_FRAME_NAMES = frozenset(
+    module + "." + function
+    for module, functions in _BROWSER_FRAME_FUNCTIONS.items()
+    for function in functions
+)
+
 MIB = 1024**2
 PROOF_FILES = {
     "resource-proof-result.json": "13d50049c9361802038992873da696ad058fa9e04d4d2cf2077ebd8cd7defb4d",
@@ -530,3 +580,43 @@ def capacity_observation(memory: int, disk: int, cached: bool) -> dict[str, Any]
         "required_disk_bytes": 1024**3,
         "image_cache_verified": cached,
     }
+
+
+def browser_failure_frames(error: Exception) -> list[dict[str, Any]]:
+    """Project only closed browser-source locations, never error text or locals.
+
+    :param error: Actual propagated browser exception.
+    :return: At most16 finite source function/line records.
+    """
+    result = []
+    for frame in traceback.extract_tb(error.__traceback__):
+        module = Path(frame.filename).stem
+        if module not in _BROWSER_FRAME_FUNCTIONS:
+            continue
+        if Path(frame.filename) != Path(__file__).with_name(module + ".py"):
+            continue
+        if frame.name in _BROWSER_FRAME_FUNCTIONS[module]:
+            result.append({"function": module + "." + frame.name, "line": frame.lineno})
+    return checked_browser_frames(result[-16:])
+
+
+def checked_browser_frames(frames: object) -> list[dict[str, Any]]:
+    """Validate the finite browser-source projection before derivative export.
+
+    :param frames: Actual generated browser failure locations.
+    :return: Independent closed records with no arbitrary strings or paths.
+    :raises ValueError: Unknown function, extra key or unbounded/type-invalid line.
+    """
+    if not isinstance(frames, list) or len(frames) > 16:
+        raise ValueError("Bounded browser source locations required.")
+    for row in frames:
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"function", "line"}
+            or not isinstance(row["function"], str)
+            or row["function"] not in _BROWSER_FRAME_NAMES
+            or type(row["line"]) is not int
+            or not 1 <= row["line"] <= 4096
+        ):
+            raise ValueError("Only fixed browser source locations may be published.")
+    return [dict(row) for row in frames]
