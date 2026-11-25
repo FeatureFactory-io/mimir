@@ -1350,3 +1350,41 @@ New Noor/Elena closing artwork is fictional framing only; its blank monitor awai
 the verified case note. Canonical storyboard and local HTML/progress match77.
 All staged long/missing S04 variants and fresh final confirmation remain explicit
 in the suite integration handoff; no local screen is being relabelled as staging.
+
+### 2026-11-25 — actual disposable CI measurement and independent diagnostic blocker
+
+Fresh independent review passed benchmark source1c8d57a:197checks in each
+dependency environment, two normal-workflow shape exclusions,15extra boundary
+checks, real PG cgroup/auth/owner control and four confirmed resource removals.
+Verification SHA256: `3162cce62d268c880608b1997b388ebd03e343a3649ce9c0a5fbecf5dbd00c8e`.
+Only the diagnostic branch was pushed. Actual CI45531722920/job138928412868 ran
+its sole benchmark job on that exact source.197guards, successful-build/source
+proof and fixed immutable image pulls passed. The384MiB workload reached its
+browser phase, then failed; no usable measurement result is available. The
+434-byte original artifact SHA256 is
+`f6af11b677ac2b82f4504fbd301a9dd688bcae9a7cfd12546d4d7552b9c404e2`.
+Its sole result reports RuntimeError, failed measurement/export, successful
+owned-resource cleanup and private_root_removed:false. Do not infer OOM, fonts,
+an idle failure or complete private-directory disposal. The CI runner was
+disposable; no SSM/idle/shared database/production operation occurred.
+
+Diagnostic repair32d2bba retained sanitized HOST observations and closed failure
+classification, but fresh independent review is NODE_FAIL. An invalid actual
+browser-diagnostic.json was rejected by its reader, then copied raw by the bulk
+exporter. The local injected sentinel counterexample is preserved; no production
+leak was observed. Verification SHA256:
+`a2133ba9bb15570c1536bc9e0acfd775dc2d6675fe53fcf7b2213b9b8208b6ea`.
+The author is fixing exact content/byte admission inside the same five files,
+including hidden duplicate-key data, before fresh review and another384run.
+The220passing checks do not override that real failing privacy counterexample.
+The original CI browser cause and all staged acceptance remain unresolved.
+
+Summary preparation07b8182 has a complete real non-eager owned-PG/HTTPS C01–C05
+local pass,30tests and10actual-PG negative controls. Its six new files leave
+application/seed bytes unchanged; independent review is still required. Visual
+variants are completing two final source-bound seven-size proofs with explicit
+1280×800 video. Earlier scroll/fullPage acquisition failures are retained and
+are not application defects. The parent full-suite handoff preserves all five
+journeys/four UAT, long/missing variants and a fresh final confirmation.
+Canonical storyboard/local HTML/progress match78; progress is now three readable
+paragraphs, with scene/narration requirements unchanged. Full film is unfinished.
