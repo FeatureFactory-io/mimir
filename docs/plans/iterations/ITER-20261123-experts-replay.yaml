@@ -45,7 +45,7 @@ iteration:
       - .github/workflows/build-and-deploy.yml
       run_input: deploy_to_idle=false
       default_compatibility: Published releases and default manual dispatch retain existing deployment behavior.
-      verification: Build-only dispatches executed with deploy_to_idle=false. Current candidate3a9bec1 runs in CI45513892328; no candidate deployment or main/latest release is claimed.
+      verification: CI45513892328 on3a9bec1 failed only the legacy collection-wrapper assertion; its exact04c9432 repair independently passed. Current build-only CI45516980492 uses04c9432 with deploy_to_idle=false, preflight_only=false, wake_idle=false and experts_staging_only=false. No candidate deployment or application release is claimed.
     read_only_ci_preflight:
       status: completed_existing_idle_online
       wake_run_id: 45502266783
@@ -58,7 +58,7 @@ iteration:
       source_validation: Existing CI wake and read-only capacity preflight passed; app test/build/deploy jobs skipped. No candidate deployed.
     ambient_database_identity: SAO declares shared huginn-db/logical mimir for both physical environments. Ambient secret URLs were not read; no default migration or Cedar seed is authorized by staging preparation.
     staging_arrangement: Exact candidate image in an owned isolated companion/database, with no ambient migrations or fixture seed.
-    candidate_deployment_status: Held pending complete latest-dependency gates and independent isolated-runner review; older-FOB and real PostgreSQL scope proofs passed.
+    candidate_deployment_status: Held pending successful candidate build and fresh independent review of staging guard repair1acf85d. Original runner review rejected missing health evidence export and missing service-worker blocking; repair has80local guard passes. No staging/UAT runtime verdict exists yet.
     owned_postgres_scope_followup:
       owner_scenario: S45
       status: real_postgres_verified

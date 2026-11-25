@@ -1162,3 +1162,36 @@ fault probes passed. All1,999source blobs remained unchanged, zero overlays.
 Review: `planning/latest-sdk-pg-independent-20261124/review.md`, verification
 SHA-256 `7d51cae20bd6a949cc14f88e8a478a498ea23eab6228699a6db15af74fcbe4b3`.
 Complete latest-dependency gates and build-only CI45513892328 remain pending.
+
+### 2026-11-25 — candidate wrapper repair and independent staging hold
+
+The completed latest-dependency local full suite on exact3a9bec1 recorded
+1 failed,3,241 passed,18 skipped; CI45513892328 recorded1 failed,3,256 passed,
+3 skipped. Both failures were the same legacy collection-wrapper assertion.
+AT remained83 scenarios/410 steps and24 agent proofs passed, with all1,999
+tracked source blobs unchanged and zero overlays. The exact04c9432 test-only
+repair preserves every original domain/ledger assertion and strictly accepts
+only the supported native list or single result-list wrapper. Fresh independent
+review passed20 cases under each SDK and10 malformed/error-shape probes;
+all2,012 source blobs remained unchanged. Evidence is retained in
+`planning/legacy-collection-wrapper-independent-20261125/`.
+Build-only CI45516980492 now tests04c9432; deployment, preflight, wake and owned
+staging modes are explicitly false. No new complete CI pass is inferred yet.
+
+Independent review of the prepared isolated runner732e555 found two blockers:
+successful health evidence was excluded from its export allowlist, and service
+workers were not explicitly blocked in the browser destination guard. The run
+remained held before cloud execution. Four-path repair1acf85d admits exactly
+health.json and explicitly blocks service workers, preserving the other guards.
+Actual local verification reports80 focused passes, Python3.9.6 archive-byte
+checks and Chromium worker suppression with a successful registration control.
+That local proof is not Linux/idle/Saga acceptance. A fresh independent review
+of exact1acf85d is active. Original failures and corrected probe evidence remain
+in `planning/staging-export-worker-repair-20261125/`.
+
+The complete staged Saga follow-up is being prepared separately against the
+four literal UAT contracts and five composed journey obligations. Only the
+finite ScriptedLLM provider port may be substituted; actual ORM, HTTP, normal
+submission/decision, native clipboard and browser observations remain required.
+This work does not broaden the delivery boundary beyond staging and its own
+positively identified test database. No main merge or production step follows.
