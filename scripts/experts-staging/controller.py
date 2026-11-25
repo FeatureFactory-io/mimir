@@ -981,10 +981,13 @@ def phase_directory(output: Path, phase: str, suite: str) -> Path:
     :param phase: Closed suite phase.
     :param suite: Explicit selected suite.
     :return: Existing core destination or fresh per-phase directory.
-    :raises FileExistsError: A full-suite phase would reuse previous output.
+    :raises FileExistsError: A selected noncore phase would reuse previous output.
+    :raises ValueError: A phase is outside the closed selected suite.
     """
+    if type(phase) is not str or phase not in {row.phase for row in suite_cases(suite)}:
+        raise ValueError("Phase must belong to the explicit selected suite.")
     destination = output if suite == "core" else output / phase
-    if suite == "full":
+    if suite != "core":
         destination.mkdir(mode=0o700)
         (destination / "source.json").write_bytes((output / "source.json").read_bytes())
         for name in resource_profile.PROOF_FILES:

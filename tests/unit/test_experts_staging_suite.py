@@ -49,14 +49,18 @@ def test_retry_receipt_with_two_passes_keeps_full_saga_unaccepted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: list[dict[str, object]] = []
-    monkeypatch.setattr(
-        controller,
-        "execute_lifecycle",
-        lambda session, destination, actual: seen.append(actual),
-    )
-    monkeypatch.setattr(
-        controller, "phase_directory", lambda output, phase, selector: output / phase
-    )
+    (tmp_path / "source.json").write_bytes(b"exact-candidate-source")
+    for name in controller.resource_profile.PROOF_FILES:
+        (tmp_path / name).write_bytes(name.encode())
+
+    def observe(session: object, destination: Path, actual: dict[str, object]) -> None:
+        assert destination.is_dir()
+        assert (destination / "source.json").read_bytes() == b"exact-candidate-source"
+        for name in controller.resource_profile.PROOF_FILES:
+            assert (destination / name).read_bytes() == name.encode()
+        seen.append(actual)
+
+    monkeypatch.setattr(controller, "execute_lifecycle", observe)
     controller.execute_suite(
         None, tmp_path, {"source_revision": "a" * 40}, "copy-summary-retry"
     )
@@ -70,6 +74,28 @@ def test_retry_receipt_with_two_passes_keeps_full_saga_unaccepted(
         result["all_cases_verified"] is True and result["full_saga_accepted"] is False
     )
     assert len({row["nonce"] for row in seen}) == 2
+
+
+def test_phase_directory_with_retry_rejects_reusing_existing_output(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "source.json").write_bytes(b"original")
+    destination = tmp_path / "copy-self"
+    destination.mkdir()
+    (destination / "keep.txt").write_bytes(b"original-evidence")
+    with pytest.raises(FileExistsError):
+        controller.phase_directory(tmp_path, "copy-self", "copy-summary-retry")
+    assert (destination / "keep.txt").read_bytes() == b"original-evidence"
+
+
+@pytest.mark.parametrize("phase", ["nomination", "../outside", "", None])
+def test_phase_directory_with_unselected_retry_phase_creates_nothing(
+    tmp_path: Path,
+    phase: object,
+) -> None:
+    with pytest.raises(ValueError):
+        controller.phase_directory(tmp_path, phase, "copy-summary-retry")
+    assert not list(tmp_path.iterdir())
 
 
 @pytest.mark.parametrize("value", [None, "FULL", "guest", "", 1])
