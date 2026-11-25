@@ -25,6 +25,7 @@ from saga_guest import (
     validate_origin,
     validate_output,
 )
+from suite_capture import wait_for_paint
 
 logger = logging.getLogger(__name__)
 _DESIGN_PATH = "/experts/?category=design"
@@ -412,8 +413,9 @@ def _capture(page: Page, output: Path, name: str, screen: str) -> dict[str, Any]
     if target.exists() or target.is_symlink():
         raise ValueError("Original responsive acquisition cannot be overwritten.")
     page.mouse.move(page.viewport_size["width"] / 2, page.viewport_size["height"] / 2)
-    page.mouse.wheel(0, -100000)
+    page.evaluate("window.scrollTo({top:0,left:0,behavior:'instant'})")
     page.wait_for_function("scrollY===0", timeout=_SETTLE_TIMEOUT_MS)
+    wait_for_paint(page)
     page.screenshot(path=str(target), full_page=True)
     return {
         "screen_id": screen,

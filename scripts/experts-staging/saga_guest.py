@@ -665,6 +665,7 @@ def _capture(page: Page, output: Path, label: str) -> dict[str, Any]:
     target = output / (label + ".png")
     if target.exists() or target.is_symlink():
         raise ValueError("Original guest acquisition cannot be overwritten.")
+    native = capture_viewport(page, output, label) if _NATIVE_VIEWPORTS.get() else None
     page.screenshot(path=str(target), full_page=True)
     record = {
         "step": label,
@@ -676,8 +677,8 @@ def _capture(page: Page, output: Path, label: str) -> dict[str, Any]:
         "document_width": page.evaluate("document.documentElement.scrollWidth"),
     }
 
-    if _NATIVE_VIEWPORTS.get():
-        record["native_viewport"] = capture_viewport(page, output, label)
+    if native is not None:
+        record["native_viewport"] = native
     return record
 
 

@@ -9,6 +9,8 @@ from typing import Any
 
 from playwright.sync_api import Page
 
+from suite_capture import wait_for_paint
+
 _STEPS = frozenset(
     {
         "G01-design",
@@ -39,6 +41,7 @@ def capture_viewport(page: Page, output: Path, step: str) -> dict[str, Any]:
     page.wait_for_function(
         "!document.getAnimations().some(a=>a.playState==='running' && a.effect?.getTiming().iterations!==Infinity)"
     )
+    wait_for_paint(page)
     scroll = page.evaluate("scrollY")
     geometry = _geometry(page)
     page.screenshot(path=str(target), full_page=False)
