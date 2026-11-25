@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from html import unescape
+from html.parser import HTMLParser
 from pathlib import Path
 from time import monotonic
 from typing import Any
@@ -54,6 +55,33 @@ _LINE_STATE = """(el, fraction) => {
         step:Math.max(1,Math.floor((innerHeight-top)*fraction)),
         maxScroll:document.documentElement.scrollHeight-innerHeight};
 }"""
+
+
+class _TokenControlParser(HTMLParser):
+    """Recognize actual account-only controls without rejecting ordinary prose."""
+
+    def __init__(self: _TokenControlParser) -> None:
+        """Initialize one document-local account-control observation.
+
+        :return: None; no document or private value is retained.
+        """
+        super().__init__(convert_charrefs=True)
+        self.found: bool = False
+
+    def handle_starttag(
+        self: _TokenControlParser, tag: str, attrs: list[tuple[str, str | None]]
+    ) -> None:
+        """Observe actual id/test hooks on parsed elements.
+
+        :param tag: Actual parsed element name; all elements are checked.
+        :param attrs: Actual attribute pairs, including independently present hooks.
+        :return: None; only a disclosure boolean is retained.
+        """
+        for name, value in attrs:
+            if name in {"id", "data-testid"} and value is not None:
+                hook = value.casefold()
+                if hook == "profile-api-token" or hook.startswith("profile-token-"):
+                    self.found = True
 
 
 def run_elena_matrix(
@@ -148,7 +176,13 @@ def _assert_public_evidence(document: str) -> None:
     ):
         if value.casefold() in surface:
             raise AssertionError("Private evidence appeared in a public expert screen.")
-    assert 'data-testid="profile-api-token"' not in surface
+    parser = _TokenControlParser()
+    parser.feed(document)
+    parser.close()
+    if parser.found:
+        raise AssertionError(
+            "Account token controls appeared in a public expert screen."
+        )
 
 
 def _assert_shell(page: Page) -> None:

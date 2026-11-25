@@ -24,6 +24,25 @@ def guest() -> ModuleType:
     return module
 
 
+@pytest.fixture
+def responsive(guest: ModuleType, monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    """Load the real responsive guard with its real guest-helper dependency.
+
+    :param guest: Actual standalone guest module.
+    :param monkeypatch: Fixture-scoped import registration; no collaborator mock.
+    :return: Actual responsive module without browser or app initialization.
+    :raises ImportError: Runtime source cannot load.
+    """
+    monkeypatch.setitem(sys.modules, "saga_guest", guest)
+    spec = importlib.util.spec_from_file_location(
+        "cedar_saga_guest_responsive", _SOURCE.with_name("saga_guest_responsive.py")
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _oracle(guest: ModuleType) -> object:
     """Supply nonsecret public facts and synthetic private disclosure probes."""
     return guest.GuestOracle(
@@ -210,3 +229,71 @@ def test_assert_disjoint_boxes_with_intersection_rejects(
             {"x": 10, "y": 20, "width": 200, "height": 300},
             {"x": x, "y": y, "width": 200, "height": 300},
         )
+
+
+@pytest.mark.parametrize(
+    "markup",
+    [
+        '<input id="profile-api-token" value="SYNTHETIC_CONTROL_PROBE">',
+        '<input data-testid="profile-token-field" value="SYNTHETIC_CONTROL_PROBE">',
+        '<input id="profile-api-token" data-testid="profile-token-field" value="SYNTHETIC_CONTROL_PROBE">',
+        "<input ID='PROFILE-API-TOKEN' value='SYNTHETIC_CONTROL_PROBE'>",
+        "<input id = profile-api-token value=SYNTHETIC_CONTROL_PROBE>",
+        '<input data-testid="profile-api-token" value="SYNTHETIC_CONTROL_PROBE">',
+        '<button data-testid="profile-token-toggle">Show token</button>',
+        '<button data-testid="profile-token-copy">Copy token</button>',
+        '<form data-testid="profile-token-regenerate-form"></form>',
+    ],
+)
+def test_assert_public_evidence_with_account_token_control_rejects(
+    responsive: ModuleType, markup: str
+) -> None:
+    """Reject actual field identities independently of the synthetic value.
+
+    :param responsive: Actual responsive validation module.
+    :param markup: Pure malicious validation input, never a browser response.
+    :return: None when the account-only control is rejected.
+    :raises AssertionError: The guard incorrectly accepts a token control.
+    """
+    with pytest.raises(AssertionError):
+        responsive._assert_public_evidence(f"<html><body>{markup}</body></html>")
+
+
+@pytest.mark.parametrize(
+    "sentinel",
+    [
+        "Cedar Bid Pricing",
+        "Internal staffing notes for Cedar",
+        "DEMO_ONLY_NOT_A_REAL_TOKEN",
+        "CEDAR%20BID%20PRICING",
+    ],
+)
+def test_assert_public_evidence_with_private_fixture_value_rejects(
+    responsive: ModuleType, sentinel: str
+) -> None:
+    """Retain all existing private-value checks while repairing control identity.
+
+    :param responsive: Actual responsive validation module.
+    :param sentinel: Pure synthetic disclosure probe.
+    :return: None when protected fixture evidence is rejected.
+    :raises AssertionError: An original disclosure check was weakened.
+    """
+    with pytest.raises(AssertionError):
+        responsive._assert_public_evidence(f"<html><body>{sentinel}</body></html>")
+
+
+def test_assert_public_evidence_with_authenticated_public_contact_accepts(
+    responsive: ModuleType,
+) -> None:
+    """Keep real public contributor contact and navigation usable after login.
+
+    :param responsive: Actual responsive validation module.
+    :return: None when permitted authenticated public content remains accepted.
+    :raises AssertionError: Legitimate contact or ordinary prose is rejected.
+    """
+    responsive._assert_public_evidence(
+        '<html><a data-testid="experts-reach-out-mrodriguez" '
+        'href="mailto:maria.rodriguez@example.com">Reach out</a>'
+        '<a data-testid="nav-view-profile">View profile</a>'
+        "<p>The profile-api-token identifier belongs to account settings.</p></html>"
+    )
