@@ -9992,7 +9992,7 @@ iteration_convergence_followups:
     - tests/unit/test_karma_sqlite_lifecycle.py
     preserves: Production behavior unchanged; restore the actual async worker wrapper and current schema leaves after owned test lifetimes.
   isolated_idle_runner:
-    status: full_suite_resource_adoption_in_progress_staging_not_accepted
+    status: full_suite_actual_retry_in_progress_staging_not_accepted
     footprint:
     - .github/workflows/build-and-deploy.yml
     - scripts/experts-staging/
@@ -10008,6 +10008,13 @@ iteration_convergence_followups:
     - Deployment held until complete gates and independent review; main merge, release and promotion retain human review.
     local_full_suite_source: 9acf7fc34918da549e19bd8c8698a431cce9c380
     local_capture_preparation: Six fresh local cases; 180 original PNGs and six native videos. Independent final capture review remains separate from staging acceptance.
+    reviewed_controller: 417c006d2893f0d8b957000741481442a8585c6c
+    reviewed_controller_checks_each_environment: 587
+    original_full_staging_run: 45550540519
+    original_full_staging_result: All eleven failed before browser; owned runtime resources removed and private failure records retained.
+    original_startup_readonly_run: 45552826357
+    actual_full_staging_retry: 45554226298
+    actual_full_staging_result: In progress; no product or visual acceptance yet.
     resource_profile:
       explicit_trial: aggregate1024
       default_initial_guard_mib: 1400

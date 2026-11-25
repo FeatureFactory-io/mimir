@@ -1551,3 +1551,97 @@ Canonical storyboard and local HTML/progress match81; only two progress
 paragraphs changed. Scene instructions/narration and all599blocks are preserved.
 First21scene cut, Scene22source introduction, lesson insert and closing artwork
 remain ready. Actual full staged UAT and final Scenes22–26 remain unfinished.
+
+### 2026-11-25 — full-suite preparation, original startup failure and bounded retry
+
+Fresh independent capture review of9acf7fc verifies448checks in each dependency
+environment,180original PNGs, six1280x800native videos and six safe archives.
+The original seven blank captures remain rejected; linked quarantine records,
+hidden values and injected blank archive members remain rejected. Report SHA256:
+`c754ff34e3dd1c54a761fbbc11daad3daedb83828b7f67b13f83cc3069dcc498`.
+These remain local components, not staged evidence.
+
+Root workflow/proof intake8893260 is independently accepted with the dependency
+correction9c71543. A genuinely clean environment initially lacked Playwright,
+then Django types used by shared guest assertions. Both original failures are
+preserved; the corrected actual minimal environment passes456checks. The fixed
+artifact ZIP and two exact proof files validate on hostPython3.9. Forty actual
+mode cases preserve the closed selectors and disable normal operations. Report:
+`2b1fdff9fb4bfd8277c3ba1cdf6d1a2929770d893c35bd2588bc38af5f94ca67`.
+
+Aggregate integrationa3bd64d preserves defaults and adds the fixed proof-bound
+warm-only profile, genuine suite observer, source/phase/nonce-bound measurements,
+canonical export/download checks and positively owned cleanup. Review found that
+a missing browser counter file discarded already-known Docker failure flags.
+Correcteda5a3566 retains those typed facts with unavailable memory, and only a
+FAILED partial receipt can admit them. Both environments pass568checks;88fresh
+independent host3.9controls pass. Final preparation review SHA256:
+`c2ac6158de80a21bfc1ef0ff5880892255e3a065091c922442d0f5b9d7a77c26`.
+No preparation result establishes full-suite fit on idle.
+
+Actual full staging CI45550540519 on exacta5a3566 ran all eleven fresh invocation
+lifecycles; all failed before browser work. Every normal job was skipped. The
+105-member artifact14993397357 is preserved unchanged, ZIP SHA256:
+`c577e86b043cdda4d386a917a9a395cff16f70b7ea02ec9e744b1930ac3626fb`.
+All eleven cleanup receipts report resources_removed:true and
+private_runtime_removed:false. These private originals and exact owned S3 keys
+remain retained; do not claim complete private/cloud-object disposal.
+
+All eleven failed archives lack source-manifest.json; their37-file control
+declarations are intact. The surfaced identity rejection concerns that missing
+source declaration. Copy-Maria alone records initial available memory
+1,349,898,240bytes, then a tiny319,488byte parent peak with all roles unavailable.
+None of these archives contains browser PNG/WebM evidence. Product UAT was not
+started, and no product/visual verdict follows from this failed startup.
+
+Read-only diagnostic CI45552826357, exact5ac7814 on its separate diagnostic ref,
+uses only STS identity and GetCommandInvocation for the eleven original fixed
+UUID/nonce pairs. It issues no new host commands. All responses pass source/
+owner binding. Ordered exception contexts preserve the original guards separately
+from later retention failures and unclassified terminal wrappers. Ten FIRST
+contexts identify a5 resource_profile.require_capacity:83, a combined typed
+memory/disk/cache predicate; the exact rejected inputs remain unknown. Copy-Maria's
+FIRST context identifies aggregate.validate_remaining:112, which specifically
+proves insufficient fresh memory for remaining parent allowance plus256MiB.
+The later checked_role:335 failures must not replace those original contexts.
+Diagnostic artifact14994143224 ZIP SHA256:
+`c9f62b4675d9a659e0fe28b5bc65b410996b8bb5cca2f8b6fe01a8cc7d6f4234`.
+Typed JSON SHA256:
+`7cd9fa033edb0051583af550df19d84bf54ffef5ce427f9fa28a7a4b5e27d5b7`.
+No raw stdout/stderr or unknown messages are exported by the diagnostic.
+
+Repair6eaf2ce retains the original source declaration on early failures without
+overwriting conflicting evidence. Numeric capacity observations precede capacity
+rejection; finite source frames retain failure phases without raw messages. The
+genuine missing-source producer/readback counterexample is preserved RED; repaired
+local producer/export/readback passes all eleven actual failure structures while
+all eleven still reject successful case acceptance. Both environments pass577
+checks and45independent host3.9controls pass. Independent report SHA256:
+`8c8d2acb74b4ca5306a7256e51aacfe728b18f1177595da26257860e1ab6618c`.
+
+Successor417c006 removes only aggregate mode's unnecessary waiting interpreter:
+the final fixed dispatch uses exec with the same interpreter and remote path.
+The complete default launcher bytes remain unchanged. Both environments pass587
+checks. Seven independent genuine local process controls verify PID/PPID, IDs,
+groups, session, directory, environment, owner file and exit/signal behavior,
+including the actual unchanged runtime deadline. Both genuine40/42member bundles
+match their exact launcher sets; all405protected candidate files remain unchanged.
+Independent preparation report SHA256:
+`7c6e090cd080c14a829377405bb910136c3c8e840d6b5a8bb9c0a81efeb12e46`.
+No memory gain or idle fit is inferred from these process checks.
+
+Actual full staging retry45554226298 is dispatched on exact
+`417c006d2893f0d8b957000741481442a8585c6c`, using candidate04c9432/build45516980492,
+full suite and aggregate1024, with normal deploy/preflight/wake disabled. The
+source, proof and image checks passed; owned execution is in progress. All five
+normal jobs are skipped. All capacity, parent, role, ownership, source, DB, media
+and cleanup checks still apply independently to every case. Actual full UAT,
+independent visual acceptance and final film remain unfinished.
+
+Canonical storyboard/local HTML/progress match84, with scene instructions and
+all599blocks preserved. Conditional Scene23Aiden narration21.44seconds is checked
+against the approved clean-branch script; it supplies no verdict. Two conditional
+Scene25native comic frames use exact dialogue and the original brief excerpt,
+preserve rear-facing work and await genuinely verified staging evidence before
+their empty working monitor can enter a final frame. No generated application
+screen, sent contact, main merge, app release or production promotion is added.
