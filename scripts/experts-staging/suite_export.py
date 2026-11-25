@@ -158,7 +158,7 @@ _STEPS = {
         "mike-after",
     ),
     "copy-guest": ("native-clipboard", "maria-after", "mike-after"),
-    "copy-self": ("native-clipboard", "mike-after"),
+    "copy-self": ("native-clipboard", "maria-after", "mike-after"),
     "summary-acceptance": (
         "C01-own-8200",
         "C02-keyboard-preview",

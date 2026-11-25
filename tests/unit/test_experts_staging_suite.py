@@ -947,3 +947,46 @@ def test_capture_case_with_actual_error_retains_frames_and_original_exception(
         == "saga_browser.inspect_copy_totals"
     )
     assert "PRIVATE_EXCEPTION" not in json.dumps(rows)
+
+
+def test_copy_self_with_producer_maria_snapshot_has_exact_export_admission(
+    tmp_path: Path,
+) -> None:
+    """Actual producer step literals must survive the real closed metadata exporter."""
+    _, method = _saga_source_method("inspect_copy_totals")
+    steps = {
+        call.args[2].value
+        for call in ast.walk(method)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id == "snapshot"
+        and isinstance(call.args[2], ast.Constant)
+    }
+    assert steps == {"maria-after", "mike-after"}
+    root = tmp_path.resolve()
+    (root / "output").mkdir()
+    for suffix in ("", "-viewport"):
+        stem = "saga-copy-self-maria-after-attempt-1" + suffix
+        (root / "output" / (stem + ".json")).write_text(
+            json.dumps({"case": "copy-self"})
+        )
+    export.prepare_public(root, {})
+    for suffix in ("", "-viewport"):
+        stem = "saga-copy-self-maria-after-attempt-1" + suffix
+        assert json.loads((root / "output" / (stem + ".json")).read_text())[
+            "derivative"
+        ]
+        assert export.allowed_name(Path("screenshots") / (stem + ".png"))
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "saga-copy-self-unknown-after-attempt-1.json",
+        "saga-copy-self-maria-after-attempt-3.json",
+        "screenshots/saga-copy-self-maria-after-attempt-1.png.private",
+        "../saga-copy-self-maria-after-attempt-1.json",
+    ],
+)
+def test_copy_self_with_unreviewed_snapshot_variant_remains_rejected(name: str) -> None:
+    assert not export.allowed_name(Path(name))
