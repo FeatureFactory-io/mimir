@@ -1140,3 +1140,25 @@ preparation. Its pending outcome must not be replaced by the prior90cd314 pass.
 The source repair owner additionally reports117focused cases under each SDK
 and95actualPostgreSQL cases including the original9owned-scope proofs; exact
 source sealing and fresh independent repair review follow.
+
+
+### 2026-11-24 — explicit user stopping boundary: staging and test DB only
+
+User: “do not release to prod; do not go past staging with the test db”.
+This supersedes the former application-release ending. Continue all49contracts,
+owned staging/test-database verification, real Saga/UAT and the final film, ending
+at verified staging. Do not merge to main, publish an application release, deploy
+to production or promote a CNAME. Do not use the normal shared idle/production
+database for Cedar. Domain playbook-release/award examples remain inside the
+owned test environment. Both active workers received the boundary immediately.
+The canonical storyboard is sequence72: Scenes24–26 and the operator references
+now end at staging; no future release approval is requested or implied. The live
+playbook itself was not changed. Previous historical journal entries retain their
+then-current scope and are superseded by this explicit instruction.
+
+The SDK/PostgreSQL repair received fresh independent NODE_PASS at exact3a9bec1:
+103 latest-library/real-PG cases,54 older-SDK cases and eight additional protocol
+fault probes passed. All1,999source blobs remained unchanged, zero overlays.
+Review: `planning/latest-sdk-pg-independent-20261124/review.md`, verification
+SHA-256 `7d51cae20bd6a949cc14f88e8a478a498ea23eab6228699a6db15af74fcbe4b3`.
+Complete latest-dependency gates and build-only CI45513892328 remain pending.

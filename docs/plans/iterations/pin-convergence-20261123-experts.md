@@ -1,10 +1,10 @@
 # Experts replay: consolidated implementation contract
 
-Status: active local implementation. All 49 dedicated planning workers returned.
+Status: all 49 original contracts independently accepted; integration and staging certification remain active.
 Denis declined GitHub publication, then explicitly approved “GO — build using
 the local contract”. The current iteration manifest and execution journal record
 activation and actual node results; remote publication requirements are waived
-by that decision. Main merge/release and production promotion retain human review.
+by that decision. The later explicit instruction stops delivery at staging with the isolated test database. Main merge, application release and production promotion are excluded.
 
 ## Scope and acceptance sources
 
@@ -300,9 +300,7 @@ receipt/GET; another proof's catalog link is insufficient evidence.
 | UAT-18-03 | S32: actual UI profile 8,200, four sources, keyboard expansion; normal submission refresh earns zero; staff accepts ADD, +500, Hana v3; local decision-mail companion |
 | UAT-18-04 | S38: independent baseline restores for Maria, Bob and Mike clipboard lanes and exact award differences |
 
-MIN repeats final Saga certification before merge. Automated/operator runs are
-labeled as such, with no fabricated human usability claim. The literal human
-visual review receives an actual gallery at the merge/release review gate.
+MIN repeats final Saga certification on the staging candidate and its isolated test database. Automated/operator runs are labeled as such, with no fabricated human usability claim. The review package includes actual screenshots and recordings. This assignment stops at staging; no merge or application release follows.
 
 ## Structural application and delivery gates
 
@@ -318,8 +316,7 @@ Record the actual files and commit for every scenario. Construct the conflict
 map and parallel groups from those real commits, then publish self-contained
 PIN-04 issues with A–H, graphs, Lessons Learned and the docs handoff SHA. Only
 then present PIN-05 for Denis's GO. GO authorizes the reviewed implementation
-contract; main merge, release and production promotion retain their later human
-review gates. Capture real failures, fixes and changes to this contract in the
+contract. The later staging-only instruction excludes main merge, application release and production promotion from this assignment. Capture real failures, fixes and changes to this contract in the
 storyboard, with genuine CLI recordings and native Cursor screenshots. Narration
 uses a male voice.
 

@@ -1,7 +1,16 @@
 iteration:
   id: ITER-20261123-experts-replay
-  goal: Deliver Experts & Karma from the pre-Experts baseline, certify the Cedar journeys and UAT, then obtain
-    reviewed release approval with genuine film evidence.
+  goal: Deliver Experts & Karma from the pre-Experts baseline through verified staging with the isolated test database,
+    certify the Cedar journeys and UAT, and finish the 20-30 minute film at that staging boundary.
+  delivery_boundary:
+    user_instruction: do not release to prod; do not go past staging with the test db
+    endpoint: staging with a positively owned isolated test database
+    main_merge: prohibited
+    application_release_publication: prohibited
+    production_deployment: prohibited
+    production_promotion: prohibited
+    application_data_boundary: No ambient shared idle/production database migrations, seed, reset or Cedar import.
+    domain_examples: Playbook release and Karma award scenarios remain permitted only inside the owned test environment; they do not release the Mimir application.
   doctrine_version: '2.1'
   created_at: '2026-11-23'
   branch: iteration/experts-replay
@@ -27,16 +36,16 @@ iteration:
   approved_scope_autonomy:
     user_clarification: the point of having the storyboard to stop asking about content, and having playbook to stop asking about engineering workflow
     authority: Necessary content alignment and engineering repairs, verification, retries and shared-file reconciliation inside the approved 49 contracts proceed without repeated confirmations.
-    retained_review: Material feature/scope changes and main merge, release and production promotion decisions.
+    retained_review: Material feature/scope changes require new direction. Main merge, application release, production deployment and promotion are excluded by the explicit staging-only instruction.
     user_correction: Denis explicitly stated he never paused S04; the attributed recorded pause and derived status are withdrawn. S04 and independent approved work are active.
   delivery_preparation:
     build_only_dispatch:
-      status: prepared_not_dispatched
+      status: candidate_ci_running_no_deployment
       footprint:
       - .github/workflows/build-and-deploy.yml
       run_input: deploy_to_idle=false
       default_compatibility: Published releases and default manual dispatch retain existing deployment behavior.
-      verification: YAML parsed and typed Boolean job guard checked against official GitHub documentation; live Actions run remains pending.
+      verification: Build-only dispatches executed with deploy_to_idle=false. Current candidate3a9bec1 runs in CI45513892328; no candidate deployment or main/latest release is claimed.
     read_only_ci_preflight:
       status: completed_existing_idle_online
       wake_run_id: 45502266783
@@ -49,10 +58,10 @@ iteration:
       source_validation: Existing CI wake and read-only capacity preflight passed; app test/build/deploy jobs skipped. No candidate deployed.
     ambient_database_identity: SAO declares shared huginn-db/logical mimir for both physical environments. Ambient secret URLs were not read; no default migration or Cedar seed is authorized by staging preparation.
     staging_arrangement: Exact candidate image in an owned isolated companion/database, with no ambient migrations or fixture seed.
-    candidate_deployment_status: Held pending SAO compatibility review and owned PostgreSQL scope proof.
+    candidate_deployment_status: Held pending complete latest-dependency gates and independent isolated-runner review; older-FOB and real PostgreSQL scope proofs passed.
     owned_postgres_scope_followup:
       owner_scenario: S45
-      status: local_pass_pending_real_postgres_ci
+      status: real_postgres_verified
       purpose: Explicit verified disposable PostgreSQL test data scope; existing SQLite and pytest/ambient denial guards preserved.
       footprint:
       - tests/support/experts_data.py
@@ -65,7 +74,7 @@ iteration:
       authorization: Necessary bounded data-isolation prerequisite inside approved S45 footprint under user autonomy; no product feature, visibility, ambient database or cloud platform change.
     release_compatibility_followup:
       owner_scenarios: [S39, S42]
-      status: repair_in_progress_release_blocked
+      status: independently_verified
       architecture_basis: SAO implicit API v1 and distributed MCP facade compatibility.
       actual_failure: Real baseline FOB detailGET200 then new receiptPOST404 fails; exportPOST200 writes two matching files then receipt404 fails.
       repair: API response advertises versioned receipt support; absent advertisement preserves legacy content/export, v1 retains strict receipts, unknown version fails explicitly.
