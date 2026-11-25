@@ -1197,6 +1197,62 @@ def _legacy_orm_guard_enabled() -> Iterator[None]:
             os.environ[UNSAFE_ORM_FLAG] = previous
 
 
+def _legacy_collection_rows(payload: object, tool_name: str) -> list[dict[str, object]]:
+    """Validate supported collection encodings before the existing row assertions.
+
+    :param payload: Real decoded tool result. Example: [{"id": 6201}].
+    :param tool_name: Name identifying the failing call. Example: list_playbooks.
+    :return: Original rows without filtering. Example: [{"id": 6201}].
+    :raises AssertionError: Shape, wrapper or row type is not a collection result.
+    """
+    if isinstance(payload, dict):
+        assert set(payload) == {"result"}, tool_name
+        payload = payload["result"]
+    assert isinstance(payload, list), tool_name
+    assert all(isinstance(row, dict) for row in payload), tool_name
+    return payload
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_legacy_collection_rows_with_supported_shape_preserves_original_rows(
+    wrapped: bool,
+) -> None:
+    """Both SDK encodings retain the same unfiltered collection object.
+
+    :param wrapped: Older structured wrapper or current bare list.
+    :return: None after original row identity is proven.
+    :raises AssertionError: The adapter filters, copies or changes the collection.
+    """
+    rows = [{"id": 6201, "name": "Public guidance"}, {"id": 6202}]
+    payload = {"result": rows} if wrapped else rows
+    assert _legacy_collection_rows(payload, "list_playbooks") is rows
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        "[]",
+        (),
+        {},
+        {"result": None},
+        {"result": {}},
+        {"result": [], "isError": True},
+        ["not a row"],
+        [None],
+    ],
+)
+def test_legacy_collection_rows_with_malformed_shape_rejects(payload: object) -> None:
+    """Malformed or error-shaped values cannot become a successful collection.
+
+    :param payload: Unsupported decoded shape, including an error wrapper.
+    :return: None after explicit rejection.
+    :raises AssertionError: Invalid input is accepted or loses its tool context.
+    """
+    with pytest.raises(AssertionError, match="list_playbooks"):
+        _legacy_collection_rows(payload, "list_playbooks")
+
+
 async def _assert_legacy_collections(
     client: RegisteredMCPClient, dataset: MCPDataset
 ) -> None:
@@ -1216,12 +1272,8 @@ async def _assert_legacy_collections(
     )
     for tool, params, fixture_key, display_field, omitted_field in arguments:
         result = decode_tool_payload(await client.call_tool(tool, params))
-        assert isinstance(result, dict) and isinstance(result["result"], list), tool
-        row = next(
-            row
-            for row in result["result"]
-            if row["id"] == dataset.entity_ids[fixture_key]
-        )
+        rows = _legacy_collection_rows(result, tool)
+        row = next(row for row in rows if row["id"] == dataset.entity_ids[fixture_key])
         assert (
             row[display_field] == dataset.expected_content[fixture_key][display_field]
         ), tool
@@ -1229,6 +1281,37 @@ async def _assert_legacy_collections(
         if tool == "list_pips":
             assert row["submitted_by_username"] == "mrodriguez"
             assert row["changes_count"] == 2
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("fault", ["renamed", "deleted"])
+async def test_legacy_collections_with_changed_real_target_rejects(
+    mcp_client_factory: MCPClientFactory, mcp_dataset: MCPDataset, fault: str
+) -> None:
+    """Real collection calls still reject a wrong or missing expected target.
+
+    :param mcp_client_factory: Actual registered legacy client factory.
+    :param mcp_dataset: Real Cedar rows and original expected public content.
+    :param fault: Actual database mutation: renamed or deleted playbook.
+    :return: None after rejection and unchanged ledger checks.
+    :raises AssertionError: The oracle accepts a wrong target or mutates awards.
+    """
+    awards = KarmaAward.objects.order_by("pk").values()
+    before = [row async for row in awards]
+    target = Playbook.objects.filter(pk=mcp_dataset.entity_ids["mike_playbook"])
+    if fault == "renamed":
+        await target.aupdate(name="Wrong public collection target")
+    else:
+        await target.adelete()
+    expected_error = AssertionError if fault == "renamed" else RuntimeError
+    reason = "list_playbooks" if fault == "renamed" else "StopIteration"
+    with _legacy_orm_guard_enabled():
+        async with mcp_client_factory.open(
+            actor_username="mrodriguez", entrypoint="legacy"
+        ) as session:
+            with pytest.raises(expected_error, match=reason):
+                await _assert_legacy_collections(session.client, mcp_dataset)
+    assert [row async for row in awards.all()] == before
 
 
 @pytest.mark.django_db(transaction=True)
