@@ -269,7 +269,7 @@ def parent_arguments(nonce: str, name: str | None) -> list[str]:
 
 
 def capacity(run: ResourceRun, cache: dict[str, Any]) -> dict[str, Any]:
-    """Require measured fixed warm-image profile and fresh1280MiB/1GiB budget.
+    """Require measured fixed warm-image profile and fresh1216MiB/1GiB budget.
 
     :param run: Explicit proof-validated invocation.
     :param cache: Actual exact image metadata from this fresh idle host.
@@ -293,7 +293,7 @@ def capacity(run: ResourceRun, cache: dict[str, Any]) -> dict[str, Any]:
     return {
         "available_memory_bytes": memory,
         "available_docker_disk_bytes": disk,
-        "required_memory_bytes": 1280 * profile.MIB,
+        "required_memory_bytes": 1216 * profile.MIB,
         "required_disk_bytes": 1024**3,
         "image_cache_verified": import_guard,
         "image_cache": cache,

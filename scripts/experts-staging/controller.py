@@ -1127,7 +1127,7 @@ def main() -> None:
     parser.add_argument("--images", type=Path)
     parser.add_argument("--suite", choices=("core", "full"), default="core")
     parser.add_argument(
-        "--resource-profile", choices=("default", "aggregate1024"), default="default"
+        "--resource-profile", choices=("default", "aggregate960"), default="default"
     )
     parser.add_argument("--resource-proof-result", type=Path)
     parser.add_argument("--resource-proof-source", type=Path)

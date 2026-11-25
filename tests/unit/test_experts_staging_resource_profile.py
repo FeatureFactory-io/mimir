@@ -40,7 +40,7 @@ def test_selected_with_explicit_choice_keeps_default_and_closes_unknown(
 ) -> None:
     assert module.selected({}) is False
     assert module.selected({"resource_profile": "default"}) is False
-    assert module.selected({"resource_profile": "aggregate1024"}) is True
+    assert module.selected({"resource_profile": "aggregate960"}) is True
     with pytest.raises(ValueError):
         module.selected({"resource_profile": "caller-floor"})
 
@@ -49,10 +49,10 @@ def test_require_capacity_with_exact_warm_floor_admits_boundary_only(
     module: ModuleType,
 ) -> None:
     mib = 1024**2
-    module.require_capacity(1280 * mib, 1024 * mib, True)
+    module.require_capacity(1216 * mib, 1024 * mib, True)
     for memory, disk, cached in [
-        (1280 * mib - 1, 1024 * mib, True),
-        (1280 * mib, 1024 * mib - 1, True),
+        (1216 * mib - 1, 1024 * mib, True),
+        (1216 * mib, 1024 * mib - 1, True),
         (1600 * mib, 4096 * mib, False),
         (True, 4096 * mib, True),
     ]:
@@ -81,7 +81,7 @@ def test_observer_source_with_original_dispatch_failure_preserves_cause() -> Non
     def broken_measurement(*args: object) -> None:
         raise ValueError("OBSERVATION_FAILURE_SENTINEL")
 
-    manifest = {"resource_profile": "aggregate1024"}
+    manifest = {"resource_profile": "aggregate960"}
     namespace = {
         "json": __import__("json"),
         "Path": lambda path: type(
@@ -111,7 +111,7 @@ def manifest(module: ModuleType) -> dict:
     image = module.IMAGES["web"].split("@")[0]
     digest = module.IMAGES["web"].split("@")[1]
     return {
-        "resource_profile": "aggregate1024",
+        "resource_profile": "aggregate960",
         "source_revision": module.SOURCE,
         "control_revision": "b" * 40,
         "runner_revision": "b" * 40,
@@ -138,7 +138,7 @@ def _measurements(module: ModuleType) -> tuple[dict, dict]:
     parent = {
         "current_bytes": 4096,
         "peak_bytes": 8192,
-        "limit_bytes": 1024 * module.MIB,
+        "limit_bytes": 960 * module.MIB,
         "swap_current_bytes": 0,
         "swap_limit_bytes": 0,
         "events": dict(events),
@@ -321,7 +321,7 @@ def model_proof(
         "cleanup": "SUCCESS",
         "export": "SUCCESS",
         "private_root_removed": True,
-        "resource_profile": "aggregate1024",
+        "resource_profile": "aggregate960",
         "aggregate_members": {role: True for role in module.CAPS},
         "aggregate": parent,
         "envelope_mib": module.CAPS,
@@ -558,7 +558,7 @@ def test_capacity_with_real_low_memory_fixture_retains_numeric_observation_befor
 ) -> None:
     """Real fixture-file OS boundary model; no actual host or Docker query."""
     memory = tmp_path / "model-meminfo"
-    memory.write_text(f"MemAvailable: {1280*1024-1} kB\n")
+    memory.write_text(f"MemAvailable: {1216*1024-1} kB\n")
     real_path = Path
     monkeypatch.setattr(
         resource_runtime,
@@ -579,8 +579,8 @@ def test_capacity_with_real_low_memory_fixture_retains_numeric_observation_befor
     with pytest.raises(ValueError):
         resource_runtime.capacity(run, {})
     row = json.loads((tmp_path / "output/capacity.json").read_text())
-    assert row["available_memory_bytes"] == 1280 * module.MIB - 1024
-    assert row["required_memory_bytes"] == 1280 * module.MIB
+    assert row["available_memory_bytes"] == 1216 * module.MIB - 1024
+    assert row["required_memory_bytes"] == 1216 * module.MIB
     assert row["image_cache_verified"] is True
     assert not (tmp_path / "aggregate-owner.json").exists()
 
@@ -854,3 +854,19 @@ def test_launcher_template_with_changed_terminal_boundary_refuses_broad_replacem
     )
     with pytest.raises(ValueError):
         controller.launcher_template(manifest)
+
+
+def test_selected_with_retired_1024_profile_refuses_compatibility_alias(
+    module: ModuleType,
+) -> None:
+    with pytest.raises(ValueError):
+        module.selected({"resource_profile": "aggregate1024"})
+
+
+def test_checked_parent_with_old_1024_cap_refuses_new_960_measurement(
+    module: ModuleType,
+) -> None:
+    parent, _ = _measurements(module)
+    parent["limit_bytes"] = 1024 * module.MIB
+    with pytest.raises(ValueError):
+        module.checked_parent(parent, False)

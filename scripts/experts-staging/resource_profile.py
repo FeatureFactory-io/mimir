@@ -40,11 +40,11 @@ FAILURE_PHASES = {
 
 MIB = 1024**2
 PROOF_FILES = {
-    "resource-proof-result.json": "5a01022824151a166000a32b0ad28bba1395b704e4244de3d639248a6b2b7556",
-    "resource-proof-source.json": "2334ed1c714de49f4808651e4b0b69e7a44335c493906a5ca930def2cc5a7766",
+    "resource-proof-result.json": "13d50049c9361802038992873da696ad058fa9e04d4d2cf2077ebd8cd7defb4d",
+    "resource-proof-source.json": "9543610b70d5e80a261866beda67a86a3b6f8547954026334ea286dcaf8750e9",
 }
 SOURCE = "04c9432bce7eac5ec34a090bc5e8ec4fa06f409d"
-RUNNER = "bf245630222dad6ae89d67f143343eb9863df4aa"
+RUNNER = "f8b25d4f5485364fbe02faa2041a5d25c8c87538"
 IMAGES = {
     "web": "411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:e7f6e2170fd6250a9b6c3f635ceb2b90d0dfbe81ed337c10180c0a903ca5e1ba",
     "browser": "411113550285.dkr.ecr.us-east-1.amazonaws.com/mimir@sha256:a74104c8fb4ff8a02dd053ee2584868d91dd4273f058b690faf0875684c5e368",
@@ -65,13 +65,13 @@ def selected(manifest: dict[str, Any]) -> bool:
     """Select only the explicit measured profile.
 
     :param manifest: Authenticated invocation.
-    :return: True only for aggregate1024, False for the unchanged default.
+    :return: True only for aggregate960, False for the unchanged default.
     :raises ValueError: Selector is unknown.
     """
     value = manifest.get("resource_profile", "default")
-    if not isinstance(value, str) or value not in {"default", "aggregate1024"}:
+    if not isinstance(value, str) or value not in {"default", "aggregate960"}:
         raise ValueError("Unknown staged resource profile.")
-    return value == "aggregate1024"
+    return value == "aggregate960"
 
 
 def validate_proof(result: bytes, source: bytes, manifest: dict[str, Any]) -> None:
@@ -97,14 +97,14 @@ def require_capacity(memory: int, disk: int, cached: bool) -> None:
     :param memory: Fresh available memory bytes.
     :param disk: Fresh free Docker-storage bytes.
     :param cached: Complete actual exact-image metadata proof.
-    :return: None at1280MiB memory/1GiB storage with positive warm proof.
+    :return: None at1216MiB memory/1GiB storage with positive warm proof.
     :raises ValueError: Any typed input, cache identity or reserve differs.
     """
     if (
         type(memory) is not int
         or type(disk) is not int
         or cached is not True
-        or memory < 1280 * MIB
+        or memory < 1216 * MIB
         or disk < 1024 * MIB
     ):
         raise ValueError(
@@ -205,7 +205,7 @@ def receipt_payload(
     """
     return {
         "format": "mimir-measured-resources-v1",
-        "resource_profile": "aggregate1024",
+        "resource_profile": "aggregate960",
         "source_revision": manifest["source_revision"],
         "control_revision": manifest["control_revision"],
         "nonce": manifest["nonce"],
@@ -329,7 +329,7 @@ def parent_shape(row: dict[str, Any]) -> None:
     ):
         raise ValueError("Finite actual parent counters required.")
     if (
-        row["limit_bytes"] != 1024 * MIB
+        row["limit_bytes"] != 960 * MIB
         or row["swap_current_bytes"] != 0
         or row["swap_limit_bytes"] != 0
         or not 0 <= row["current_bytes"] <= row["peak_bytes"]
@@ -383,7 +383,7 @@ def proof_semantics(measured: dict[str, Any], identity: dict[str, Any]) -> None:
         or measured["cleanup"] != "SUCCESS"
         or measured["export"] != "SUCCESS"
         or measured["private_root_removed"] is not True
-        or measured["resource_profile"] != "aggregate1024"
+        or measured["resource_profile"] != "aggregate960"
         or measured["aggregate_members"] != {role: True for role in CAPS}
     ):
         raise ValueError("Successful source-bound aggregate measurement required.")
@@ -526,7 +526,7 @@ def capacity_observation(memory: int, disk: int, cached: bool) -> dict[str, Any]
     return {
         "available_memory_bytes": memory,
         "available_docker_disk_bytes": disk,
-        "required_memory_bytes": 1280 * MIB,
+        "required_memory_bytes": 1216 * MIB,
         "required_disk_bytes": 1024**3,
         "image_cache_verified": cached,
     }
