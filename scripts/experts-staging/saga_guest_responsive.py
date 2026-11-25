@@ -372,12 +372,14 @@ def _scroll_next(page: Page, state: dict[str, Any]) -> None:
 
     :param page: Actual browser page.
     :param state: Actual measured current scrolling/reading state.
-    :return: None after native wheel scrolling reaches its expected position.
+    :return: None after real document scrolling reaches its measured position.
     :raises AssertionError: Remaining text cannot be reached.
     """
     target = min(state["scrollY"] + state["step"], state["maxScroll"])
     assert target > state["scrollY"]
-    page.mouse.wheel(0, state["step"])
+    page.evaluate(
+        "target=>window.scrollTo({top:target,left:0,behavior:'instant'})", target
+    )
     page.wait_for_function(
         "target=>Math.abs(scrollY-target)<=1", arg=target, timeout=_SETTLE_TIMEOUT_MS
     )

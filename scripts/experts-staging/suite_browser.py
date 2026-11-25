@@ -140,7 +140,11 @@ def _guest_matrix(page: Page, oracle: GuestOracle) -> list[dict[str, Any]]:
         destination = _OUTPUT / "screenshots" / f"guest-{width}-{height}"
         destination.mkdir(mode=0o700)
         try:
-            rows.append(run_guest(page, _ORIGIN, destination, oracle))
+            rows.append(
+                run_guest(
+                    page, _ORIGIN, destination, oracle, native_viewport_captures=True
+                )
+            )
         finally:
             page.context.tracing.stop_chunk(
                 path=str(original_path(_OUTPUT, width, height))

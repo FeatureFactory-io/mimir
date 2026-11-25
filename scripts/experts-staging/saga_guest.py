@@ -8,6 +8,7 @@ import math
 import os
 import re
 import stat
+from contextvars import ContextVar
 from dataclasses import dataclass
 from html import unescape
 from pathlib import Path
@@ -16,7 +17,6 @@ from typing import Any, Literal
 from urllib.parse import unquote, urlsplit
 
 from playwright.sync_api import Locator, Page, Response, expect
-
 from tests.support.experts_guest_browser import (
     activate_guest_tooltip,
     assert_guest_tooltip_in_viewport,
@@ -24,7 +24,12 @@ from tests.support.experts_guest_browser import (
     tab_to_guest_control,
 )
 
+from suite_guest_capture import capture_viewport
+
 logger = logging.getLogger(__name__)
+_NATIVE_VIEWPORTS: ContextVar[bool] = ContextVar(
+    "guest_native_viewports", default=False
+)
 VIEWPORTS = (
     (1280, 800),
     (1920, 1080),
@@ -230,6 +235,7 @@ def run_guest(
     oracle: GuestOracle,
     *,
     local_verification: bool = False,
+    native_viewport_captures: bool = False,
 ) -> dict[str, Any]:
     """Execute literal G01–G04 using the caller's actual fresh browser.
 
@@ -238,6 +244,7 @@ def run_guest(
     :param output: Existing private acquisition directory.
     :param oracle: Exact public facts and private in-memory disclosure probes.
     :param local_verification: Explicit local-only label; never staged acceptance.
+    :param native_viewport_captures: Opt in to paired native captures of fixed states.
     :return: Actual observations; companion DB/mail verification remains required.
     :raises ValueError: Unsafe input or incomplete identity.
     :raises AssertionError: Any literal condition differs.
@@ -248,11 +255,17 @@ def run_guest(
         "staging_guest | entry | viewport=%s local=%s", viewport, local_verification
     )
     started, rows = monotonic(), []
-    _run_public_reading(page, origin, output, oracle, rows)
-    _run_rejections(page, origin, output, oracle, rows)
-    assert not page.context.cookies(), "Anonymous reading created a cookie."
-    logger.info("staging_guest | exit | observations=%s", len(rows))
-    return _result(page, oracle, rows, started, local_verification)
+    if type(native_viewport_captures) is not bool:
+        raise ValueError("Explicit native capture boolean required.")
+    binding = _NATIVE_VIEWPORTS.set(native_viewport_captures)
+    try:
+        _run_public_reading(page, origin, output, oracle, rows)
+        _run_rejections(page, origin, output, oracle, rows)
+        assert not page.context.cookies(), "Anonymous reading created a cookie."
+        logger.info("staging_guest | exit | observations=%s", len(rows))
+        return _result(page, oracle, rows, started, local_verification)
+    finally:
+        _NATIVE_VIEWPORTS.reset(binding)
 
 
 def _fresh_viewport(page: Page) -> tuple[int, int]:
@@ -653,7 +666,7 @@ def _capture(page: Page, output: Path, label: str) -> dict[str, Any]:
     if target.exists() or target.is_symlink():
         raise ValueError("Original guest acquisition cannot be overwritten.")
     page.screenshot(path=str(target), full_page=True)
-    return {
+    record = {
         "step": label,
         "path": urlsplit(page.url).path,
         "query": urlsplit(page.url).query,
@@ -662,6 +675,10 @@ def _capture(page: Page, output: Path, label: str) -> dict[str, Any]:
         "sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
         "document_width": page.evaluate("document.documentElement.scrollWidth"),
     }
+
+    if _NATIVE_VIEWPORTS.get():
+        record["native_viewport"] = capture_viewport(page, output, label)
+    return record
 
 
 def _validate_request(

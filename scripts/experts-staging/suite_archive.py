@@ -142,14 +142,70 @@ def _identity_record(records: dict[str, Any], manifest: dict[str, Any]) -> None:
         identity.get(key) != manifest.get(key)
         for key in (
             "source_revision",
-            "nonce",
+            "build_run_id",
             "web_image",
+            "browser_image",
+            "fixture_sha256",
+            "nonce",
             "suite_phase",
             "saga_case",
             "control_revision",
         )
     ):
         raise ValueError("Downloaded candidate/control/case identity differs.")
+    _declaration_records(records, manifest)
+
+
+def _declaration_records(records: dict[str, Any], manifest: dict[str, Any]) -> None:
+    """Bind actual source/control declarations and emitted readiness source facts.
+
+    :param records: Parsed actual archive reports.
+    :param manifest: Authenticated current candidate/control identity and hash maps.
+    :return: None after every emitted identity agrees with the current invocation.
+    :raises ValueError: Any declaration or emitted readiness proof is cross-bound.
+    """
+    for filename, map_key, revision_key in (
+        ("source-manifest.json", "source_files", "source_revision"),
+        ("control-identity.json", "control_files", "control_revision"),
+    ):
+        if map_key in manifest:
+            declaration = records.get(filename, {}).get("declaration", {})
+            if (
+                declaration.get(revision_key) != manifest[revision_key]
+                or declaration.get("files") != manifest[map_key]
+            ):
+                raise ValueError(
+                    "Downloaded exact source/control hash declaration differs."
+                )
+    _readiness_records(records, manifest)
+
+
+def _readiness_records(records: dict[str, Any], manifest: dict[str, Any]) -> None:
+    """Cross-bind emitted actual image-source and HTTPS readiness observations.
+
+    :param records: Actual parsed archive reports.
+    :param manifest: Exact authenticated candidate source/fixture declaration.
+    :return: None after every emitted actual readiness source agrees.
+    :raises ValueError: A source/fixture/health identity differs.
+    """
+    image = records.get("image-source-verification.json")
+    if image is not None and (
+        image.get("source_revision") != manifest["source_revision"]
+        or image.get("fixture_sha256") != manifest["fixture_sha256"]
+        or (
+            "source_files" in manifest
+            and image.get("verified_files") != len(manifest["source_files"])
+        )
+    ):
+        raise ValueError(
+            "Downloaded actual image-source proof differs from invocation."
+        )
+    health = records.get("health.json")
+    if health is not None and (
+        health.get("revision") != manifest["source_revision"]
+        or health.get("status") != "healthy"
+    ):
+        raise ValueError("Downloaded actual health identity differs from invocation.")
 
 
 def _lane_records(case: str, records: dict[str, Any]) -> None:

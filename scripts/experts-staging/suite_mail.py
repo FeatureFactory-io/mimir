@@ -31,7 +31,10 @@ def preview_record(raw: bytes, recipient: str, name: str) -> dict[str, Any]:
         message.get_all("To") == [recipient]
         and recipient == "maria.rodriguez@example.com"
     )
-    assert "Accepted" in subject and name == "Screen Reader Error Recovery"
+    expected_subject = 'Your PIP "Screen Reader Error Recovery" — Accepted ✓'
+    assert message.get_all("Subject") == [expected_subject]
+    assert subject == expected_subject and name == "Screen Reader Error Recovery"
+    assert message.get_content_type() == "text/plain" and not message.is_multipart()
     assert (
         f'ADD Activity "{name}"' in body
         and "Decision: ACCEPT" in body
@@ -42,7 +45,7 @@ def preview_record(raw: bytes, recipient: str, name: str) -> dict[str, Any]:
         "evidence_kind": "actual_file_mail_preview",
         "original_sha256": hashlib.sha256(raw).hexdigest(),
         "recipient": recipient,
-        "subject": "Accepted",
+        "subject": expected_subject,
         "operation": "ADD Activity",
         "activity": name,
         "version": "3.0",

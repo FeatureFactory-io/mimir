@@ -18,7 +18,12 @@ from uuid import uuid4
 
 import boto3
 
-from contract import select_idle, validate_receipt, validate_runtime_manifest
+from contract import (
+    SOURCE_EXACT_FILES,
+    select_idle,
+    validate_receipt,
+    validate_runtime_manifest,
+)
 from suite_archive import verify_case_archive
 from suite_contract import selected_case, suite_cases
 
@@ -57,6 +62,7 @@ _RUNTIME_FILES = (
     "suite_mail.py",
     "suite_receipts.py",
     "suite_guest_trace.py",
+    "suite_guest_capture.py",
 )
 _SOURCE_PREFIXES = (
     "accounts/",
@@ -179,9 +185,7 @@ def source_manifest(repository: Path, revision: str) -> dict[str, Any]:
         "methodology/models/karma_award.py",
         "tests/support/experts_data.py",
         "test-data/experts/cedar-rfp-01.json",
-        "tests/uat/e2e-uat-flow.feature",
-        "tests/e2e/test_expert_cards.py",
-    }
+    } | SOURCE_EXACT_FILES
     if not required <= files.keys():
         raise ValueError("Candidate source is incomplete.")
     return {"source_revision": revision, "files": files}
@@ -207,7 +211,7 @@ def source_hashes(repository: Path, revision: str) -> dict[str, str]:
             name.startswith(_SOURCE_PREFIXES)
             and Path(name).suffix in {".py", ".html", ".css", ".js", ".json"}
         )
-        or name in {"tests/uat/e2e-uat-flow.feature", "tests/e2e/test_expert_cards.py"}
+        or name in SOURCE_EXACT_FILES
     ]
     return {
         name: hashlib.sha256(
@@ -367,6 +371,8 @@ def make_bundle(output: Path, manifest: dict[str, Any]) -> tuple[Path, str]:
     manifest["control_revision"] = controls["control_revision"]
     files["controls.json"] = json.dumps(controls).encode()
     files["source.json"] = (output / "source.json").read_bytes()
+    manifest["source_files"] = json.loads(files["source.json"])["files"]
+    manifest["control_files"] = controls["files"]
     files["run.json"] = json.dumps(manifest).encode()
     if sum(len(data) for data in files.values()) > 2 * 1024 * 1024:
         raise ValueError("Runtime source package exceeds the fixed transport bound.")
@@ -538,6 +544,7 @@ def run_and_retrieve(
         "Status": result["Status"],
         "ResponseCode": result["ResponseCode"],
         "environment_id": idle["EnvironmentId"],
+        "nonce": manifest["nonce"],
     }
     (output / "ssm-receipt.json").write_text(json.dumps(safe, indent=2))
     finalize_transport(session, output, manifest, idle, instance_id, result)
@@ -563,7 +570,7 @@ def cleanup_after(
         "commands": [
             cleanup_launcher(
                 manifest,
-                verified_download=(output / "verified-safe-download.json").is_file(),
+                verified_download=verified_current_download(output, manifest),
             )
         ],
         "executionTimeout": ["360"],
@@ -779,6 +786,7 @@ def finalize_transport(
                     (output / "idle-browser-evidence.tar.gz").read_bytes()
                 ).hexdigest(),
                 "safe_archive_verified": True,
+                "command_id": result["CommandId"],
             }
         )
     )
@@ -920,6 +928,104 @@ def execute_lifecycle(
         run_and_retrieve(session, output, manifest, idle, instance_id)
     finally:
         cleanup_after(session, output, manifest, instance_id)
+
+
+def verified_current_download(output: Path, manifest: dict[str, Any]) -> bool:
+    """Authorize private disposal only for the current actual verified transfer.
+
+    :param output: Owned local invocation directory.
+    :param manifest: Exact fresh invocation/candidate/control identity.
+    :return: True only when current nonce/SSM/object/archive content all agree.
+    """
+    try:
+        _verify_current_download(output, manifest)
+    except (OSError, ValueError, TypeError, KeyError, EOFError, tarfile.TarError):
+        return False
+    return True
+
+
+def _download_record(output: Path, name: str) -> dict[str, Any]:
+    """Read only an actual unlinked bounded record from the owned output.
+
+    :param output: Owned invocation output.
+    :param name: Fixed source-owned receipt name.
+    :return: Actual parsed object.
+    :raises ValueError: Links, foreign ownership, bounds or type differ.
+    """
+    path = output / name
+    if (
+        path.resolve() != path
+        or not path.is_file()
+        or path.stat().st_nlink != 1
+        or path.stat().st_uid != os.getuid()
+        or path.stat().st_size > 2 * 1024**2
+    ):
+        raise ValueError("Actual owned bounded download receipt required.")
+    record = json.loads(path.read_text())
+    if not isinstance(record, dict):
+        raise TypeError("Typed actual download receipt required.")
+    return record
+
+
+def _verify_current_download(output: Path, manifest: dict[str, Any]) -> None:
+    """Cross-bind current actual SSM command, S3 object, byte hash and safe archive.
+
+    :param output: Owned invocation output.
+    :param manifest: Exact current owner/source/control declaration.
+    :return: None only after positive actual current proof.
+    :raises ValueError: A stale, mismatched or incomplete receipt is supplied.
+    """
+    stamp = _current_download_stamp(output, manifest)
+    receipt = _download_record(output, "artifact-receipt.json")
+    archive = output / "idle-browser-evidence.tar.gz"
+    if (
+        archive.resolve() != archive
+        or not archive.is_file()
+        or archive.stat().st_nlink != 1
+        or not 0 < archive.stat().st_size <= 128 * 1024**2
+    ):
+        raise ValueError("Actual current bounded archive required.")
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    expected_key = f"experts-uat/{manifest['nonce']}/evidence.tar.gz"
+    if (
+        set(receipt) != {"evidence_key", "bytes", "sha256"}
+        or receipt["evidence_key"] != expected_key
+        or type(receipt["bytes"]) is not int
+        or receipt["bytes"] != archive.stat().st_size
+        or receipt["sha256"] != digest
+        or stamp["sha256"] != digest
+    ):
+        raise ValueError("Current exact object, byte count and archive hash required.")
+    verify_case_archive(archive, manifest, require_pass=False)
+
+
+def _current_download_stamp(output: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+    """Bind a positive disposal stamp to this exact actual terminal SSM command.
+
+    :param output: Owned local evidence directory.
+    :param manifest: Fresh invocation identity.
+    :return: Validated exact current stamp.
+    :raises ValueError: A stale or invented command/owner/status is supplied.
+    """
+    stamp = _download_record(output, "verified-safe-download.json")
+    ssm = _download_record(output, "ssm-receipt.json")
+    if (
+        set(stamp) != {"nonce", "sha256", "safe_archive_verified", "command_id"}
+        or stamp["nonce"] != manifest["nonce"]
+        or stamp["safe_archive_verified"] is not True
+        or ssm.get("nonce") != manifest["nonce"]
+        or ssm.get("CommandId") != stamp["command_id"]
+        or not isinstance(stamp["command_id"], str)
+        or not re.fullmatch(
+            r"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}", stamp["command_id"]
+        )
+        or ssm.get("Status") not in {"Success", "Failed", "TimedOut", "Cancelled"}
+        or type(ssm.get("ResponseCode")) is not int
+    ):
+        raise ValueError(
+            "Current nonce and actual command-bound verification required."
+        )
+    return stamp
 
 
 def main() -> None:

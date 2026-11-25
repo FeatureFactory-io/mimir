@@ -844,9 +844,7 @@ def isolation_row(
         else {names["internal"]}
     )
     limits = item["HostConfig"]
-    assert (
-        limits["Memory"] == _LIMITS[kind][0] * 1024 * 1024 and limits["ReadonlyRootfs"]
-    )
+    _check_container_limits(limits, kind)
     return {
         "role": kind,
         "image": item["Config"]["Image"],
@@ -855,6 +853,23 @@ def isolation_row(
         "nano_cpus": limits["NanoCpus"],
         "ports": item["NetworkSettings"].get("Ports"),
     }
+
+
+def _check_container_limits(limits: dict[str, Any], kind: str) -> None:
+    """Verify actual memory/swap/CPU/process and security ceilings before browser proof.
+
+    :param limits: Actual Docker HostConfig from the owned container inspection.
+    :param kind: Closed web, db or browser role.
+    :return: None after every unchanged enforced ceiling agrees.
+    :raises AssertionError: Any actual bound or security property differs.
+    """
+    memory, cpu, pids, _ = _LIMITS[kind]
+    assert limits["Memory"] == limits["MemorySwap"] == memory * 1024**2
+    assert limits["NanoCpus"] == int(float(cpu) * 10**9)
+    assert limits["PidsLimit"] == pids
+    assert limits["ReadonlyRootfs"] is True and limits["Privileged"] is False
+    assert set(limits.get("CapDrop", [])) == {"ALL"}
+    assert "no-new-privileges" in limits.get("SecurityOpt", [])
 
 
 def archive_evidence(root: Path, manifest: dict[str, Any]) -> None:

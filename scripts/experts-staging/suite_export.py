@@ -5,7 +5,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import re
+import stat
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -59,6 +61,8 @@ _INTS = {
     "proposed_target_seconds",
     "blocked_requests",
     "copy_receipt_requests",
+    "capture_scroll_y",
+    "document_width",
     "available_memory_bytes",
     "available_docker_disk_bytes",
     "full_uat_contracts_passed",
@@ -255,7 +259,78 @@ def _size_capture_names() -> set[str]:
         result.update(
             f"screenshots/guest-{width}-{height}/{step}.png" for step in _GUEST_STEPS
         )
-    return result
+    return result | _native_capture_names()
+
+
+def _native_capture_names() -> set[str]:
+    """Declare only paired native guest captures for the six reviewed UI states.
+
+    :return: Exact seven-size native PNG and geometry-sidecar paths.
+    """
+    steps = (
+        "G01-design",
+        "G01-detail",
+        "G02-list-hover",
+        "G02-list-keyboard",
+        "G02-detail-hover",
+        "G02-detail-keyboard",
+    )
+    return {
+        f"screenshots/guest-{w}-{h}/{step}-viewport.png{suffix}"
+        for w, h in _SIZES
+        for step in steps
+        for suffix in ("", ".json")
+    }
+
+
+def _owned_regular_file(path: Path, root: Path) -> None:
+    """Reject aliases, links and foreign files before reading actual evidence bytes.
+
+    :param path: Exact constructed owned evidence path.
+    :param root: Positively owned invocation root.
+    :return: None only for an owned regular unlinked actual file beneath root.
+    :raises ValueError: Type, ownership, alias or hardlink topology differs.
+    """
+    info = path.lstat()
+    if (
+        not path.is_relative_to(root)
+        or path.resolve() != path
+        or not stat.S_ISREG(info.st_mode)
+        or info.st_nlink != 1
+        or info.st_uid != os.getuid()
+    ):
+        raise ValueError("Actual unlinked positively owned evidence file required.")
+
+
+def _check_evidence_topology(root: Path) -> None:
+    """Reject every incoming alias before relocating, reading or transforming it.
+
+    :param root: Owned runtime root.
+    :return: None after public and private evidence topology is safe.
+    :raises ValueError: Any link, foreign owner or special file is present.
+    """
+    if root.resolve() != root or root.stat().st_uid != os.getuid():
+        raise ValueError("Actual owned evidence root required.")
+    for base in (root / "output", root / "private-evidence"):
+        if not base.exists() and not base.is_symlink():
+            continue
+        if (
+            base.is_symlink()
+            or base.resolve() != base
+            or not base.is_dir()
+            or base.stat().st_uid != os.getuid()
+        ):
+            raise ValueError("Actual unlinked owned evidence directory required.")
+        for path in base.rglob("*"):
+            info = path.lstat()
+            if path.resolve() != path or info.st_uid != os.getuid():
+                raise ValueError("Evidence cannot borrow aliases or foreign owners.")
+            if stat.S_ISREG(info.st_mode):
+                _owned_regular_file(path, root)
+            elif not stat.S_ISDIR(info.st_mode):
+                raise ValueError(
+                    "Evidence accepts only owned regular files/directories."
+                )
 
 
 def move_private(root: Path) -> None:
@@ -324,6 +399,7 @@ def public_receipt(
     _selected_observations(record, result)
     _capture_fields(record, result)
     _step_fields(record, result)
+    _geometry_fields(record, result)
     protocol_fields(record, result)
     if name.endswith("effects.json"):
         _check_effects(record)
@@ -444,6 +520,33 @@ def _capture_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
         result["modal_viewport_acquired"] = record["modal_viewport_acquired"]
 
 
+def _geometry_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
+    """Retain only actual numeric native navbar and tooltip geometry.
+
+    :param record: Parsed original viewport acquisition facts.
+    :param result: Typed public derivative.
+    :return: None after exact shape/type/bounds checks.
+    :raises ValueError: Untrusted metadata attempts to export strings or extra fields.
+    """
+    for key in ("navbar_geometry", "tooltip_geometry"):
+        if key not in record:
+            continue
+        box = record[key]
+        if box is None:
+            result[key] = None
+            continue
+        if (
+            not isinstance(box, dict)
+            or set(box) != {"x", "y", "width", "height"}
+            or any(
+                type(value) not in (int, float) or not -100000 <= value <= 100000
+                for value in box.values()
+            )
+        ):
+            raise ValueError("Closed actual numeric native geometry required.")
+        result[key] = box
+
+
 def _step_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
     """Retain only the literal completed UAT step sequence produced by this lane.
 
@@ -519,7 +622,7 @@ def _mail_fields(record: dict[str, Any], result: dict[str, Any]) -> None:
     expected = {
         "evidence_kind": "actual_file_mail_preview",
         "recipient": "maria.rodriguez@example.com",
-        "subject": "Accepted",
+        "subject": 'Your PIP "Screen Reader Error Recovery" — Accepted ✓',
         "operation": "ADD Activity",
         "activity": "Screen Reader Error Recovery",
         "version": "3.0",
@@ -543,6 +646,7 @@ def prepare_public(root: Path, manifest: dict[str, Any]) -> None:
     :return: None only after the complete public subtree is safe.
     :raises ValueError: Any member, receipt or trace fails content admission.
     """
+    _check_evidence_topology(root)
     move_private(root)
     output, private = root / "output", root / "private-evidence"
     reports = private / "reports"
@@ -699,9 +803,11 @@ def _private_values(root: Path) -> tuple[bytes, ...]:
     values = {"Cedar-fictional-tests-only-2026"}
     captured = root / "private-evidence/browser/captured-secrets.json"
     if captured.exists():
+        _owned_regular_file(captured, root)
         values.update(json.loads(captured.read_text())["values"])
     environment = root / "app.env"
     if environment.exists():
+        _owned_regular_file(environment, root)
         values.update(
             line.partition("=")[2]
             for line in environment.read_text().splitlines()
@@ -723,12 +829,22 @@ def _core_trace(root: Path, secrets: tuple[bytes, ...]) -> None:
     :raises ValueError: Unsafe original member or surviving private value.
     """
     public = root / "output/browser-trace.zip"
-    if not public.exists():
+    if not public.exists() and not public.is_symlink():
         return
+    _owned_regular_file(public, root)
     folder = root / "private-evidence/browser"
     folder.mkdir(mode=0o700, exist_ok=True)
     original = folder / "browser-trace-original.zip"
+    provenance = root / "output/browser-trace-provenance.json"
+    if (
+        original.exists()
+        or original.is_symlink()
+        or provenance.exists()
+        or provenance.is_symlink()
+    ):
+        raise ValueError("Original trace/provenance cannot be replaced.")
     public.rename(original)
+    os.chmod(original, 0o600)
     changed, members = write_redacted(original, public, secrets)
     verify_redacted(public, secrets)
     record = {
@@ -736,7 +852,8 @@ def _core_trace(root: Path, secrets: tuple[bytes, ...]) -> None:
         "redacted_members": changed,
         "members": members,
     }
-    (root / "output/browser-trace-provenance.json").write_text(json.dumps(record))
+    with provenance.open("x") as stream:
+        json.dump(record, stream)
 
 
 def _check_trace(root: Path, secrets: tuple[bytes, ...]) -> None:
@@ -761,6 +878,7 @@ def _check_trace(root: Path, secrets: tuple[bytes, ...]) -> None:
     for public, original, provenance in pairs:
         if (root / "output" / public).exists():
             _trace_pair(
+                root,
                 root / "output" / public,
                 root / "private-evidence/browser" / original,
                 root / "output" / provenance,
@@ -769,10 +887,15 @@ def _check_trace(root: Path, secrets: tuple[bytes, ...]) -> None:
 
 
 def _trace_pair(
-    public: Path, original: Path, provenance: Path, secrets: tuple[bytes, ...]
+    root: Path,
+    public: Path,
+    original: Path,
+    provenance: Path,
+    secrets: tuple[bytes, ...],
 ) -> None:
     """Validate one actual safe derivative against its untouched private original.
 
+    :param root: Exact positively owned invocation root.
     :param public: Actual safe derivative ZIP.
     :param original: Untouched private browser chunk.
     :param provenance: Actual matching JSON provenance.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import sys
+from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,7 @@ from tests.support.experts_data import CEDAR_PASSWORD, CedarDataset
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "scripts/experts-staging"))
 import suite_readonly as fixture
+from suite_mail import preview_record
 
 
 def _login(client: Client) -> dict[str, Any]:
@@ -117,4 +119,57 @@ def test_assert_readonly_rows_with_unrelated_delta_or_unbound_login_rejects(
     with pytest.raises(AssertionError):
         fixture.assert_readonly_rows(
             case, before, fixture.domain_rows(), observed, fixture.now()
+        )
+
+
+def test_preview_record_with_contradictory_accepted_substring_subject_rejects(
+    tmp_path: Path,
+) -> None:
+    message = EmailMessage()
+    message["To"] = "maria.rodriguez@example.com"
+    message["Subject"] = "NOT Accepted — PRIVATE_SUBJECT_SENTINEL"
+    message.set_content(
+        'ADD Activity "Screen Reader Error Recovery"\nDecision: ACCEPT\nis now v3.0'
+    )
+    target = tmp_path / "actual-parser-control.eml"
+    target.write_bytes(message.as_bytes())
+    with pytest.raises(AssertionError):
+        preview_record(
+            target.read_bytes(),
+            "maria.rodriguez@example.com",
+            "Screen Reader Error Recovery",
+        )
+
+
+@pytest.mark.parametrize("duplicate", [False, True])
+def test_preview_record_with_exact_real_product_subject_or_duplicate_header(
+    tmp_path: Path, duplicate: bool
+) -> None:
+    message = EmailMessage()
+    message["To"] = "maria.rodriguez@example.com"
+    message["Subject"] = 'Your PIP "Screen Reader Error Recovery" — Accepted ✓'
+    message.set_content(
+        'ADD Activity "Screen Reader Error Recovery"\nDecision: ACCEPT\nis now v3.0'
+    )
+    raw = message.as_bytes()
+    if duplicate:
+        raw = b"Subject: PRIVATE_DUPLICATE_SUBJECT\n" + raw
+    target = tmp_path / "subject-control.eml"
+    target.write_bytes(raw)
+    if duplicate:
+        with pytest.raises(AssertionError):
+            preview_record(
+                target.read_bytes(),
+                "maria.rodriguez@example.com",
+                "Screen Reader Error Recovery",
+            )
+    else:
+        result = preview_record(
+            target.read_bytes(),
+            "maria.rodriguez@example.com",
+            "Screen Reader Error Recovery",
+        )
+        assert (
+            result["subject"] == str(message["Subject"])
+            and result["derivative"] is True
         )

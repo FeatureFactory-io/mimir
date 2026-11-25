@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import sys
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -12,9 +14,11 @@ import pytest
 
 _ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT / "scripts/experts-staging"))
+import controller
 import suite_contract as suite
 import suite_export as export
 from saga_trace import redact_trace
+from suite_archive import verify_case_archive
 
 
 def test_suite_cases_with_full_has_eleven_distinct_phases_and_final_true_nomination() -> (
@@ -227,3 +231,193 @@ def test_allowed_name_with_actual_native_video_spelling_is_closed(
     name: str, allowed: bool
 ) -> None:
     assert export.allowed_name(Path(name)) is allowed
+
+
+def _archive_manifest() -> dict[str, str]:
+    """Construct synthetic safe archive identity controls, never browser evidence.
+
+    :return: Closed nonce/source/image/build/control facts.
+    """
+    return {
+        "source_revision": "a" * 40,
+        "build_run_id": "123",
+        "web_image": "web@sha256:" + "b" * 64,
+        "browser_image": "browser@sha256:" + "c" * 64,
+        "fixture_sha256": "d" * 64,
+        "nonce": "e" * 32,
+        "suite_phase": "core",
+        "saga_case": "core",
+        "control_revision": "f" * 40,
+    }
+
+
+def _write_core_archive(
+    path: Path, manifest: dict[str, str], changed: str | None = None
+) -> None:
+    """Write real tar bytes for a deliberately synthetic validator-only control.
+
+    :param path: Exclusive owned test file.
+    :param manifest: Baseline authentication facts.
+    :param changed: One identity field changed only inside the downloaded artifact.
+    :return: None after complete actual test archive creation.
+    """
+    identity = dict(manifest)
+    if changed:
+        identity[changed] = "0" * len(identity[changed])
+    records = {
+        "source-identity.json": identity,
+        "browser-readiness.json": {"status": "SMOKE_ONLY_UAT_PENDING"},
+        "post-browser-state.json": {"scope_rechecked": True},
+    }
+    with tarfile.open(path, "w:gz") as archive:
+        for name, record in records.items():
+            record.update(derivative=True, original_sha256="9" * 64)
+            data = json.dumps(record).encode()
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+        for name in (
+            "video/" + "a" * 32 + ".webm",
+            "screenshots/guest-native-clipboard.png",
+        ):
+            data = b"synthetic-validator-only-control"
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+
+
+@pytest.mark.parametrize("field", ["browser_image", "fixture_sha256", "build_run_id"])
+def test_verify_case_archive_with_cross_bound_identity_mismatch_rejects(
+    tmp_path: Path, field: str
+) -> None:
+    manifest = _archive_manifest()
+    target = tmp_path / "actual.tar.gz"
+    _write_core_archive(target, manifest, field)
+    with pytest.raises(ValueError):
+        verify_case_archive(target, manifest)
+
+
+def test_verify_case_archive_with_complete_matching_identity_accepts_control(
+    tmp_path: Path,
+) -> None:
+    manifest = _archive_manifest()
+    target = tmp_path / "clean.tar.gz"
+    _write_core_archive(target, manifest)
+    verify_case_archive(target, manifest)
+
+
+def test_verified_current_download_with_stale_old_nonce_stamp_and_no_archive_preserves_private(
+    tmp_path: Path,
+) -> None:
+    manifest = _archive_manifest()
+    stamp = {"nonce": "0" * 32, "sha256": "a" * 64, "safe_archive_verified": True}
+    (tmp_path / "verified-safe-download.json").write_text(json.dumps(stamp))
+    assert controller.verified_current_download(tmp_path, manifest) is False
+
+
+def _current_download_files(output: Path, manifest: dict[str, str]) -> None:
+    """Write a current fully bound synthetic safe-download filesystem control.
+
+    :param output: Exclusive owned control directory.
+    :param manifest: Exact current synthetic identity.
+    :return: None after actual archive, command, object and stamp files exist.
+    """
+    target = output / "idle-browser-evidence.tar.gz"
+    _write_core_archive(target, manifest)
+    digest = hashlib.sha256(target.read_bytes()).hexdigest()
+    command = "12345678-1234-4234-8234-123456789abc"
+    stamp = {
+        "nonce": manifest["nonce"],
+        "sha256": digest,
+        "safe_archive_verified": True,
+        "command_id": command,
+    }
+    receipt = {
+        "evidence_key": f"experts-uat/{manifest['nonce']}/evidence.tar.gz",
+        "sha256": digest,
+        "bytes": target.stat().st_size,
+    }
+    ssm = {
+        "nonce": manifest["nonce"],
+        "CommandId": command,
+        "Status": "Success",
+        "ResponseCode": 0,
+    }
+    for name, record in (
+        ("verified-safe-download.json", stamp),
+        ("artifact-receipt.json", receipt),
+        ("ssm-receipt.json", ssm),
+    ):
+        (output / name).write_text(json.dumps(record))
+
+
+def test_verified_current_download_with_current_command_object_and_bytes_accepts(
+    tmp_path: Path,
+) -> None:
+    manifest = _archive_manifest()
+    _current_download_files(tmp_path, manifest)
+    assert controller.verified_current_download(tmp_path, manifest) is True
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "old_nonce",
+        "old_command",
+        "wrong_object",
+        "receipt_hash",
+        "archive_bytes",
+        "missing_archive",
+        "missing_ssm",
+        "linked_stamp",
+    ],
+)
+def test_verified_current_download_with_stale_or_mismatched_transfer_preserves_private(
+    tmp_path: Path, tamper: str
+) -> None:
+    manifest = _archive_manifest()
+    _current_download_files(tmp_path, manifest)
+    if tamper in {"old_nonce", "old_command"}:
+        path = tmp_path / "verified-safe-download.json"
+        record = json.loads(path.read_text())
+        record["nonce" if tamper == "old_nonce" else "command_id"] = "0" * 32
+        path.write_text(json.dumps(record))
+    elif tamper in {"wrong_object", "receipt_hash"}:
+        path = tmp_path / "artifact-receipt.json"
+        record = json.loads(path.read_text())
+        record["evidence_key" if tamper == "wrong_object" else "sha256"] = "0" * 64
+        path.write_text(json.dumps(record))
+    elif tamper == "archive_bytes":
+        with (tmp_path / "idle-browser-evidence.tar.gz").open("ab") as stream:
+            stream.write(b"changed")
+    elif tamper == "missing_archive":
+        (tmp_path / "idle-browser-evidence.tar.gz").unlink()
+    elif tamper == "missing_ssm":
+        (tmp_path / "ssm-receipt.json").unlink()
+    else:
+        path = tmp_path / "verified-safe-download.json"
+        path.rename(tmp_path / "outside.json")
+        path.symlink_to(tmp_path / "outside.json")
+    assert controller.verified_current_download(tmp_path, manifest) is False
+
+
+@pytest.mark.parametrize("kind", ["symlink", "hardlink"])
+def test_prepare_public_with_linked_core_trace_rejects_before_touching_original(
+    tmp_path: Path, kind: str
+) -> None:
+    root = tmp_path / "owned"
+    output = root / "output"
+    output.mkdir(parents=True, mode=0o700)
+    outside = tmp_path / "outside.zip"
+    with zipfile.ZipFile(outside, "w") as archive:
+        archive.writestr("trace.trace", "PRIVATE_OUTSIDE_TRACE_SENTINEL")
+    original = outside.read_bytes()
+    target = output / "browser-trace.zip"
+    if kind == "symlink":
+        target.symlink_to(outside)
+    else:
+        target.hardlink_to(outside)
+    with pytest.raises(ValueError):
+        export.prepare_public(root, {})
+    assert outside.read_bytes() == original
+    assert target.is_symlink() if kind == "symlink" else target.stat().st_nlink == 2
