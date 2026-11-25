@@ -558,7 +558,7 @@ def test_capacity_with_real_low_memory_fixture_retains_numeric_observation_befor
 ) -> None:
     """Real fixture-file OS boundary model; no actual host or Docker query."""
     memory = tmp_path / "model-meminfo"
-    memory.write_text(f"MemAvailable: {1216*1024-1} kB\n")
+    memory.write_text(f"MemAvailable: {1216 * 1024 - 1} kB\n")
     real_path = Path
     monkeypatch.setattr(
         resource_runtime,
