@@ -238,12 +238,28 @@ def _lane_records(case: str, records: dict[str, Any], manifest: dict[str, Any]) 
         )
     _received_semantics(prefix, effects, browser)
     _browser_facts(case, browser, records, manifest)
-    if (
-        case == "summary-acceptance"
-        and records.get("saga-summary-mail-preview.json", {}).get("evidence_kind")
-        != "actual_file_mail_preview"
+    if case == "summary-acceptance":
+        _summary_mail_facts(records)
+
+
+def _summary_mail_facts(records: dict[str, Any]) -> None:
+    """Revalidate the actual downloaded closed file-mail derivative content.
+
+    :param records: Actual received public reports.
+    :return: None after exact fixture recipient/subject/body/version and hash agree.
+    :raises ValueError: A label substitutes for genuine checked companion mail facts.
+    """
+    record = records.get("saga-summary-mail-preview.json", {})
+    if record.get("evidence_kind") != "actual_file_mail_preview" or not re.fullmatch(
+        r"[a-f0-9]{64}", str(record.get("original_message_sha256", ""))
     ):
         raise ValueError("Actual verified file-mail preview required.")
+    try:
+        public_receipt(
+            "saga-summary-mail-preview.json", record, json.dumps(record).encode()
+        )
+    except (AssertionError, KeyError, TypeError) as error:
+        raise ValueError("Received actual file-mail facts differ.") from error
 
 
 def _received_semantics(
@@ -281,6 +297,9 @@ def _browser_facts(
     """
     if browser.get("fixture_sha256") != manifest.get("fixture_sha256"):
         raise ValueError("Actual browser fixture proof differs.")
+    for field in ("source_revision", "application_source_revision"):
+        if field in browser and browser[field] != manifest["source_revision"]:
+            raise ValueError("Actual browser source revision differs from invocation.")
     if case == "summary-acceptance":
         if (
             browser.get("completed_steps") != ["C01", "C02", "C03", "C04", "C05"]
