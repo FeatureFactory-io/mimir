@@ -1684,3 +1684,41 @@ Canonical storyboard/localHTML/progress now match85 with599blocks preserved.
 The first21scenes and conditional ending assets retain their previous verified
 status. Full actual staged UAT and finalfilm remain unfinished; no production
 DB access/copy, normal EB deployment, main merge, release or promotion occurs.
+
+
+### Reviewed960 profile dispatched — 25 November 2026
+
+Runtime1230daf plus single test-expression spacing successor
+`f8791f0ca8f9768ffa7736f02b71c4ccabc37021` replaces the experimental1024profile
+with exact measured960source/proof. Ordinary1400MiB/default launcher and Docker
+vectors remain unchanged. Final serial gates pass593checks in EACH installed
+environment with zero exclusions. Two earlier parallel final-source repeats
+preserve592passes plus one5second local exec-fixture timeout each; owned snapshots
+show the same PID reaching its after-record at approximately6seconds. A serial
+component retry passes3controls, then both full serial593gates pass with no code
+or deadline change. Cause of the parallel scheduling delay is unproven.
+Author final report SHA256:
+`c09d9a11d6bda876c492672bb0983ef333b684cc0415a317b823262918e59b69`.
+Fresh exact-source independent review passes88hostPython3.9controls, all405
+protected source files, genuine40default/42aggregate bundles and identical fixed
+proof copies across all eleven phase directories. Old/mixed proofs and unknown
+selectors reject. Independent report SHA256:
+`63dd861f8c1ee297e34cfe93e3a6b0b0c9d01bf8e5251b6cabb58560b8a4ff4e`.
+
+Root pushed exactf879 and dispatched full stagingCI45557882849/job139014255729,
+using candidate04c9432/build45516980492, aggregate960, all normal flagsfalse.
+Actual Linux CI runner contracts, fixed proof, candidate source/build and image
+checks pass. All five normal jobs are SKIPPED. Owned host execution is in
+progress; actual per-case verdicts, all20UATobservations, visual/product judgment
+and final film remain pending. Prior actual failures and unwaived global lint/
+Analytics findings remain retained. No release or production activity is added.
+
+Storyboard/Page/localHTML/progress match87 and retain599blocks. Scene22 now
+explicitly differentiates scripted browser actions from independent agent visual
+review. New narration preserves the same approved Aiden/pinned OSS model; a
+separate pronunciation input spells U-A-T without changing canonical content.
+The previous source-introduction voice is superseded pending the new clip QA.
+The final edit must use actual staged evidence and automated elapsed time,
+separately from editorial reading holds; no human usability-study claim follows.
+Native editable guest DO/SEE and shared-design source frames are readable and
+verified reference inputs only. They supply no staged product/visual verdict.

@@ -9992,7 +9992,7 @@ iteration_convergence_followups:
     - tests/unit/test_karma_sqlite_lifecycle.py
     preserves: Production behavior unchanged; restore the actual async worker wrapper and current schema leaves after owned test lifetimes.
   isolated_idle_runner:
-    status: smaller_measured_profile_preparation_staging_not_accepted
+    status: measured960_full_suite_in_progress_staging_not_accepted
     footprint:
     - .github/workflows/build-and-deploy.yml
     - scripts/experts-staging/
@@ -10008,13 +10008,15 @@ iteration_convergence_followups:
     - Deployment held until complete gates and independent review; main merge, release and promotion retain human review.
     local_full_suite_source: 9acf7fc34918da549e19bd8c8698a431cce9c380
     local_capture_preparation: Six fresh local cases; 180 original PNGs and six native videos. Independent final capture review remains separate from staging acceptance.
-    reviewed_controller: 417c006d2893f0d8b957000741481442a8585c6c
-    reviewed_controller_checks_each_environment: 587
+    reviewed_controller: f8791f0ca8f9768ffa7736f02b71c4ccabc37021
+    reviewed_controller_checks_each_environment: 593
     original_full_staging_run: 45550540519
     original_full_staging_result: All eleven failed before browser; owned runtime resources removed and private failure records retained.
     original_startup_readonly_run: 45552826357
     actual_full_staging_retry: 45554226298
     actual_full_staging_result: All eleven failed at initial memory guard; no browser work; complete owned runtime cleanup; product and visual acceptance not assessed.
+    actual_measured960_full_run: 45557882849
+    actual_measured960_full_result: In progress after actual CI contract/source/proof/image gates passed; all normal jobs skipped; staging and UAT remain unaccepted.
     resource_profile:
       explicit_trial: aggregate960
       default_initial_guard_mib: 1400
