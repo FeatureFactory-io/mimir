@@ -692,6 +692,10 @@ def test_default_launcher_with_old_profile_keeps_original_subprocess_vector(
     ]
 
 
+# A local real exec took 7.58s; these fixtures prove identity and signal invariants,
+# not startup speed. Production supervision deadlines remain unchanged.
+_LOCAL_EXEC_WAIT_SECONDS = 15
+
 _LOCAL_EXEC_IDENTITY = """import hashlib,json,os,signal,sys,time
 from pathlib import Path
 root=Path(__file__).resolve().parent
@@ -788,7 +792,7 @@ def test_aggregate_exec_with_real_local_process_retains_pid_identity_and_exit_st
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    stdout, stderr = process.communicate(timeout=5)
+    stdout, stderr = process.communicate(timeout=_LOCAL_EXEC_WAIT_SECONDS)
     assert process.returncode == exit_code and stdout == stderr == b""
     before = json.loads((wrapper.parent / "before.json").read_text())
     after = json.loads((wrapper.parent / "after.json").read_text())
@@ -798,7 +802,7 @@ def test_aggregate_exec_with_real_local_process_retains_pid_identity_and_exit_st
 
 def _ready_exec_snapshot(path: Path) -> dict:
     """Read a completed real snapshot before delivering the bounded test signal."""
-    deadline = time.monotonic() + 5
+    deadline = time.monotonic() + _LOCAL_EXEC_WAIT_SECONDS
     while time.monotonic() < deadline:
         try:
             return json.loads(path.read_text())
@@ -826,14 +830,14 @@ def test_aggregate_exec_with_real_local_sigterm_reaches_same_supervised_pid(
     try:
         after = _ready_exec_snapshot(wrapper.parent / "after.json")
         process.send_signal(signal.SIGTERM)
-        stdout, stderr = process.communicate(timeout=5)
+        stdout, stderr = process.communicate(timeout=_LOCAL_EXEC_WAIT_SECONDS)
         assert process.returncode == 74 and stdout == stderr == b""
         before = json.loads((wrapper.parent / "before.json").read_text())
         _assert_exec_identity(before, after, process.pid)
     finally:
         if process.poll() is None:
             process.kill()
-            process.wait(timeout=5)
+            process.wait(timeout=_LOCAL_EXEC_WAIT_SECONDS)
 
 
 @pytest.mark.parametrize("choice", [None, True, "aggregate512", {"floor": 1}])
