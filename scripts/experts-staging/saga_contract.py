@@ -42,6 +42,8 @@ class LoginInterval(NamedTuple):
     started_at: datetime
     completed_at: datetime
     session_key_sha256: str
+    verified_at: datetime
+    session_age_seconds: int
 
 
 def utc_timestamp(value: object) -> datetime:
@@ -61,7 +63,11 @@ def utc_timestamp(value: object) -> datetime:
 
 
 def validate_login_observation(
-    case: str, observed: dict[str, Any] | None, prepared_at: str, verified_at: str
+    case: str,
+    observed: dict[str, Any] | None,
+    prepared_at: str,
+    verified_at: str,
+    session_age_seconds: int = NORMAL_LOGIN_EXPIRY_SECONDS,
 ) -> LoginInterval | None:
     """Bind one actual actor login interval inside the private case observation window.
 
@@ -69,26 +75,35 @@ def validate_login_observation(
     :param observed: Actual safe native POST/302 metadata, or None for anonymous.
     :param prepared_at: Private baseline completion timestamp.
     :param verified_at: Actual companion verification timestamp.
+    :param session_age_seconds: Actual configured age, consistent with normal login.
     :return: Precise immutable login bounds; None only for the anonymous lane.
     :raises AssertionError: Actor, request, UTC bounds or session identity differ.
     """
     actor = ACTORS[validate_case(case)]
+    assert (
+        type(session_age_seconds) is int
+        and session_age_seconds == NORMAL_LOGIN_EXPIRY_SECONDS
+    )
     window = (utc_timestamp(prepared_at), utc_timestamp(verified_at))
     assert 0 <= (window[1] - window[0]).total_seconds() <= _MAX_CASE_SECONDS
     if actor is None:
         assert observed is None, "Anonymous case cannot acquire login exceptions."
         return None
-    return checked_login_interval(actor, observed, window)
+    return checked_login_interval(actor, observed, window, session_age_seconds)
 
 
 def checked_login_interval(
-    actor: str, observed: dict[str, Any] | None, window: tuple[datetime, datetime]
+    actor: str,
+    observed: dict[str, Any] | None,
+    window: tuple[datetime, datetime],
+    session_age_seconds: int,
 ) -> LoginInterval:
     """Validate exact native request metadata without enlarging its time interval.
 
     :param actor: Exact case actor.
     :param observed: Actual safe POST/302 response observation.
     :param window: Private baseline and verification UTC bounds.
+    :param session_age_seconds: Actual configured normal-login session age.
     :return: Exact observed interval and safe session identity digest.
     :raises AssertionError: Shape, request, actor, timestamp or digest differs.
     """
@@ -102,7 +117,7 @@ def checked_login_interval(
     assert (end - start).total_seconds() <= _MAX_LOGIN_SECONDS
     digest = observed["session_key_sha256"]
     assert isinstance(digest, str) and re.fullmatch(r"[a-f0-9]{64}", digest)
-    return LoginInterval(actor, start, end, digest)
+    return LoginInterval(actor, start, end, digest, window[1], session_age_seconds)
 
 
 def validate_case(case: str) -> str:
@@ -374,7 +389,7 @@ def assert_session_rows(
     row = after[key]
     assert row["pk"] == key and row["model"] == "sessions.session"
     assert row["fields"].keys() == {"session_data", "expire_date"}
-    created = utc_timestamp(row["fields"]["expire_date"]) - timedelta(
-        seconds=NORMAL_LOGIN_EXPIRY_SECONDS
+    refreshed = utc_timestamp(row["fields"]["expire_date"]) - timedelta(
+        seconds=login.session_age_seconds
     )
-    assert login.started_at <= created <= login.completed_at
+    assert login.started_at <= refreshed <= login.verified_at

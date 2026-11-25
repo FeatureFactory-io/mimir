@@ -28,7 +28,6 @@ from methodology.services.experts_service import ExpertsService
 from bootstrap import scope, state, write_private
 from saga_contract import (
     ACTORS,
-    NORMAL_LOGIN_EXPIRY_SECONDS,
     LoginInterval,
     assert_row_delta,
     validate_case,
@@ -233,6 +232,7 @@ def verify_case_state(
         observed.get("login_observation"),
         baseline["prepared_at"],
         datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+        settings.SESSION_COOKIE_AGE,
     )
     additions = assert_row_delta(case, baseline["rows"], domain_rows(), login)
     verify_actual_session(login)
@@ -252,6 +252,7 @@ def verify_actual_session(login: LoginInterval | None) -> None:
     """
     if login is None:
         return
+    assert settings.SESSION_SAVE_EVERY_REQUEST is True
     matches = [
         row
         for row in Session.objects.all()
@@ -268,7 +269,7 @@ def verify_actual_session(login: LoginInterval | None) -> None:
     assert actual["_auth_user_hash"] == user.get_session_auth_hash()
     assert (
         type(actual["_session_expiry"]) is int
-        and actual["_session_expiry"] == NORMAL_LOGIN_EXPIRY_SECONDS
+        and actual["_session_expiry"] == login.session_age_seconds
     )
 
 

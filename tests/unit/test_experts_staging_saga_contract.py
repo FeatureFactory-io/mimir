@@ -451,6 +451,8 @@ def _interval(actor: str = "esvensson") -> contract.LoginInterval:
         datetime.fromisoformat(_STARTED),
         datetime.fromisoformat(_COMPLETED),
         hashlib.sha256(("s" * 32).encode()).hexdigest(),
+        datetime.fromisoformat(_VERIFIED),
+        contract.NORMAL_LOGIN_EXPIRY_SECONDS,
     )
 
 
@@ -632,6 +634,38 @@ def test_assert_session_rows_with_exact_cookie_and_normal_bounded_expiry_passes(
     """
     old = {"old": {"unchanged": True}}
     contract.assert_session_rows(old, {**old, "s" * 32: _session()}, _interval())
+
+
+def test_assert_session_rows_with_source_supported_get_refresh_passes() -> None:
+    """SESSION_SAVE_EVERY_REQUEST may refresh only the observed new session expiry.
+
+    :return: None when the real configured-age reference lies inside the case window.
+    """
+    login = _interval()
+    refreshed = login.completed_at + timedelta(seconds=1)
+    row = _session()
+    row["fields"]["expire_date"] = (
+        refreshed + timedelta(seconds=login.session_age_seconds)
+    ).isoformat(timespec="microseconds")
+    contract.assert_session_rows({}, {"s" * 32: row}, login)
+
+
+@pytest.mark.parametrize("offset", [-1, 1])
+def test_assert_session_rows_with_refresh_outside_actual_case_window_rejects(
+    offset: int,
+) -> None:
+    """Even one microsecond beyond the supported refresh window remains invalid.
+
+    :param offset: Before login or after actual private verification time.
+    :return: None after the precise source-supported expiry check rejects it.
+    """
+    login, row = _interval(), _session()
+    reference = login.started_at if offset < 0 else login.verified_at
+    row["fields"]["expire_date"] = (
+        reference + timedelta(seconds=login.session_age_seconds, microseconds=offset)
+    ).isoformat(timespec="microseconds")
+    with pytest.raises(AssertionError):
+        contract.assert_session_rows({}, {"s" * 32: row}, login)
 
 
 @pytest.mark.parametrize(
