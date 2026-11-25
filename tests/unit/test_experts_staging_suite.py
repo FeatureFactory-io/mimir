@@ -589,3 +589,71 @@ def test_quarantine_blank_with_actual_original_retains_bytes_and_hash(
 )
 def test_allowed_name_with_required_actual_native_uat_pair_is_closed(name: str) -> None:
     assert export.allowed_name(Path(name)) is True
+
+
+@pytest.mark.parametrize("kind", ["hardlinked_receipt", "aliased_private_folder"])
+def test_quarantine_blank_with_borrowed_topology_leaves_outside_and_original_untouched(
+    tmp_path: Path, kind: str
+) -> None:
+    output = tmp_path / "output"
+    (output / "private").mkdir(parents=True, mode=0o700)
+    (output / "screenshots").mkdir()
+    source = output / "screenshots/source.png"
+    raw = _png_control(bytes((245, 247, 250)))
+    source.write_bytes(raw)
+    outside = tmp_path / "outside.json"
+    original_record = json.dumps(
+        {
+            "case": "summary-acceptance",
+            "rejected_captures": 0,
+            "rejected_capture_sha256": [],
+            "blank_originals_private": True,
+        }
+    ).encode()
+    outside.write_bytes(original_record)
+    if kind == "hardlinked_receipt":
+        (output / "capture-rejections.json").hardlink_to(outside)
+    else:
+        directory = tmp_path / "outside-folder"
+        directory.mkdir()
+        (output / "private/rejected-captures").symlink_to(
+            directory, target_is_directory=True
+        )
+    with pytest.raises(ValueError):
+        capture_control.quarantine_blank(output, source, "summary-acceptance")
+    assert source.read_bytes() == raw and outside.read_bytes() == original_record
+    if kind == "aliased_private_folder":
+        assert not list(directory.iterdir())
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("unknown_private", "PRIVATE_BYTES"),
+        ("case", "copy-maria"),
+        ("rejected_captures", True),
+        ("rejected_capture_sha256", ["PRIVATE_BYTES"]),
+    ],
+)
+def test_quarantine_blank_with_unreviewed_existing_receipt_rejects_before_move(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    output = tmp_path / "output"
+    (output / "private").mkdir(parents=True, mode=0o700)
+    (output / "screenshots").mkdir()
+    original = output / "screenshots/source.png"
+    raw = _png_control(bytes((245, 247, 250)))
+    original.write_bytes(raw)
+    record = {
+        "case": "summary-acceptance",
+        "rejected_captures": 0,
+        "rejected_capture_sha256": [],
+        "blank_originals_private": True,
+    }
+    record[field] = value
+    receipt = output / "capture-rejections.json"
+    before = json.dumps(record).encode()
+    receipt.write_bytes(before)
+    with pytest.raises(ValueError):
+        capture_control.quarantine_blank(output, original, "summary-acceptance")
+    assert original.read_bytes() == raw and receipt.read_bytes() == before
