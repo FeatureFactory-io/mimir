@@ -1437,3 +1437,64 @@ Full decode and decoded-audio finite/unclipped checks pass; all three decoded
 shots are individually inspected. This interval must replace its matching whole
 Scene22 interval, not repeat it. Actual staged actions/verdict and full film
 remain unfinished. Canonical storyboard/local HTML/progress now match79.
+
+### 2026-11-25 — measured768 success, original512 failure and fresh host facts
+
+Fresh independent review accepted diagnostic803d287 preparation:270checks in
+both dependency environments and35Python3.9 boundary controls. Verification:
+`8738e7620de01c25ac304007196600e6c41a4d1ab01b2edd4f8522647e126023`.
+Actual disposable CI45539262653 then completed the genuine core/browser/DB
+workload with zero OOM at browser768MiB. Actual peaks: browser781,168,640bytes,
+web316,940,288bytes, PG87,752,704bytes. Its measurement isSUCCESS, but overall
+jobFAIL because both real videos violate the old basename grammar. Typed actual
+failure classification is NAME_PATTERN_MISMATCH, not a guessed link failure.
+Original artifact SHA256:
+`2d013efe94733ca30368df7cd1058daf91c507597b9af44c3ae502c01d67663b`.
+Neither this measurement nor a sum of separate role peaks proves idle fit.
+
+Separate preparation31bebba closes each actual page before the next stage and
+admits only the old32lowerhex or actualpage@32lowerhex WebM form. Parent fresh
+independent review passes290checks in each environment, nine actual host3.9
+capture contracts and five additional filename boundaries. A fresh real local
+Chromium component confirms one-page ownership, close-on-success/error, original
+error propagation, two finalized/fully decoded native videos and byte-identical
+safe export. Other function ASTs/globals and all captures/security/resource
+contracts are preserved. Verification SHA256:
+`3524bf61775d184ed151e878d1b5894e6be95cdcd43858b40528f3adaa67e332`.
+This component is not a candidate memory or staged UAT proof.
+
+Actual CI45540593226 on31bebba still failed512MiB, at the first1920full-document
+capture after the1280pair. Browser OOM2/kill1 and driver:false remain failures.
+Its exportSUCCESS now retains19hash-verified original members, including the
+immutable browser image's actualpage@41275e46bdbd5cc3b404ff3d4618a98c.webm.
+Owned resource cleanupSUCCESS/private_root_removed:true are verified. Original
+6.9MB ZIP SHA256:
+`e17dba1b5e87ce3891dd581b3585c9cd4615945ad1fb13bf095f566443e5f6e2`.
+Page ownership and filename corrections are valid; neither establishes512fit.
+
+Read-only CI45541277544/source892120f succeeded; all five other jobs skipped.
+The sole workflow change added Docker's driver/version metadata to its existing
+read-only command. Dynamic CNAME/tag ownership still selects actual idle
+i-0f9603f1b45a08879/mimir-idle/e-ibjztwrgbc. Its Docker25.0.14 uses systemd/cgroup2;
+actual available memory1,365,794,816bytes, swap0, disk3,227,956KiB, no running
+containers and the three exact immutable images cached. Original artifact:
+`2552854b9dbc41f2b88b13e424972efe0c914cabd5dba6a1a9f5e34a9d53834e`.
+A positively owned temporary aggregate limit is being designed, not adopted.
+Default1400MiB/384web/192PG/512browser safeguards remain unchanged. No host
+resize, global Docker/systemd/EB change, IAM change or normal DB operation occurs.
+
+Fresh exact-source static audit of candidate04c9432 checks all2,012tracked blobs
+before/after, with no source overlays. Actual MakeLint exits2, Ruff check1,
+format check1. All893diagnostics match the prior independently reviewed90cd314
+multiset by path/rule/message/multiplicity; no new classification or globalPASS
+is inferred from that equality. Verification SHA256:
+`91f1f81cb05b54d56de15bdf14256f99046a6f580ac8b600bab9f5f5ef737709`.
+
+Full-suite9402300 fixes independently found archive identity, stale disposal
+stamp, accepted-mail subject and linked raw-trace admission gaps. Independent
+synthetic controls found an additional case-effect readback gap, now under
+correction. New native guest viewport pairs and consistent duplicate-preview
+removal preserve explicit screenshots, videos, snapshots/sources and user actions.
+Actual local matrix/summary replays and fresh independent review remain active;
+no local proof is called staging. Canonical/local storyboard/progress match80.
+Full staged UAT and the completed20–30minute movie remain unfinished.
