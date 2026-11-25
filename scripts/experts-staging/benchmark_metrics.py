@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import json
+import os
 import re
 import traceback
 from pathlib import Path
@@ -50,7 +52,10 @@ _BROWSER_FUNCTIONS = {
     "run_readiness",
     "perform_readiness",
 }
+MAX_DIAGNOSTIC_BYTES = 16 * 1024
 _REASONS = {
+    "Browser diagnostic bytes are not canonical.": "BROWSER_DIAGNOSTIC_BYTES_REJECTED",
+    "Browser diagnostic bytes exceed the fixed bound.": "BROWSER_DIAGNOSTIC_SIZE_REJECTED",
     "Unknown evidence directory.": "EXPORT_DIRECTORY_REJECTED",
     "Unknown or linked evidence file.": "EXPORT_MEMBER_REJECTED",
     "Linked evidence cannot be exported.": "EXPORT_LINK_REJECTED",
@@ -380,3 +385,47 @@ def browser_ranges(source: Path) -> dict[str, tuple[int, int]]:
         and node.name in _BROWSER_FUNCTIONS
         and node.end_lineno is not None
     }
+
+
+def browser_diagnostic_bytes(record: dict[str, Any]) -> bytes:
+    """Serialize only the exact closed schema into one canonical byte representation.
+
+    :param record: Original safe observer failure projection.
+    :return: ASCII JSON with sorted keys, fixed separators and one final newline.
+    :raises ValueError: The original schema, class or source frame is invalid.
+    """
+    closed = validate_browser_failure(record)
+    text = json.dumps(closed, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    return (text + "\n").encode("ascii")
+
+
+def parse_browser_diagnostic(data: bytes) -> dict[str, Any]:
+    """Require exact canonical raw bytes, rejecting hidden or overwritten JSON data.
+
+    :param data: Original observer file bytes, never a parsed projection alone.
+    :return: Closed safe diagnostic only when every original byte is admitted.
+    :raises ValueError: Oversized, invalid, duplicated or noncanonical JSON bytes.
+    """
+    if type(data) is not bytes or not 0 < len(data) <= MAX_DIAGNOSTIC_BYTES:
+        raise ValueError("Browser diagnostic bytes exceed the fixed bound.")
+    closed = validate_browser_failure(json.loads(data))
+    if data != browser_diagnostic_bytes(closed):
+        raise ValueError("Browser diagnostic bytes are not canonical.")
+    return closed
+
+
+def write_browser_diagnostic(path: Path, record: dict[str, Any]) -> None:
+    """Write the actual observer's canonical bytes exclusively with private mode.
+
+    :param path: New exact observer receipt destination.
+    :param record: Closed failure record with no messages, args or locals.
+    :return: None after the same canonical bytes required by export are written.
+    :raises OSError: Existing destination or unsafe write.
+    :raises ValueError: Diagnostic is invalid before any bytes are written.
+    """
+    data = browser_diagnostic_bytes(record)
+    descriptor = os.open(
+        path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
+    )
+    with os.fdopen(descriptor, "wb") as stream:
+        stream.write(data)

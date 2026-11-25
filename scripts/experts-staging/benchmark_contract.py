@@ -11,6 +11,7 @@ from typing import Any
 
 import contract
 import remote
+from benchmark_metrics import MAX_DIAGNOSTIC_BYTES, parse_browser_diagnostic
 
 ACCOUNT = "411113550285"
 SOURCE = "04c9432bce7eac5ec34a090bc5e8ec4fa06f409d"
@@ -131,8 +132,12 @@ def safe_export(source: Path, destination: Path) -> list[dict[str, Any]]:
         raise ValueError("The host result cannot originate from a container.")
     if destination.resolve() != destination or not destination.is_dir():
         raise ValueError("An actual unlinked public destination is required.")
+    admitted = diagnostic_snapshots(files)
     return [
-        copy_public_file(path, destination, path.relative_to(source)) for path in files
+        copy_public_file(
+            path, destination, path.relative_to(source), admitted.get(path)
+        )
+        for path in files
     ]
 
 
@@ -252,18 +257,21 @@ def git_text(repository: Path, *arguments: str) -> str:
     return remote.command([*command, *arguments])
 
 
-def copy_public_file(path: Path, destination: Path, relative: Path) -> dict[str, Any]:
+def copy_public_file(
+    path: Path, destination: Path, relative: Path, admitted: bytes | None = None
+) -> dict[str, Any]:
     """Copy one prevalidated file exclusively, preserving exact original bytes.
 
     :param path: Prevalidated regular source.
     :param destination: Invocation-owned new public directory.
     :param relative: Exact allowlisted relative path.
+    :param admitted: Previously validated canonical snapshot for the diagnostic.
     :return: Public original-byte content hash and size.
     :raises OSError: Existing destination, alias or write failure.
     """
     target = destination / relative
     target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    data = path.read_bytes()
+    data = path.read_bytes() if admitted is None else admitted
     descriptor = os.open(
         target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
     )
@@ -339,3 +347,37 @@ def member_kind(mode: int) -> str:
     if stat.S_ISDIR(mode):
         return "directory"
     return "file" if stat.S_ISREG(mode) else "other"
+
+
+def diagnostic_snapshots(files: list[Path]) -> dict[Path, bytes]:
+    """Admit every diagnostic's raw canonical bytes before any mixed file copy.
+
+    :param files: Metadata-checked export file list.
+    :return: Immutable admitted original bytes for the one exact diagnostic name.
+    :raises ValueError: Any diagnostic's raw bytes are invalid; nothing is copied.
+    """
+    return {
+        path: validated_diagnostic_bytes(path)
+        for path in files
+        if path.name == "browser-diagnostic.json"
+    }
+
+
+def validated_diagnostic_bytes(path: Path) -> bytes:
+    """Read one bounded regular unlinked diagnostic and admit its exact raw bytes.
+
+    :param path: Exact actual observer receipt.
+    :return: Original canonical bytes, safe to snapshot and copy unchanged.
+    :raises ValueError: Any path, link, type, size, schema or raw byte is rejected.
+    :raises OSError: Safe regular-file read fails.
+    """
+    if not path.is_absolute() or path.resolve() != path or not path.is_file():
+        raise ValueError("An absolute unlinked actual input file is required.")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "rb") as stream:
+        metadata = os.fstat(stream.fileno())
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise ValueError("Input must be an unlinked bounded regular file.")
+        data = stream.read(MAX_DIAGNOSTIC_BYTES + 1)
+    parse_browser_diagnostic(data)
+    return data

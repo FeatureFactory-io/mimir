@@ -848,3 +848,186 @@ def test_export_public_with_actual_numeric_host_data_and_rejected_member_preserv
         saved
     ) and "SECRET_CONTENT" not in json.dumps(saved)
     assert {p.name for p in public.iterdir()} == {"benchmark-result.json"}
+
+
+def test_export_public_with_independently_rejected_diagnostic_blocks_all_mixed_files(
+    driver: ModuleType, tmp_path: Path
+) -> None:
+    root, public = tmp_path / "owned", tmp_path / "public"
+    (root / "output").mkdir(parents=True)
+    public.mkdir()
+    invalid = {
+        "status": "FAILED",
+        "exception_class": "AssertionError",
+        "source_frames": [],
+        "private_output_exported": False,
+        "private": "INDEPENDENT_PRIVATE_SENTINEL",
+    }
+    original = json.dumps(invalid).encode()
+    (root / "output/browser-diagnostic.json").write_bytes(original)
+    (root / "output/health.json").write_text('{"status":"healthy"}')
+    result = {"status": "FAILED", "observations": {"actual_numeric_control": 1024}}
+    result["browser_diagnostic"] = driver.read_browser_diagnostic(root)
+    assert result["browser_diagnostic"]["status"] == "REJECTED"
+    driver.export_public(root, public, result)
+    assert result["export"] == "FAILED"
+    assert not list(public.iterdir())
+    assert (root / "output/browser-diagnostic.json").read_bytes() == original
+    assert "INDEPENDENT_PRIVATE_SENTINEL" not in json.dumps(result)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b'{"status":"FAILED","exception_class":"PRIVATE_SENTINEL","exception_class":"AssertionError","source_frames":[],"private_output_exported":false}',
+        b'{"status":"FAILED","exception_class":"AssertionError","source_frames":"PRIVATE_SENTINEL","source_frames":[],"private_output_exported":false}',
+        b'{"status":"FAILED","exception_cl\\u0061ss":"AssertionError","source_frames":[],"private_output_exported":false}',
+        b'{"status":"FAILED","exception_class":"AssertionError","source_frames":[],"private_output_exported":false} PRIVATE_SENTINEL',
+        b'{"status":"FAILED","exception_class":"AssertionError","source_frames":[],"private_output_exported":false,"private":"\\u0050RIVATE_SENTINEL"}',
+    ],
+)
+def test_safe_export_with_hidden_or_noncanonical_diagnostic_rejects_before_copy(
+    controls: ModuleType, tmp_path: Path, raw: bytes
+) -> None:
+    source, public = tmp_path / "source", tmp_path / "public"
+    source.mkdir()
+    public.mkdir()
+    (source / "benchmark-source.json").write_text("{}")
+    (source / "health.json").write_text("{}")
+    (source / "browser-diagnostic.json").write_bytes(raw)
+    with pytest.raises((ValueError, UnicodeError)):
+        controls.safe_export(source, public)
+    assert not list(public.iterdir())
+    assert (source / "browser-diagnostic.json").read_bytes() == raw
+
+
+def test_safe_export_with_actual_observer_writer_bytes_copies_original_canonical_failure(
+    controls: ModuleType, metrics: ModuleType, driver: ModuleType, tmp_path: Path
+) -> None:
+    root, public = tmp_path / "owned", tmp_path / "public"
+    (root / "output").mkdir(parents=True)
+    public.mkdir()
+    try:
+        raise AssertionError("PRIVATE_ERROR_MESSAGE")
+    except AssertionError as error:
+        record = metrics.browser_failure(error, _RUNTIME / "browser.py")
+    path = root / "output/browser-diagnostic.json"
+    metrics.write_browser_diagnostic(path, record)
+    raw = path.read_bytes()
+    assert (
+        raw == metrics.browser_diagnostic_bytes(record)
+        and "PRIVATE_ERROR_MESSAGE" not in raw.decode()
+    )
+    assert driver.read_browser_diagnostic(root) == record
+    (root / "output/benchmark-source.json").write_text('{"source":"public-control"}')
+    result = {"status": "FAILED", "observations": {"numeric_control": 1024}}
+    driver.export_public(root, public, result)
+    assert result["export"] == "SUCCESS" and result["status"] == "FAILED"
+    assert (public / "browser-diagnostic.json").read_bytes() == raw
+    assert result["observations"] == {"numeric_control": 1024}
+    assert path.stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "class_bool",
+        "class_unknown",
+        "line_bool",
+        "line_outside_function",
+        "frame_extra",
+        "frames_21",
+        "root_extra",
+    ],
+)
+def test_safe_export_with_typed_schema_or_frame_violation_rejects_all_mixed_members(
+    controls: ModuleType, metrics: ModuleType, tmp_path: Path, mutation: str
+) -> None:
+    source, public = tmp_path / "source", tmp_path / "public"
+    source.mkdir()
+    public.mkdir()
+    record = _invalid_diagnostic(metrics, mutation)
+    (source / "browser-diagnostic.json").write_text(
+        json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
+    )
+    (source / "benchmark-source.json").write_text("{}")
+    with pytest.raises(ValueError):
+        controls.safe_export(source, public)
+    assert not list(public.iterdir())
+
+
+@pytest.mark.parametrize("variant", ["trailing_space", "bom", "utf16", "oversized"])
+def test_parse_browser_diagnostic_with_noncanonical_encoding_or_size_rejects(
+    metrics: ModuleType, variant: str
+) -> None:
+    record = {
+        "status": "FAILED",
+        "exception_class": "AssertionError",
+        "private_output_exported": False,
+        "source_frames": [],
+    }
+    raw = metrics.browser_diagnostic_bytes(record)
+    raw = {
+        "trailing_space": raw + b" ",
+        "bom": b"\xef\xbb\xbf" + raw,
+        "utf16": raw.decode().encode("utf-16"),
+        "oversized": raw + b" " * metrics.MAX_DIAGNOSTIC_BYTES,
+    }[variant]
+    with pytest.raises(ValueError):
+        metrics.parse_browser_diagnostic(raw)
+
+
+def test_diagnostic_snapshot_with_later_private_overwrite_copies_only_admitted_bytes(
+    controls: ModuleType, metrics: ModuleType, tmp_path: Path
+) -> None:
+    source, public = tmp_path / "source", tmp_path / "public"
+    source.mkdir()
+    public.mkdir()
+    path = source / "browser-diagnostic.json"
+    record = {
+        "status": "FAILED",
+        "exception_class": "AssertionError",
+        "private_output_exported": False,
+        "source_frames": [],
+    }
+    metrics.write_browser_diagnostic(path, record)
+    snapshot = controls.diagnostic_snapshots(controls.checked_export_files(source))[
+        path
+    ]
+    path.write_text('{"private":"PRIVATE_SENTINEL"}')
+    controls.copy_public_file(path, public, Path("browser-diagnostic.json"), snapshot)
+    assert (public / path.name).read_bytes() == snapshot
+    assert "PRIVATE_SENTINEL" not in (public / path.name).read_text()
+    next_public = tmp_path / "next-public"
+    next_public.mkdir()
+    with pytest.raises(ValueError):
+        controls.safe_export(source, next_public)
+    assert not list(next_public.iterdir())
+
+
+def _invalid_diagnostic(metrics: ModuleType, mutation: str) -> dict[str, Any]:
+    """Construct one schema/frame counterexample for pre-copy admission."""
+    record = {
+        "status": "FAILED",
+        "exception_class": "AssertionError",
+        "private_output_exported": False,
+        "source_frames": [
+            {
+                "function": "capture",
+                "line": metrics.browser_ranges(_RUNTIME / "browser.py")["capture"][0],
+            }
+        ],
+    }
+    if mutation.startswith("class"):
+        record["exception_class"] = (
+            True if mutation == "class_bool" else "PRIVATE_SENTINEL"
+        )
+    elif mutation == "frames_21":
+        record["source_frames"] *= 21
+    elif mutation == "root_extra":
+        record["private"] = "PRIVATE_SENTINEL"
+    elif mutation == "frame_extra":
+        record["source_frames"][0]["private"] = "PRIVATE_SENTINEL"
+    else:
+        record["source_frames"][0]["line"] = True if mutation == "line_bool" else 1
+    return record

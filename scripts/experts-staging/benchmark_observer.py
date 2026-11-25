@@ -7,7 +7,12 @@ import os
 from pathlib import Path
 
 import browser
-from benchmark_metrics import browser_failure, read_memory, require_headroom
+from benchmark_metrics import (
+    browser_failure,
+    read_memory,
+    require_headroom,
+    write_browser_diagnostic,
+)
 
 _LIMIT_BYTES = 512 * 1024 * 1024
 
@@ -47,20 +52,18 @@ def observe(driver_passed: bool) -> None:
     require_headroom(record)
 
 
-def write_diagnostic(error: Exception) -> None:
+def write_diagnostic(
+    error: Exception, destination: Path = Path("/output/browser-diagnostic.json")
+) -> None:
     """Retain only fixed exception class and reviewed browser source frames.
 
     :param error: Actual browser.main exception, never its message or arguments.
+    :param destination: Explicit owned test path or unchanged runtime receipt path.
     :return: None after one exclusive safe observer receipt exists.
     :raises OSError: Diagnostic cannot be recorded safely.
     """
     record = browser_failure(error, Path(browser.__file__))
-    path = Path("/output/browser-diagnostic.json")
-    descriptor = os.open(
-        path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
-    )
-    with os.fdopen(descriptor, "w") as stream:
-        json.dump(record, stream, indent=2)
+    write_browser_diagnostic(destination, record)
 
 
 if __name__ == "__main__":

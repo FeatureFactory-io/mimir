@@ -26,13 +26,14 @@ from benchmark_contract import (
     safe_export,
     validate_cache,
     validate_prepared,
+    validated_diagnostic_bytes,
 )
 from benchmark_metrics import (
     failure_reason,
     host_observations,
+    parse_browser_diagnostic,
     parse_memory,
     require_headroom,
-    validate_browser_failure,
 )
 
 _MIB = 1024 * 1024
@@ -570,7 +571,7 @@ def read_browser_diagnostic(root: Path) -> dict[str, Any]:
     if not path.exists() and not path.is_symlink():
         return {"status": "NOT_RECORDED"}
     try:
-        return validate_browser_failure(read_json(path))
+        return parse_browser_diagnostic(validated_diagnostic_bytes(path))
     except Exception as error:  # noqa: BLE001 - never expose diagnostic input text.
         return {
             "status": "REJECTED",
