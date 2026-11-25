@@ -1318,3 +1318,35 @@ Deck SHA256: `ac4f58c03e44c898ce7187b705bd796902460cac02260a997c08ef0241407af0`.
 Canonical storyboard and local HTML/progress now match sequence76. Actual staged
 UAT, remaining film scenes and final movie remain unfinished. No production DB
 read/copy, main merge, release or promotion occurred.
+
+### 2026-11-25 — independent account-oracle acceptance and benchmark preparation
+
+Exact9bcde8c has independent local-preparation NODE_PASS:272checks in each
+dependency environment, clean real-PG/privateHTTPS controls before and after
+all18rejected account/session mutations, all39models/auto-M2M tables,414public
+trace members scanned and343original images unchanged. Verification SHA256:
+`d2a5167e33ae638f637a47156740498b1e2f4e6a7270c9d72f13ba38d7ca00e8`.
+The login interval is the observed native action-start to actual POST302response
+envelope, not a transport-wire request-start timestamp. Staged acceptance remains
+separate; full UAT18-03 preparation is now a separate implementation node.
+
+The diagnostic Linux benchmark branch at1c8d57a contains only a manual branch-bound
+benchmark job, fixed candidate images, credential-free root workload invocation
+and reviewed runtime controls.193author gates plus four root workflow checks give
+197PASS in each dependency environment. Exactly two tests for the replaced NORMAL
+workflow shape are deselected; five benchmark-workflow safety checks cover its
+actual shape instead. The original unfiltered190PASS/2FAIL is retained, as is the
+root's new1FAIL/3PASS red before the workflow gate correction. No existing test
+was changed or marked skipped. Fresh independent benchmark review is active;
+there has been no full-candidate CI measurement, guard change or idle retry.
+
+The19-second Scene24 ranking lesson is ready as a standalone insert, not a full
+scene or film. All three decoded shots are inspected, full video/audio decode
+passes, decoded audio is finite/unclipped and Whisper's words match the intended
+approved Aiden excerpt. MP4 SHA256:
+`d8697cf1d33bacb6856c6c284291df43e13c892acde0a827552574f668699fa6`.
+The matching excerpt must replace, not duplicate, the full Scene24 narration.
+New Noor/Elena closing artwork is fictional framing only; its blank monitor awaits
+the verified case note. Canonical storyboard and local HTML/progress match77.
+All staged long/missing S04 variants and fresh final confirmation remain explicit
+in the suite integration handoff; no local screen is being relabelled as staging.
